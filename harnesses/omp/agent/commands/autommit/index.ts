@@ -901,12 +901,22 @@ const runAtomicityCritic = async (
     return decision;
 };
 
+/** Thrown when the user cancels autommit (SIGINT/SIGTERM). Aborts cleanly without publishing. */
+export class AutommitCancelledError extends Error {
+    override name = "AutommitCancelledError";
+}
+
+const throwIfCancelled = (signal?: AbortSignal): void => {
+    if (signal?.aborted) throw new AutommitCancelledError("Autommit cancelled by user.");
+};
+
 const runCommitAgent = async (
     api: CommandAPI,
     cwd: string,
     modelRegistry: ModelRegistry,
     options: CommitOptions,
     internals: CommitInternals,
+    signal?: AbortSignal,
 ) => {
     const settings = await api.pi.Settings.init({ cwd });
     await modelRegistry.refresh();
@@ -995,6 +1005,7 @@ const runCommitAgent = async (
     }
 
     const promptAgent = async (attempt: number): Promise<void> => {
+        throwIfCancelled(signal);
         if (proposalExists(state) || attempt >= MAX_RETRIES) return;
         emitTrace(isDebug, "agent_prompt", { attempt, hasProposal: Boolean(state.proposal), hasSplitProposal: Boolean(state.splitProposal) });
         try {
@@ -1009,10 +1020,25 @@ const runCommitAgent = async (
                 },
             );
         } catch (error) {
+            throwIfCancelled(signal);
             if (!proposalExists(state)) throw error;
         }
+        throwIfCancelled(signal);
         await promptAgent(attempt + 1);
     };
+    type SessionAbort = (options?: { goalReason?: string; reason?: string }) => Promise<unknown>;
+    const findSessionAbort = (target: unknown): SessionAbort | undefined => {
+        if (target && typeof target === "object" && "abort" in target && typeof target.abort === "function") {
+            // Inner session type is unavailable in command scope; shape-guarded above.
+            const abort: SessionAbort = target.abort as SessionAbort;
+            return abort;
+        }
+        return undefined;
+    };
+    const abortInnerSession = (): void => {
+        void findSessionAbort(session)?.({ goalReason: "interrupted", reason: "Autommit cancelled by user." }).catch(() => {});
+    };
+    signal?.addEventListener("abort", abortInnerSession, { once: true });
     try {
         await promptAgent(0);
         if (!state.proposal) return state;
@@ -1055,6 +1081,7 @@ const runCommitAgent = async (
                 synthetic: true,
             });
         } catch (error) {
+            throwIfCancelled(signal);
             if (!state.splitProposal) throw error;
         }
         if (!state.splitProposal || state.splitProposal.commits.length < 2) {
@@ -1064,8 +1091,8 @@ const runCommitAgent = async (
             throw new Error(message);
         }
         return state;
-
     } finally {
+        signal?.removeEventListener("abort", abortInnerSession);
         await session.dispose();
     }
 };
@@ -1275,6 +1302,7 @@ const applySplitProposal = async (
     commonDir: string,
     plan: SplitCommitPlan,
     internals: CommitInternals,
+    signal?: AbortSignal,
 ): Promise<AppliedCommitResult> => {
     const expected = await currentEvidence(api, cwd);
     const { order, stagedDiff, zeroDiff } = await validateSplitPlan(api, cwd, plan, internals);
@@ -1289,19 +1317,19 @@ const applySplitProposal = async (
         if (addWorktree.code !== 0) {
             throw new Error(addWorktree.stderr || `Unable to add worktree at ${worktree}`);
         }
-        added = true;
         for (const commitIndex of order) {
+            throwIfCancelled(signal);
             const commit = plan.commits[commitIndex];
             if (!commit) throw new Error(`Split plan references missing commit ${commitIndex}.`);
             await writeFile(patchPath, buildCommitPatch(commit.changes, stagedDiff, zeroDiff, internals), "utf8");
-            const applied = await api.exec("git", ["-c", "core.quotepath=false", "apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree });
+            const applied = await api.exec("git", ["-c", "core.quotepath=false", "apply", "--index", "--unidiff-zero", patchPath], { cwd: worktree, signal });
             if (applied.code !== 0) throw new Error(applied.stderr || "Unable to apply split commit patch.");
             const msgPath = join(patchDir, ".autommit.msg");
             await writeFile(msgPath, formatCommitMessage(commit.summary, commit.details), "utf8");
             const committed = await api.exec(
                 "git",
                 ["-c", "core.hooksPath=", "commit", "--no-verify", "-F", msgPath],
-                { cwd: worktree },
+                { cwd: worktree, signal },
             );
             if (committed.code !== 0) {
                 throw new Error(committed.stderr || "Unable to commit split patch in worktree.");
@@ -1390,6 +1418,7 @@ const applyState = async (
     commonDir: string,
     state: CommitAgentState,
     internals: CommitInternals,
+    signal?: AbortSignal,
 ): Promise<AppliedCommitResult> => {
     if (state.proposal && state.splitProposal) {
         throw new Error("Commit agent produced both single and split proposals; refusing to publish either.");
@@ -1410,9 +1439,9 @@ const applyState = async (
             }],
             warnings: proposal.warnings,
         };
-        return applySplitProposal(api, cwd, commonDir, plan, internals);
+        return applySplitProposal(api, cwd, commonDir, plan, internals, signal);
     }
-    if (state.splitProposal) return applySplitProposal(api, cwd, commonDir, state.splitProposal, internals);
+    if (state.splitProposal) return applySplitProposal(api, cwd, commonDir, state.splitProposal, internals, signal);
     throw new Error("Commit agent did not provide a valid proposal.");
 };
 
@@ -1433,6 +1462,12 @@ const factory: CustomCommandFactory = api => ({
 
         await ctx.waitForIdle();
         ctx.ui.setStatus("autommit", "Running direct local commit agent…");
+        const controller = new AbortController();
+        const onSignal = (): void => {
+            controller.abort();
+        };
+        process.once("SIGINT", onSignal);
+        process.once("SIGTERM", onSignal);
         try {
             const commonDirResult = await api.exec("git", ["rev-parse", "--git-common-dir"], { cwd: ctx.cwd });
             if (commonDirResult.code !== 0) {
@@ -1448,14 +1483,31 @@ const factory: CustomCommandFactory = api => ({
                     return recoverPreparedReceipt(api, ctx.cwd, commonDir, receipt);
                 }
                 const internals = await loadCommitInternals();
-                const state = await runCommitAgent(api, ctx.cwd, ctx.modelRegistry, parsed, internals);
-                return applyState(api, ctx.cwd, commonDir, state, internals);
+                const state = await runCommitAgent(api, ctx.cwd, ctx.modelRegistry, parsed, internals, controller.signal);
+                return applyState(api, ctx.cwd, commonDir, state, internals, controller.signal);
             });
+            if (controller.signal.aborted) {
+                report(ctx, { message: "Autommit cancelled; no commits were published.", type: "info" });
+                return;
+            }
             report(ctx, { message: result.messages.join("\n"), type: "info" });
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            if (error instanceof AutommitCancelledError || controller.signal.aborted) {
+                report(ctx, { message: "Autommit cancelled; no commits were published.", type: "info" });
+                return;
+            }
+            let message = error instanceof Error ? error.message : String(error);
+            if (message.includes("operation already in progress")) {
+                const commonDirResult = await api.exec("git", ["rev-parse", "--git-common-dir"], { cwd: ctx.cwd });
+                if (commonDirResult.code === 0) {
+                    const hint = await describeOperationLock(resolve(ctx.cwd, commonDirResult.stdout.trim()));
+                    if (hint) message = `${message} ${hint}`;
+                }
+            }
             report(ctx, { message: `Commit workflow failed: ${message}`, type: "error" });
         } finally {
+            process.removeListener("SIGINT", onSignal);
+            process.removeListener("SIGTERM", onSignal);
             ctx.ui.setStatus("autommit", undefined);
         }
     },
