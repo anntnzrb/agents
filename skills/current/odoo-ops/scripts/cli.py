@@ -3,6 +3,7 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "pytest>=8",
+#     "lxml>=5.0",
 # ]
 # ///
 """Public entrypoint and dispatcher for Odoo Ops."""
