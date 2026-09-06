@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
+import xml_view_linter
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
@@ -618,6 +620,11 @@ def _resolve_target_paths(
 ) -> list[Path]:
     """Resolve target module paths from single module name or profile workflow."""
     addons = _resolve_addons()
+    # 0. Direct file path check
+    direct_file = Path(target) if Path(target).is_absolute() else (addons / target)
+    if direct_file.is_file():
+        return [direct_file]
+
 
     # 1. Single module direct directory check
     mod_path = addons / target
@@ -1091,6 +1098,7 @@ def _build_test_cmd(
         f"--test-tags={tags_str}",
         "--stop-after-init",
         "--no-http",
+        "--http-port=0",
         "--log-level=test",
     ]
     if update_str:
@@ -1350,6 +1358,48 @@ def cmd_fmt(args: argparse.Namespace) -> int:
         cmd, check=False
     )
     return proc.returncode
+
+
+def cmd_lint_views(args: argparse.Namespace) -> int:
+    """Run AST and semantic linter on Odoo 17 XML views."""
+    ctx = _resolve_workspace()
+    target = _require_str(args, "target", "crm")
+    profile = _require_str(args, "profile", "etech")
+    strict = _require_bool(args, "strict")
+    json_mode = _require_bool(args, "json")
+    all_mode = _require_bool(args, "all")
+
+    linter = xml_view_linter.OdooXmlViewLinter(root_path=ctx.root)
+    violations: list[xml_view_linter.ViewViolation] = []
+
+    if all_mode:
+        mods = _discover_all_modules(ctx.root)
+        for mod_name in mods:
+            mod_dir = ctx.root / mod_name
+            if mod_dir.is_dir():
+                violations.extend(linter.lint_module(mod_dir))
+    else:
+        target_paths = _resolve_target_paths(target, profile, for_lint=True)
+        for p in target_paths:
+            if p.is_dir():
+                violations.extend(linter.lint_module(p))
+    if json_mode:
+        print(xml_view_linter.format_violations_json(violations))
+    else:
+        print(xml_view_linter.format_violations_human(violations))
+
+    has_critical = any(
+        v["severity"] == xml_view_linter.Severity.CRITICAL.value for v in violations
+    )
+    has_warning = any(
+        v["severity"] == xml_view_linter.Severity.WARNING.value for v in violations
+    )
+
+    if has_critical:
+        return 1
+    if strict and has_warning:
+        return 1
+    return 0
 
 
 def cmd_logs(args: argparse.Namespace) -> int:
@@ -1734,6 +1784,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--check", action="store_true", help="Check formatting without modifying files"
     )
 
+    # Lint Views Command
+    p_lint_views = subparsers.add_parser(
+        "lint-views",
+        parents=[parent_parser],
+        help="AST and semantic linter for Odoo 17 XML views",
+    )
+    _ = p_lint_views.add_argument(
+        "target",
+        default="crm",
+        nargs="?",
+        help="Module name or workflow profile key (default: crm)",
+    )
+    _ = p_lint_views.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings as errors (exit code 1 on warnings)",
+    )
+    _ = p_lint_views.add_argument(
+        "--all",
+        action="store_true",
+        help="Lint all discoverable custom addons in workspace",
+    )
+
     # Stop Command
     _ = subparsers.add_parser(
         "stop",
@@ -1830,6 +1903,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "test": cmd_test,
         "lint": cmd_lint,
         "fmt": cmd_fmt,
+        "lint-views": cmd_lint_views,
         "stop": cmd_stop,
         "logs": cmd_logs,
         "env": cmd_env_inspect,

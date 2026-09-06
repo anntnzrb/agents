@@ -15,7 +15,7 @@ Use the bundled CLI as the single entrypoint:
 uv run --script <skill-dir>/scripts/cli.py ...
 ```
 
-## The 4 Core Commands
+## The 5 Core Commands
 
 ### 1. Dev Runner (`dev`)
 Starts the local development stack directly in foreground with instant hot-reloading (`--dev=all`). (Press `Ctrl-C` to stop).
@@ -51,6 +51,14 @@ Runs Ruff formatter across workflow modules or single module.
 uv run --script <skill-dir>/scripts/cli.py fmt <workflow|module> [--check] [--pretty]
 ```
 
+
+### 5. XML View & AST Linter (`lint-views`)
+Runs the AST and semantic validator for Odoo 17 XML views and QWeb templates (checks deprecated `attrs`/`states`, `column_invisible` in list/tree views, brittle `@class` and positional XPaths, duplicate fields, accessible alert roles, and extensible group/page naming).
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py lint-views <workflow|module> [--strict] [--json]
+uv run --script <skill-dir>/scripts/cli.py lint-views --all [--strict]
+```
 ## Stack Control & Logs
 
 ```bash
