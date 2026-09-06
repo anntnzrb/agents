@@ -13,9 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 import odooctl
+import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
