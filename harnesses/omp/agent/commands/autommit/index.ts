@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -1448,6 +1448,34 @@ const applyState = async (
 const report = (ctx: { readonly hasUI: boolean; readonly ui: { notify(message: string, type?: "info" | "error"): void } }, notification: Notification): void => {
     if (ctx.hasUI) ctx.ui.notify(notification.message, notification.type);
     else process.stdout.write(`${notification.message}\n`);
+};
+
+/** Reads the autommit operation lock without acquiring it; used to explain lock contention. */
+export const describeOperationLock = async (commonDir: string): Promise<string | undefined> => {
+    let raw: string;
+    try {
+        raw = await readFile(join(commonDir, "autommit", "operation.lock"), "utf8");
+    } catch {
+        return undefined;
+    }
+    let pid: unknown;
+    try {
+        pid = (JSON.parse(raw) as { pid?: unknown }).pid;
+    } catch {
+        return `operation lock is unreadable at ${commonDir}/autommit/operation.lock; remove it if no autommit run is active.`;
+    }
+    if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
+        return `operation lock at ${commonDir}/autommit/operation.lock has no usable PID; remove it if no autommit run is active.`;
+    }
+    let alive = true;
+    try {
+        process.kill(pid, 0);
+    } catch {
+        alive = false;
+    }
+    return alive
+        ? `operation lock is held by live process ${pid}; wait for it or stop that run first.`
+        : `operation lock is stale (process ${pid} is not running); remove ${commonDir}/autommit/operation.lock to recover.`;
 };
 
 const factory: CustomCommandFactory = api => ({
