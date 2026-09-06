@@ -544,18 +544,19 @@ const execRepoSplit = async (
         };
     });
     for (const commit of commits) {
-        const seen = new Set<string>();
+        const seenByFile = new Map<string, HunkSelector[]>();
         for (const change of commit.changes) {
             const file = change.path;
             if (!stagedSet.has(file)) {
                 errors.push(`File not staged: ${file}`);
                 continue;
             }
-            if (seen.has(file)) {
-                errors.push(`File listed multiple times in commit ${commit.summary}: ${file}`);
+            const prior = seenByFile.get(file) ?? [];
+            if (prior.some(previous => selectionsOverlap(previous, change, parsedFiles.get(file)))) {
+                errors.push(`Overlapping hunk selections in commit ${commit.summary}: ${file}`);
                 continue;
             }
-            seen.add(file);
+            seenByFile.set(file, [...prior, change]);
         }
     }
     const plannedFiles = new Set(commits.flatMap(commit => commit.changes.map(change => change.path)));
@@ -668,8 +669,31 @@ const mkRepoSplitTool = (
 
 type HunkSelector = FileChange;
 
-const selectionsOverlap = (left: HunkSelector, right: HunkSelector): boolean => {
+const selectionsOverlap = (left: HunkSelector, right: HunkSelector, parsed?: FileHunks): boolean => {
     if (left.kind === "all" || right.kind === "all") return true;
+    if (parsed) {
+        const selectedHunksOf = (selector: HunkSelector): Set<number> => {
+            if (selector.kind === "indices") return new Set(selector.indices ?? []);
+            if (selector.kind === "lines") {
+                const start = selector.start ?? 0;
+                const end = selector.end ?? 0;
+                const indices = new Set<number>();
+                for (const hunk of parsed.hunks) {
+                    const hunkEnd = hunk.newLines === 0 ? hunk.newStart : hunk.newStart + hunk.newLines - 1;
+                    if (hunk.newStart <= end && start <= hunkEnd) {
+                        indices.add(hunk.index + 1);
+                    }
+                }
+                return indices;
+            }
+            return new Set();
+        };
+        const leftHunks = selectedHunksOf(left);
+        const rightHunks = selectedHunksOf(right);
+        if (leftHunks.size > 0 && rightHunks.size > 0) {
+            return [...leftHunks].some(index => rightHunks.has(index));
+        }
+    }
     if (left.kind === "indices" && right.kind === "indices") {
         const selected = new Set(left.indices ?? []);
         return (right.indices ?? []).some(index => selected.has(index));
@@ -711,7 +735,7 @@ const selectorIntersectsHunk = (
     return hunk.newStart <= end && start <= hunkEnd;
 };
 
-const validateHunkCoverage = (
+export const validateHunkCoverage = (
     stagedFiles: readonly string[],
     commits: readonly SplitCommitGroup[],
     parsedFiles: ReadonlyMap<string, FileHunks>,
@@ -727,22 +751,12 @@ const validateHunkCoverage = (
     }
 
     const errors: string[] = [];
-    const filesByCommit = new Map<string, number>();
-    for (let cIdx = 0; cIdx < commits.length; cIdx += 1) {
-        for (const change of commits[cIdx].changes) {
-            const prev = filesByCommit.get(change.path);
-            if (prev !== undefined && prev !== cIdx) {
-                errors.push(`File ${change.path} is split across multiple commits (commit ${prev + 1} and ${cIdx + 1}); all changes to a file must be grouped in the same commit.`);
-            }
-            filesByCommit.set(change.path, cIdx);
-        }
-    }
     for (const [file, selections] of selectionsByFile) {
         for (let leftIndex = 0; leftIndex < selections.length; leftIndex += 1) {
             const left = selections[leftIndex];
             if (!left) continue;
             for (const right of selections.slice(leftIndex + 1)) {
-                if (selectionsOverlap(left, right)) {
+                if (selectionsOverlap(left, right, parsedFiles.get(file))) {
                     errors.push(`Overlapping hunk selections across commits: ${file}`);
                     break;
                 }
@@ -1131,7 +1145,28 @@ const buildCommitPatch = (
         const files = change.kind === "lines" ? zeroFiles : regularFiles;
         const file = files.get(change.path);
         if (!file) throw new Error(`No staged diff found for ${change.path}.`);
-        return selectPatch(file, change, internals);
+        const patch = selectPatch(file, change, internals);
+        if (change.kind !== "lines") return patch;
+        const firstHunk = patch.indexOf("\n@@");
+        if (firstHunk < 0) return patch;
+        const header = patch.slice(0, firstHunk);
+        const parsed = internals.parseFileHunks(file);
+        const selStart = change.start ?? 0;
+        const selEnd = change.end ?? 0;
+        const selectedHunks = parsed.hunks.filter(hunk => {
+            const end = hunk.newLines === 0 ? hunk.newStart : hunk.newStart + hunk.newLines - 1;
+            return hunk.newStart <= selEnd && selStart <= end;
+        });
+        let offset = 0;
+        const rewrittenHunks = selectedHunks.map(hunk => {
+            const newStart = hunk.oldStart + offset;
+            const oldLinesPart = hunk.oldLines === 1 ? `${hunk.oldStart}` : `${hunk.oldStart},${hunk.oldLines}`;
+            const newLinesPart = hunk.newLines === 1 ? `${newStart}` : `${newStart},${hunk.newLines}`;
+            const hunkHeader = `@@ -${oldLinesPart} +${newLinesPart} @@${hunk.trailer || ""}`;
+            offset += (hunk.newLines - hunk.oldLines);
+            return [hunkHeader, ...hunk.content.split("\n").slice(1)].join("\n");
+        });
+        return [header, ...rewrittenHunks].join("\n");
     });
     return `${parts.join("\n")}\n`;
 };

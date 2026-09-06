@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { consumeCompletedReceipt, emitTrace, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath } from "./index";
+import { consumeCompletedReceipt, describeOperationLock, emitTrace, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath, validateHunkCoverage } from "./index";
 import { readReceipt, writeReceipt } from "./transaction";
 
 
@@ -148,6 +148,104 @@ describe("emitTrace", () => {
       expect(typeof parsed.timestamp).toBe("string");
     } finally {
       process.stderr.write = originalWrite;
+    }
+  });
+});
+
+describe("validateHunkCoverage", () => {
+  const parsedFiles = new Map([
+    ["a.txt", {
+      hunks: [
+        { index: 0, newStart: 10, newLines: 5, content: "@@ -10,5 +10,5 @@" },
+        { index: 1, newStart: 30, newLines: 4, content: "@@ -30,4 +30,4 @@" },
+      ],
+    }],
+  ]) as unknown as Parameters<typeof validateHunkCoverage>[2];
+  const commit = (summary: string, changes: { path: string; kind: "all" | "indices" | "lines"; indices?: number[]; start?: number; end?: number }[]) => ({
+    changes,
+    summary,
+  }) as unknown as Parameters<typeof validateHunkCoverage>[1][number];
+
+  test("accepts disjoint hunk indices of one file split across commits", () => {
+    const errors = validateHunkCoverage(
+      ["a.txt"],
+      [
+        commit("first", [{ path: "a.txt", kind: "indices", indices: [1] }]),
+        commit("second", [{ path: "a.txt", kind: "indices", indices: [2] }]),
+      ],
+      parsedFiles,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test("accepts disjoint line ranges of one file split across commits", () => {
+    const errors = validateHunkCoverage(
+      ["a.txt"],
+      [
+        commit("first", [{ path: "a.txt", kind: "lines", start: 10, end: 14 }]),
+        commit("second", [{ path: "a.txt", kind: "lines", start: 30, end: 33 }]),
+      ],
+      parsedFiles,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test("rejects overlapping selections of one file across commits", () => {
+    const errors = validateHunkCoverage(
+      ["a.txt"],
+      [
+        commit("first", [{ path: "a.txt", kind: "indices", indices: [1] }]),
+        commit("second", [{ path: "a.txt", kind: "indices", indices: [1, 2] }]),
+      ],
+      parsedFiles,
+    );
+    expect(errors.some(error => error.includes("Overlapping hunk selections"))).toBe(true);
+  });
+
+  test("rejects split plans missing staged hunks", () => {
+    const errors = validateHunkCoverage(
+      ["a.txt"],
+      [commit("first", [{ path: "a.txt", kind: "indices", indices: [1] }])],
+      parsedFiles,
+    );
+    expect(errors.some(error => error.includes("Staged hunk missing"))).toBe(true);
+  });
+});
+
+describe("describeOperationLock", () => {
+  const writeLock = async (dir: string, content: string): Promise<void> => {
+    await mkdir(join(dir, "autommit"), { recursive: true });
+    await writeFile(join(dir, "autommit", "operation.lock"), content, "utf8");
+  };
+
+  test("returns undefined when no lock exists", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "autommit-lock-"));
+    try {
+      expect(await describeOperationLock(dir)).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("reports a stale lock for a dead PID", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "autommit-lock-"));
+    try {
+      await writeLock(dir, `${JSON.stringify({ pid: 2 ** 30, token: "test" })}\n`);
+      const hint = await describeOperationLock(dir);
+      expect(hint).toContain("stale");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("reports a live lock for the current process", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "autommit-lock-"));
+    try {
+      await writeLock(dir, `${JSON.stringify({ pid: process.pid, token: "test" })}\n`);
+      const hint = await describeOperationLock(dir);
+      expect(hint).toContain("live");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   });
 });
