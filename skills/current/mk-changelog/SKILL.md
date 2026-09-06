@@ -31,15 +31,14 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
 2. Extract deterministic commit, PR, diff, and monorepo changelog boundary context:
 
    ```text
-   # From a commit range (e.g. tag to HEAD or base branch)
-   uv run --script <skill-dir>/scripts/cli.py prepare --range v1.0.0..HEAD [--repo PATH]
+   # 1. From a local commit range (e.g. branch to main, or tag to HEAD)
+   uv run --script <skill-dir>/scripts/cli.py prepare --range main..HEAD [--repo PATH]
 
-   # From a GitHub Pull Request
-   uv run --script <skill-dir>/scripts/cli.py prepare --pr 123 [--repo PATH]
+   # 2. From a GitHub Pull Request URL or number
+   uv run --script <skill-dir>/scripts/cli.py prepare --pr https://github.com/owner/repo/pull/123
 
-   # From staged or uncommitted working tree changes
+   # 3. From local staged or working tree changes
    uv run --script <skill-dir>/scripts/cli.py prepare --staged [--repo PATH]
-   ```
 
 3. The command outputs a single structured JSON payload containing:
    - `commits`: normalized commit records (hash, subject, category, author, PR reference, revert status).
@@ -50,16 +49,17 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
 
 4. Distill and synthesize user-facing entries using the prompt guidance in `references/prompts.md`. Focus strictly on user-observable behavior; omit internal refactoring, tests, and CI churn.
 
-5. Format or surgically patch the target `CHANGELOG.md`:
+5. Output the result depending on your goal:
 
-   ```text
-   # Format entries into standard Markdown
-   uv run --script <skill-dir>/scripts/cli.py format --entries-file <temp-dir>/entries.json
+   - **For PR Body / Release Notes (no file writes):**
+     ```text
+     uv run --script <skill-dir>/scripts/cli.py format --entries-file <temp-dir>/entries.json
+     ```
 
-   # Patch target CHANGELOG.md under ## [Unreleased]
-   uv run --script <skill-dir>/scripts/cli.py patch --target CHANGELOG.md --entries-file <temp-dir>/entries.json
-   ```
-
+   - **For CHANGELOG.md update (idempotent disk patch under ## [Unreleased]):**
+     ```text
+     uv run --script <skill-dir>/scripts/cli.py patch --target CHANGELOG.md --entries-file <temp-dir>/entries.json
+     ```
 ## Invariants
 
 - Keep entries grouped by standard Keep a Changelog categories: `Breaking Changes`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
