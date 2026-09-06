@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import concurrent.futures
 import configparser
 import json
 import os
@@ -720,6 +721,18 @@ def _require_int(args: argparse.Namespace, key: str, default: int = 0) -> int:
     return int(val) if isinstance(val, (int, str)) else default
 
 
+def _optional_int(args: argparse.Namespace, key: str) -> int | None:
+    """Extract optional integer from argparse namespace."""
+    val: object = getattr(args, key, None)
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str) and val.isdigit():
+        return int(val)
+    return None
+
+
 # ==============================================================================
 # PODMAN RUNTIME ENGINE (START, STOP, DEV, TEST)
 # ==============================================================================
@@ -983,18 +996,30 @@ def _resolve_test_targets(
         pfile = PROFILE_DIR / f"{profile_name}.json"
         if pfile.is_file():
             try:
-                data = json.loads(pfile.read_text(encoding="utf-8"))
-                workflows = data.get("workflows", {})
-                if isinstance(workflows, dict):
-                    for wf_data in workflows.values():
-                        if isinstance(wf_data, dict):
-                            mods = list(wf_data.get("modules", [])) + list(
-                                wf_data.get("test_modules", [])
-                            )
-                            if target in mods:
-                                db = str(wf_data.get("database") or ctx.effective_db_name)
-                                return db, [f"/{target}"], [target]
-            except Exception:
+                raw_data: object = json.loads(pfile.read_text(encoding="utf-8"))
+                if isinstance(raw_data, dict):
+                    workflows: object = raw_data.get("workflows")
+                    if isinstance(workflows, dict):
+                        for wf_data in workflows.values():
+                            if isinstance(wf_data, dict):
+                                raw_mods: object = wf_data.get("modules")
+                                raw_test_mods: object = wf_data.get("test_modules")
+                                mods: list[str] = (
+                                    [str(m) for m in raw_mods]
+                                    if isinstance(raw_mods, list)
+                                    else []
+                                ) + (
+                                    [str(m) for m in raw_test_mods]
+                                    if isinstance(raw_test_mods, list)
+                                    else []
+                                )
+                                if target in mods:
+                                    db_val: object = wf_data.get("database")
+                                    db = (
+                                        str(db_val) if db_val else ctx.effective_db_name
+                                    )
+                                    return db, [f"/{target}"], [target]
+            except (json.JSONDecodeError, OSError):
                 pass
         return ctx.effective_db_name, [f"/{target}"], [target]
     profile = _load_workflow_profile(profile_name, target)
@@ -1065,6 +1090,7 @@ def _build_test_cmd(
         "--test-enable",
         f"--test-tags={tags_str}",
         "--stop-after-init",
+        "--no-http",
         "--log-level=test",
     ]
     if update_str:
@@ -1120,23 +1146,129 @@ def _run_test_process(
     return exit_code, "".join(output_lines)
 
 
+def _run_single_module_test(
+    ctx: WorkspaceContext,
+    mod: str,
+    db_to_use: str,
+    explicit_tags: str | None,
+    index: int,
+) -> tuple[str, bool, int, list[str], str, float]:
+    """Execute test container process for a single module in isolation."""
+    start_time = time.time()
+    tags_str = explicit_tags or f"/{mod}"
+    container_test_name = f"odoo-test-{mod}-{int(time.time())}-{index}"
+    cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, mod)
+    exit_code, output = _run_test_process(cmd, container_test_name, json_mode=True)
+    is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
+    elapsed = time.time() - start_time
+    return mod, is_success, exit_code, summary_lines, output, elapsed
+
+
+def _run_parallel_tests(
+    ctx: WorkspaceContext,
+    args: argparse.Namespace,
+    db_to_use: str,
+    update_mods: list[str],
+) -> int:
+    """Execute test suites for multiple modules concurrently."""
+    target = _require_str(args, "target", "crm")
+    json_mode = _require_bool(args, "json")
+    jobs_val = _optional_int(args, "jobs")
+    jobs = jobs_val if jobs_val is not None else 4
+
+    _ensure_runtime_pod(ctx)
+    _cleanup_stale_test_containers()
+
+    count = len(update_mods)
+    header = (
+        f"Running isolated Odoo unit tests for {target} ({count} modules) "
+        f"in parallel (jobs: {jobs}, db: {db_to_use})...\n"
+    )
+    stream = sys.stderr if json_mode else sys.stdout
+    _ = stream.write(header)
+    _ = stream.flush()
+
+    results: list[tuple[str, bool, int, list[str], str, float]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
+        future_to_mod = {
+            executor.submit(_run_single_module_test, ctx, m, db_to_use, None, i): m
+            for i, m in enumerate(update_mods)
+        }
+        for future in concurrent.futures.as_completed(future_to_mod):
+            mod = future_to_mod[future]
+            try:
+                res = future.result()
+                results.append(res)
+                name, ok, _, summary, _, dur = res
+                tag = "[OK]" if ok else "[FAIL]"
+                stats = summary[0] if summary else f"{dur:.2f}s"
+                if not json_mode:
+                    print(f" {tag} {name:25} ({dur:.2f}s) -> {stats}")
+            except (subprocess.SubprocessError, OSError, RuntimeError) as exc:
+                results.append((mod, False, 1, [str(exc)], "", 0.0))
+                if not json_mode:
+                    print(f" [FAIL] {mod:25} (Error: {exc})")
+
+    all_ok = all(r[1] for r in results)
+    max_dur = max((r[5] for r in results), default=0.0)
+
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "target": target,
+                    "database": db_to_use,
+                    "parallel": True,
+                    "jobs": jobs,
+                    "success": all_ok,
+                    "duration": round(max_dur, 2),
+                    "modules": [
+                        {
+                            "module": r[0],
+                            "success": r[1],
+                            "exit_code": r[2],
+                            "summary": r[3],
+                            "duration": round(r[5], 2),
+                        }
+                        for r in results
+                    ],
+                }
+            )
+        )
+    elif all_ok:
+        print(f"\n[OK] All {len(results)} module test suites passed in {max_dur:.2f}s.")
+    else:
+        print("\n[FAIL] One or more module test suites failed.")
+
+    return 0 if all_ok else 1
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     """Run isolated Odoo 17 unit tests for a module or workflow."""
     ctx = _resolve_workspace()
     target = _require_str(args, "target", "crm")
     profile_name = _require_str(args, "profile", "etech")
     json_mode = _require_bool(args, "json")
+    explicit_tags = _optional_str(args, "tags")
+    explicit_db = _optional_str(args, "db")
+    parallel = _require_bool(args, "parallel")
+    jobs_val = _optional_int(args, "jobs")
+    jobs = jobs_val if jobs_val is not None else (4 if parallel else 1)
 
     db_to_use, test_tags, update_mods = _resolve_test_targets(ctx, target, profile_name)
+    if explicit_db:
+        db_to_use = explicit_db
+
+    if (parallel or jobs > 1) and len(update_mods) > 1 and not explicit_tags:
+        return _run_parallel_tests(ctx, args, db_to_use, update_mods)
+    tags_str = explicit_tags or ",".join(test_tags)
     _ensure_runtime_pod(ctx)
     _cleanup_stale_test_containers()
 
-    tags_str = ",".join(test_tags)
     update_str = ",".join(update_mods)
     container_test_name = f"odoo-test-{int(time.time())}"
 
     cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, update_str)
-
     header_msg = (
         f"Running isolated Odoo unit tests for {target} "
         f"(tags: {tags_str}, db: {db_to_use})...\n"
@@ -1547,6 +1679,29 @@ def _build_parser() -> argparse.ArgumentParser:
         default="crm",
         nargs="?",
         help="Module name or workflow profile key (default: crm)",
+    )
+    _ = p_test.add_argument(
+        "--tags",
+        "--test-tags",
+        dest="tags",
+        help="Explicit test tags filter (e.g. :TestModel or /module)",
+    )
+    _ = p_test.add_argument(
+        "--db",
+        dest="db",
+        help="Database name override",
+    )
+    _ = p_test.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run module test suites concurrently in parallel containers",
+    )
+    _ = p_test.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        dest="jobs",
+        help="Number of concurrent test worker containers (default: 4 when --parallel)",
     )
 
     # Lint Command
