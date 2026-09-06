@@ -1,0 +1,1 @@
+"""mk-changelog core library."""
