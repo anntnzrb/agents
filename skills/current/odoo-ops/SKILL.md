@@ -29,9 +29,13 @@ Executes unit tests in an isolated headless container with real-time log streami
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py test <workflow|module> [--json]
+uv run --script <skill-dir>/scripts/cli.py test <module> --tags :TestClass.test_method  # Fast targeted test
+uv run --script <skill-dir>/scripts/cli.py test <workflow> --parallel [-j 4]          # Concurrency across modules
 ```
-- Real-time output streaming (to stdout in human mode, to stderr in `--json` mode with clean structured payload on stdout).
-- Guaranteed container lifecycle management (preflight cleanup of stale test containers, graceful stop on Ctrl-C, and forced removal in `finally`).
+- **Granular Tag Filtering**: Pass `--tags` / `--test-tags` to run specific test classes or methods in seconds without full suite overhead.
+- **Parallel Module Runner**: Pass `--parallel` / `-j` to execute independent module suites concurrently in isolated containers.
+- **Network & Port Isolation**: Test containers run with `--no-http` to prevent port 8069 socket collisions.
+- **Database Resolution**: Single-module tests automatically inherit the correct profile workflow database (e.g. `erptech_0817-crm`).
 - Accurate pass/fail evaluation based on Odoo test result summaries, avoiding false positives on expected log errors.
 ### 3. Linter Gate (`lint`)
 Runs Ruff linter across workflow modules or single module with `<skill>/config/ruff.toml`.
@@ -128,4 +132,12 @@ uv run --script <skill-dir>/scripts/cli.py rpc --write unarchive <model> '[101, 
 # 6. Delete records permanently
 uv run --script <skill-dir>/scripts/cli.py rpc --write unlink <model> '[101]'
 ```
+
+### Production Batch Normalization & Migration Protocols
+
+When developing or executing mass data sanitation scripts in production:
+1. **Mandatory Dry-Run First**: Always implement and execute a `--dry-run` pass before writing. Output total qualifying records, filtered-out edge cases (e.g. records locked by stage/business constraints), and before/after samples.
+2. **Chunked RPC Batching (250–500 records)**: Never mutate thousands of records in a single RPC transaction. Process in discrete chunks with explicit progress logging to prevent table locks and HTTP connection timeouts.
+3. **Preflight Model Constraint Audit**: Check active `@api.constrains` on the target model prior to execution. If certain stages or states disallow changes, isolate or exclude those IDs cleanly.
+4. **Decoupled Dedicated Logging**: Stream batch execution progress to a dedicated log file (e.g. `/tmp/odoo_migration.log`) and monitor via background tail (`tail -f /tmp/odoo_migration.log`) to preserve conversation context.
 Linter and formatter configurations are centralized in `<skill>/config/ruff.toml`.
