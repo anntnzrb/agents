@@ -5,6 +5,9 @@
   "followUpMode": "all",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.84.2",
+  "enabledModels": [
+    "opencode-go/muse-spark-1.3-contributor:low"
+  ],
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
