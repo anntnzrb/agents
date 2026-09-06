@@ -980,8 +980,23 @@ def _resolve_test_targets(
     """Resolve database, test tags, and update modules for test execution."""
     mod_path = ctx.root / target
     if mod_path.is_dir():
+        pfile = PROFILE_DIR / f"{profile_name}.json"
+        if pfile.is_file():
+            try:
+                data = json.loads(pfile.read_text(encoding="utf-8"))
+                workflows = data.get("workflows", {})
+                if isinstance(workflows, dict):
+                    for wf_data in workflows.values():
+                        if isinstance(wf_data, dict):
+                            mods = list(wf_data.get("modules", [])) + list(
+                                wf_data.get("test_modules", [])
+                            )
+                            if target in mods:
+                                db = str(wf_data.get("database") or ctx.effective_db_name)
+                                return db, [f"/{target}"], [target]
+            except Exception:
+                pass
         return ctx.effective_db_name, [f"/{target}"], [target]
-
     profile = _load_workflow_profile(profile_name, target)
     test_tags = [f"/{m}" for m in profile.test_modules]
     return profile.database, test_tags, profile.test_modules
