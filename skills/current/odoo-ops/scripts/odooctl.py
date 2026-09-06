@@ -620,6 +620,11 @@ def _resolve_target_paths(
 ) -> list[Path]:
     """Resolve target module paths from single module name or profile workflow."""
     addons = _resolve_addons()
+    # 0. Direct file path check
+    direct_file = Path(target) if Path(target).is_absolute() else (addons / target)
+    if direct_file.is_file():
+        return [direct_file]
+
 
     # 1. Single module direct directory check
     mod_path = addons / target
