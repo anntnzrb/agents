@@ -301,20 +301,16 @@ class OdooXmlViewLinter:
         # Find view architectures
         for arch_node in tree.xpath("//field[@name='arch']"):
             seen_fields: dict[str, tuple[int, etree._Element]] = {}
-            # Iterate only through direct fields (not sub-views inside one2many/many2many)
             for field_node in arch_node.xpath(".//form//field | .//tree//field"):
-                # Ignore fields inside embedded sub-trees or sub-forms
-                # Ignore fields inside embedded sub-trees or sub-forms of relational fields
-                parent = field_node.getparent()
-                grandparent = parent.getparent() if parent is not None else None
-                if parent is not None and parent != arch_node and parent.tag == "field":
+                # Check if this field belongs to an embedded relational sub-form or sub-tree
+                ancestors = list(field_node.iterancestors())
+                # If there is a <field> ancestor between field_node and arch_node, it is a sub-field of a relational field
+                field_ancestors = [
+                    a for a in ancestors if a != arch_node and a.tag == "field"
+                ]
+                if field_ancestors:
                     continue
-                if (
-                    grandparent is not None
-                    and grandparent != arch_node
-                    and grandparent.tag == "field"
-                ):
-                    continue
+
                 field_name = field_node.attrib.get("name")
                 if not field_name:
                     continue
@@ -364,7 +360,6 @@ class OdooXmlViewLinter:
                         )
                 else:
                     seen_fields[field_name] = (line, field_node)
-
     def _check_unnamed_groups_and_pages(
         self, path: Path, tree: etree._Element, violations: list[ViewViolation]
     ) -> None:
