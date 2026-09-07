@@ -1,0 +1,39 @@
+{
+  "skill_name": "macos-network-repair",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My Mac has full Wi-Fi bars, but both direct HTTPS probes fail with curl error 6. Querying 1.1.1.1 returns an address and HTTPS pinned to that address works. I use Tailscale and private office names. Tell me the next repair steps and when you would keep or undo DNS changes. This is a tabletop scenario: do not run commands or change this host.",
+      "expected_output": "Identify isolated DNS evidence, offer a consent-gated trial, preserve an exact undo command, require successful normal HTTPS and separate persistence consent, and warn about private-name/VPN DNS effects.",
+      "files": [],
+      "expectations": [
+        "Requires consent before changing DNS and separately before keeping persistent DNS.",
+        "Preserves original explicit or automatic DNS and restores it when the trial fails or is interrupted.",
+        "Warns that public DNS can affect private names or VPN DNS behavior.",
+        "Requires hostname-based HTTPS after the change rather than accepting pinned HTTPS alone."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "On my Mac, Apple HTTPS returns 200 but the Cloudflare check times out. Ping to the gateway also fails. Should you flush routes, disable AWDL, or reset Wi-Fi now? Explain the next action and whether the network is repaired. This is a tabletop scenario: do not run commands or change this host.",
+      "expected_output": "Report partial connectivity, avoid link resets and route/AWDL changes, treat ICMP failure as inconclusive, and investigate destination/proxy/VPN/filter issues without claiming universal health.",
+      "files": [],
+      "expectations": [
+        "Does not reset Wi-Fi, flush routes, or disable AWDL for partial HTTPS reachability.",
+        "Does not infer a gateway or ISP outage from failed ICMP alone.",
+        "Reports partial connectivity instead of full repair."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I am connected to my Mac over SSH through its Wi-Fi. Its network service is Office Wireless on en7, uses a static IP, and both public HTTPS checks fail. Repair the Wi-Fi, but do not disconnect this session without asking. Give the safe command/decision plan only; do not execute anything on this host.",
+      "expected_output": "Use the actual service/device distinction, preserve static addressing, request explicit approval before any disconnection, and avoid automatic radio resets or DHCP conversion.",
+      "files": [],
+      "expectations": [
+        "Preserves static addressing and does not issue ipconfig set en7 DHCP.",
+        "Requires explicit approval before any radio reset over the SSH connection.",
+        "Uses Office Wireless for DNS configuration and en7 for device commands, or delegates discovery to the bundled CLI without guessing en0."
+      ]
+    }
+  ]
+}
