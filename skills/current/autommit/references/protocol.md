@@ -27,14 +27,14 @@ uv run --script <skill-dir>/scripts/cli.py schema
 ### `prepare`
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py prepare [--scope all|staged] [context ...] [--context TEXT ...] [--repo PATH]
+uv run --script <skill-dir>/scripts/cli.py prepare [--scope auto|staged|all] [context ...] [--context TEXT ...] [--repo PATH]
 ```
 
 Behavior:
 
 1. Resolve the worktree-local Git directory with `git rev-parse --absolute-git-dir` and acquire `<git-dir>/autommit/operation.lock` with exclusive creation. This allows concurrent autommit runs across distinct worktrees.
 2. Recover a durable prepared receipt before considering current changes.
-3. In `all` scope (default), stage uncommitted changes with `git add --all`. In `staged` scope, operate strictly on existing staged changes without sweeping in unstaged work.
+3. In `auto` scope (default), use the existing staged snapshot unchanged. If nothing is staged, stage all uncommitted changes with `git add --all`. Explicit `all` scope stages all changes regardless of the index. `staged` scope requires existing staged changes and never stages anything.
 4. Require a branch checkout with an existing `HEAD`.
 5. Bind the branch ref, `HEAD`, and index tree into `snapshot`.
 6. Return the exact cached binary diff, staged paths, changed-hunk count, composed context, recent subjects, and repository context.
@@ -84,7 +84,7 @@ Apply behavior:
 8. Fsync a prepared receipt in the worktree-local directory, advance the branch with CAS (`git update-ref REF AFTER BEFORE`), verify branch/index evidence, then remove the receipt.
 9. Remove the temporary worktree. Never fall back to in-place commits.
 
-The original worktree index becomes clean relative to the new `HEAD`; in `staged` scope, unrelated unstaged work remains in place.
+The original worktree index becomes clean relative to the new `HEAD`. In `auto` scope with an existing staged snapshot, and in `staged` scope, unrelated unstaged work remains in place.
 
 ## Plan Shape
 

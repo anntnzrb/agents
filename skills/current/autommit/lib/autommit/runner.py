@@ -357,7 +357,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Direct headless commit runner with pluggable AI providers.",
     )
     parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--scope", choices=["staged", "all"], default="all", type=str)
+    parser.add_argument(
+        "--scope", choices=["auto", "staged", "all"], default="auto", type=str
+    )
     parser.add_argument(
         "--ogo",
         action="store_true",

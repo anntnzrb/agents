@@ -194,7 +194,11 @@ class AutommitCliTests(unittest.TestCase):
         _ = (self.repo / "tracked.txt").write_text(
             "staged\nunstaged\n", encoding="utf-8"
         )
-        result = self.prepare(scope="staged")
+        _ = (self.repo / "untracked.txt").write_text("leave out\n", encoding="utf-8")
+        index_tree = self.git("write-tree").stdout
+        result = self.prepare()
+        self.assertEqual(self.git("write-tree").stdout, index_tree)
+        self.assertEqual(result["staged_files"], ["tracked.txt"])
         self.assertIn("+staged", result["diff"])
         self.assertNotIn("+unstaged", result["diff"])
         self.assertEqual(self.git("diff", "--name-only").stdout.strip(), "tracked.txt")
@@ -207,7 +211,7 @@ class AutommitCliTests(unittest.TestCase):
         _ = (self.repo / "tracked.txt").write_text(
             "staged\nunstaged\n", encoding="utf-8"
         )
-        prepared = self.prepare(scope="staged")
+        prepared = self.prepare()
         plan = self.write_json(
             "plan.json",
             self.whole_file_plan("tracked.txt", summary="Update tracked value"),

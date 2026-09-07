@@ -32,7 +32,7 @@ def build_parser() -> Parser:
     prepare_cmd = subparsers.add_parser("prepare")
     prepare_cmd.add_argument("--repo", type=Path, default=Path.cwd())
     prepare_cmd.add_argument(
-        "--scope", choices=["staged", "all"], default="all", type=str
+        "--scope", choices=["auto", "staged", "all"], default="auto", type=str
     )
     prepare_cmd.add_argument("--context", action="append", default=[])
     prepare_cmd.add_argument("positional_context", nargs="*", default=[])
@@ -56,7 +56,7 @@ def build_parser() -> Parser:
 def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
     context: list[str] = []
     repo: Path = Path.cwd()
-    scope = "all"
+    scope = "auto"
     idx = 0
     double_dash = False
     while idx < len(values):
@@ -76,14 +76,22 @@ def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
             repo = Path(tok.split("=", 1)[1])
             idx += 1
         elif tok == "--scope":
-            if idx + 1 >= len(values) or values[idx + 1] not in ("staged", "all"):
-                raise AutommitError("usage_error", "--scope must be 'staged' or 'all'.")
+            if idx + 1 >= len(values) or values[idx + 1] not in (
+                "auto",
+                "staged",
+                "all",
+            ):
+                raise AutommitError(
+                    "usage_error", "--scope must be 'auto', 'staged' or 'all'."
+                )
             scope = values[idx + 1]
             idx += 2
         elif tok.startswith("--scope="):
             val = tok.split("=", 1)[1]
-            if val not in ("staged", "all"):
-                raise AutommitError("usage_error", "--scope must be 'staged' or 'all'.")
+            if val not in ("auto", "staged", "all"):
+                raise AutommitError(
+                    "usage_error", "--scope must be 'auto', 'staged' or 'all'."
+                )
             scope = val
             idx += 1
         elif tok == "--context":
@@ -115,7 +123,7 @@ def _schema() -> dict[str, object]:
         "commands": {
             "prepare": {
                 "inputs": {
-                    "scope": "staged | all",
+                    "scope": "auto | staged | all (optional, default: auto)",
                     "repo": "path (optional, default: cwd)",
                     "context": "array of strings (optional)",
                 },
@@ -162,50 +170,32 @@ def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream.flush()
 
 
-def _config_str(arguments: argparse.Namespace, field: str) -> str:
-    return cast("str", getattr(arguments, field))
-
-
-def _config_bool(arguments: argparse.Namespace, field: str) -> bool:
-    return cast("bool", getattr(arguments, field))
-
-
-def _config_path(arguments: argparse.Namespace, field: str) -> Path:
-    return cast("Path", getattr(arguments, field))
-
-
-def _optional_path(arguments: argparse.Namespace, field: str) -> Path | None:
-    return cast("Path | None", getattr(arguments, field))
-
-
-def _config_str_list(arguments: argparse.Namespace, field: str) -> list[str]:
-    return cast("list[str]", getattr(arguments, field))
-
-
 def _dispatch(arguments: argparse.Namespace) -> object:
-    command = _config_str(arguments, "command")
+    command: str = arguments.command
     if command == "schema":
         return _schema()
     if command == "prepare":
-        repo = _config_path(arguments, "repo").resolve()
-        scope_str = _config_str(arguments, "scope")
-        scope: Literal["staged", "all"] = "staged" if scope_str == "staged" else "all"
-        flag_context = _config_str_list(arguments, "context")
-        pos_context = _config_str_list(arguments, "positional_context")
-        return prepare(repo, tuple(flag_context + pos_context), scope=scope)
+        repo: Path = arguments.repo.resolve()
+        scope = cast('Literal["auto", "staged", "all"]', arguments.scope)
+        context = tuple(arguments.context + arguments.positional_context)
+        return prepare(repo, context, scope=scope)
     if command == "validate-plan":
-        repo = _config_path(arguments, "repo").resolve()
-        snapshot = _config_str(arguments, "snapshot")
-        plan_file = _config_path(arguments, "plan_file").resolve()
-        require_split = _config_bool(arguments, "require_split")
-        return validate_plan(repo, snapshot, plan_file, require_split=require_split)
+        repo = arguments.repo.resolve()
+        return validate_plan(
+            repo,
+            arguments.snapshot,
+            arguments.plan_file.resolve(),
+            require_split=arguments.require_split,
+        )
     if command == "apply":
-        repo = _config_path(arguments, "repo").resolve()
-        snapshot = _config_str(arguments, "snapshot")
-        plan_file = _config_path(arguments, "plan_file").resolve()
-        decision_file = _optional_path(arguments, "decision_file")
-        if decision_file is not None:
-            decision_file = decision_file.resolve()
+        repo = arguments.repo.resolve()
+        snapshot: str = arguments.snapshot
+        plan_file: Path = arguments.plan_file.resolve()
+        decision_file: Path | None = (
+            arguments.decision_file.resolve()
+            if arguments.decision_file is not None
+            else None
+        )
         return apply(repo, snapshot, plan_file, decision_file)
     raise AutommitError("usage_error", "Unknown command.")
 

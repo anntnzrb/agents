@@ -30,7 +30,7 @@ The primary entrypoint for autommit is the Python CLI at `scripts/cli.py`.
 2. Run `prepare` from the requested repository. Pass all user context in original order with positional text or repeated `--context` values:
 
    ```text
-   uv run --script <skill-dir>/scripts/cli.py prepare [--scope all|staged] [context ...] [--context TEXT ...] [--repo PATH]
+   uv run --script <skill-dir>/scripts/cli.py prepare [--scope auto|staged|all] [context ...] [--context TEXT ...] [--repo PATH]
    ```
 
 3. Parse the one-line JSON response. If `result.status` is `recovered`, report recovery and stop; a new run is required for remaining changes.
@@ -55,7 +55,8 @@ The primary entrypoint for autommit is the Python CLI at `scripts/cli.py`.
 
 ## Invariants
 
-- By default (`--scope all`), stage all uncommitted working tree changes. In `--scope staged`, commit only existing staged changes and preserve every unstaged change.
+- Default to `--scope auto`: preserve the existing staged snapshot, including partial-file selections. Stage all changes only when nothing is staged. If everything is already staged, use that snapshot unchanged.
+- Use `--scope all` only when the user explicitly requests including unstaged changes. `--scope staged` requires existing staged changes and never stages anything.
 - Cover every captured path and changed hunk exactly once overall. Never invent paths or omit captured metadata/binary changes.
 - Keep implementation, tests, and callers for one externally observable behavior together.
 - Split independently reversible behavior. History and repository policy affect naming and grouping only; they are not atomicity criteria.

@@ -225,7 +225,7 @@ def prepare(
     cwd: Path,
     context: tuple[str, ...],
     *,
-    scope: Literal["staged", "all"] = "all",
+    scope: Literal["auto", "staged", "all"] = "auto",
 ) -> dict[str, object]:
     """Recover if needed, stage per scope, and expose exact planning evidence."""
     git_dir = _git_dir(cwd)
@@ -233,7 +233,7 @@ def prepare(
         if recovered := _consume_or_recover(cwd, git_dir):
             return recovered
         staged = _staged_files(cwd)
-        if scope == "all":
+        if scope == "all" or (scope == "auto" and not staged):
             run_git(cwd, "add", "--all")
             staged = _staged_files(cwd)
         elif not staged:
