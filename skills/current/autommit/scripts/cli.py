@@ -1,8 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = [
-#     "expression>=5.7.0",
-# ]
+# dependencies = []
 # ///
 """Run the harness-agnostic autommit CLI."""
 

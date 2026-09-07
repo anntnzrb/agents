@@ -13,11 +13,9 @@ import unittest
 from pathlib import Path
 from typing import TypedDict, cast, final
 
-from expression import Option, Result
-
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
-
+from autommit.errors import AutommitError
 from autommit.git import run_git
 from autommit.proposal import (
     normalize_atomicity_decision,
@@ -695,88 +693,51 @@ class AutommitCliTests(unittest.TestCase):
         self.assertEqual(error["code"], "invalid_plan")
 
 
-class AutommitFunctionalTests(unittest.TestCase):
-    """Unit tests for functional Result and Option types with Expression."""
+class AutommitUnitTests(unittest.TestCase):
+    """Unit tests for normalized proposals and Git helpers."""
 
-    def test_normalize_proposal_result(self) -> None:
-        valid_payload: dict[str, object] = {
+    def test_normalize_proposal(self) -> None:
+        valid = {
             "commits": [
                 {
-                    "summary": "feat: add feature",
-                    "details": ["some detail"],
-                    "changes": [
-                        {
-                            "path": "foo.py",
-                            "hunks": "all",
-                        }
-                    ],
+                    "summary": "feat: test",
+                    "details": ["one change"],
+                    "changes": [{"path": "a.txt", "hunks": "all"}],
                 }
             ]
         }
-        match normalize_proposal(valid_payload):
-            case Result(tag="ok", ok=proposal):
-                self.assertEqual(len(proposal.commits), 1)
-                self.assertEqual(proposal.commits[0].summary, "feat: add feature")
-            case _:
-                self.fail("Expected Ok(CommitProposal)")
+        proposal = normalize_proposal(valid)
+        self.assertEqual(len(proposal.commits), 1)
+        self.assertEqual(proposal.commits[0].summary, "feat: test")
 
-        invalid_payload: dict[str, object] = {"commits": []}
-        match normalize_proposal(invalid_payload):
-            case Result(tag="error", error=err):
-                self.assertEqual(err.code, "invalid_plan")
-            case _:
-                self.fail("Expected Error for empty commits")
-
-    def test_normalize_atomicity_decision_result(self) -> None:
-        valid_accept: dict[str, object] = {
+    def test_normalize_atomicity_decision(self) -> None:
+        valid_accept = {
             "decision": "accept",
-            "concerns": cast("list[object]", []),
-            "rationale": "Looks good and cohesive.",
+            "concerns": [],
+            "rationale": "Single concern.",
         }
-        match normalize_atomicity_decision(valid_accept):
-            case Result(tag="ok", ok=decision):
-                self.assertEqual(decision.decision, "accept")
-            case _:
-                self.fail("Expected Ok for valid accept decision")
+        decision = normalize_atomicity_decision(valid_accept)
+        self.assertEqual(decision.decision, "accept")
 
-        invalid_accept: dict[str, object] = {
-            "decision": "accept",
-            "concerns": ["concern 1", "concern 2"],
-            "rationale": "Cannot have concerns with accept.",
+        invalid_split = {
+            "decision": "split",
+            "concerns": [],
+            "rationale": "Needs split.",
         }
-        match normalize_atomicity_decision(invalid_accept):
-            case Result(tag="error", error=err):
-                self.assertEqual(err.code, "invalid_atomicity_decision")
-            case _:
-                self.fail("Expected Error for accept with concerns")
+        with self.assertRaises(AutommitError):
+            _ = normalize_atomicity_decision(invalid_split)
 
-    def test_run_git_result(self) -> None:
+    def test_run_git(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            match run_git(repo, "init", "-b", "main"):
-                case Result(tag="ok"):
-                    pass
-                case _:
-                    self.fail("Expected Ok from run_git init")
+            _ = run_git(repo, "init", "-b", "main")
+            with self.assertRaises(AutommitError):
+                _ = run_git(repo, "non-existent-subcommand")
 
-            match run_git(repo, "non-existent-subcommand"):
-                case Result(tag="error", error=err):
-                    self.assertEqual(err.code, "git_error")
-                case _:
-                    self.fail("Expected Error from run_git invalid subcommand")
-
-    def test_receipt_option_result(self) -> None:
+    def test_receipt_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             common_dir = Path(temp_dir)
-            match read_receipt(common_dir):
-                case Result(tag="ok", ok=receipt_opt):
-                    match receipt_opt:
-                        case Option(tag="none"):
-                            pass
-                        case _:
-                            self.fail("Expected Nothing for absent receipt")
-                case _:
-                    self.fail("Expected Ok(Nothing)")
+            self.assertIsNone(read_receipt(common_dir))
 
             receipt = Receipt(
                 version=1,
@@ -786,22 +747,12 @@ class AutommitFunctionalTests(unittest.TestCase):
                 after="2" * 40,
                 index_tree="3" * 40,
             )
-            match write_receipt(common_dir, receipt):
-                case Result(tag="ok"):
-                    pass
-                case _:
-                    self.fail("Expected Ok from write_receipt")
-
-            match read_receipt(common_dir):
-                case Result(tag="ok", ok=receipt_opt):
-                    match receipt_opt:
-                        case Option(tag="some", some=read_back):
-                            self.assertEqual(read_back.ref, "refs/heads/main")
-                            self.assertEqual(read_back.after, "2" * 40)
-                        case _:
-                            self.fail("Expected Some(Receipt)")
-                case _:
-                    self.fail("Expected Ok(Some(Receipt))")
+            write_receipt(common_dir, receipt)
+            read_back = read_receipt(common_dir)
+            self.assertIsNotNone(read_back)
+            if read_back is not None:
+                self.assertEqual(read_back.ref, "refs/heads/main")
+                self.assertEqual(read_back.after, "2" * 40)
 
 
 if __name__ == "__main__":

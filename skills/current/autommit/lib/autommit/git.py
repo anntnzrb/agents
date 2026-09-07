@@ -9,24 +9,30 @@ from typing import TYPE_CHECKING, Final
 if TYPE_CHECKING:
     from pathlib import Path
 
-from expression import Error, Ok, Result
-
-from autommit.errors import AutommitError, GitError, GitMissingError
+from autommit.errors import GitError, GitMissingError
 
 GIT_ENVIRONMENT: Final[dict[str, str]] = {
     "GIT_TERMINAL_PROMPT": "0",
     "LC_ALL": "C",
 }
 
+GIT_SAFE_ARGS: Final[tuple[str, ...]] = (
+    "-c",
+    "core.quotepath=false",
+    "-c",
+    "diff.mnemonicprefix=false",
+    "-c",
+    "diff.noprefix=false",
+)
 
-def run_git(
-    cwd: Path, *args: str, env: dict[str, str] | None = None
-) -> Result[str, AutommitError]:
-    """Run Git without a shell and return stdout wrapped in a Result."""
+
+def run_git(cwd: Path, *args: str, env: dict[str, str] | None = None) -> str:
+    """Run Git without a shell and return stdout, raising GitError on failure."""
     merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
+    cmd = ["git", *GIT_SAFE_ARGS, *args]
     try:
         completed = subprocess.run(
-            ["git", *args],
+            cmd,
             cwd=cwd,
             check=False,
             capture_output=True,
@@ -35,32 +41,33 @@ def run_git(
             errors="surrogateescape",
             env=merged_env,
         )
-    except FileNotFoundError:
-        return Error(GitMissingError())
+    except FileNotFoundError as err:
+        raise GitMissingError from err
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip()
         if not detail:
             detail = f"exit code {completed.returncode}"
-        command = " ".join(("git", *args))
-        return Error(GitError(f"{command} failed: {detail}"))
-    return Ok(completed.stdout)
+        command = " ".join(cmd)
+        raise GitError(f"{command} failed: {detail}")
+    return completed.stdout
 
 
 def try_git(
-    cwd: Path, *args: str
-) -> Result[subprocess.CompletedProcess[str], AutommitError]:
+    cwd: Path, *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run Git when the caller needs to interpret a nonzero status."""
+    merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
+    cmd = ["git", *GIT_SAFE_ARGS, *args]
     try:
-        completed = subprocess.run(
-            ["git", *args],
+        return subprocess.run(
+            cmd,
             cwd=cwd,
             check=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="surrogateescape",
-            env={**os.environ, **GIT_ENVIRONMENT},
+            env=merged_env,
         )
-    except FileNotFoundError:
-        return Error(GitMissingError())
-    return Ok(completed)
+    except FileNotFoundError as err:
+        raise GitMissingError from err

@@ -8,8 +8,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NoReturn, cast
 
-from expression import Error, Ok, Result
-
 from autommit.errors import AutommitError
 from autommit.service import apply, prepare, validate_plan
 
@@ -28,135 +26,119 @@ class Parser(argparse.ArgumentParser):
 
 def build_parser() -> Parser:
     """Build the public command parser."""
-    parser = Parser(
-        prog="autommit",
-        description="Prepare and atomically publish model-planned Git commits.",
-        allow_abbrev=False,
+    parser = Parser(prog="autommit", description="Autommit transaction boundary.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    prepare_cmd = subparsers.add_parser("prepare")
+    prepare_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    prepare_cmd.add_argument(
+        "--scope", choices=["staged", "all"], default="all", type=str
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    _ = commands.add_parser("schema", help="Describe the JSON protocol.")
-    prepare_parser = commands.add_parser(
-        "prepare", help="Recover, stage changes, and return exact planning evidence."
-    )
-    _ = prepare_parser.add_argument(
-        "--scope",
-        choices=["all", "staged"],
-        default="all",
-        help="Scope of changes to capture: all (default) or staged",
-    )
-    _ = prepare_parser.add_argument("--repo", default=".", metavar="PATH")
-    validate = commands.add_parser(
-        "validate-plan", help="Validate a plan against a snapshot."
-    )
-    _ = validate.add_argument("--snapshot", required=True)
-    _ = validate.add_argument("--plan-file", type=Path, required=True)
-    _ = validate.add_argument("--require-split", action="store_true")
-    _ = validate.add_argument("--repo", default=".", metavar="PATH")
-    apply_parser = commands.add_parser(
-        "apply", help="Create and atomically publish commits."
-    )
-    _ = apply_parser.add_argument("--snapshot", required=True)
-    _ = apply_parser.add_argument("--plan-file", type=Path, required=True)
-    _ = apply_parser.add_argument("--decision-file", type=Path)
-    _ = apply_parser.add_argument("--repo", default=".", metavar="PATH")
+    prepare_cmd.add_argument("--context", action="append", default=[])
+    prepare_cmd.add_argument("positional_context", nargs="*", default=[])
+
+    validate_cmd = subparsers.add_parser("validate-plan")
+    validate_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    validate_cmd.add_argument("--snapshot", required=True)
+    validate_cmd.add_argument("--plan-file", type=Path, required=True)
+    validate_cmd.add_argument("--require-split", action="store_true")
+
+    apply_cmd = subparsers.add_parser("apply")
+    apply_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    apply_cmd.add_argument("--snapshot", required=True)
+    apply_cmd.add_argument("--plan-file", type=Path, required=True)
+    apply_cmd.add_argument("--decision-file", type=Path)
+
+    subparsers.add_parser("schema")
     return parser
 
 
-def _prepare_arguments(
-    values: Sequence[str],
-) -> Result[argparse.Namespace, AutommitError]:
+def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
     context: list[str] = []
-    repository = "."
-    scope_val: Literal["all", "staged"] = "all"
-    passthrough = False
-    index = 0
-    while index < len(values):
-        value = values[index]
-        if passthrough:
-            context.append(value)
-        elif value == "--":
-            passthrough = True
-        elif value in {"--context", "--repo", "--scope"}:
-            index += 1
-            if index >= len(values) or not values[index]:
-                return Error(AutommitError("usage_error", f"{value} requires a value"))
-            if value == "--context":
-                context.append(values[index])
-            elif value == "--repo":
-                repository = values[index]
-            elif value == "--scope":
-                arg_scope = values[index]
-                if arg_scope not in {"all", "staged"}:
-                    return Error(
-                        AutommitError(
-                            "usage_error", "--scope must be 'all' or 'staged'"
-                        )
-                    )
-                scope_val = cast('Literal["all", "staged"]', arg_scope)
-        elif value.startswith("--context="):
-            item = value.removeprefix("--context=")
-            if not item:
-                return Error(AutommitError("usage_error", "--context requires a value"))
-            context.append(item)
-        elif value.startswith("--repo="):
-            repository = value.removeprefix("--repo=")
-            if not repository:
-                return Error(AutommitError("usage_error", "--repo requires a value"))
-        elif value.startswith("--scope="):
-            raw_scope = value.removeprefix("--scope=")
-            if raw_scope not in {"all", "staged"}:
-                return Error(
-                    AutommitError("usage_error", "--scope must be 'all' or 'staged'")
-                )
-            scope_val = cast('Literal["all", "staged"]', raw_scope)
-        elif value.startswith("-"):
-            return Error(AutommitError("usage_error", f"Unsupported option: {value}"))
+    repo: Path = Path.cwd()
+    scope = "all"
+    idx = 0
+    double_dash = False
+    while idx < len(values):
+        tok = values[idx]
+        if double_dash:
+            context.append(tok)
+            idx += 1
+        elif tok == "--":
+            double_dash = True
+            idx += 1
+        elif tok == "--repo":
+            if idx + 1 >= len(values):
+                raise AutommitError("usage_error", "--repo requires an argument.")
+            repo = Path(values[idx + 1])
+            idx += 2
+        elif tok.startswith("--repo="):
+            repo = Path(tok.split("=", 1)[1])
+            idx += 1
+        elif tok == "--scope":
+            if idx + 1 >= len(values) or values[idx + 1] not in ("staged", "all"):
+                raise AutommitError("usage_error", "--scope must be 'staged' or 'all'.")
+            scope = values[idx + 1]
+            idx += 2
+        elif tok.startswith("--scope="):
+            val = tok.split("=", 1)[1]
+            if val not in ("staged", "all"):
+                raise AutommitError("usage_error", "--scope must be 'staged' or 'all'.")
+            scope = val
+            idx += 1
+        elif tok == "--context":
+            if idx + 1 >= len(values):
+                raise AutommitError("usage_error", "--context requires an argument.")
+            context.append(values[idx + 1])
+            idx += 2
+        elif tok.startswith("--context="):
+            context.append(tok.split("=", 1)[1])
+            idx += 1
+        elif tok.startswith("-"):
+            raise AutommitError("usage_error", f"Unrecognized option: {tok}")
         else:
-            context.append(value)
-        index += 1
-    return Ok(
-        argparse.Namespace(
-            command="prepare", context=context, repo=repository, scope=scope_val
-        )
+            context.append(tok)
+            idx += 1
+    return argparse.Namespace(
+        command="prepare",
+        repo=repo,
+        scope=scope,
+        context=context,
+        positional_context=[],
     )
 
 
 def _schema() -> dict[str, object]:
     return {
         "protocol": SCHEMA,
+        "version": SCHEMA,
         "commands": {
-            "schema": "Describe this protocol without repository mutation.",
-            "prepare": (
-                "Recover, stage only when the index is empty, "
-                "and return exact planning evidence."
-            ),
-            "validate-plan": (
-                "Validate complete staged-diff coverage; optionally require a split."
-            ),
-            "apply": (
-                "Prepare commits in a temporary worktree "
-                "and publish the branch by compare-and-swap."
-            ),
-        },
-        "plan": {
-            "commits": [
-                {
-                    "summary": "non-empty string",
-                    "details": ["optional detail"],
-                    "changes": [
-                        {
-                            "path": "staged path",
-                            "hunks": "all | {type:indices,indices:[1]} | "
-                            "{type:lines,start:1,end:2}",
-                        }
-                    ],
-                }
-            ]
-        },
-        "decision": {
-            "decision": "accept | split",
-            "concerns": ["optional concern"],
-            "rationale": "non-empty string",
+            "prepare": {
+                "inputs": {
+                    "scope": "staged | all",
+                    "repo": "path (optional, default: cwd)",
+                    "context": "array of strings (optional)",
+                },
+                "returns": "Evidence object with snapshot and diff",
+            },
+            "validate-plan": {
+                "inputs": {
+                    "snapshot": "string",
+                    "plan_file": "path",
+                    "require_split": "boolean (optional)",
+                    "repo": "path (optional, default: cwd)",
+                },
+                "returns": "Validation status with review requirement flag",
+            },
+            "apply": {
+                "inputs": {
+                    "snapshot": "string",
+                    "plan_file": "path",
+                    "decision_file": "path (optional)",
+                    "repo": "path (optional, default: cwd)",
+                },
+                "returns": "Publication evidence with created commit objects",
+            },
         },
     }
 
@@ -181,103 +163,71 @@ def _emit(payload: dict[str, object], *, error: bool = False) -> None:
 
 
 def _config_str(arguments: argparse.Namespace, field: str) -> str:
-    """Extract a required str option from parsed args."""
     return cast("str", getattr(arguments, field))
 
 
 def _config_bool(arguments: argparse.Namespace, field: str) -> bool:
-    """Extract a required bool flag from parsed args."""
     return cast("bool", getattr(arguments, field))
 
 
 def _config_path(arguments: argparse.Namespace, field: str) -> Path:
-    """Extract a required path option from parsed args."""
     return cast("Path", getattr(arguments, field))
 
 
 def _optional_path(arguments: argparse.Namespace, field: str) -> Path | None:
-    """Extract an optional path option from parsed args."""
     return cast("Path | None", getattr(arguments, field))
 
 
 def _config_str_list(arguments: argparse.Namespace, field: str) -> list[str]:
-    """Extract a required string-list option from parsed args."""
     return cast("list[str]", getattr(arguments, field))
 
 
-def _dispatch(
-    arguments: argparse.Namespace,
-) -> Result[object, AutommitError]:
+def _dispatch(arguments: argparse.Namespace) -> object:
     command = _config_str(arguments, "command")
     if command == "schema":
-        return Ok(_schema())
-    repo = _config_str(arguments, "repo")
-    cwd = Path(repo).resolve()
+        return _schema()
     if command == "prepare":
-        context = _config_str_list(arguments, "context")
-        raw_scope = getattr(arguments, "scope", "all")
-        scope: Literal["all", "staged"] = "staged" if raw_scope == "staged" else "all"
-        return prepare(cwd, tuple(context), scope=scope)
+        repo = _config_path(arguments, "repo").resolve()
+        scope_str = _config_str(arguments, "scope")
+        scope: Literal["staged", "all"] = "staged" if scope_str == "staged" else "all"
+        flag_context = _config_str_list(arguments, "context")
+        pos_context = _config_str_list(arguments, "positional_context")
+        return prepare(repo, tuple(flag_context + pos_context), scope=scope)
     if command == "validate-plan":
-        return validate_plan(
-            cwd,
-            _config_str(arguments, "snapshot"),
-            _config_path(arguments, "plan_file"),
-            require_split=_config_bool(arguments, "require_split"),
-        )
+        repo = _config_path(arguments, "repo").resolve()
+        snapshot = _config_str(arguments, "snapshot")
+        plan_file = _config_path(arguments, "plan_file").resolve()
+        require_split = _config_bool(arguments, "require_split")
+        return validate_plan(repo, snapshot, plan_file, require_split=require_split)
     if command == "apply":
-        return apply(
-            cwd,
-            _config_str(arguments, "snapshot"),
-            _config_path(arguments, "plan_file"),
-            _optional_path(arguments, "decision_file"),
-        )
-    return Error(AutommitError("usage_error", "Unknown command."))
+        repo = _config_path(arguments, "repo").resolve()
+        snapshot = _config_str(arguments, "snapshot")
+        plan_file = _config_path(arguments, "plan_file").resolve()
+        decision_file = _optional_path(arguments, "decision_file")
+        if decision_file is not None:
+            decision_file = decision_file.resolve()
+        return apply(repo, snapshot, plan_file, decision_file)
+    raise AutommitError("usage_error", "Unknown command.")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and preserve protocol output on expected failures."""
-    values = list(sys.argv[1:] if argv is None else argv)
-    command = values[0] if values else "unknown"
-    parser = build_parser()
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    command = args_list[0] if args_list and not args_list[0].startswith("-") else ""
     try:
-        if command == "prepare" and not any(
-            value in {"-h", "--help"} for value in values[1:]
-        ):
-            match _prepare_arguments(values[1:]):
-                case Result(tag="ok", ok=parsed_args):
-                    arguments = parsed_args
-                case Result(tag="error", error=err):
-                    _emit(_failure(command, err), error=True)
-                    return err.exit_code
-                case _:
-                    return 2
+        if command == "prepare":
+            arguments = _prepare_arguments(args_list[1:])
         else:
-            arguments = parser.parse_args(values)
-        command = _config_str(arguments, "command")
+            parser = build_parser()
+            arguments = parser.parse_args(args_list)
         result = _dispatch(arguments)
-    except AutommitError as error:
-        _emit(_failure(command, error), error=True)
-        return error.exit_code
-    except KeyboardInterrupt:
-        error = AutommitError("interrupted", "Autommit was interrupted.", 4)
-        _emit(_failure(command, error), error=True)
-        return error.exit_code
-    except Exception:
-        error = AutommitError(
-            "runtime_error",
-            "Autommit failed unexpectedly; repository state was preserved.",
-            4,
-        )
-        _emit(_failure(command, error), error=True)
-        return error.exit_code
-
-    match result:
-        case Result(tag="ok", ok=data):
-            _emit(_success(command, data))
-            return 0
-        case Result(tag="error", error=err):
-            _emit(_failure(command, err), error=True)
-            return err.exit_code
-        case _:
-            return 2
+        _emit(_success(command, result))
+    except AutommitError as err:
+        _emit(_failure(command or "autommit", err), error=True)
+        return err.exit_code
+    except Exception as err:
+        unknown = AutommitError("internal_error", f"Unexpected failure: {err}", 1)
+        _emit(_failure(command or "autommit", unknown), error=True)
+        return 1
+    else:
+        return 0

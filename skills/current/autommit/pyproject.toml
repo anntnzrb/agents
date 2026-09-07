@@ -39,7 +39,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["T201", "INP001"]
-"tests/**/*.py" = ["S101", "PT009", "ANN", "ARG", "E402", "INP001", "FBT001"]
+"tests/**/*.py" = ["S101", "PT009", "PT027", "ANN", "ARG", "E402", "INP001", "FBT001"]
 
 [tool.ruff.format]
 quote-style = "double"
