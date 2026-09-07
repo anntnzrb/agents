@@ -107,6 +107,7 @@ const COMMIT_AGENT_SYSTEM_PROMPT = [
     "When independent concerns share one Git hunk, split them with disjoint new-file `lines` ranges; never collapse them because Git presented one hunk.",
     "Whenever one file contains both formatting-only and semantic edits, you MUST use separate commit groups with disjoint new-file `lines` ranges, even when Git presents them as one hunk.",
     "Choose propose_commit only for one indivisible concern; otherwise choose split_commit.",
+    "Hunk indices are 1-based (hunk 1 is the first hunk). Never use 0 as a hunk index.",
     "Cover every staged file and selected hunk exactly once in split plans.",
     "Finish immediately after exactly one valid propose_commit or split_commit call.",
     "Never call propose_changelog; changelog generation is disabled.",
