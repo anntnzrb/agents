@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Standalone direct runner for autommit with pluggable AI providers."""
+"""Standalone direct runner for autommit with pluggable AI providers and full atomicity critic."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ if str(LIB_PATH) not in sys.path:
 
 # ruff: noqa: E402
 from autommit.errors import AutommitError
+from autommit.proposal import normalize_atomicity_decision, normalize_proposal
 from autommit.service import apply, prepare, validate_plan
 
 
@@ -217,13 +218,136 @@ def _call_opencode_api(options: ApiCallOptions) -> str:
 
     if not isinstance(content, str) or not content.strip():
         raise AutommitError("provider_error", "Empty completion from provider.")
+    return content
+
+
+def _clean_json_response(content: str) -> str:
     cleaned = content.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
         cleaned = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
         if cleaned.startswith("json"):
             cleaned = cleaned[4:].strip()
-    return json.loads(cleaned)
+    return cleaned
+
+
+def generate_plan_opencode(
+    request: PlanRequest,
+    *,
+    timeout: float = 300.0,
+) -> dict[str, object]:
+    """Call OpenCode Go / Zen endpoint with proper session headers and protocol routing."""
+    is_go = request.api_key != "public" and "contributor" in request.model.model_id
+    endpoint = (
+        "https://opencode.ai/zen/go/v1/responses"
+        if is_go
+        else "https://opencode.ai/zen/v1/chat/completions"
+    )
+    headers = {
+        "Authorization": f"Bearer {request.api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "omp/18.2.0",
+        "x-opencode-session": "autommit-session-001",
+    }
+
+    context_parts: list[str] = []
+    if request.repository_context.strip():
+        context_parts.append(
+            f"REPOSITORY POLICY & RECENT COMMITS:\n{request.repository_context}"
+        )
+    if request.user_context:
+        context_parts.append("USER INSTRUCTIONS:\n" + "\n".join(request.user_context))
+    if request.forced_split_context:
+        context_parts.append(f"CRITIC REQUIREMENT:\n{request.forced_split_context}")
+    context_parts.append(
+        f"STAGED FILES:\n{json.dumps(list(request.staged_files))}\n\nDIFF:\n{request.diff}"
+    )
+    user_prompt = "\n\n".join(context_parts)
+
+    if is_go:
+        payload: dict[str, object] = {
+            "model": request.model.model_id,
+            "input": f"{PLAN_SYSTEM_PROMPT}\n\n{user_prompt}",
+        }
+    else:
+        messages = [
+            {"role": "system", "content": PLAN_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
+        payload = {
+            "model": request.model.model_id,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+        if request.model.effort is not None:
+            effort_map: dict[str, str] = {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "high",
+                "max": "high",
+            }
+            payload["reasoning_effort"] = effort_map.get(request.model.effort, "high")
+
+    options = ApiCallOptions(
+        endpoint=endpoint,
+        headers=headers,
+        payload=payload,
+        timeout=timeout,
+        is_go=is_go,
+    )
+    raw_content = _call_opencode_api(options)
+    return json.loads(_clean_json_response(raw_content))
+
+
+def run_atomicity_critic_opencode(
+    diff: str,
+    proposal: dict[str, object],
+    model: ParsedModel,
+    api_key: str,
+    *,
+    timeout: float = 60.0,
+) -> dict[str, object]:
+    """Review single broad proposals using the independent critic prompt."""
+    is_go = api_key != "public" and "contributor" in model.model_id
+    endpoint = (
+        "https://opencode.ai/zen/go/v1/responses"
+        if is_go
+        else "https://opencode.ai/zen/v1/chat/completions"
+    )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "autommit-runner/1.0",
+        "x-opencode-session": "autommit-critic",
+    }
+    critic_input = (
+        f"PROPOSAL:\n{json.dumps(proposal, indent=2)}\n\nDIFF TO COMMIT:\n{diff}"
+    )
+    if is_go:
+        payload: dict[str, object] = {
+            "model": model.model_id,
+            "input": f"{CRITIC_SYSTEM_PROMPT}\n\n{critic_input}",
+        }
+    else:
+        messages = [
+            {"role": "system", "content": CRITIC_SYSTEM_PROMPT},
+            {"role": "user", "content": critic_input},
+        ]
+        payload = {
+            "model": model.model_id,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+    options = ApiCallOptions(
+        endpoint=endpoint,
+        headers=headers,
+        payload=payload,
+        timeout=timeout,
+        is_go=is_go,
+    )
+    raw_content = _call_opencode_api(options)
+    return json.loads(_clean_json_response(raw_content))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -349,15 +473,66 @@ def run(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write("Validating atomic plan...\n")
         val = validate_plan(repo, snapshot, plan_path)
         commit_count = val["commit_count"]
+        requires_review = bool(val.get("requires_atomicity_review"))
         sys.stdout.write(f"Plan validated: {commit_count} commit(s) planned.\n")
 
-        # Step 4: Apply
-        sys.stdout.write("Applying atomic commits to Git...\n")
-        result = apply(repo, snapshot, plan_path, decision_file=None)
-        commits = cast("list[dict[str, str]]", result.get("commits", []))
-        sys.stdout.write(f"Successfully published {len(commits)} commit(s):\n")
-        for c in commits:
-            sys.stdout.write(f"  {c['sha'][:7]} {c['summary']}\n")
-        return 0
+        decision_path: Path | None = None
+        if requires_review:
+            sys.stdout.write(
+                "Provisional single-commit proposal triggered atomicity review...\n"
+            )
+            critic_result = run_atomicity_critic_opencode(
+                diff, plan_obj, parsed_model, api_key, timeout=args.timeout
+            )
+            decision = normalize_atomicity_decision(critic_result)
+            if decision.decision == "split":
+                sys.stdout.write(
+                    f"Critic rejected single commit: {'; '.join(decision.concerns)}. Forcing split plan...\n"
+                )
+                concerns_text = "\n".join(f"- {c}" for c in decision.concerns)
+                forced_context = (
+                    f"The atomicity critic rejected the single commit proposal.\n"
+                    f"Concerns:\n{concerns_text}\n"
+                    f"Rationale: {decision.rationale}\n"
+                    f"You MUST split these changes into at least 2 atomic commits addressing these concerns."
+                )
+                forced_request = PlanRequest(
+                    diff=diff,
+                    staged_files=staged_files,
+                    repository_context=repository_context,
+                    user_context=user_context,
+                    model=parsed_model,
+                    api_key=api_key,
+                    forced_split_context=forced_context,
+                )
+                plan_obj = generate_plan_opencode(forced_request, timeout=args.timeout)
+                _ = normalize_proposal(plan_obj)
+                plan_path.write_text(json.dumps(plan_obj, indent=2), encoding="utf-8")
+                val = validate_plan(repo, snapshot, plan_path, require_split=True)
+                sys.stdout.write(
+                    f"Forced split plan validated: {val['commit_count']} commit(s) planned.\n"
+                )
+            else:
+                sys.stdout.write(
+                    f"Critic accepted single atomic commit: {decision.rationale}\n"
+                )
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".json", delete=False, encoding="utf-8"
+                ) as temp_dec:
+                    temp_dec.write(json.dumps(critic_result))
+                    decision_path = Path(temp_dec.name)
+
+        try:
+            # Step 4: Apply
+            sys.stdout.write("Applying atomic commits to Git...\n")
+            result = apply(repo, snapshot, plan_path, decision_file=decision_path)
+            commits = cast("list[dict[str, str]]", result.get("commits", []))
+            sys.stdout.write(f"Successfully published {len(commits)} commit(s):\n")
+            for c in commits:
+                sys.stdout.write(f"  {c['sha'][:7]} {c['summary']}\n")
+            return 0
+        finally:
+            if decision_path:
+                decision_path.unlink(missing_ok=True)
     finally:
         plan_path.unlink(missing_ok=True)
