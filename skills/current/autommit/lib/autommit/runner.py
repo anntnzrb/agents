@@ -21,11 +21,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
-LIB_PATH = Path(__file__).resolve().parent.parent / "lib"
-if str(LIB_PATH) not in sys.path:
-    sys.path.insert(0, str(LIB_PATH))
-
-# ruff: noqa: E402
 from autommit.errors import AutommitError
 from autommit.proposal import normalize_atomicity_decision, normalize_proposal
 from autommit.service import apply, prepare, validate_plan

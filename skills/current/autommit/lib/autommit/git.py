@@ -26,32 +26,6 @@ GIT_SAFE_ARGS: Final[tuple[str, ...]] = (
 )
 
 
-def run_git(cwd: Path, *args: str, env: dict[str, str] | None = None) -> str:
-    """Run Git without a shell and return stdout, raising GitError on failure."""
-    merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
-    cmd = ["git", *GIT_SAFE_ARGS, *args]
-    try:
-        completed = subprocess.run(
-            cmd,
-            cwd=cwd,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="surrogateescape",
-            env=merged_env,
-        )
-    except FileNotFoundError as err:
-        raise GitMissingError from err
-    if completed.returncode != 0:
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        if not detail:
-            detail = f"exit code {completed.returncode}"
-        command = " ".join(cmd)
-        raise GitError(f"{command} failed: {detail}")
-    return completed.stdout
-
-
 def try_git(
     cwd: Path, *args: str, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -71,3 +45,17 @@ def try_git(
         )
     except FileNotFoundError as err:
         raise GitMissingError from err
+
+
+def run_git(cwd: Path, *args: str, env: dict[str, str] | None = None) -> str:
+    """Run Git without a shell and return stdout, raising GitError on failure."""
+    completed = try_git(cwd, *args, env=env)
+    if completed.returncode != 0:
+        detail = (
+            completed.stderr.strip()
+            or completed.stdout.strip()
+            or f"exit code {completed.returncode}"
+        )
+        command = " ".join(["git", *GIT_SAFE_ARGS, *args])
+        raise GitError(f"{command} failed: {detail}")
+    return completed.stdout

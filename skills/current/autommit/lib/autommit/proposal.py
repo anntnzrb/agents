@@ -145,38 +145,37 @@ def _integer(value: object, label: str) -> int:
     return value
 
 
+def _parse_indices_list(raw_indices: object, empty_error: str) -> tuple[int, ...]:
+    if not isinstance(raw_indices, list) or not raw_indices:
+        raise _invalid(empty_error)
+    ind_list: list[int] = []
+    for idx, item in enumerate(raw_indices):
+        int_val = _integer(item, f"hunk index [{idx}]")
+        if int_val < 1:
+            raise _invalid(f"hunk index [{idx}] must be >= 1")
+        ind_list.append(int_val)
+    if len(set(ind_list)) != len(ind_list):
+        raise _invalid("duplicate hunk index in selector")
+    return tuple(sorted(ind_list))
+
+
 def _normalize_selector(value: object) -> HunkSelector:
     if value == "all":
         return AllSelector()
     if isinstance(value, list):
-        if not value:
-            raise _invalid("hunk indices array must not be empty")
-        indices: list[int] = []
-        for idx, item in enumerate(value):
-            int_val = _integer(item, f"hunk index [{idx}]")
-            if int_val < 1:
-                raise _invalid(f"hunk index [{idx}] must be >= 1")
-            indices.append(int_val)
-        if len(set(indices)) != len(indices):
-            raise _invalid("duplicate hunk index in selector")
-        return IndicesSelector(tuple(sorted(indices)))
+        return IndicesSelector(
+            _parse_indices_list(value, "hunk indices array must not be empty")
+        )
     if isinstance(value, dict):
         obj = _mapping(value, "hunks selector")
         sel_type = obj.get("type") or obj.get("kind")
         if sel_type in ("indices", "index") or "indices" in obj:
             _record(obj, "indices selector", frozenset({"indices", "type", "kind"}))
-            raw_indices = obj.get("indices")
-            if not isinstance(raw_indices, list) or not raw_indices:
-                raise _invalid("hunk indices must be a non-empty array")
-            ind_list: list[int] = []
-            for idx, item in enumerate(raw_indices):
-                int_val = _integer(item, f"hunk index [{idx}]")
-                if int_val < 1:
-                    raise _invalid(f"hunk index [{idx}] must be >= 1")
-                ind_list.append(int_val)
-            if len(set(ind_list)) != len(ind_list):
-                raise _invalid("duplicate hunk index in selector")
-            return IndicesSelector(tuple(sorted(ind_list)))
+            return IndicesSelector(
+                _parse_indices_list(
+                    obj.get("indices"), "hunk indices must be a non-empty array"
+                )
+            )
         if "start" in obj or "end" in obj or sel_type == "lines":
             _record(obj, "lines selector", frozenset({"start", "end", "type", "kind"}))
             start = _integer(obj.get("start"), "lines.start")
@@ -583,9 +582,6 @@ def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
     first_hunk = file.content.find("\n@@")
     file_header = file.content if first_hunk < 0 else file.content[:first_hunk]
     selected_hunks: list[str] = []
-    old_line_cursor = 1
-    new_line_cursor = 1
-
     for hunk in file.hunks:
         hunk_end = (
             hunk.new_start
@@ -593,8 +589,6 @@ def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
             else hunk.new_start + hunk.new_lines - 1
         )
         if hunk_end < selector.start or hunk.new_start > selector.end:
-            old_line_cursor += hunk.old_lines
-            new_line_cursor += hunk.new_lines
             continue
 
         hunk_lines = hunk.content.splitlines()[1:]
