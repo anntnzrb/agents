@@ -10,8 +10,10 @@ import argparse
 import http
 import json
 import os
+import ssl
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
@@ -77,94 +79,132 @@ PLAN_SYSTEM_PROMPT = """You are an expert Git commit planner. Given a Git diff, 
 }
 
 Rules:
-1. Every staged file and every staged hunk MUST be covered exactly once across all commits.
-2. Hunk indices in {"indices": [...]} are 1-based (index 1 is the first hunk). Never use 0.
-3. Group related changes into the smallest independently-revertible atomic commits.
-4. If multiple changes belong to distinct features or concerns, split them into separate commits.
-5. Output ONLY valid JSON. Do not include markdown formatting, backticks, or any explanatory text."""
+1. Read the REPOSITORY POLICY and RECENT COMMITS carefully. Match the repository's commit conventions (e.g. `skills(<skill>): ...`, `<harness>: ...`, `docs: ...`, or specific prefixes). Do not use generic conventional commits like `feat(...)` or `fix(...)` unless explicitly requested by the repo policy.
+2. Every staged file and every staged hunk MUST be covered exactly once across all commits.
+3. Hunk indices in {"indices": [...]} are 1-based (index 1 is the first hunk). Never use 0.
+4. Group related changes into the smallest independently-revertible atomic commits.
+5. If multiple changes belong to distinct features or concerns, split them into separate commits.
+6. Output ONLY valid JSON. Do not include markdown formatting, backticks, or any explanatory text."""
 
 
-def generate_plan_opencode(
-    diff: str,
-    staged_files: Sequence[str],
-    model: ParsedModel,
-    api_key: str,
-    *,
-    timeout: float = 30.0,
-) -> dict[str, object]:
-    """Call OpenCode Go / Zen endpoint with proper session headers and protocol routing."""
-    is_go = api_key != "public" and "contributor" in model.model_id
-    endpoint = (
-        "https://opencode.ai/zen/go/v1/responses"
-        if is_go
-        else "https://opencode.ai/zen/v1/chat/completions"
-    )
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "User-Agent": "autommit-runner/1.0",
-        "x-opencode-session": "autommit-runner",
-    }
+CRITIC_SYSTEM_PROMPT = """You are an independent atomicity critic. Review a single-commit proposal for an unattended commit workflow.
 
-    if is_go:
-        user_prompt = (
-            f"STAGED FILES:\n{json.dumps(list(staged_files))}\n\nDIFF:\n{diff}"
+An atomic commit expresses exactly one independently-revertible change with all necessary implementation, tests, and metadata.
+Reject the proposal and choose "split" when:
+- Multiple independent behaviors, bug fixes, or features are bundled together.
+- Unrelated files, docs, or configs are lumped into the same commit.
+
+Output ONLY a JSON object matching this exact schema:
+{
+  "decision": "accept" | "split",
+  "concerns": ["<concern 1>", "<concern 2>"],
+  "rationale": "<brief explanation>"
+}"""
+
+
+KNOWN_CA_LOCATIONS: tuple[str, ...] = (
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/pki/tls/certs/ca-bundle.crt",
+    "/etc/ssl/ca-bundle.pem",
+    "/etc/ssl/cert.pem",
+)
+
+
+def _create_secure_ssl_context() -> ssl.SSLContext:
+    """Create an SSL context with resilient CA bundle resolution across Linux distros and macOS."""
+    ctx = ssl.create_default_context()
+    for ca_path in KNOWN_CA_LOCATIONS:
+        try:
+            ctx.load_verify_locations(ca_path)
+            break
+        except OSError:
+            pass
+    return ctx
+
+
+@dataclass(frozen=True, slots=True)
+class PlanRequest:
+    """Input payload for generating an atomic commit plan."""
+
+    diff: str
+    staged_files: Sequence[str]
+    repository_context: str
+    user_context: Sequence[str]
+    model: ParsedModel
+    api_key: str
+    forced_split_context: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApiCallOptions:
+    """Network call options for OpenCode API."""
+
+    endpoint: str
+    headers: dict[str, str]
+    payload: dict[str, object]
+    timeout: float
+    is_go: bool
+    max_retries: int = 3
+
+
+def _call_opencode_api(options: ApiCallOptions) -> str:
+    ssl_context = _create_secure_ssl_context()
+    last_error: Exception | None = None
+
+    for attempt in range(options.max_retries):
+        req = urllib.request.Request(  # noqa: S310
+            options.endpoint,
+            data=json.dumps(options.payload).encode("utf-8"),
+            headers=options.headers,
+            method="POST",
         )
-        payload: dict[str, object] = {
-            "model": model.model_id,
-            "input": f"{PLAN_SYSTEM_PROMPT}\n\n{user_prompt}",
-        }
+        try:
+            with urllib.request.urlopen(  # noqa: S310
+                req, timeout=options.timeout, context=ssl_context
+            ) as response:
+                if response.status != http.HTTPStatus.OK:
+                    raise AutommitError(
+                        "provider_error",
+                        f"OpenCode API returned status {response.status}",
+                        exit_code=1,
+                    )
+                raw_data = response.read().decode("utf-8")
+                break
+        except urllib.error.HTTPError as err:
+            if (
+                err.code == http.HTTPStatus.TOO_MANY_REQUESTS
+                and attempt < options.max_retries - 1
+            ):
+                # Exponential backoff on rate limit (1.5s, 3.0s)
+                time.sleep(1.5 * (2**attempt))
+                last_error = err
+                continue
+            err_body = err.read().decode("utf-8", "replace")
+            raise AutommitError(
+                "provider_error",
+                f"OpenCode API error ({err.code}): {err_body}",
+                exit_code=1,
+            ) from err
+        except TimeoutError as err:
+            raise AutommitError(
+                "network_timeout",
+                f"OpenCode API timed out after {options.timeout}s. Retry with a higher --timeout or a faster model.",
+                exit_code=1,
+            ) from err
+        except OSError as err:
+            raise AutommitError(
+                "network_error",
+                f"Failed to connect to OpenCode API: {err}",
+                exit_code=1,
+            ) from err
     else:
-        messages = [
-            {"role": "system", "content": PLAN_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"STAGED FILES:\n{json.dumps(list(staged_files))}\n\nDIFF:\n{diff}",
-            },
-        ]
-        payload = {
-            "model": model.model_id,
-            "messages": messages,
-            "response_format": {"type": "json_object"},
-        }
-        if model.effort is not None:
-            effort_map: dict[str, str] = {
-                "low": "low",
-                "medium": "medium",
-                "high": "high",
-                "xhigh": "high",
-                "max": "high",
-            }
-            payload["reasoning_effort"] = effort_map.get(model.effort, "high")
-    req = urllib.request.Request(  # noqa: S310
-        endpoint,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:  # noqa: S310
-            if response.status != http.HTTPStatus.OK:
-                raise AutommitError(
-                    "provider_error",
-                    f"OpenCode API returned status {response.status}",
-                    exit_code=1,
-                )
-            raw_data = response.read().decode("utf-8")
-    except urllib.error.HTTPError as err:
-        err_body = err.read().decode("utf-8", "replace")
         raise AutommitError(
-            "provider_error",
-            f"OpenCode API error ({err.code}): {err_body}",
+            "rate_limit_exceeded",
+            f"OpenCode API rate limit exceeded after {options.max_retries} attempts: {last_error}",
             exit_code=1,
-        ) from err
-    except OSError as err:
-        raise AutommitError(
-            "network_error", f"Failed to connect to OpenCode API: {err}", exit_code=1
-        ) from err
-
+        )
     data = json.loads(raw_data)
-    if is_go:
+    if options.is_go:
         content_parts: list[str] = []
         for item in data.get("output", []):
             if isinstance(item, dict) and item.get("type") == "message":
@@ -219,8 +259,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=30.0,
-        help="Inference HTTP timeout in seconds (default: 30.0).",
+        default=300.0,
+        help="Inference HTTP timeout in seconds (default: 300.0).",
     )
     parser.add_argument("--context", action="append", default=[])
     return parser
