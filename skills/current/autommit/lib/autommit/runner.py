@@ -62,12 +62,12 @@ def parse_model_string(raw: str) -> ParsedModel:
     return ParsedModel(provider=provider, model_id=model_id, effort=effort)
 
 
-PLAN_SYSTEM_PROMPT = """You are an expert Git commit planner. Given a Git diff, output ONLY a valid JSON object matching this exact schema:
+PLAN_SYSTEM_PROMPT = """You are an expert Git commit planner. Given a repository's policy and a staged diff, output ONLY a valid JSON object matching this exact schema:
 {
   "commits": [
     {
-      "summary": "<type>(<scope>): <subject>",
-      "details": ["<optional point 1>", "<optional point 2>"],
+      "summary": "<commit message summary adhering strictly to repository policy/conventions>",
+      "details": ["<optional detail point 1>", "<optional detail point 2>"],
       "changes": [
         {
           "path": "<relative file path>",
@@ -304,11 +304,13 @@ def run(argv: Sequence[str] | None = None) -> int:
     diff = str(prep["diff"])
     staged_files = cast("list[str]", prep["staged_files"])
     hunk_count = prep["changed_hunk_count"]
+    repository_context = str(prep.get("repository_context", ""))
+    user_context = cast("list[str]", prep.get("user_context", []))
     sys.stdout.write(
         f"Staged {len(staged_files)} file(s), {hunk_count} hunk(s) (snapshot {snapshot[:8]})\n"
     )
 
-    # Step 2: Inference
+    # Step 2: Plan generation with retry
     model_display = f"{parsed_model.model_id}" + (
         f":{parsed_model.effort}" if parsed_model.effort else ""
     )
@@ -322,9 +324,19 @@ def run(argv: Sequence[str] | None = None) -> int:
     sys.stdout.write(
         f"Generating split plan via {provider_name} ({model_display})...\n"
     )
-    plan_obj = generate_plan_opencode(
-        diff, staged_files, parsed_model, api_key, timeout=args.timeout
+
+    plan_request = PlanRequest(
+        diff=diff,
+        staged_files=staged_files,
+        repository_context=repository_context,
+        user_context=user_context,
+        model=parsed_model,
+        api_key=api_key,
     )
+    plan_obj = generate_plan_opencode(plan_request, timeout=args.timeout)
+
+    # Validate normalized structure
+    _ = normalize_proposal(plan_obj)
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False, encoding="utf-8"
