@@ -710,6 +710,19 @@ class AutommitUnitTests(unittest.TestCase):
         self.assertEqual(len(proposal.commits), 1)
         self.assertEqual(proposal.commits[0].summary, "feat: test")
 
+        # 0-based hunk index must be rejected with invalid_plan error
+        invalid_zero_index = {
+            "commits": [
+                {
+                    "summary": "feat: zero index",
+                    "details": [],
+                    "changes": [{"path": "a.txt", "hunks": [0]}],
+                }
+            ]
+        }
+        with self.assertRaises(AutommitError):
+            _ = normalize_proposal(invalid_zero_index)
+
     def test_normalize_atomicity_decision(self) -> None:
         valid_accept = {
             "decision": "accept",
