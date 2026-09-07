@@ -520,7 +520,7 @@ const execRepoSplit = async (
         const issueRefs = commit.issue_refs ?? [];
         const dependencies = (commit.dependencies ?? []).map(dep => Math.floor(dep));
         const changes = commit.changes.map(change => ({
-            path: change.path,
+            path: change.path.startsWith("./") ? change.path.slice(2) : change.path,
             kind: change.kind,
             indices: change.indices,
             start: change.start,
