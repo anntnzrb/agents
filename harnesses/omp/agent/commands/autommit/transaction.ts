@@ -190,7 +190,7 @@ const isRecord = (value: unknown): value is JsonRecord =>
 
 const hasExactKeys = (value: JsonRecord, keys: readonly string[]): boolean => {
     const ownKeys = Reflect.ownKeys(value);
-    return ownKeys.length === keys.length && keys.every(key => Object.prototype.hasOwnProperty.call(value, key));
+    return ownKeys.length === keys.length && keys.every(key => Object.hasOwn(value, key));
 };
 
 const validateReceiptValue = (value: unknown): Receipt => {
@@ -242,7 +242,7 @@ const readBoundedText = async (target: string, maxBytes: number): Promise<string
         if (error instanceof Error && error.message.startsWith("Autommit file exceeds")) throw error;
         throw pathError("Unable to read Autommit file", target, error);
     } finally {
-        if (handle) await handle.close().catch(() => {});
+        await handle?.close().catch(() => {});
     }
 };
 
@@ -297,7 +297,7 @@ export const writeReceipt = async (commonDir: string, receipt: Receipt): Promise
     } catch (error) {
         throw pathError("Unable to write Autommit receipt", paths.receipt, error);
     } finally {
-        if (handle) await handle.close().catch(() => {});
+        await handle?.close().catch(() => {});
         await unlink(tempPath).catch(() => {});
     }
 };
@@ -374,7 +374,7 @@ export const withOperationLock = async <T>(commonDir: string, fn: () => Promise<
         await handle.close();
         handle = undefined;
     } catch (error) {
-        if (handle) await handle.close().catch(() => {});
+        await handle?.close().catch(() => {});
         if (handle) await unlink(paths.lock).catch(() => {});
         if (isErrorCode(error, "EEXIST")) {
             throw new Error(

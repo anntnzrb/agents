@@ -22,8 +22,6 @@ const ATOMICITY_DECISION_KEYS: Record<string, true> = {
     concerns: true,
     rationale: true,
 };
-
-
 export const ATOMICITY_CRITIC_SYSTEM_PROMPT = [
     "You are an atomicity critic for a staged repository proposal.",
     "Define exactly one behavior by its externally observable goal, preconditions, postconditions, and invariants.",

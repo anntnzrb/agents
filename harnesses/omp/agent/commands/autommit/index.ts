@@ -135,7 +135,6 @@ interface CommitOptions {
     readonly context: readonly string[];
     readonly debug: boolean;
 }
-
 interface ParseState {
     readonly options: CommitOptions;
     readonly awaitingContext: boolean;
@@ -208,7 +207,6 @@ const parseArgs = (args: readonly string[]): ParseResult => {
 
 const composeContext = (options: CommitOptions): string =>
     [...options.context].filter(Boolean).join("\n\n");
-
 export const emitTrace = (enabled: boolean, event: string, data?: Record<string, unknown>): void => {
     if (!enabled) return;
     const entry = {
@@ -276,6 +274,18 @@ const formatCommitMessage = (
     return body.length > 0 ? `${summary.trim()}\n\n${body.join("\n")}` : summary.trim();
 };
 
+const GIT_PATH_ESCAPES: Record<string, number> = {
+    n: 0x0a,
+    t: 0x09,
+    r: 0x0d,
+    b: 0x08,
+    f: 0x0c,
+    v: 0x0b,
+    a: 0x07,
+    '"': 0x22,
+    "\\": 0x5c,
+};
+
 export const unquoteGitPath = (path: string): string => {
     if (!path.startsWith('"') || !path.endsWith('"') || path.length < 2) {
         return path;
@@ -291,45 +301,16 @@ export const unquoteGitPath = (path: string): string => {
                 bytes.push(0x5c);
                 break;
             }
-            const next = raw[i];
-            if (next !== undefined && next >= "0" && next <= "7") {
+            const next = raw[i]!;
+            if (next >= "0" && next <= "7") {
                 let octal = next;
-                if (i + 1 < raw.length && raw[i + 1] !== undefined && raw[i + 1]! >= "0" && raw[i + 1]! <= "7") {
-                    octal += raw[i + 1];
-                    i += 1;
-                    if (i + 1 < raw.length && raw[i + 1] !== undefined && raw[i + 1]! >= "0" && raw[i + 1]! <= "7") {
-                        octal += raw[i + 1];
-                        i += 1;
-                    }
+                for (let j = 0; j < 2 && i + 1 < raw.length && raw[i + 1]! >= "0" && raw[i + 1]! <= "7"; j += 1) {
+                    octal += raw[++i];
                 }
                 bytes.push(Number.parseInt(octal, 8));
                 i += 1;
-            } else if (next === "n") {
-                bytes.push(0x0a);
-                i += 1;
-            } else if (next === "t") {
-                bytes.push(0x09);
-                i += 1;
-            } else if (next === "r") {
-                bytes.push(0x0d);
-                i += 1;
-            } else if (next === "b") {
-                bytes.push(0x08);
-                i += 1;
-            } else if (next === "f") {
-                bytes.push(0x0c);
-                i += 1;
-            } else if (next === "v") {
-                bytes.push(0x0b);
-                i += 1;
-            } else if (next === "a") {
-                bytes.push(0x07);
-                i += 1;
-            } else if (next === '"') {
-                bytes.push(0x22);
-                i += 1;
-            } else if (next === "\\") {
-                bytes.push(0x5c);
+            } else if (next in GIT_PATH_ESCAPES) {
+                bytes.push(GIT_PATH_ESCAPES[next]!);
                 i += 1;
             } else {
                 bytes.push(raw.charCodeAt(i));
@@ -449,30 +430,32 @@ const execRepoProposal = async (
 const validateHunkSelectors = (
     commitIndex: number,
     changes: SplitCommitGroup["changes"],
-    files: string[],
 ): { readonly errors: string[]; readonly warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
     const prefix = `Commit ${commitIndex + 1}`;
-    if (files.length === 0) {
+    if (changes.length === 0) {
         errors.push(`${prefix}: no files specified`);
         return { errors, warnings };
     }
     for (const change of changes) {
         if (change.kind === "indices") {
-            const invalid = (change.indices ?? []).filter(
-                value => !Number.isFinite(value) || Math.floor(value) !== value || value < 1,
+            const hasInvalid = (change.indices ?? []).some(
+                value => !Number.isInteger(value) || value < 1,
             );
-            if (invalid.length > 0) errors.push(`${prefix}: invalid hunk indices for ${change.path}`);
+            if (hasInvalid) errors.push(`${prefix}: invalid hunk indices for ${change.path}`);
             continue;
         }
         if (change.kind === "lines") {
             const { start, end } = change;
-            if (start === undefined || end === undefined || !Number.isFinite(start) || !Number.isFinite(end)) {
-                errors.push(`${prefix}: invalid line range for ${change.path}`);
-                continue;
-            }
-            if (Math.floor(start) !== start || Math.floor(end) !== end || start < 1 || end < start) {
+            if (
+                start === undefined ||
+                end === undefined ||
+                !Number.isInteger(start) ||
+                !Number.isInteger(end) ||
+                start < 1 ||
+                end < start
+            ) {
                 errors.push(`${prefix}: invalid line range for ${change.path}`);
             }
         }
@@ -484,7 +467,7 @@ const validateDependencies = (commitIndex: number, dependencies: number[], total
     const errors: string[] = [];
     const prefix = `Commit ${commitIndex + 1}`;
     for (const dependency of dependencies) {
-        if (!Number.isFinite(dependency) || Math.floor(dependency) !== dependency) {
+        if (!Number.isInteger(dependency)) {
             errors.push(`${prefix}: dependency index must be an integer`);
             continue;
         }
@@ -498,6 +481,7 @@ const validateDependencies = (commitIndex: number, dependencies: number[], total
     }
     return errors;
 };
+
 
 const execRepoSplit = async (
     state: CommitAgentState,
@@ -527,9 +511,8 @@ const execRepoSplit = async (
             start: change.start,
             end: change.end,
         }));
-        const files = changes.map(change => change.path);
         errors.push(...validateSubject(summary).map(error => `Commit ${index + 1}: ${error}`));
-        const hunkValidation = validateHunkSelectors(index, changes, files);
+        const hunkValidation = validateHunkSelectors(index, changes);
         warnings.push(...hunkValidation.warnings);
         errors.push(...hunkValidation.errors);
         errors.push(...validateDependencies(index, dependencies, (params.commits ?? []).length));
@@ -1138,7 +1121,7 @@ export const selectPatch = (
     if (file.isBinary && selector.kind !== "all") {
         throw new Error(`Cannot partially select binary file ${file.filename}.`);
     }
-    const isRename = file.content.includes("\nrename " + "from ") || file.content.startsWith("rename " + "from ");
+    const isRename = file.content.includes("\nrename from ") || file.content.startsWith("rename from ");
     if (isRename && selector.kind !== "all") {
         throw new Error(`Cannot partially select renamed file ${file.filename}; entire file change must be committed together.`);
     }
