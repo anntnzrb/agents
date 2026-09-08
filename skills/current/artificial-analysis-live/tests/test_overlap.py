@@ -64,12 +64,12 @@ def test_fuzzy_or_partial_overlap_never_warns() -> None:
 
 def test_dependencies_and_independence_are_declarative_and_unchanged() -> None:
     metadata = declarative_dependencies(
-        component_id="harness",
+        component_id="evaluation",
         release="1",
         depends_on=[_component("agentic", "2026-01")],
         independent_of=[_component("price", "2026-01")],
     )
-    assert metadata["component_id"] == "harness"
+    assert metadata["component_id"] == "evaluation"
     assert metadata["release"] == "1"
     assert metadata["dependencies"] == [_component("agentic", "2026-01")]
     assert metadata["independence"] == [_component("price", "2026-01")]

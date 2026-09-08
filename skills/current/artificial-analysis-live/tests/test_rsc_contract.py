@@ -3,27 +3,23 @@
 # ruff: noqa: E501
 from __future__ import annotations
 
-import tempfile
+import gzip
+import hashlib
+import json
 import unittest
-from pathlib import Path
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from artificial_analysis.diagnostics import Diagnostic
-from unittest.mock import patch
 
 import pytest
 
-from artificial_analysis import cli
-from artificial_analysis.cli import (
-    _coding_namespace,  # pyright: ignore[reportPrivateUsage]
-    _coding_payload,  # pyright: ignore[reportPrivateUsage]
-)
 from artificial_analysis.rsc import (
     ExtractionError,
     FetchResult,
     build_snapshot_payload,
+    decode_manifest_payload,
+    extract_evaluation_manifest,
     extract_evaluation_rows,
     extract_lists,
     normalize_official_models,
@@ -248,6 +244,178 @@ class TestRscExtraction(unittest.TestCase):
                 cast("list[tuple[str, object]]", [("0", {"rows": [{"value": 1}]})])
             )
 
+    def test_extract_evaluation_rows_supports_dynamic_metrics_and_breakdowns(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "slug": "test-eval",
+                    "manifest": {"path": "/data/test.txt", "key": "abcd"},
+                    "fallbackPriceByModelSlug": {"claude-opus-4-8": {"input": 5}},
+                    "initialModels": [
+                        {
+                            "id": "model-1",
+                            "slug": "claude-fable-5-1",
+                            "name": "Claude Fable 5.1",
+                            "terminalbenchV40": 0.5202,
+                            "terminalbenchV21": 0.9138,
+                            "automationBenchBreakdown": {
+                                "strictScore": 0.3211,
+                                "completion": 0.8808,
+                                "violationsTotal": 467,
+                            },
+                            "creator": {"slug": "anthropic", "name": "Anthropic"},
+                            "isReasoning": True,
+                        },
+                        {
+                            "id": "model-2",
+                            "slug": "gpt-6-astra",
+                            "name": "GPT-6 Astra",
+                            "automationBenchPartialScore": 0.6849,
+                            "automationBenchBreakdown": {
+                                "strictScore": 0.4512,
+                                "completion": 0.9234,
+                            },
+                            "creator": {"slug": "openai", "name": "OpenAI"},
+                            "isReasoning": True,
+                        },
+                    ],
+                },
+            ),
+        ]
+        rows = extract_evaluation_rows(frames)
+        assert len(rows) == 2
+        assert rows[0]["slug"] == "claude-fable-5-1"
+        assert rows[0]["terminalbenchV40"] == 0.5202
+        assert (
+            cast("dict[str, object]", rows[0]["automationBenchBreakdown"])["completion"]
+            == 0.8808
+        )
+        assert cast("dict[str, object]", rows[0]["creator"])["slug"] == "anthropic"
+
+    def test_extract_evaluation_manifest_locates_path_and_key(self) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "slug": "test-eval",
+                    "manifest": {"path": "/data/f0e5.txt", "key": "12ff9b"},
+                    "initialModels": [],
+                },
+            ),
+        ]
+        manifest = extract_evaluation_manifest(frames)
+        assert manifest == {"path": "/data/f0e5.txt", "key": "12ff9b"}
+
+        frames_without_manifest: list[tuple[str, object]] = [
+            ("0", {"slug": "test-eval"})
+        ]
+        assert extract_evaluation_manifest(frames_without_manifest) is None
+
+    def test_decode_manifest_payload_roundtrip_and_tamper_rejection(self) -> None:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        raw_payload: dict[str, object] = {
+            "models": [
+                {"slug": "test-model", "name": "Test Model", "score": 99.5},
+            ],
+            "fallbackPriceByModelSlug": {},
+        }
+        uncompressed_json = json.dumps(raw_payload).encode("utf-8")
+        compressed_data = gzip.compress(uncompressed_json)
+        key_hex = "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
+        key_bytes = bytes.fromhex(key_hex)
+        iv = hashlib.sha256(key_bytes).digest()[:12]
+
+        encrypted = AESGCM(key_bytes).encrypt(iv, compressed_data, None)
+        decoded = decode_manifest_payload(encrypted, key_hex)
+        assert decoded == raw_payload
+
+        tampered = encrypted[:-1] + (b"\x00" if encrypted[-1:] != b"\x00" else b"\x01")
+        with pytest.raises(ExtractionError):
+            _ = decode_manifest_payload(tampered, key_hex)
+
+    def test_extract_evaluation_rows_rejects_initial_models_without_valid_container(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "initialModels": [
+                        {
+                            "slug": "price-only-model",
+                            "name": "Price Only",
+                            "price1mInputTokens": 10,
+                        },
+                    ],
+                },
+            ),
+        ]
+        with pytest.raises(ExtractionError, match="recognizable model rows"):
+            _ = extract_evaluation_rows(frames)
+
+    def test_extract_evaluation_rows_rejects_unscored_catalogs_and_metadata(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "models": [
+                        {
+                            "slug": "claude-fable-5-1",
+                            "name": "Claude Fable 5.1",
+                            "effort": {"slug": "max", "level": 60},
+                            "release": {
+                                "slug": "claude-fable-5-1",
+                                "name": "Claude Fable 5.1",
+                            },
+                        },
+                        {
+                            "slug": "gpt-6-astra",
+                            "name": "GPT-6 Astra",
+                            "effort": {"slug": "max", "level": 60},
+                        },
+                    ],
+                    "pricing_only_models": [
+                        {
+                            "slug": "price-model-1",
+                            "name": "Price Model 1",
+                            "price1mInputTokens": 10,
+                            "price1mOutputTokens": 30,
+                        },
+                    ],
+                    "hosts": [
+                        {"slug": "anthropic", "name": "Anthropic"},
+                        {"slug": "openai", "name": "OpenAI"},
+                    ],
+                    "paging": [
+                        {
+                            "name": "page_info",
+                            "count": 2,
+                            "total": 100,
+                            "offset": 0,
+                            "limit": 50,
+                        },
+                    ],
+                    "layout": [
+                        {
+                            "name": "box",
+                            "width": 100,
+                            "height": 200,
+                            "size": 50,
+                            "position": 1,
+                        },
+                    ],
+                },
+            ),
+        ]
+        with pytest.raises(ExtractionError, match="recognizable model rows"):
+            _ = extract_evaluation_rows(frames)
+
     def test_snapshot_slugs_accepts_aliases(self) -> None:
         snapshot: dict[str, object] = {
             "endpoints": [
@@ -257,277 +425,6 @@ class TestRscExtraction(unittest.TestCase):
         }
         slugs = snapshot_slugs(snapshot)
         assert slugs == ["provider-1_model-1", "provider-1_model-2"]
-
-    def _coding_payload(
-        self,
-        frames: list[tuple[str, object]],
-        **options: object,
-    ) -> dict[str, object]:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            options = {
-                "output_json": str(Path(temp_dir) / "coding.json"),
-                **options,
-            }
-            args = _coding_namespace(options)
-            result = SimpleNamespace(
-                body="ignored",
-                fetched_at="2026-07-13T00:00:00+00:00",
-                status_code=200,
-            )
-            with (
-                patch.object(cli, "fetch_rsc", return_value=result),
-                patch.object(cli, "parse_json_frames", return_value=frames),
-            ):
-                return _coding_payload(args)
-
-    @staticmethod
-    def _current_row(
-        slug: str,
-        score: float,
-        creator: str,
-        *,
-        with_metrics: bool = True,
-    ) -> dict[str, object]:
-        row: dict[str, object] = {
-            "slug": slug,
-            "headlineValue": score,
-            "modelCreator": {
-                "name": creator,
-                "slug": creator.lower().replace(" ", "-"),
-            },
-            "shortName": slug.replace("-", " ").title(),
-            "isReasoning": True,
-            "releaseDate": "2026-07-01",
-            "isOpenWeights": False,
-        }
-        if with_metrics:
-            row.update(
-                {
-                    "outputTokensPerTask": {
-                        "output": 300,
-                        "answer": 200,
-                        "reasoning": 100,
-                    },
-                    "costPerTask": {
-                        "total": 1.25,
-                        "input": 0.10,
-                        "nonCacheInput": 0.08,
-                        "cacheRead": 0.01,
-                        "cacheWrite": 0.01,
-                        "output": 0.75,
-                        "reasoning": 0.25,
-                        "answer": 0.50,
-                    },
-                    "timePerTaskSeconds": 12.5,
-                },
-            )
-        return row
-
-    def test_coding_payload_normalizes_legacy_default_data(self) -> None:
-        frames: list[tuple[str, object]] = [
-            (
-                "legacy",
-                {
-                    "defaultData": [
-                        {
-                            "slug": "legacy-alpha",
-                            "name": "Legacy Alpha",
-                            "coding_index": 81.2,
-                            "tokenCounts": {
-                                "inputTokens": 500,
-                                "answerTokens": 200,
-                                "reasoningTokens": 100,
-                                "outputTokens": 300,
-                            },
-                            "evalCost": {
-                                "totalCost": 1.25,
-                                "inputCost": 0.10,
-                                "answerCost": 0.50,
-                                "reasoningCost": 0.25,
-                            },
-                        },
-                        {
-                            "slug": "legacy-beta",
-                            "name": "Legacy Beta",
-                            "coding_index": 72.4,
-                            "tokenCounts": {
-                                "inputTokens": 400,
-                                "answerTokens": 150,
-                                "reasoningTokens": 50,
-                                "outputTokens": 200,
-                            },
-                            "evalCost": {
-                                "totalCost": 0.80,
-                                "inputCost": 0.08,
-                                "answerCost": 0.30,
-                                "reasoningCost": 0.12,
-                            },
-                        },
-                    ],
-                },
-            ),
-        ]
-
-        payload = self._coding_payload(frames)
-
-        counts = cast("dict[str, object]", payload["counts"])
-        assert counts["matched_models"] == 2
-        rows = cast("list[dict[str, object]]", payload["rows"])
-        row = rows[0]
-        assert row["model_slug"] == "legacy-alpha"
-        assert row["coding"] == 81.2
-        token_counts = cast("dict[str, object]", row["coding_token_counts"])
-        assert token_counts["input_tokens"] == 500
-        assert token_counts["output_tokens"] == 300
-        eval_cost = cast("dict[str, object]", row["coding_eval_cost"])
-        assert eval_cost["total_cost"] == 1.25
-        assert eval_cost["answer_cost"] == 0.5
-
-    def test_coding_payload_normalizes_current_models_task_metrics(self) -> None:
-        frames: list[tuple[str, object]] = [
-            (
-                "current",
-                {
-                    "models": [
-                        self._current_row("current-alpha", 88.4, "OpenAI"),
-                        self._current_row("current-beta", 79.1, "OpenAI"),
-                    ],
-                },
-            ),
-        ]
-
-        payload = self._coding_payload(frames)
-
-        counts = cast("dict[str, object]", payload["counts"])
-        assert counts["matched_models"] == 2
-        rows = cast("list[dict[str, object]]", payload["rows"])
-        row = rows[0]
-        assert row["model_slug"] == "current-alpha"
-        assert row["short_name"] == "Current Alpha"
-        assert row["creator"] == "OpenAI"
-        assert row["coding"] == 88.4
-        assert row["is_reasoning"]
-        assert row["release_date"] == "2026-07-01"
-        task_metrics = cast("dict[str, object]", row["coding_task_metrics"])
-        assert task_metrics["output_tokens_per_task"] == {
-            "output_tokens": 300,
-            "answer_tokens": 200,
-            "reasoning_tokens": 100,
-        }
-        assert task_metrics["cost_per_task_usd"] == {
-            "total_cost": 1.25,
-            "input_cost": 0.1,
-            "non_cache_input_cost": 0.08,
-            "cache_read_cost": 0.01,
-            "cache_write_cost": 0.01,
-            "output_cost": 0.75,
-            "reasoning_cost": 0.25,
-            "answer_cost": 0.5,
-        }
-        assert task_metrics["time_per_task_seconds"] == 12.5
-
-    def test_coding_payload_retains_current_score_without_task_metrics(self) -> None:
-        frames: list[tuple[str, object]] = [
-            (
-                "current",
-                {
-                    "models": [
-                        self._current_row(
-                            "score-only",
-                            77.7,
-                            "OpenAI",
-                            with_metrics=False,
-                        ),
-                        self._current_row(
-                            "score-only-peer",
-                            70.0,
-                            "OpenAI",
-                            with_metrics=False,
-                        ),
-                    ],
-                },
-            ),
-        ]
-
-        payload = self._coding_payload(frames)
-        counts = cast("dict[str, object]", payload["counts"])
-        assert counts["matched_models"] == 2
-
-        rows = cast("list[dict[str, object]]", payload["rows"])
-        row = rows[0]
-        assert row["model_slug"] == "score-only"
-        assert row["coding"] == 77.7
-        metrics = cast("dict[str, object]", row["coding_task_metrics"])
-        assert metrics["output_tokens_per_task"] == {
-            "output_tokens": None,
-            "answer_tokens": None,
-            "reasoning_tokens": None,
-        }
-        assert metrics["cost_per_task_usd"] == {
-            "total_cost": None,
-            "input_cost": None,
-            "non_cache_input_cost": None,
-            "cache_read_cost": None,
-            "cache_write_cost": None,
-            "output_cost": None,
-            "reasoning_cost": None,
-            "answer_cost": None,
-        }
-        assert metrics["time_per_task_seconds"] is None
-
-    def test_coding_payload_rejects_unrelated_provider_snapshot(self) -> None:
-        frames: list[tuple[str, object]] = [
-            (
-                "providers",
-                {
-                    "models": [
-                        {
-                            "slug": "provider-one_model-a",
-                            "name": "Provider One / Model A",
-                            "price1mInputTokens": 0.25,
-                        },
-                        {
-                            "slug": "provider-two_model-b",
-                            "name": "Provider Two / Model B",
-                            "price1mInputTokens": 0.10,
-                        },
-                    ],
-                },
-            ),
-        ]
-
-        with pytest.raises(ExtractionError):
-            _ = self._coding_payload(frames)
-
-    def test_coding_payload_filters_and_sorts_current_rows_deterministically(
-        self,
-    ) -> None:
-        frames: list[tuple[str, object]] = [
-            (
-                "current",
-                {
-                    "models": [
-                        self._current_row("lab-alpha", 75.0, "Target Lab"),
-                        self._current_row("lab-beta", 91.0, "Target Lab"),
-                        self._current_row("other", 99.0, "Other Lab"),
-                    ],
-                },
-            ),
-        ]
-
-        payload = self._coding_payload(
-            frames,
-            creator="target lab",
-            sort_by="coding",
-            order="desc",
-            limit=10,
-        )
-
-        rows = cast("list[dict[str, object]]", payload["rows"])
-        assert [row["model_slug"] for row in rows] == [
-            "lab-beta",
-            "lab-alpha",
-        ]
 
     def test_official_models_merge_into_unique_slim_schema_v2_snapshot(self) -> None:
         rsc_model = {

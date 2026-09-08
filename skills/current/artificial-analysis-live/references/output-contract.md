@@ -1,43 +1,43 @@
 # artificial-analysis output contract
 
-All command outputs: JSON.
+All CLI and RPC commands output JSON.
 
 ## CLI
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|harness|coding|evaluation|reasoning|query|qa|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|evaluation|compare|query|qa|schema","data":{...}}
 ```
 
-One documented CLI entry point; omitted command → `fetch`. Add flags or commands only; retain `fetch`, `stats`, `diff`, `diagnose`, `harness`, `coding`, `evaluation`, `reasoning`, `query`, `qa`, `schema`; never rename/remove the entry point or a command. Success MUST retain `ok: true`, string `version: "1"`, `command`, `data` and their types; additions MUST NOT rename, remove, or retype them.
+The CLI provides a single entry point. An omitted command defaults to `fetch`. Supported commands are `fetch`, `stats`, `diff`, `diagnose`, `evaluation`, `compare`, `query`, `qa`, and `schema`. Successful execution MUST return `ok: true`, string `version: "1"`, `command`, and `data`.
 
-Default artifacts: `<temp-dir>/artifacts/artificial-analysis/{full-data.json,endpoints.txt,full-url.txt}`. Preserve these paths; custom output paths opt-in.
+Default artifacts write to `<temp-dir>/artifacts/artificial-analysis/{full-data.json,endpoints.txt,full-url.txt}` unless an explicit output path is specified.
 
-Snapshot v2: `meta.schema_version: 2`; top-level `models`, `hosts`, `hosts_models`; `hosts_models` slim and joined by `model_slug`. Add fields/projections only; preserve v2 keys and join.
+Snapshot v2 sets `meta.schema_version: 2` and exposes top-level `models`, `hosts`, and `hosts_models`. The `hosts_models` table joins canonical models by `model_slug`.
 
-Pricing scopes stay distinct: model/API `price_1m_blended_3_to_1`; endpoint/RSC `price_1m_blended_7_to_2_to_1`. Never merge, rename, or reinterpret them.
+Model and API scopes record `price_1m_blended_3_to_1`. Endpoint and RSC scopes record `price_1m_blended_7_to_2_to_1`. Keep these pricing fields separate.
 
-Malformed source envelopes/rows remain rejected. `fetch --strict`: no-fallback mode. Preserve rejection/fallback semantics; reconciliation MUST be versioned and additive.
+Reject malformed source envelopes and rows. Running `fetch --strict` disables fallbacks. Schema reconciliation MUST be versioned and additive.
 
 ### Freshness
 
-Every refresh/reader result distinguishes these modes:
+Every refresh and reader result reports one of four freshness modes:
 
-- `fresh`: successful current source response; `stale:false`, `historical:false`.
-- `cache-revalidated`: validated 304/body reuse; `stale:false`; never outage-stale.
-- `stale-last-good`: explicit `--allow-stale` or `--stale-policy allow-last-good` fallback; `stale:true`, `fallback:true`.
-- `snapshot`: explicit local input; `historical:true`, `stale:false`.
+- `fresh`: successful current source response with `stale: false` and `historical: false`.
+- `cache-revalidated`: validated HTTP 304 or body reuse with `stale: false`.
+- `stale-last-good`: fallback activated by `--allow-stale` or `--stale-policy allow-last-good`, setting `stale: true` and `fallback: true`.
+- `snapshot`: explicit local file input with `historical: true` and `stale: false`.
 
-Default refresh policy: `error`; `--strict` remains its compatibility alias. Default output snapshot retains its 24-hour reader guard. Stale fallback NEVER overwrites current cache bytes. Explicitly named old paths are historical snapshots, not stale outage fallbacks.
+The default refresh policy is `error`, with `--strict` as a compatibility alias. Default output snapshots apply a 24-hour reader guard. Stale fallbacks MUST NOT overwrite current cache bytes. Historical input files operate in `snapshot` mode.
 
 ## RPC
 
-Success:
+Success response:
 
 ```json
 {"id":"...","type":"response","command":"...","success":true,"data":{...}}
 ```
 
-Error:
+Error response:
 
 ```json
 {
@@ -51,138 +51,86 @@ Error:
 
 ## Fetch credentials and secrets
 
-Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Prefer a process-injected key, or `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted dotenv file (e.g. mode `0600`) outside the skill tree. The key is never a CLI/RPC argument.
+Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Supply the key through process environment variables or through `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a file with restricted permissions (such as mode `0600`) outside the skill directory. NEVER pass API keys as CLI or RPC arguments.
 
-NEVER copy `.env.example` into the skill tree or generated tool home: it is a tracked template, not a secret store. Precedence: process values, then explicitly supplied external env file. Skill-root/ancestor `.env` discovery is transitional compatibility only and unsupported for new setups. This release has no `AA_LEGACY_DOTENV`; do not rely on it.
+Do not copy `.env.example` into the skill tree or generated tool homes. Store active credentials in external environment files. Credential resolution checks process environment variables first, then the explicit file in `ARTIFICIAL_ANALYSIS_ENV_FILE`.
 
-Asset-sync owner MUST exclude `.env` and other secret files from generated tool homes. `.gitignore` controls Git tracking only; it CANNOT enforce sync exclusion.
+Asset synchronization MUST exclude `.env` and other secret files from generated tool homes. Configure sync exclusion rules in addition to `.gitignore`.
 
 ## Snapshot JSON v2
 
-Top-level keys: `meta`, `models`, `hosts`, `hosts_models`.
+Snapshot JSON v2 structures data under four top-level keys: `meta`, `models`, `hosts`, and `hosts_models`.
 
-`meta`: `schema_version: 2`, `counts`, `sources`. `sources.rsc` and `sources.official_api`: source URL, status code, fetched-at timestamp, supplied ETag, and applicable `reused_cached_payload`; never credentials or raw response bodies. `counts`: unique canonical `models`, `hosts`, endpoint `hosts_models`, plus available endpoint/provider sanity counts.
+`meta` contains `schema_version: 2`, `counts`, and `sources`. Fields under `sources.rsc` and `sources.official_api` record the source URL, HTTP status code, fetch timestamp, ETag, and optional `reused_cached_payload`. Exclude credentials and raw response bodies from metadata. `counts` records totals for unique canonical `models`, `hosts`, `hosts_models`, and provider sanity checks.
 
-`models` is the only model projection: exactly one canonical row per `slug`; official API identity, evaluations, and API pricing belong here. `hosts_models` is a slim provider-endpoint table: each row has `model_slug` joining the canonical model and retains endpoint/provider pricing, speed, latency, context, features, and classifications; it MUST NOT embed a `model` object.
+`models` contains canonical model rows indexed by `slug`. This table records official API identity, benchmark evaluations, and API pricing.
 
-The model API's 3:1 blend and RSC endpoint's 7:2:1 blend intentionally coexist: model and provider-endpoint scopes, not duplicate prices.
+`hosts_models` is a provider-endpoint table. Each row includes `model_slug` to join the canonical model and contains endpoint pricing, speed, latency, context size, features, and classifications. Rows in `hosts_models` MUST NOT embed full `model` objects.
+
+Model pricing uses `price_1m_blended_3_to_1` for API scopes. Provider endpoint pricing uses `price_1m_blended_7_to_2_to_1` for RSC scopes.
 
 ## Evidence, statuses, eligibility
 
-Named scalar fields remain stable. Additive `metric_evidence.<metric>` records: `raw_value`, `normalized_value`, `unit`, `normalization`, `source_path`, `source_field`, `value_status`, `metric_semantics_status`, `comparison_eligibility`, `blocked_reasons`, `parser`, `parser_version`, and available `artifact_id`/`sha256`.
+Named scalar fields preserve stable keys. The additive `metric_evidence.<metric>` object records metadata for each metric:
+- `raw_value` and `normalized_value`
+- `unit` and `normalization`
+- `source_path` and `source_field`
+- `value_status`: `published`, `derived`, `missing`, or `unparsed`
+- `metric_semantics_status`: `known`, `unknown`, or `ambiguous`
+- `comparison_eligibility`: `eligible` or `blocked`
+- `blocked_reasons`
+- `parser` and `parser_version`
+- `artifact_id` and `sha256` when available
 
-`value_status`: `published|derived|missing|unparsed`. `metric_semantics_status`: `known|unknown|ambiguous`. `comparison_eligibility`: `eligible|blocked`.
-
-Placeholders, booleans, non-finite/malformed/out-of-range values, unknown semantics, unit/scope/release mismatches, and conflicting duplicates remain visible with reasons; they MUST NOT become fake zeroes or eligible comparisons. Derived fields retain formulas and input paths and never replace published values. Unknown source keys survive under `raw_fields`/`raw_metadata`.
+Missing, boolean, placeholder, malformed, out-of-range, and ambiguous metric values MUST retain blocked status with explicit entries in `blocked_reasons`. They MUST NOT convert into zero values or eligible comparisons. Derived fields preserve formulas and input paths alongside published values. Preserve unmapped source attributes under `raw_fields` and `raw_metadata`.
 
 ## Diagnostics, diff, errors
 
-`diagnose`: explicit local snapshot/cache paths only; NEVER fetches. Report: redacted schema/parser/freshness/source/cache/artifact health and diagnostics.
+The `diagnose` command evaluates local snapshot and cache paths. It MUST NOT make network requests. Output reports redacted schema integrity, parser status, cache health, and artifact diagnostics.
 
-`diff --schema-aware` or RPC `schema_aware:true`: add `schema_diff` while preserving every legacy endpoint/provider key. Stable IDs match first; possible rename suggestions carry `merge:false`.
+Running `diff --schema-aware` or passing RPC `schema_aware: true` adds `schema_diff` to the output while preserving existing endpoint and provider keys. Stable identifiers match first. Suggested renames set `merge: false`.
 
-CLI success remains protocol v1. RPC emits one response per non-empty input line with existing error codes. During staged migration, `--json-errors` emits one compact redacted CLI error object on stdout; `--legacy-errors` retains human-readable stderr. Neither form contains credentials.
+The CLI returns JSON version 1 responses on success. RPC emits one JSON response per non-empty input line. When migrating error handlers, `--json-errors` outputs a single redacted JSON error object to stdout, and `--legacy-errors` writes text errors to stderr. Exclude credentials from error output.
 
 ## Immutable artifacts and URL policy
 
-Raw source bytes: content-addressed under `<cache>/artifacts/`, with redacted metadata sidecars. Immutable manifests: atomically written under `<cache>/manifests/`. Legacy mutable cache inputs promoted as `legacy_unverified`.
+Store raw source bytes in content-addressed files under `<cache>/artifacts/` alongside redacted metadata sidecars. Write immutable manifests atomically under `<cache>/manifests/`. Unverified cache inputs receive the `legacy_unverified` label.
 
-`evaluation <url>`: HTTPS only; redact credential query parameters. Local/deterministic replay: `evaluation --input <file>`.
+The `evaluation <url>` command requires HTTPS URLs and redacts query parameters containing credentials. Use `evaluation --input <file>` for local replay and deterministic evaluation.
+
+## Model comparison
+
+The `compare` command selects canonical models using release and effort metadata independent of provider endpoints. Specify selections with repeated `--select release[:effort,effort]` arguments.
+
+Matching rules for `compare`:
+- A release identifier without an effort suffix selects all observed effort variants for that release.
+- Resolution matches normalized exact release names or slugs first, then unique token substrings. Ambiguous identifiers, missing releases, and unavailable requested efforts raise errors.
+- Effort slug, label, and level populate directly from source objects. Non-reasoning models require an explicit false reasoning flag.
+- Source model records and unmapped fields remain intact. Preserved unknown metrics keep their original status without inferred units or comparison eligibility.
+- Output reports resolved selections, available effort levels, source freshness metadata, and model rows from the fetched catalog.
+- Canonical model pricing retains model and API scope. Keep pricing distinct from task evaluation costs unless published task-level evidence is available.
 
 ## QA and query
 
-`qa` returns `question`, `parsed_intent` (`model`, `provider`, `sort_by`, `order`, `limit`), and full `query` payload.
+The `qa` command returns `question`, `parsed_intent` (`model`, `provider`, `sort_by`, `order`, `limit`), and the matching `query` payload. The `qa` command rejects comparative queries containing versus or against tokens. Use `compare` for multi-model comparisons.
 
-Each `query` row MAY contain nulls for upstream-unprovided metrics. High-signal fields:
-
-- identity: `endpoint_slug`, `model_slug`, `provider_slug`
-- quality: `intelligence`, `coding`, `math`, `gpqa`, `mmlu_pro`, `ifbench`, `scicode`, `tau2`
-- economics: `price_input`, `price_output`, `price_blended`
-- speed/latency: `speed`, `ttfc`, `e2e`
-- context: `context_window_tokens`, `host_api_id`
-
-## Coding
-
-`coding` returns Coding capability-page model rows under the CLI/RPC envelopes. Extraction tolerates both shapes:
-
-- legacy: `slug`, `coding_index`, `tokenCounts`, `evalCost`
-- current client-rendered RSC: `slug`, `headlineValue`, `modelCreator`, `shortName`, `isReasoning`, `releaseDate`, `isOpenWeights`, `outputTokensPerTask`, `costPerTask`, `evalCost`, `timePerTaskSeconds`
-
-Retain Coding Index when present even if optional task metrics are absent. Missing optional evidence → `null` or omitted key; do not discard rows for missing token/cost/time evidence. Existing row keys remain compatible; `coding_task_metrics` additive.
-
-### Coding Index scope
-
-- `coding`: Coding Index score (`headlineValue` current, `coding_index` legacy).
-- Scope: Coding Index evaluation, Terminal-Bench v2.1 and SciCode. Component scores pass through only; never synthesize missing components.
-- Legacy `coding_token_counts`/`coding_eval_cost`, when present, remain Coding-evaluation values, not global Intelligence Index values.
-
-### Optional task metrics
-
-When current source provides them, `coding_task_metrics` contains observed evidence only:
-
-- `output_tokens_per_task`: derived from `outputTokensPerTask`; `output_tokens`, `answer_tokens`, `reasoning_tokens`, each token count **per benchmark task**. Never infer input-token counts.
-- `cost_per_task_usd`: derived from `costPerTask`; `total_cost`, `input_cost`, `non_cache_input_cost`, `cache_read_cost`, `cache_write_cost`, `output_cost`, `reasoning_cost`, `answer_cost`, each **Coding evaluation/API USD per benchmark task**.
-- `time_per_task_seconds`: derived from `timePerTaskSeconds`; weighted decode time in **seconds per benchmark task**.
-
-These are Coding evaluation/API USD measurements, not ChatGPT/Codex subscription-plan quota, allowance, or billing values; imply no plan-quota equivalence or conversion.
+Query rows MAY return null for metrics omitted by upstream sources. High-signal fields include:
+- Identity: `endpoint_slug`, `model_slug`, `provider_slug`
+- Quality: `intelligence`, `coding`, `agentic`, `math`, `gpqa`, `mmlu_pro`, `ifbench`, `scicode`, `tau2`
+- Economics: `price_input`, `price_output`, `price_blended`
+- Speed and latency: `speed`, `ttfc`, `e2e`
+- Context: `context_window_tokens`, `host_api_id`
 
 ## Dedicated evaluation
 
-`evaluation` reads a public dedicated evaluation page or saved HTML/RSC response and returns:
-
-- `source`: URL/path, HTTP status, fetch timestamp, content type
-- `filters_applied`: minimum rows, optional sort path/order, limit
+The `evaluation` command reads a public dedicated evaluation page or saved HTML and RSC response and returns:
+- `source`: URL or path, HTTP status, fetch timestamp, content type
+- `filters_applied`: minimum rows, sort path and order, limit
 - `counts`: parsed frames, matched rows, returned rows
-- `rows`: largest recognizable list of model-identity + numeric-score rows
+- `rows`: structured model identity and numeric score rows
 
-Rows preserve source fields and use `value_status=published`. Sorting, limiting, and post-extraction arithmetic are derived. Preserve unknown fields; benchmark-specific normalization stays outside this generic extractor.
+Generic evaluation extraction is schema-dependent and cannot guarantee parsing every benchmark page layout or frontend revision.
 
-## Reasoning
+Live evaluation responses include `population_source` and `coverage` when a public manifest supplies the full catalog. The ciphertext SHA-256 identifies the source of decoded row values, and the page retains its own source hash. Offline HTML replay reports `initial_models_only` when a manifest is present but not fetched.
 
-`reasoning` returns one row per unique model:
-
-```json
-[
-  {
-    "rank": 1,
-    "model_slug": "minimax-m3",
-    "model_name": "MiniMax-M3",
-    "creator": "MiniMax",
-    "reasoning_model": true,
-    "is_open_weights": true,
-    "release_date": "2026-06-01",
-    "context_window_tokens": 1000000,
-    "intelligence": 44.44,
-    "agentic": 68.62,
-    "coding": 43.41,
-    "harness": 56.01,
-    "reasoning_profile": {
-      "reasoning_floor": 0.001,
-      "reasoning_floor_benchmark": "briefcase",
-      "reasoning_ceiling": 0.978,
-      "reasoning_ceiling_benchmark": "hle",
-      "selectivity_score": 0.977,
-      "weighted_reasoning_share": 0.8928,
-      "classification": "selective_extreme",
-      "benchmark_count": 13
-    }
-  }
-]
-```
-
-With `--benchmarks`, each row also includes `per_benchmark`:
-
-```json
-"per_benchmark": [
-  {"benchmark": "briefcase", "answer_tokens": 7448234, "reasoning_tokens": 4416, "output_tokens": 7452650, "reasoning_share": 0.0006},
-  {"benchmark": "terminalbench_hard", "answer_tokens": 761966, "reasoning_tokens": 33713, "output_tokens": 795679, "reasoning_share": 0.0424}
-]
-```
-
-Classifications:
-
-- `selective_extreme`: floor < 10% and range > 75pp
-- `selective`: floor < 25% and range > 60pp
-- `moderate`: 25% ≤ floor < 50%
-- `uniform_heavy`: floor ≥ 50% and weighted ≥ 80%
-- `hard_uniform_heavy`: floor ≥ 60% and weighted ≥ 85%
+Rows preserve source fields and use `value_status: "published"`. Sorting, limiting, and post-extraction calculations are marked as derived. Preserve unmapped fields without benchmark-specific normalization.

@@ -334,9 +334,14 @@ web_search:
   enabled: false
 
 browser:
-  enabled: false
+  enabled: true
+  relay: true
+  headless: true
   cmux: false
 
+computer:
+  enabled: false
+  display: all
 ask:
   enabled: true
   timeout: 600

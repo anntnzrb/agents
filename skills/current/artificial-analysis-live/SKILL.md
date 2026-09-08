@@ -11,11 +11,9 @@ metadata:
 
 # artificial-analysis-live
 
-AI-first skill for **fresh** Artificial Analysis endpoint data.
+Query fresh Artificial Analysis endpoint data before answering model or provider benchmark questions. MUST run the CLI; NEVER answer from memory.
 
-MUST run the tool before answering benchmark/provider questions; NEVER use stale memory.
-
-## Commands
+## Public entrypoint
 
 With `SKILLS_DIR`:
 `uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" ...`
@@ -25,38 +23,50 @@ Direct:
 
 ## Credentials and fetch
 
-Before `fetch`, inject credentials by one supported path:
-1. `ARTIFICIAL_ANALYSIS_API_KEY` in process environment (preferred).
-2. `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted dotenv file outside the skill tree, e.g. mode `0600`.
+Set `ARTIFICIAL_ANALYSIS_API_KEY` in the process environment, or set `ARTIFICIAL_ANALYSIS_ENV_FILE` to point to a secure dotenv file outside the skill directory (such as permissions mode `0600`). Process environment variables take precedence over external files.
 
-`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers `query`, `qa`, `stats`, `diff`, `harness`, `reasoning` do not. Process-injected values win; otherwise read the explicitly supplied external env file.
+`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Snapshot readers (`compare`, `query`, `qa`, `stats`, `diff`) operate offline and do not require API keys.
 
-NEVER copy `.env.example` into the skill tree or generated tool home; it is a tracked template, not a secret store. NEVER pass keys through CLI or RPC. Older skill-root/ancestor `.env` discovery is transitional compatibility only, unsupported for new setups. This release has no `AA_LEGACY_DOTENV`; do not rely on it. The asset-sync owner MUST exclude skill-local `.env` and other secret files from generated tool homes; `.gitignore` controls Git tracking only and cannot enforce sync exclusion.
+NEVER copy `.env.example` into the skill directory or generated tool home. Keep `.env.example` as a tracked template. Store credentials in external environment variables or external dotenv files. NEVER pass API keys via CLI flags or RPC payloads. Legacy dotenv discovery from the skill root or parent directory is unsupported. This release does not support `AA_LEGACY_DOTENV`. The asset sync process MUST exclude local `.env` files and secret files from generated tool homes.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
 
+## Model and effort comparisons
+
+- Translate natural language comparisons into repeatable `compare --select` selectors. Use `qa` only for questions about a single model or provider.
+- A selector names a published release. When `:efforts` is omitted, include every variant observed for that release. Append effort labels separated by commas to filter variants.
+- Run `fetch` before comparing. Example: `compare --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"`.
+- Report resolved model names, efforts, source timestamp, and available variants. Output labeled "All" represents all variants present in the fetched snapshot.
+- Rely on published release and effort metadata. Do not assume maximum effort for a bare model slug. Do not assume non-reasoning mode when effort metadata is missing.
+- Resolve ambiguous model families or requested effort levels before running comparisons. MUST NOT omit a requested variant silently.
+- Preserve newly published fields without assuming units or equivalence. Do not treat per-token prices as equivalent to task evaluation costs.
+- For dedicated benchmark pages, use `evaluation` and match rows against canonical model slugs. Store benchmark scores in a separate table scoped to that source. Do not join rows solely by display name. Do not substitute alternative effort levels when a benchmark page omits one.
+- A fresh API response does not establish an Intelligence Index release number. Report a benchmark version only when published by the source.
+
 ## Output policy
 
-- `evaluation` preferred for a dedicated public benchmark page; `--input` replays a saved HTML/RSC response and is used for local replay.
-- Keep dedicated evaluation scores separate from Coding Index, Coding Agent Index, and provider-matrix data.
-- Mark page rows `published`; mark sorting, limiting, and arithmetic `derived`; preserve source URL and scope.
-- Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations. Public evaluation URLs MUST use HTTPS.
-- When freshness matters, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths intentionally represent historical data.
+- `evaluation` parses a dedicated public benchmark page, or replays a saved HTML or RSC response with `--input`.
+- Generic evaluation extraction depends on page schema and does not guarantee parsing all benchmark layouts.
+- Keep published coding and agentic snapshot metrics (`query`, `qa`) separate from standalone evaluation page results.
+- Label raw benchmark rows as `published`. Label sorting, filtering, and calculated metrics as `derived`. Preserve the source URL and evaluation scope.
+- Read `references/evaluation-pages.md` before choosing an evaluation URL or comparing benchmark populations. Public evaluation URLs MUST use HTTPS.
+- Run `fetch` immediately before `compare`, `query`, or `qa` when fresh data is required. Default readers for `<temp-dir>/artifacts/artificial-analysis/full-data.json` reject snapshots older than 24 hours. Explicit file paths read historical snapshots directly.
 
 ## Hardening
 
-- Snapshot-reader freshness: `fresh`, `cache-revalidated`, `stale-last-good`, or explicit `snapshot`. Only explicit stale policy may return `stale:true`; explicit old input is `historical:true`, not outage-stale.
-- Machine-readable rows retain additive evidence: `raw_value`, normalized value, unit, source path/field, parser/version, artifact hash; independent `value_status`, `metric_semantics_status`, and `comparison_eligibility`. Missing, placeholder, malformed, non-finite, or conflicting values NEVER become synthesized zero.
-- `diagnose` is offline and inspects only explicit snapshot/cache paths. `diff --schema-aware` is opt-in and additive; legacy diff keys remain. `--json-errors` stages one compact redacted CLI error object; use `--legacy-errors` during migration. RPC remains one response per input line with existing error codes.
-- Cache raw bytes and manifests are immutable, content-addressed, and redacted. `filter_agent_models.py` joins v2 endpoint rows to canonical `models` by `model_slug`; JSON preserves unknown fields, while Markdown/TSV remain fixed views.
+- Snapshot readers categorize freshness as `fresh`, `cache-revalidated`, `stale-last-good`, or explicit `snapshot`. Only an explicit stale policy returns `stale:true`. Explicit historical input files return `historical:true`.
+- Machine-readable rows include additive evidence fields: `raw_value`, normalized value, unit, source path or field, parser version, artifact hash, `value_status`, `metric_semantics_status`, and `comparison_eligibility`. Missing, placeholder, malformed, non-finite, or conflicting values MUST NEVER convert into zero.
+- `diagnose` runs offline and inspects only explicit snapshot or cache paths. The `--schema-aware` option for `diff` is opt-in and additive, preserving legacy diff keys. `--json-errors` emits a single compact redacted CLI error object; use `--legacy-errors` during migration. RPC mode returns one response per input line using existing error codes.
+- Cache raw bytes and cache manifests are immutable, content-addressed, and redacted. The script `filter_agent_models.py` joins v2 endpoint rows to canonical `models` entries by `model_slug`. JSON output retains unknown fields; Markdown and TSV outputs format fixed views.
 
 ## Required follow-up reads
 
-- Command selection/reliability: `references/command-routing.md`; before choosing commands, using RPC, or relying on cache/fallback behavior.
-- Full command/flag usage: `README.md`; when fast-path commands are insufficient.
-- JSON envelopes, fields, reasoning metrics: `references/output-contract.md`; before consuming structured output or reasoning classifications.
-- Capability-page schema repair: `references/capability-schema-drift.md`; when `coding` fails after upstream drift.
-- Dedicated evaluation pages: `references/evaluation-pages.md`; when using `evaluation` or separating standalone pages from composite indexes.
-- Recovery: `references/troubleshooting.md`; for fetch, extraction, cache, freshness, or credential failures.
+| Need | Read | When |
+| --- | --- | --- |
+| Command routing and RPC | [references/command-routing.md](references/command-routing.md) | Choosing CLI commands, running RPC mode, or configuring cache and fallback behavior |
+| Full CLI reference and flags | [README.md](README.md) | Detailed command syntax, options, and full flag definitions |
+| JSON output contract and schemas | [references/output-contract.md](references/output-contract.md) | Consuming JSON envelopes, evidence fields, or freshness statuses |
+| Dedicated evaluation pages | [references/evaluation-pages.md](references/evaluation-pages.md) | Running `evaluation` or replaying standalone benchmark pages |
+| Troubleshooting and recovery | [references/troubleshooting.md](references/troubleshooting.md) | Resolving fetch, credential, cache, integrity, or parsing failures |

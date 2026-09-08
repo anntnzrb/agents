@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import binascii
 import contextlib
+import gzip
 import hashlib
 import json
 import os
@@ -14,8 +16,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from urllib.error import HTTPError
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 from urllib.request import Request, urlopen
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .diagnostics import Diagnostic, redact, redact_query
 from .identity import (
@@ -43,7 +48,6 @@ BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
 MODEL_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
 MODEL_API_KEY_ENV = "ARTIFICIAL_ANALYSIS_API_KEY"
 MODEL_API_BASE_URL_ENV = "ARTIFICIAL_ANALYSIS_API_BASE_URL"
-CODING_CAPABILITY_URL = "https://artificialanalysis.ai/models/capabilities/coding"
 CACHE_META_FILE = "providers-cache.json"
 CACHE_BODY_FILE = "providers.rsc"
 CACHE_LAST_GOOD_FILE = "last-good.json"
@@ -669,22 +673,34 @@ def parse_next_payload(document: str) -> list[tuple[str, object]]:
     return [(frame_id, value) for frame_id, value in parse_json_frames(document)]
 
 
+_EXPLICIT_EVALUATION_SCORE_KEYS: tuple[str, ...] = (
+    "score",
+    "value",
+    "overall",
+    "headlineValue",
+    "pass_at_1",
+    "coding",
+)
+_EVALUATION_IDENTITY_KEYS: tuple[str, ...] = (
+    "slug",
+    "model",
+    "model_slug",
+    "model_name",
+    "name",
+)
+
+
 def _default_evaluation_row(row: dict[str, object]) -> bool:
-    identity_keys = ("slug", "model", "model_slug", "model_name", "name")
-    score_keys = (
-        "score",
-        "value",
-        "overall",
-        "headlineValue",
-        "pass_at_1",
-        "coding",
+    has_identity = any(
+        isinstance(row.get(key), str) and bool(row.get(key))
+        for key in _EVALUATION_IDENTITY_KEYS
     )
-    has_identity = any(isinstance(row.get(key), str) for key in identity_keys)
-    has_score = any(
+    if not has_identity:
+        return False
+    return any(
         isinstance(row.get(key), (int, float)) and not isinstance(row.get(key), bool)
-        for key in score_keys
+        for key in _EXPLICIT_EVALUATION_SCORE_KEYS
     )
-    return has_identity and has_score
 
 
 def _scan_evaluation_node(
@@ -695,12 +711,45 @@ def _scan_evaluation_node(
     candidates: list[list[dict[str, object]]],
     seen_lists: set[int],
 ) -> None:
-    if isinstance(node, list):
+    if isinstance(node, dict):
+        dict_node = cast("dict[str, object]", node)
+        initial_models = dict_node.get("initialModels")
+        has_eval_container = (
+            isinstance(dict_node.get("slug"), str)
+            and isinstance(dict_node.get("manifest"), dict)
+            and isinstance(dict_node.get("fallbackPriceByModelSlug"), dict)
+        )
+        if isinstance(initial_models, list) and has_eval_container:
+            list_node = cast("list[object]", initial_models)
+            node_id = id(list_node)
+            if node_id not in seen_lists:
+                seen_lists.add(node_id)
+                matched: list[dict[str, object]] = [
+                    cast("dict[str, object]", item)
+                    for item in list_node
+                    if isinstance(item, dict)
+                    and any(
+                        isinstance(cast("dict[str, object]", item).get(k), str)
+                        and bool(cast("dict[str, object]", item).get(k))
+                        for k in _EVALUATION_IDENTITY_KEYS
+                    )
+                ]
+                if len(matched) >= min_rows:
+                    candidates.append(matched)
+        for value in dict_node.values():
+            _scan_evaluation_node(
+                value,
+                predicate=predicate,
+                min_rows=min_rows,
+                candidates=candidates,
+                seen_lists=seen_lists,
+            )
+    elif isinstance(node, list):
         list_node = cast("list[object]", node)
         node_id = id(list_node)
         if node_id not in seen_lists:
             seen_lists.add(node_id)
-            matched: list[dict[str, object]] = [
+            matched = [
                 cast("dict[str, object]", item)
                 for item in list_node
                 if isinstance(item, dict) and predicate(cast("dict[str, object]", item))
@@ -715,16 +764,112 @@ def _scan_evaluation_node(
                 candidates=candidates,
                 seen_lists=seen_lists,
             )
-    elif isinstance(node, dict):
+
+
+def extract_evaluation_manifest(
+    parsed_frames: list[tuple[str, object]],
+) -> dict[str, str] | None:
+    """Extract the public catalog manifest from evaluation frames."""
+    for _, frame in parsed_frames:
+        manifest = _find_manifest_node(frame)
+        if manifest is not None:
+            return manifest
+    return None
+
+
+def _find_manifest_node(node: object) -> dict[str, str] | None:
+    if isinstance(node, dict):
         dict_node = cast("dict[str, object]", node)
+        manifest = dict_node.get("manifest")
+        if (
+            isinstance(manifest, dict)
+            and isinstance(cast("dict[str, object]", manifest).get("path"), str)
+            and isinstance(cast("dict[str, object]", manifest).get("key"), str)
+        ):
+            return {
+                "path": cast("str", manifest["path"]),
+                "key": cast("str", manifest["key"]),
+            }
         for value in dict_node.values():
-            _scan_evaluation_node(
-                value,
-                predicate=predicate,
-                min_rows=min_rows,
-                candidates=candidates,
-                seen_lists=seen_lists,
+            found = _find_manifest_node(value)
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for item in cast("list[object]", node):
+            found = _find_manifest_node(item)
+            if found is not None:
+                return found
+    return None
+
+
+def decode_manifest_payload(data: bytes, key_hex: str) -> dict[str, object]:
+    """Decode the public frontend's authenticated, compressed model catalog."""
+    try:
+        key = bytes.fromhex(key_hex)
+        decrypted = AESGCM(key).decrypt(hashlib.sha256(key).digest()[:12], data, None)
+        parsed = cast("object", json.loads(gzip.decompress(decrypted)))
+    except (ValueError, InvalidTag, OSError, EOFError, binascii.Error) as exc:
+        _raise_extraction_error("Invalid public evaluation manifest payload", exc)
+    if not isinstance(parsed, dict):
+        _raise_extraction_error("Evaluation manifest must contain an object")
+    return cast("dict[str, object]", parsed)
+
+
+def fetch_manifest_models(
+    manifest: dict[str, str],
+    *,
+    base_url: str,
+    timeout_seconds: float = 60.0,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Fetch the full public catalog without decoding ciphertext as text."""
+    url = urljoin(base_url, manifest["path"])
+    base = urlparse(base_url)
+    target = urlparse(url)
+    if (
+        target.scheme != "https"
+        or target.netloc != base.netloc
+        or target.username
+        or target.password
+    ):
+        _raise_extraction_error("Evaluation manifest must use the page's HTTPS origin")
+    request = Request(url, headers={"User-Agent": "artificial-analysis/0.3"})
+    try:
+        raw_response = cast("object", urlopen(request, timeout=timeout_seconds))
+        with cast("HTTPResponse", raw_response) as response:
+            final = _response_final_url(response, url) or url
+            if (
+                urlparse(final).netloc != base.netloc
+                or urlparse(final).scheme != "https"
+            ):
+                _raise_extraction_error(
+                    "Evaluation manifest redirected outside its origin"
+                )
+            raw = response.read()
+            status = response.status
+    except HTTPError as exc:
+        _raise_os_error(f"Evaluation manifest request failed: HTTP {exc.code}", exc)
+    decoded = decode_manifest_payload(raw, manifest["key"])
+    models = decoded.get("models")
+    if not isinstance(models, list) or not models:
+        _raise_extraction_error("Evaluation manifest missing non-empty models list")
+    rows: list[dict[str, object]] = []
+    for item in cast("list[object]", models):
+        if not isinstance(item, dict) or not isinstance(
+            cast("dict[str, object]", item).get("slug"), str
+        ):
+            _raise_extraction_error(
+                "Evaluation manifest contains invalid model identity"
             )
+        rows.append(cast("dict[str, object]", item))
+    return rows, {
+        "url": redact_query(url),
+        "final_url": redact_query(final),
+        "status_code": status,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "byte_length": len(raw),
+        "fetched_at": datetime.now(UTC).isoformat(),
+        "population": "manifest_models",
+    }
 
 
 def extract_evaluation_rows(
@@ -2171,7 +2316,6 @@ __all__ = [
     "CACHE_BODY_FILE",
     "CACHE_LAST_GOOD_FILE",
     "CACHE_META_FILE",
-    "CODING_CAPABILITY_URL",
     "DEFAULT_MIN_EVALUATION_ROWS",
     "MIN_NEXT_PUSH_ITEMS",
     "MIN_SAMPLE_SIZE",
@@ -2188,9 +2332,12 @@ __all__ = [
     "atomic_write",
     "build_full_url",
     "build_snapshot_payload",
+    "decode_manifest_payload",
     "endpoint_slugs",
+    "extract_evaluation_manifest",
     "extract_evaluation_rows",
     "extract_lists",
+    "fetch_manifest_models",
     "fetch_models",
     "fetch_page",
     "fetch_rsc",

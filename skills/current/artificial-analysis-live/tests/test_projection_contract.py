@@ -9,7 +9,6 @@ from typing import cast
 from artificial_analysis.cli import (
     _attach_row_evidence,  # pyright: ignore[reportPrivateUsage]
     _evidence_record,  # pyright: ignore[reportPrivateUsage]
-    _harness_score,  # pyright: ignore[reportPrivateUsage]
     _sort_metric,  # pyright: ignore[reportPrivateUsage]
 )
 
@@ -116,26 +115,20 @@ def test_evidence_sorting_places_only_eligible_finite_values_first() -> None:
 def test_row_projection_preserves_raw_unknowns_and_published_values() -> None:
     row: dict[str, object] = {
         "coding": 80,
-        "harness": 71,
+        "agentic": 71,
         "raw_fields": {"futureMetric": 123},
         "unknowns": {"sourceFlag": "x"},
     }
     _ = _attach_row_evidence(
         row,
-        metric_paths=("coding", "harness", "mystery"),
+        metric_paths=("coding", "agentic", "mystery"),
         derived_paths={"mystery": ("coding / 2", ("$.coding",))},
     )
     assert row["coding"] == 80
-    assert row["harness"] == 71
+    assert row["agentic"] == 71
     assert row["raw_fields"] == {"futureMetric": 123}
     assert row["unknowns"] == {"sourceFlag": "x"}
     metric_evidence = cast("dict[str, dict[str, object]]", row["metric_evidence"])
     assert metric_evidence["coding"]["normalized"] == 80
-    assert metric_evidence["harness"]["normalized"] == 71
+    assert metric_evidence["agentic"]["normalized"] == 71
     assert metric_evidence["mystery"]["status"] == "derived"
-
-
-def test_legacy_scalar_helpers_reject_boolean_and_nonfinite_values() -> None:
-    assert _harness_score({"agentic_index": 80, "coding_index": 60}) == 70.0
-    assert _harness_score({"agentic_index": True, "coding_index": 60}) is None
-    assert _harness_score({"agentic_index": float("inf"), "coding_index": 60}) is None

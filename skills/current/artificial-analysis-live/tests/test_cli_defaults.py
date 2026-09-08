@@ -18,7 +18,6 @@ import pytest
 from artificial_analysis import cli
 from artificial_analysis.cli import (
     _capability_schema,  # pyright: ignore[reportPrivateUsage]
-    _coding_namespace,  # pyright: ignore[reportPrivateUsage]
     _ensure_default_snapshot_fresh,  # pyright: ignore[reportPrivateUsage]
     _envelope,  # pyright: ignore[reportPrivateUsage]
     _evaluation_namespace,  # pyright: ignore[reportPrivateUsage]
@@ -26,7 +25,6 @@ from artificial_analysis.cli import (
     _fetch_namespace,  # pyright: ignore[reportPrivateUsage]
     _fetch_payload,  # pyright: ignore[reportPrivateUsage]
     _handle_fetch,  # pyright: ignore[reportPrivateUsage]
-    _harness_payload,  # pyright: ignore[reportPrivateUsage]
     _load_dotenv,  # pyright: ignore[reportPrivateUsage]
     _normalize_argv,  # pyright: ignore[reportPrivateUsage]
     _query_payload,  # pyright: ignore[reportPrivateUsage]
@@ -39,7 +37,6 @@ TMP_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analy
 TMP_SNAPSHOT = TMP_ARTIFACT_DIR / "full-data.json"
 TMP_ENDPOINTS = TMP_ARTIFACT_DIR / "endpoints.txt"
 TMP_URL = TMP_ARTIFACT_DIR / "full-url.txt"
-TMP_CODING = TMP_ARTIFACT_DIR / "coding-data.json"
 
 
 def _ns_dict(namespace: argparse.Namespace) -> dict[str, object]:
@@ -67,12 +64,10 @@ class TestCliDefaultPaths(unittest.TestCase):
             "stats",
             "diff",
             "diagnose",
-            "coding",
-            "harness",
             "evaluation",
-            "reasoning",
             "query",
             "qa",
+            "compare",
             "schema",
         }
 
@@ -109,18 +104,13 @@ class TestCliDefaultPaths(unittest.TestCase):
 
     def test_reader_commands_default_to_tmp_snapshot(self) -> None:
         parser = cli.build_parser()
-        for command in (["stats"], ["harness"], ["reasoning"], ["query"]):
+        for command in (["stats"], ["query"]):
             with self.subTest(command=command[0]):
                 args = _ns_dict(parser.parse_args(command))
                 assert args["snapshot"] == TMP_SNAPSHOT
 
         args = _ns_dict(parser.parse_args(["qa", "best provider"]))
         assert args["snapshot"] == TMP_SNAPSHOT
-
-    def test_coding_parser_uses_tmp_output_default(self) -> None:
-        args = _ns_dict(cli.build_parser().parse_args(["coding"]))
-
-        assert args["output_json"] == TMP_CODING
 
     def test_evaluation_parser_accepts_url_and_generic_controls(self) -> None:
         args = _ns_dict(
@@ -149,7 +139,6 @@ class TestCliDefaultPaths(unittest.TestCase):
         assert fetch_args["output_endpoints"] == TMP_ENDPOINTS
         assert fetch_args["output_url"] == TMP_URL
         assert _ns_dict(_stats_namespace({}))["snapshot"] == TMP_SNAPSHOT
-        assert _ns_dict(_coding_namespace({}))["output_json"] == TMP_CODING
 
     def test_capability_schema_reports_tmp_fetch_defaults(self) -> None:
         schema = _capability_schema()
@@ -242,20 +231,9 @@ class TestCliDefaultPaths(unittest.TestCase):
                     limit=10,
                 ),
             )
-            harness = _harness_payload(
-                argparse.Namespace(
-                    snapshot=snapshot_path,
-                    model=None,
-                    creator=None,
-                    open_weights_only=False,
-                    limit=10,
-                ),
-            )
         query_rows = cast("list[dict[str, object]]", query["rows"])
         assert query_rows[0]["model_name"] == "Model A"
         assert query_rows[0]["price_blended"] == 4
-        harness_rows = cast("list[dict[str, object]]", harness["rows"])
-        assert harness_rows[0]["creator"] == "Lab"
 
     def test_fetch_uses_last_good_snapshot_when_required_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

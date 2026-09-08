@@ -1,48 +1,49 @@
 # artificial-analysis
 
-Read this when the `SKILL.md` fast path omits a required command or flag.
+Read this file when `SKILL.md` omits a required command or flag.
 
-AI-only extractor for the Artificial Analysis model catalog and provider-endpoint
-matrix.
+This tool extracts data from the Artificial Analysis model catalog and provider endpoint matrix. It emits deterministic JSON envelopes without human prose.
 
-No human prose output. JSON only. Deterministic envelopes.
+## Contents
+
+- [Fetch credentials](#fetch-credentials)
+- [Entry point](#entry-point)
+- [CLI mode](#cli-mode-default)
+- [Stats](#stats)
+- [Diff](#diff)
+- [Compare releases and efforts](#compare-releases-and-efforts)
+- [Dedicated evaluation pages](#dedicated-evaluation-pages)
+- [Query](#query-modelprovider-benchmark-questions)
+- [QA](#qa-minimum-natural-language-command)
+- [Schema](#schema)
+- [RPC mode](#rpc-mode-jsonl)
+- [Contracts and recovery](#contracts-and-recovery)
+- [Released additive contracts](#released-additive-contracts)
+- [Lightweight tests](#lightweight-tests)
 
 Live `fetch` combines two required sources:
 
-- provider endpoints from `https://artificialanalysis.ai/leaderboards/providers`
-  with header `RSC: 1`
-- canonical models from `https://artificialanalysis.ai/api/v2/data/llms/models`
+- Provider endpoints from `https://artificialanalysis.ai/leaderboards/providers` with header `RSC: 1`
+- Canonical models from `https://artificialanalysis.ai/api/v2/data/llms/models`
 
 ## Fetch credentials
 
-Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; commands that read an existing
-snapshot do not. Prefer a process-injected key, or set
-`ARTIFICIAL_ANALYSIS_ENV_FILE` to a permissions-restricted dotenv file (for
-example, mode `0600`) outside the skill tree. Do not pass keys as CLI or RPC
-arguments.
+Only `fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`. Commands reading existing snapshots run without credentials. Use a process environment variable, or set `ARTIFICIAL_ANALYSIS_ENV_FILE` to a restricted file path (such as file mode `0600`) outside the skill directory. Do not pass API keys as CLI or RPC arguments.
 
-Do not copy `.env.example` into the skill tree or a generated tool home. It is a
-tracked template, not a secret store. Process values win, then the explicitly
-supplied external env file is read. Older installations may discover a skill-root
-or ancestor `.env`; that lookup is transitional compatibility only and is not
-supported for new setups. This release does not expose an `AA_LEGACY_DOTENV`
-switch, so do not rely on one.
+Do not copy `.env.example` into the skill tree or into a generated tool home. It is a tracked template. Store credentials outside the skill tree. The loader applies process environment variables first, then reads the explicitly configured environment file. Transitional compatibility may inspect ancestor directories for `.env` in older installations, but new setups MUST NOT rely on ancestor discovery or an `AA_LEGACY_DOTENV` environment switch.
 
-The asset-sync owner MUST exclude `.env` and other secret files from generated
-tool homes. `.gitignore` only controls Git tracking; it cannot enforce sync
-exclusion.
+Asset sync processes MUST exclude `.env` and other secret files from generated tool directories. `.gitignore` controls Git tracking only; sync exclusion rules must be configured in your deployment scripts.
 
-Compatibility hardening:
+Compatibility features:
 
-- key aliases + structural heuristics for upstream schema drift
-- ETag cache + 304 reuse
-- last-good fallback (opt-in with `--stale-policy allow-last-good` or
-  `--allow-stale`; `--strict` aliases `error`)
-- sanity thresholds (`min_endpoints`, `min_providers`)
+- Match key aliases and structural heuristics during upstream schema drift.
+- Cache ETag metadata and reuse payloads on HTTP 304.
+- Support last-good fallback with `--stale-policy allow-last-good` or `--allow-stale` (default is `--strict`, which aliases `error`).
+- Enforce minimum sanity thresholds with `--min-endpoints` and `--min-providers`.
 
 ## Entry point
 
-Cross-platform:
+Run commands through `uv`:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py ...
@@ -50,7 +51,7 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 ## CLI mode (default)
 
-Default command is `fetch` when omitted.
+The CLI runs `fetch` by default when no subcommand is specified.
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py
@@ -77,28 +78,19 @@ uv run --script <skill-dir>/scripts/cli.py fetch \
   --strict
 ```
 
-Cache/ETag behavior:
+Cache and ETag behavior:
 
-- stores metadata + payload in `~/.cache/artificial-analysis` (or `--cache-dir`)
-- sends `If-None-Match` when ETag exists
-- on `304`, reuses cached payload
-- when fresh parsing or sanity checks fail, the default `error` policy fails;
-  `--stale-policy allow-last-good` or `--allow-stale` explicitly enables a
-  `stale-last-good` fallback, while `--strict` remains the `error` alias
-- default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; run `fetch` again or pass an explicit historical snapshot path
+- Stores metadata and payload in `~/.cache/artificial-analysis` or `--cache-dir`.
+- Sends `If-None-Match` when an ETag exists.
+- Reuses cached payload on HTTP 304 responses.
+- Fails under the default `error` policy when parsing or sanity checks fail. Opt into fallback with `--stale-policy allow-last-good` or `--allow-stale`. `--strict` aliases `error`.
+- Rejects snapshots older than 24 hours when reading the default `<temp-dir>/artifacts/artificial-analysis/full-data.json`. Run `fetch` again or pass an explicit historical snapshot path.
 
 ### Snapshot schema v2
 
-`models` is the sole canonical, unique model table. `hosts_models` contains
-provider/endpoint observations and joins each one to `models` through
-`model_slug`; it does not repeat model metrics. Model identity, official
-evaluations, and the official API pricing object belong to canonical models.
-Provider speed, latency, context, feature, classification, and RSC pricing belong
-to endpoints.
+`models` is the canonical unique model table. `hosts_models` contains provider and endpoint observations, joining each record to `models` using `model_slug` without repeating model metrics. Model identity, official evaluations, and the official API pricing object belong to canonical models. Provider speed, latency, context, features, classification, and RSC pricing belong to endpoints.
 
-The official API's 3:1 model-pricing blend and RSC's 7:2:1 endpoint-pricing blend
-are both retained deliberately: one is model-scoped and the other is
-provider-endpoint-scoped.
+The official API uses a 3:1 model pricing blend. The RSC endpoint feed uses a 7:2:1 endpoint pricing blend. Retain both blends: model pricing applies to the canonical model, and endpoint pricing applies to the provider endpoint.
 
 ## Stats
 
@@ -107,7 +99,7 @@ uv run --script <skill-dir>/scripts/cli.py stats
 uv run --script <skill-dir>/scripts/cli.py stats <temp-dir>/artifacts/artificial-analysis/full-data.json --top 20
 ```
 
-Returns counts + top providers by endpoint count.
+Returns total counts and the top providers sorted by endpoint count.
 
 ## Diff
 
@@ -116,11 +108,7 @@ uv run --script <skill-dir>/scripts/cli.py diff old.json new.json
 uv run --script <skill-dir>/scripts/cli.py diff old.json new.json --schema-aware
 ```
 
-The default keeps the legacy endpoint/provider keys. `--schema-aware` adds
-`schema_diff` with deterministic model and endpoint identities, field/metric
-changes, evidence/status/freshness/parser/schema changes, diagnostics, duplicate
-records, and possible renames. Stable IDs match first; a possible rename has
-`merge:false` and is never merged.
+The default output includes legacy endpoint and provider keys. `--schema-aware` adds `schema_diff` with deterministic model and endpoint identities, field and metric changes, evidence, status, freshness, parser, and schema changes, diagnostics, duplicate records, and possible renames. Stable IDs match first. Possible renames set `merge:false` and never merge automatically.
 
 Returns:
 
@@ -128,70 +116,31 @@ Returns:
 - removed endpoint slugs
 - provider endpoint deltas
 
-`type` supports:
-
-- `ping`
-- `get_schema` (alias: `schema`)
-- `fetch`
-- `stats`
-- `diff` (`schema_aware:true` is additive)
-- `diagnose` (offline snapshot/cache health)
-- `harness`
-- `coding`
-- `evaluation`
-- `query`
-- `qa`
-
-## Harness
-
-Rank unique models by Harness, a coding-agent score that avoids Intelligence Index benchmark soup:
-
-```text
-Harness = 0.5 * Agentic Index + 0.5 * Coding Index
-Execution Gap = Agentic Index - Coding Index
-```
+## Compare releases and efforts
 
 ```bash
-uv run --script <skill-dir>/scripts/cli.py harness --limit 25
-uv run --script <skill-dir>/scripts/cli.py harness --creator anthropic --limit 10
-uv run --script <skill-dir>/scripts/cli.py harness --open-weights-only --limit 25
-uv run --script <skill-dir>/scripts/cli.py query --sort-by harness --order desc --limit 20
+uv run --script <skill-dir>/scripts/cli.py fetch
+uv run --script <skill-dir>/scripts/cli.py compare \
+  --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"
 ```
 
-Use `Harness` for model picking. Use `Execution Gap` as a risk flag: large positive gaps mean the model may pursue tasks well but have weaker executable/code precision.
+`compare [snapshot]` reads canonical models from the snapshot. It skips provider endpoint rows. Repeat `--select` for each release. Omit the effort suffix to include every variant published in the source. Add `:effort,effort` to restrict that release.
 
-## Coding Index token composition
+Release matching uses published names and slugs, preferring exact matches, then unambiguous whole-token substrings. The command fails on missing or ambiguous releases, and on missing requested efforts. It does not return partial comparisons. Effort labels come directly from source data. Non-reasoning models require an explicit false reasoning flag in the source; missing effort metadata does not imply a non-reasoning model.
 
-Fetches `https://artificialanalysis.ai/models/capabilities/coding` directly. No long `models=` URL required.
+Rows preserve original model data and unknown fields. Keep published metric units and source scopes distinct. Model token prices measure raw token rates, while benchmark metrics measure task cost. The term all variants refers to models in the fetched catalog.
 
-```bash
-uv run --script <skill-dir>/scripts/cli.py coding --limit 25
-uv run --script <skill-dir>/scripts/cli.py coding --model gpt-5-5 --include-benchmark-counts
-uv run --script <skill-dir>/scripts/cli.py coding --sort-by output_tokens --order desc --limit 10
-```
-
-Returns unique model rows with `coding_token_counts`:
-
-- scope: `coding_index_only`
-- `input_tokens`
-- `answer_tokens`
-- `reasoning_tokens`
-- `output_tokens = answer_tokens + reasoning_tokens`
-- answer/reasoning output shares
-
-Important: these counts are tied to the Coding Index capability evaluation, not global `intelligence_index_token_counts`. The current Coding Index components are Terminal-Bench Hard and SciCode; pass `--include-benchmark-counts` to include each component's token counts.
+Translate natural language comparison requests into explicit `--select` arguments. Use `compare` for multi-model comparisons; `qa` handles single-model and single-provider lookups only.
 
 ## Dedicated evaluation pages
 
-Use `evaluation` for a standalone public benchmark page. It parses standard RSC
-responses and embedded Next.js Flight payloads without assuming a benchmark-specific
-row schema:
+Use `evaluation` for standalone public benchmark pages. The parser processes standard RSC responses and embedded Next.js Flight payloads without assuming a benchmark-specific row schema:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py evaluation \
-  https://artificialanalysis.ai/evaluations/terminalbench-v2-1 \
+  https://artificialanalysis.ai/evaluations/<benchmark-slug> \
   --sort-by score --order desc --limit 25 \
-  --output-json <temp-dir>/terminalbench.json
+  --output-json <temp-dir>/benchmark.json
 ```
 
 Replay a saved page response:
@@ -201,11 +150,11 @@ uv run --script <skill-dir>/scripts/cli.py evaluation \
   --input <temp-dir>/evaluation.html
 ```
 
-The result preserves source metadata and unknown row fields. Page rows are
-published values; sorting, limiting, and arithmetic are derived. Do not merge a
-dedicated evaluation score with the Coding Index or Coding Agent Index without
-checking benchmark population, task count, repeats, harness, and metric scope.
-See `references/evaluation-pages.md` for routing and comparability rules.
+The result preserves source metadata and unknown row fields. Page rows contain published values, while sorting, limiting, and summary arithmetic are derived. Generic evaluation extraction depends on upstream page structure and may not parse unsupported page layouts.
+
+Live pages with a public catalog manifest load the full model population. Saved HTML replay runs offline and marks output as initial coverage. The manifest decoder uses `cryptography`, installed in the PEP 723 script environment.
+
+Check benchmark population, task count, repeat counts, test harness details, and metric scope before combining a dedicated evaluation score with official model snapshot metrics. See `references/evaluation-pages.md` for routing and comparability rules.
 
 ## Query (model/provider benchmark questions)
 
@@ -217,8 +166,7 @@ uv run --script <skill-dir>/scripts/cli.py query --model claude-opus-4-7 --sort-
 uv run --script <skill-dir>/scripts/cli.py query --provider deepinfra --sort-by intelligence --order desc --limit 20
 ```
 
-Returns provider-endpoint rows joined to canonical model metrics, with endpoint
-pricing, speed/latency, and context.
+Returns provider endpoint rows joined to canonical model metrics, including endpoint pricing, speed, latency, and context window limits.
 
 ## QA (minimum natural-language command)
 
@@ -230,7 +178,7 @@ uv run --script <skill-dir>/scripts/cli.py qa "best provider for claude opus 4.7
 uv run --script <skill-dir>/scripts/cli.py qa "cheapest deepinfra top 5"
 ```
 
-It returns parsed intent + delegated `query` result in one JSON object.
+Returns parsed intent and delegated `query` output in one JSON object. Use `compare` when questions compare multiple models or use words such as versus or against.
 
 ## Schema
 
@@ -259,10 +207,9 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `stats`
 - `diff` (`schema_aware:true` is additive)
 - `diagnose` (offline snapshot/cache health)
-- `harness`
-- `coding`
 - `evaluation`
 - `query`
+- `compare`
 - `qa`
 
 ### Response format
@@ -299,6 +246,8 @@ printf '%s\n' \
 
 ## Contracts and recovery
 
+- `references/command-routing.md`
+- `references/evaluation-pages.md`
 - `references/output-contract.md`
 - `references/troubleshooting.md`
 
@@ -308,43 +257,24 @@ printf '%s\n' \
 
 Fetch and reader payloads use explicit freshness modes:
 
-- `fresh`: successful 200 response;
-- `cache-revalidated`: validated 304/body reuse, not stale;
-- `stale-last-good`: explicit outage fallback with `stale:true`, `fallback:true`,
-  source/reason/hash metadata, and no cache overwrite;
-- `snapshot`: explicit local input with `historical:true`, not outage-stale.
+- `fresh`: HTTP 200 response with parsed live data.
+- `cache-revalidated`: HTTP 304 response reusing cached payload.
+- `stale-last-good`: Outage fallback setting `stale:true` and `fallback:true`, preserving existing cache without overwriting.
+- `snapshot`: Explicit local input file setting `historical:true`.
 
-Machine-readable metrics may retain additive `metric_evidence` with raw and
-normalized values, unit/normalization, source path/field, parser/version,
-artifact hash, `value_status`, `metric_semantics_status`, and
-`comparison_eligibility`. Missing, placeholder, malformed, boolean, non-finite,
-out-of-range, unknown-semantics, or conflicting-duplicate values remain visible
-and blocked rather than synthesized.
+Machine-readable metrics may include additive `metric_evidence` containing raw and normalized values, unit and normalization metadata, source path, parser version, artifact hash, `value_status`, `metric_semantics_status`, and `comparison_eligibility`. When values are missing, placeholder, malformed, boolean, non-finite, out of range, semantically unknown, or conflicting duplicates, the extractor leaves them visible and blocked from ranking. It does not synthesize replacement values.
 
 ### Diagnostics, errors, and artifacts
 
-`diagnose [snapshot] --cache-dir <dir>` is offline and never fetches. It reports
-redacted snapshot/cache/schema/parser/freshness/artifact/diagnostic health.
-RPC diagnose returns one response per input line.
+`diagnose [snapshot] --cache-dir <dir>` runs offline without network requests. It reports redacted health status for snapshot, cache, schema, parser, freshness, artifact, and diagnostic components. In RPC mode, `diagnose` returns one response per input line.
 
-CLI success remains protocol v1:
-`{"ok":true,"version":"1","command":...,"data":...}`. During error migration,
-`--json-errors` emits exactly one compact redacted object on stdout; omit it (or
-pass `--legacy-errors`) for human-readable stderr compatibility. RPC preserves
-one response per non-empty line and its existing error codes.
+CLI success output follows protocol v1: `{"ok":true,"version":"1","command":...,"data":...}`. Pass `--json-errors` to emit one compact redacted error object on stdout. Omit `--json-errors` or pass `--legacy-errors` to emit human-readable error messages on stderr. RPC mode emits one response per non-empty line with structured error codes.
 
-Raw source bytes are content-addressed under `<cache>/artifacts/<sha256>.raw`
-with redacted metadata sidecars; immutable manifests live under
-`<cache>/manifests/<sha256>.json` and are atomically written. Legacy mutable
-cache files are compatibility inputs and are marked unverified when promoted.
+Raw source bytes are content addressed under `<cache>/artifacts/<sha256>.raw` alongside redacted metadata sidecars. Immutable manifests are written atomically under `<cache>/manifests/<sha256>.json`. Legacy mutable cache files serve as fallback inputs and receive an unverified status label when promoted.
 
 ### Filter and URL boundaries
 
-`filter_agent_models.py` reads canonical v2 `models` first, joins endpoint
-observations through `model_slug`, and emits diagnostics for missing joins.
-JSON/source artifacts preserve unknown fields; Markdown and TSV are fixed named
-views. Public `evaluation` URLs require HTTPS and redact credential query
-parameters; use `--input` for deterministic local HTML/RSC replay.
+`filter_agent_models.py` reads canonical v2 `models` first, joins endpoint observations on `model_slug`, and emits diagnostics for missing joins. JSON and source artifacts preserve unknown fields. Markdown and TSV formats provide fixed named views. Public `evaluation` URLs require HTTPS and strip query parameters containing credentials. Use `--input` for deterministic local HTML or RSC replay.
 
 ## Lightweight tests
 
