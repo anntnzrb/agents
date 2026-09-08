@@ -111,7 +111,7 @@ Sync parses configuration, secrets, environment files, and extension/skill sourc
 ### JavaScript and TypeScript import extraction
 
 - **Static and dynamic imports**: Extracts static ESM `import` statements, `export ... from` re-exports, dynamic `import()` expressions, and CommonJS `require()` calls.
-- **Require normalization**: `require("...")` calls are normalized so the scanner recognizes them as dynamic imports during AST traversal.
+- **CommonJS calls**: Literal `require("...")` calls are scanned alongside ESM imports; no JavaScript runtime or AST dependency is needed.
 - **Comment and string immunity**: Import and require statements inside single-line comments (`//`), multiline block comments (`/* ... */`), string literals (single or double quotes), and template literals (`` `...` ``) are ignored.
 - **Type-only erasure**: Type-only imports (`import type { ... }`) are stripped during transpilation/scanning and excluded from runtime dependency specifiers.
 - **Specifier classification**: Downstream package validation (`missing_package_roots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
@@ -125,6 +125,12 @@ The Python implementation (`sync/src/sync/packages/validate.py`) performs import
 - **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, and local secrets (`secrets.local.json`, `deployment.json`, `release-manifest.json`, hook states, wrapper state).
 - **Trailing comma tolerance**: Permits trailing commas in objects and arrays.
 
+Deployment input is validated once by strict Pydantic models, including nested unknown-field rejection.
+
+### TOML preservation
+
+Endpoint publication uses Python's `tomllib` to recognize table headers, including quoted keys, Unicode escapes, and array tables. It retains the original text of owned sections rather than serializing the whole file, preserving comments and formatting.
+
 ### YAML
 
 - **Standard YAML mappings**: Parses and emits standard YAML configuration templates (e.g., CLIProxyAPI `config.yaml.tmpl`).
@@ -132,12 +138,16 @@ The Python implementation (`sync/src/sync/packages/validate.py`) performs import
 
 ### Dotenv (`.env`)
 
-- **Variable expansion disabled**: Literal `$VAR` or `${VAR}` sequences remain unexpanded (`expandVariables: false`).
-- **Empty key omission**: Keys with empty or unset values are omitted from the decoded environment map (`preserveEmptyStrings: false`).
+- **Variable expansion disabled**: `python-dotenv` decodes the file with `interpolate=False`; literal `$VAR` and `${VAR}` sequences remain unexpanded.
+- **Empty value omission**: Keys with empty or unset values are omitted from the decoded environment map.
 
-### Python scanner note
+### Efficiency constraints
 
-The Python implementation (`src/sync/packages/validate.py`) performs import scanning with a comment/string-stripping state machine plus targeted patterns instead of a full JS/TS AST library. Any change to the scanner must preserve comment/string immunity: add adversarial cases (comments, multiline strings, template literals, type-only imports) to `tests/test_package_validate.py`.
+- Resolve endpoint-template paths once per harness while building the plan.
+- Keep executable lookup in one worker-thread operation, rather than scheduling each `PATH` filesystem check separately.
+- Reuse the npm package-manifest validator; do not rebuild its schema on every cache check.
+- Tree and children jobs share traversal logic. Children scope preserves unrelated top-level entries; managed subdirectories still use tree pruning.
+- Preserve deterministic fingerprint bytes and unchanged destination inode/mtime when optimizing filesystem work.
 
 ## Behavioral contract
 

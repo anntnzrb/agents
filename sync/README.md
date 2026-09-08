@@ -1,3 +1,5 @@
 # agents-sync
 
-Reconcile AI agent configurations, skills, and harness environments from SSOT. Python + `uv` port of the former Bun/TypeScript sync app. See `AGENTS.md` for contracts and validation.
+Reconcile AI agent configurations, skills, and harness environments from SSOT using Python and `uv`.
+
+See [development and validation](../docs/sync/development.md) for contributor checks and [the sync reference](../docs/sync/sync.md) for commands, reconciliation, and failure behavior.

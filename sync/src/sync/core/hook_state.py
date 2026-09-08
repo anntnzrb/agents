@@ -75,7 +75,7 @@ class _LoadedExtensionHookState:
 
 def fingerprint_tree(root: str | os.PathLike[str]) -> str:
     """Compute deterministic SHA-256 fingerprint for a directory tree."""
-    root_str = str(root)
+    root_str = os.fspath(root)
     hasher = hashlib.sha256()
     if not _exists(root_str):
         hasher.update(b"missing")
@@ -95,11 +95,8 @@ def _hash_symlink_entry(
         if stat.S_ISDIR(target_stat.st_mode):
             message = f"refusing source directory symlink: {entry_path}"
             raise ValueError(message)
-    except FileNotFoundError:
-        hasher.update(f"broken:{relative_path}\n".encode())
-        return True
-    except OSError as error:
-        if error.errno == errno.ENOENT:
+    except (FileNotFoundError, OSError) as error:
+        if isinstance(error, FileNotFoundError) or error.errno == errno.ENOENT:
             hasher.update(f"broken:{relative_path}\n".encode())
             return True
         raise
@@ -115,8 +112,8 @@ def _hash_file_content(
     try:
         with Path(entry_path).open("rb") as file_handle:
             hasher.update(file_handle.read())
-    except OSError as error:
-        if error.errno == errno.ENOENT:
+    except (FileNotFoundError, OSError) as error:
+        if isinstance(error, FileNotFoundError) or error.errno == errno.ENOENT:
             hasher.update(f"broken:{relative_path}\n".encode())
             return
         raise
@@ -137,7 +134,7 @@ def _walk_tree(root: str, current: str, hasher: _TreeHasher) -> None:
             continue
 
         absolute = entry.path
-        relative_path = _normalize_relative_path(os.path.relpath(absolute, root))
+        relative_path = Path(absolute).relative_to(root).as_posix()
         if entry.is_dir(follow_symlinks=False):
             hasher.update(f"dir:{relative_path}\n".encode())
             _walk_tree(root, absolute, hasher)
@@ -173,10 +170,9 @@ def prepare_extension_hook_state(
         if _exists(str(Path(hook.root) / entry_name))
     ]
     should_skip = len(generated_entries) == len(previous_state.generated_entries)
-    should_refresh_state = previous_state.should_refresh_state
     preserve_paths = (
         [
-            _join_relative(hook.relative_root, entry_name)
+            f"{hook.relative_root}/{entry_name}" if hook.relative_root else entry_name
             for entry_name in generated_entries
         ]
         if should_skip
@@ -187,7 +183,7 @@ def prepare_extension_hook_state(
         generated_entries=generated_entries,
         preserve_paths=preserve_paths,
         should_skip=should_skip,
-        should_refresh_state=should_refresh_state,
+        should_refresh_state=previous_state.should_refresh_state,
     )
 
 
@@ -249,14 +245,6 @@ def _is_generated_extension_entry_name(entry_name: str) -> bool:
     return base_name in _GENERATED_EXTENSION_ENTRY_SET
 
 
-def _normalize_relative_path(path_value: str) -> str:
-    return path_value.replace("\\", "/")
-
-
-def _join_relative(left: str, right: str) -> str:
-    return right if len(left) == 0 else f"{left}/{right}"
-
-
 def _exists(target_path: str) -> bool:
     try:
         p = Path(target_path)
@@ -297,12 +285,11 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
     filtered = [
         entry for entry in normalized if _is_generated_extension_entry_name(entry)
     ]
-    should_refresh = len(filtered) != len(normalized)
 
     return _LoadedExtensionHookState(
         fingerprint=fingerprint,
         generated_entries=filtered,
-        should_refresh_state=should_refresh,
+        should_refresh_state=len(filtered) != len(normalized),
     )
 
 

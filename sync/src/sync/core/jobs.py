@@ -66,7 +66,7 @@ class Hasher(Protocol):
     """Protocol for hash objects supporting incremental update."""
 
     def update(self, data: bytes, /) -> None:
-        """Update the hash with bytes data."""
+        """Update hash state with data chunk."""
         ...
 
 
@@ -103,9 +103,42 @@ def _run_dir_job(
         *preserve_paths_by_dst.get(job.dst, ()),
         *job.preserve_paths,
     ]
-    if job.scope == "Children":
-        return _sync_dir_into(job.src, job.dst, preserve_paths, source_content_cache)
-    return _sync_managed_dir(job.src, job.dst, preserve_paths, source_content_cache)
+    try:
+        if not Path(job.src).is_dir():
+            err(f"missing directory: {job.src}")
+            return True
+        if job.scope == "Children":
+            Path(job.dst).mkdir(parents=True, exist_ok=True)
+            sync_managed_children(
+                job.src, job.dst, preserve_paths, source_content_cache
+            )
+        else:
+            Path(job.dst).parent.mkdir(parents=True, exist_ok=True)
+            sync_managed_tree(job.src, job.dst, preserve_paths, source_content_cache)
+    except (OSError, RuntimeError) as error:
+        err(f"copy failed: {job.src} -> {job.dst} ({panic_message(error)})")
+        return False
+    return True
+
+
+def _run_file_job(job: FileJob) -> bool:
+    try:
+        if not Path(job.src).exists() and not is_symlink(job.src):
+            err(f"missing source: {job.src}")
+            return True
+        try:
+            src_stat = Path(job.src).stat()
+        except OSError:
+            src_stat = None
+        if src_stat is not None and is_identical_file(job.src, src_stat, job.dst):
+            return True
+        Path(job.dst).parent.mkdir(parents=True, exist_ok=True)
+        rm_entry(job.dst)
+        _ = shutil.copy2(job.src, job.dst)
+    except (OSError, RuntimeError) as error:
+        err(f"copy failed: {job.src} -> {job.dst} ({panic_message(error)})")
+        return False
+    return True
 
 
 def _run_secret_template_job(job: SecretTemplateJob) -> bool:
@@ -170,7 +203,7 @@ async def _run_job(
             case DirJob():
                 success = _run_dir_job(job, preserve_paths_by_dst, source_content_cache)
             case FileJob():
-                success = _sync_item(job.src, job.dst)
+                success = _run_file_job(job)
             case SecretTemplateJob():
                 success = _run_secret_template_job(job)
             case CliProxyReadinessJob():
@@ -204,17 +237,14 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
         message = "runtime dependency install failed: output limit exceeded"
         raise RuntimeError(message)
     if install.timed_out or install.exit_code != 0:
-        stderr_text = install.stderr.strip() if install.stderr else ""
-        stdout_text = install.stdout.strip() if install.stdout else ""
-        detail = stderr_text or stdout_text or "unknown error"
+        detail = (install.stderr or install.stdout or "unknown error").strip()
         if len(detail) > MAX_DETAIL_CHARS:
             detail = f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
         message = f"runtime dependency install failed: {detail}"
         raise RuntimeError(message)
 
     marker_path = Path(stage) / ".release-complete"
-    with marker_path.open("w", encoding="utf-8") as marker_file:
-        _ = marker_file.write(f"{release_id}\n")
+    _ = marker_path.write_text(f"{release_id}\n", encoding="utf-8")
 
     if not _is_complete_release(stage):
         message = "runtime install did not produce a complete release"
@@ -259,11 +289,11 @@ def _validate_required_sources(source_root: str) -> RequiredPaths | None:
     pyproject_toml = str(source_path / "pyproject.toml")
     uv_lock = str(source_path / "uv.lock")
 
-    if not _is_regular_readable(src_dir, "src/", "directory"):
-        return None
-    if not _is_regular_readable(pyproject_toml, "pyproject.toml", "file"):
-        return None
-    if not _is_regular_readable(uv_lock, "uv.lock", "file"):
+    if (
+        not _is_regular_readable(src_dir, "src/", "directory")
+        or not _is_regular_readable(pyproject_toml, "pyproject.toml", "file")
+        or not _is_regular_readable(uv_lock, "uv.lock", "file")
+    ):
         return None
 
     return RequiredPaths(
@@ -281,62 +311,62 @@ def _is_regular_readable(
         if stat.S_ISLNK(metadata.st_mode):
             err(f"runtime source {label} is a symlink: {target_path}")
             return False
-        is_dir = stat.S_ISDIR(metadata.st_mode)
-        is_reg = stat.S_ISREG(metadata.st_mode)
-        if kind == "directory" and not is_dir:
+        if kind == "directory" and not stat.S_ISDIR(metadata.st_mode):
             err(f"runtime source {label} is not a directory: {target_path}")
             return False
-        if kind == "file" and not is_reg:
+        if kind == "file" and not stat.S_ISREG(metadata.st_mode):
             err(f"runtime source {label} is not a regular file: {target_path}")
             return False
-        required_access = (os.R_OK | os.X_OK) if kind == "directory" else os.R_OK
+        required_access = os.R_OK | os.X_OK if kind == "directory" else os.R_OK
         if not os.access(target_path, required_access):
             err(f"missing or unreadable runtime source {label}: {target_path}")
             return False
     except OSError as error:
-        message = (
-            f"missing or unreadable runtime source {label}: {target_path} "
-            f"({panic_message(error)})"
-        )
-        err(message)
+        panic = panic_message(error)
+        err(f"missing or unreadable runtime source {label}: {target_path} ({panic})")
         return False
-    else:
-        return True
+    return True
 
 
 def _compute_runtime_release_id(paths: RequiredPaths) -> str:
     hasher = hashlib.sha256()
-    _hash_directory_into(paths.src_dir, hasher)
+    _hash_runtime_directory(paths.src_dir, hasher)
     for file_path in (paths.pyproject_toml, paths.uv_lock):
         with Path(file_path).open("rb") as file_handle:
             hasher.update(file_handle.read())
     return hasher.hexdigest()
 
 
-def _hash_directory_into(root: str, hasher: Hasher, prefix: str = "") -> None:
-    entries = sorted(Path(root).iterdir(), key=lambda entry: entry.name)
+def _hash_runtime_directory(root: str, hasher: Hasher, prefix: str = "") -> None:
+    try:
+        with os.scandir(root) as it:
+            entries = sorted(it, key=lambda e: e.name)
+    except OSError as error:
+        message = f"unreadable directory: {root} ({panic_message(error)})"
+        raise RuntimeError(message) from error
 
     for entry in entries:
-        relative_path = entry.name if len(prefix) == 0 else f"{prefix}/{entry.name}"
+        rel = entry.name if not prefix else f"{prefix}/{entry.name}"
         if entry.is_symlink():
             try:
-                target_stat = entry.stat()
+                target_stat = Path(entry.path).stat()
             except OSError as error:
-                message = f"unreadable symlink target: {entry} ({panic_message(error)})"
+                panic = panic_message(error)
+                message = f"unreadable symlink target: {entry.path} ({panic})"
                 raise RuntimeError(message) from error
             if stat.S_ISDIR(target_stat.st_mode):
-                message = f"refusing source directory symlink: {entry}"
+                message = f"refusing source directory symlink: {entry.path}"
                 raise RuntimeError(message)
-            hasher.update(f"file:{relative_path}\n".encode())
-            with entry.open("rb") as file_handle:
+            hasher.update(f"file:{rel}\n".encode())
+            with Path(entry.path).open("rb") as file_handle:
                 hasher.update(file_handle.read())
             hasher.update(b"\n")
-        elif entry.is_dir():
-            hasher.update(f"dir:{relative_path}\n".encode())
-            _hash_directory_into(str(entry), hasher, relative_path)
-        elif entry.is_file():
-            hasher.update(f"file:{relative_path}\n".encode())
-            with entry.open("rb") as file_handle:
+        elif entry.is_dir(follow_symlinks=False):
+            hasher.update(f"dir:{rel}\n".encode())
+            _hash_runtime_directory(entry.path, hasher, rel)
+        elif entry.is_file(follow_symlinks=False):
+            hasher.update(f"file:{rel}\n".encode())
+            with Path(entry.path).open("rb") as file_handle:
                 hasher.update(file_handle.read())
             hasher.update(b"\n")
 
@@ -348,43 +378,30 @@ def _copy_runtime_inputs(
 ) -> None:
     stage_path = Path(stage)
     stage_src = str(stage_path / "src")
-    stage_path.mkdir(parents=True, exist_ok=True)
     sync_managed_tree(paths.src_dir, stage_src, (), source_content_cache)
-    stage_pyproject = str(stage_path / "pyproject.toml")
-    stage_uv_lock = str(stage_path / "uv.lock")
-    _ = shutil.copyfile(paths.pyproject_toml, stage_pyproject)
-    shutil.copymode(paths.pyproject_toml, stage_pyproject)
-    _ = shutil.copyfile(paths.uv_lock, stage_uv_lock)
-    shutil.copymode(paths.uv_lock, stage_uv_lock)
+    _ = shutil.copy2(paths.pyproject_toml, stage_path / "pyproject.toml")
+    _ = shutil.copy2(paths.uv_lock, stage_path / "uv.lock")
     source_readme = Path(paths.pyproject_toml).parent / "README.md"
     stage_readme = stage_path / "README.md"
     if source_readme.is_file():
-        _ = shutil.copyfile(source_readme, stage_readme)
-        shutil.copymode(source_readme, stage_readme)
+        _ = shutil.copy2(source_readme, stage_readme)
     else:
         _ = stage_readme.write_text("", encoding="utf-8")
 
 
 def _is_complete_release(release_dir: str) -> bool:
     try:
-        release_path = Path(release_dir)
-        cli_py = release_path / "src" / "sync" / "cli.py"
-        cli_root_py = release_path / "src" / "cli.py"
-        if not (cli_py.is_file() or cli_root_py.is_file()):
-            return False
-        venv_python = release_path / ".venv" / "bin" / "python"
-        if not venv_python.is_file():
-            return False
-        marker = release_path / ".release-complete"
-        venv_dir = release_path / ".venv"
-        return marker.is_file() or venv_dir.is_dir()
+        p = Path(release_dir)
+        return (p / ".venv" / "bin" / "python").is_file() and (
+            (p / "src" / "sync" / "cli.py").is_file()
+            or (p / "src" / "cli.py").is_file()
+        )
     except OSError:
         return False
 
 
 def _create_stage(releases_root: str) -> str:
-    nonce = secrets.token_hex(4)
-    stage_path = Path(releases_root) / f".stage-{os.getpid()}-{nonce}"
+    stage_path = Path(releases_root) / f".stage-{os.getpid()}-{secrets.token_hex(4)}"
     if stage_path.exists():
         message = f"runtime stage collision: {stage_path}"
         raise RuntimeError(message)
@@ -397,14 +414,14 @@ def publish_current_link(current_link: str, release_dir: str) -> bool:
     parent.mkdir(parents=True, exist_ok=True)
     temp = Path(f"{current_link}.{os.getpid()}.tmp")
     try:
-        rm_entry(str(temp))
-        target = os.path.relpath(release_dir, str(parent))
+        rm_entry(temp)
+        target = os.path.relpath(release_dir, parent)
         temp.symlink_to(target)
         _ = temp.replace(current_link)
     except (OSError, RuntimeError) as error:
         err(f"failed to publish current link {current_link}: {panic_message(error)}")
         with contextlib.suppress(OSError):
-            rm_entry(str(temp))
+            rm_entry(temp)
         return False
     return True
 
@@ -427,46 +444,38 @@ def _is_process_alive(pid: int) -> bool:
 def _prune_stage_dir(
     releases_root: str,
     entry_name: str,
-    pid: int,
+    pid_str: str,
     now_ms: float,
     timeout_ms: int,
 ) -> None:
     stage_path = str(Path(releases_root) / entry_name)
-    is_stale = not _is_process_alive(pid)
+    is_stale = False
+    with contextlib.suppress(ValueError):
+        is_stale = not _is_process_alive(int(pid_str))
     if not is_stale:
         try:
             entry_stat = Path(stage_path).stat()
             age_ms = now_ms - (entry_stat.st_mtime * 1000.0)
-            if age_ms > timeout_ms:
-                is_stale = True
+            is_stale = age_ms > timeout_ms
         except OSError:
             pass
-
     if is_stale:
         try:
             rm_entry(stage_path)
         except (OSError, RuntimeError) as error:
-            message = (
-                f"failed to prune stale stage directory {entry_name}: "
-                f"{panic_message(error)}"
-            )
-            warn(message)
+            panic = panic_message(error)
+            warn(f"failed to prune stale stage directory {entry_name}: {panic}")
 
 
-def _prune_unreferenced_release(
-    releases_root: str,
-    entry_name: str,
-) -> None:
+def _prune_unreferenced_release(releases_root: str, entry_name: str) -> None:
     release_path = str(Path(releases_root) / entry_name)
     if not _is_complete_release(release_path):
         return
-
     try:
         rm_entry(release_path)
     except (OSError, RuntimeError) as error:
-        warn(
-            f"failed to prune unreferenced release {entry_name}: {panic_message(error)}"
-        )
+        panic = panic_message(error)
+        warn(f"failed to prune unreferenced release {entry_name}: {panic}")
 
 
 def prune_unreferenced_releases(
@@ -482,44 +491,40 @@ def prune_unreferenced_releases(
         return
 
     try:
-        resolved = Path(current_release_dir_or_link).resolve()
-        current_base = resolved.name
+        current_base = Path(current_release_dir_or_link).resolve().name
     except OSError as error:
-        message = (
-            "failed to resolve current release link for pruning: "
-            f"{panic_message(error)}"
-        )
-        warn(message)
+        panic = panic_message(error)
+        warn(f"failed to resolve current release link for pruning: {panic}")
         return
 
     if not SHA256_HEX_PATTERN.match(current_base):
         return
 
     try:
-        entries = list(Path(releases_root).iterdir())
+        entries = list(os.scandir(releases_root))
     except OSError as error:
         warn(f"failed to list releases for pruning: {panic_message(error)}")
         return
 
     now_ms = time.time() * 1000.0
-
     for entry in entries:
-        if entry.is_symlink() or not entry.is_dir():
+        if entry.is_symlink() or not entry.is_dir(follow_symlinks=False):
             continue
-
-        stage_match = STAGE_DIR_PATTERN.match(entry.name)
-        if stage_match is not None:
-            pid = int(stage_match.group(1))
-            _prune_stage_dir(releases_root, entry.name, pid, now_ms, timeout_ms)
+        if stage_match := STAGE_DIR_PATTERN.match(entry.name):
+            _prune_stage_dir(
+                releases_root,
+                entry.name,
+                stage_match.group(1),
+                now_ms,
+                timeout_ms,
+            )
             continue
-
         if (
             entry.name.startswith(".")
             or entry.name == current_base
             or not SHA256_HEX_PATTERN.match(entry.name)
         ):
             continue
-
         _prune_unreferenced_release(releases_root, entry.name)
 
 
@@ -532,83 +537,11 @@ def remove_legacy_runtime_install(runtime_home: str) -> bool:
         metadata = legacy.lstat()
         if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
             return True
-        rm_entry(str(legacy))
+        rm_entry(legacy)
     except (OSError, RuntimeError) as error:
         err(f"legacy runtime cleanup failed: {legacy} ({panic_message(error)})")
         return False
-    else:
-        return True
-
-
-def _sync_dir_into(
-    src_dir: str,
-    dst_dir: str,
-    preserve_paths: Sequence[str],
-    source_content_cache: SourceContentCache,
-) -> bool:
-    try:
-        if not _is_directory_like(src_dir):
-            err(f"missing directory: {src_dir}")
-            return True
-
-        Path(dst_dir).mkdir(parents=True, exist_ok=True)
-        sync_managed_children(src_dir, dst_dir, preserve_paths, source_content_cache)
-    except (OSError, RuntimeError) as error:
-        err(f"copy failed: {src_dir} -> {dst_dir} ({panic_message(error)})")
-        return False
-    else:
-        return True
-
-
-def _sync_managed_dir(
-    src_dir: str,
-    dst_dir: str,
-    preserve_paths: Sequence[str],
-    source_content_cache: SourceContentCache,
-) -> bool:
-    try:
-        if not _is_directory_like(src_dir):
-            err(f"missing directory: {src_dir}")
-            return True
-
-        Path(dst_dir).parent.mkdir(parents=True, exist_ok=True)
-        sync_managed_tree(src_dir, dst_dir, preserve_paths, source_content_cache)
-    except (OSError, RuntimeError) as error:
-        err(f"copy failed: {src_dir} -> {dst_dir} ({panic_message(error)})")
-        return False
-    else:
-        return True
-
-
-def _sync_item(src: str, dst: str) -> bool:
-    try:
-        if not Path(src).exists() and not is_symlink(src):
-            err(f"missing source: {src}")
-            return True
-
-        try:
-            src_stat = Path(src).stat()
-        except OSError:
-            src_stat = None
-        if src_stat is not None and is_identical_file(src, src_stat, dst):
-            return True
-
-        Path(dst).parent.mkdir(parents=True, exist_ok=True)
-        rm_entry(dst)
-        _ = shutil.copyfile(src, dst)
-        shutil.copymode(src, dst)
-    except (OSError, RuntimeError) as error:
-        err(f"copy failed: {src} -> {dst} ({panic_message(error)})")
-        return False
-    else:
-        return True
-
-
-def _is_directory_like(path: str) -> bool:
-    try:
-        return stat.S_ISDIR(Path(path).stat().st_mode)
-    except OSError:
-        return False
+    return True
 
 
 __all__ = [

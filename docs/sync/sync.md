@@ -35,7 +35,7 @@ Sync compares file content and modes before replacement. An unchanged run leaves
 Directory jobs use one of two scopes:
 
 - A tree job makes the destination tree match its source.
-- A children job reconciles managed top-level entries inside an existing harness home.
+- A children job reconciles managed top-level entries inside an existing harness home, preserving unrelated top-level entries while making each managed subdirectory match its source.
 
 Recorded ownership limits cleanup to safe top-level names. Sync preserves unmanaged wrapper conflicts and reports each conflict.
 

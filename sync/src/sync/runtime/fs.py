@@ -37,7 +37,7 @@ _MAX_TEMP_ATTEMPTS = 16
 def is_safe_managed_entry_name(entry_name: str) -> bool:
     """Check whether entry name is a safe top-level relative name."""
     return (
-        len(entry_name) > 0
+        bool(entry_name)
         and not Path(entry_name).is_absolute()
         and "/" not in entry_name
         and "\\" not in entry_name
@@ -64,7 +64,7 @@ def is_ignored_sync_entry(name: str) -> bool:
 def is_symlink(target_path: str | os.PathLike[str]) -> bool:
     """Return True if path is a symlink, False if non-symlink or ENOENT."""
     try:
-        return stat.S_ISLNK(os.lstat(os.fspath(target_path)).st_mode)
+        return stat.S_ISLNK(Path(target_path).lstat().st_mode)
     except OSError as error:
         if is_errno(error, "ENOENT"):
             return False
@@ -72,7 +72,7 @@ def is_symlink(target_path: str | os.PathLike[str]) -> bool:
 
 
 def _resolve_source_entry(src: str) -> os.stat_result:
-    metadata = os.lstat(src)
+    metadata = Path(src).lstat()
     if stat.S_ISLNK(metadata.st_mode):
         target_metadata = Path(src).stat()
         if stat.S_ISDIR(target_metadata.st_mode):
@@ -84,9 +84,9 @@ def _resolve_source_entry(src: str) -> os.stat_result:
 
 def rm_entry(target_path: str | os.PathLike[str]) -> None:
     """Remove a file, symlink, or directory tree if it exists."""
-    path_str = os.fspath(target_path)
+    p = Path(target_path)
     try:
-        metadata = os.lstat(path_str)
+        metadata = p.lstat()
     except OSError as error:
         if is_errno(error, "ENOENT"):
             return
@@ -94,14 +94,14 @@ def rm_entry(target_path: str | os.PathLike[str]) -> None:
 
     if stat.S_ISDIR(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
         try:
-            shutil.rmtree(path_str)
+            shutil.rmtree(p)
         except OSError as error:
             if not is_errno(error, "ENOENT"):
                 raise
         return
 
     try:
-        Path(path_str).unlink()
+        p.unlink()
     except OSError as error:
         if not is_errno(error, "ENOENT"):
             raise
@@ -140,10 +140,10 @@ def _copy_tree_recursive(src: str, dst: str) -> None:
 
 def _get_dst_metadata(dst_str: str) -> os.stat_result | None:
     try:
-        dst_lstat = os.lstat(dst_str)
-        if stat.S_ISLNK(dst_lstat.st_mode):
+        dst_path = Path(dst_str)
+        if dst_path.is_symlink():
             return None
-        return Path(dst_str).stat()
+        return dst_path.stat()
     except OSError:
         return None
 
@@ -186,11 +186,12 @@ def is_identical_file(
         return False
 
     dst_metadata = _get_dst_metadata(dst_str)
-    if dst_metadata is None or not stat.S_ISREG(dst_metadata.st_mode):
-        return False
-    if src_metadata.st_size != dst_metadata.st_size:
-        return False
-    if (src_metadata.st_mode & 0o777) != (dst_metadata.st_mode & 0o777):
+    if (
+        dst_metadata is None
+        or not stat.S_ISREG(dst_metadata.st_mode)
+        or src_metadata.st_size != dst_metadata.st_size
+        or (src_metadata.st_mode & 0o777) != (dst_metadata.st_mode & 0o777)
+    ):
         return False
     if src_metadata.st_size == 0:
         return True
@@ -198,8 +199,7 @@ def is_identical_file(
     src_content = _read_cached_source_content(
         src_str, src_metadata, source_content_cache
     )
-    dst_content = Path(dst_str).read_bytes()
-    return src_content == dst_content
+    return src_content == Path(dst_str).read_bytes()
 
 
 def _sync_managed_file(
@@ -210,22 +210,22 @@ def _sync_managed_file(
 ) -> None:
     if is_identical_file(src, src_metadata, dst, source_content_cache):
         return
-
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     rm_entry(dst)
     _ = shutil.copy2(src, dst)
 
 
 def _ensure_directory(dst: str) -> None:
+    dst_path = Path(dst)
     try:
-        metadata = os.lstat(dst)
+        metadata = dst_path.lstat()
         if stat.S_ISDIR(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
             return
         rm_entry(dst)
     except OSError as error:
         if not is_errno(error, "ENOENT"):
             raise
-    Path(dst).mkdir(parents=True, exist_ok=True)
+    dst_path.mkdir(parents=True, exist_ok=True)
 
 
 def _safe_scandir(target_path: str) -> list[os.DirEntry[str]]:
@@ -277,40 +277,42 @@ def _prune_managed_tree(dst: str, preserve_paths: Sequence[str]) -> None:
         rm_entry(child_dst)
 
 
-def _sync_managed_tree_recursive(
+def _sync_managed_entry(
     src: str,
     dst: str,
     preserve_paths: Sequence[str],
-    source_content_cache: SourceContentCache | None = None,
+    source_content_cache: SourceContentCache | None,
+    *,
+    prune_dst: bool,
 ) -> None:
     metadata = _resolve_source_entry(src)
     if not stat.S_ISDIR(metadata.st_mode):
         _sync_managed_file(src, dst, metadata, source_content_cache)
         return
 
-    _ensure_directory(dst)
+    if prune_dst:
+        _ensure_directory(dst)
 
     with os.scandir(src) as it:
         src_entries = [entry for entry in it if not is_ignored_sync_entry(entry.name)]
     src_names = {entry.name for entry in src_entries}
 
-    for dst_entry in _safe_scandir(dst):
-        if dst_entry.name in src_names:
-            continue
-        if dst_entry.name in preserve_paths:
-            continue
-        child_dst = str(Path(dst) / dst_entry.name)
-        if (
-            _preserves_entry(preserve_paths, dst_entry.name)
-            and dst_entry.is_dir(follow_symlinks=False)
-            and not dst_entry.is_symlink()
-        ):
-            _prune_managed_tree(
-                child_dst,
-                _child_preserve(preserve_paths, dst_entry.name),
-            )
-            continue
-        rm_entry(child_dst)
+    if prune_dst:
+        for dst_entry in _safe_scandir(dst):
+            if dst_entry.name in src_names or dst_entry.name in preserve_paths:
+                continue
+            child_dst = str(Path(dst) / dst_entry.name)
+            if (
+                _preserves_entry(preserve_paths, dst_entry.name)
+                and dst_entry.is_dir(follow_symlinks=False)
+                and not dst_entry.is_symlink()
+            ):
+                _prune_managed_tree(
+                    child_dst,
+                    _child_preserve(preserve_paths, dst_entry.name),
+                )
+                continue
+            rm_entry(child_dst)
 
     for src_entry in src_entries:
         if src_entry.name in preserve_paths:
@@ -320,48 +322,12 @@ def _sync_managed_tree_recursive(
         child_preserve_paths = _child_preserve(preserve_paths, src_entry.name)
         child_metadata = _resolve_source_entry(child_src)
         if stat.S_ISDIR(child_metadata.st_mode):
-            _sync_managed_tree_recursive(
+            _sync_managed_entry(
                 child_src,
                 child_dst,
                 child_preserve_paths,
                 source_content_cache,
-            )
-            continue
-        _sync_managed_file(
-            child_src,
-            child_dst,
-            child_metadata,
-            source_content_cache,
-        )
-
-
-def _sync_managed_children_recursive(
-    src: str,
-    dst: str,
-    preserve_paths: Sequence[str],
-    source_content_cache: SourceContentCache | None = None,
-) -> None:
-    metadata = _resolve_source_entry(src)
-    if not stat.S_ISDIR(metadata.st_mode):
-        _sync_managed_file(src, dst, metadata, source_content_cache)
-        return
-
-    with os.scandir(src) as it:
-        src_entries = list(it)
-
-    for src_entry in src_entries:
-        if is_ignored_sync_entry(src_entry.name) or src_entry.name in preserve_paths:
-            continue
-        child_src = str(Path(src) / src_entry.name)
-        child_dst = str(Path(dst) / src_entry.name)
-        child_preserve_paths = _child_preserve(preserve_paths, src_entry.name)
-        child_metadata = _resolve_source_entry(child_src)
-        if stat.S_ISDIR(child_metadata.st_mode):
-            _sync_managed_tree_recursive(
-                child_src,
-                child_dst,
-                child_preserve_paths,
-                source_content_cache,
+                prune_dst=True,
             )
             continue
         _sync_managed_file(
@@ -379,17 +345,12 @@ def sync_managed_tree(
     source_content_cache: SourceContentCache | None = None,
 ) -> None:
     """Synchronize source tree to destination, pruning unmanaged files."""
-    src_str = os.fspath(src)
-    dst_str = os.fspath(dst)
-    metadata = _resolve_source_entry(src_str)
-    if not stat.S_ISDIR(metadata.st_mode):
-        _sync_managed_file(src_str, dst_str, metadata, source_content_cache)
-        return
-    _sync_managed_tree_recursive(
-        src_str,
-        dst_str,
+    _sync_managed_entry(
+        os.fspath(src),
+        os.fspath(dst),
         _normalize_preserve_paths(preserve_paths),
         source_content_cache,
+        prune_dst=True,
     )
 
 
@@ -400,28 +361,19 @@ def sync_managed_children(
     source_content_cache: SourceContentCache | None = None,
 ) -> None:
     """Synchronize only direct children of source tree to destination."""
-    src_str = os.fspath(src)
-    dst_str = os.fspath(dst)
-    metadata = _resolve_source_entry(src_str)
-    if not stat.S_ISDIR(metadata.st_mode):
-        _sync_managed_file(src_str, dst_str, metadata, source_content_cache)
-        return
-    _sync_managed_children_recursive(
-        src_str,
-        dst_str,
+    _sync_managed_entry(
+        os.fspath(src),
+        os.fspath(dst),
         _normalize_preserve_paths(preserve_paths),
         source_content_cache,
+        prune_dst=False,
     )
 
 
 def _matches_output(path: str, content: str, mode: int) -> bool:
     try:
-        metadata = os.lstat(path)
-        if (
-            not stat.S_ISREG(metadata.st_mode)
-            or stat.S_ISLNK(metadata.st_mode)
-            or (metadata.st_mode & 0o777) != mode
-        ):
+        metadata = Path(path).lstat()
+        if not stat.S_ISREG(metadata.st_mode) or (metadata.st_mode & 0o777) != mode:
             return False
         return Path(path).read_text(encoding="utf-8") == content
     except (OSError, UnicodeDecodeError):
@@ -432,8 +384,9 @@ def _create_temp_file(path: str, mode: int) -> tuple[int, str]:
     now_ms = int(time.time() * 1000)
     nonce = format(now_ms, "x")
     pid = os.getpid()
-    base_name = Path(path).name or "config"
-    dir_name = Path(path).parent
+    path_obj = Path(path)
+    base_name = path_obj.name or "config"
+    dir_name = path_obj.parent
 
     for attempt in range(_MAX_TEMP_ATTEMPTS):
         temp_path = str(dir_name / f".{base_name}.{pid}.{nonce}-{attempt}.tmp")
@@ -468,8 +421,7 @@ def sync_text_file(
     if _matches_output(dst_str, content, mode):
         return
 
-    parent_dir = Path(dst_str).parent
-    parent_dir.mkdir(parents=True, exist_ok=True)
+    Path(dst_str).parent.mkdir(parents=True, exist_ok=True)
 
     fd, temp_path = _create_temp_file(dst_str, mode)
     closed = False
