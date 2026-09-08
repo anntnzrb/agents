@@ -1098,8 +1098,7 @@ def _build_test_cmd(
         "--test-enable",
         f"--test-tags={tags_str}",
         "--stop-after-init",
-        "--no-http",
-        "--http-port=0",
+        f"--http-port={DEFAULT_TEST_HTTP_PORT}",
         "--log-level=test",
     ]
     if update_str:
