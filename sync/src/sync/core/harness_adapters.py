@@ -17,6 +17,9 @@ type HostPlatform = Literal["darwin", "linux"]
 
 type HarnessId = Literal["codex", "deepseek", "grok", "opencode", "pi", "omp"]
 
+DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
+DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
+
 
 @dataclass(frozen=True, slots=True)
 class HarnessLauncherSpec:
@@ -135,6 +138,8 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
 )
 
 __all__ = [
+    "DEFAULT_INSTRUCTION_FILE",
+    "DEFAULT_PACKAGE_CACHE_SUBDIR",
     "HARNESS_ADAPTERS",
     "ExtensionDepsHook",
     "HarnessAdapter",

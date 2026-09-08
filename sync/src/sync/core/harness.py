@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 import dotenv
 
 from sync.core.harness_adapters import (
+    DEFAULT_INSTRUCTION_FILE,
+    DEFAULT_PACKAGE_CACHE_SUBDIR,
     HARNESS_ADAPTERS,
     ExtensionDepsHook,
     HarnessAdapter,
@@ -28,11 +30,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 SOURCE_AGENT_FILE: str = "HARNESS.md"
-DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 INSTALL_TIMEOUT_SECONDS: int = 120
 INSTALL_TIMEOUT_MS: int = 120_000
 MANAGED_STATE_SUBDIR: str = ".local/share/agents/sync-managed"
-DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
 SKILLS_DST_DIR: str = "skills"
 SKILLS_SOURCE_SUBDIR: str = "current"
 PATH_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -121,35 +121,29 @@ class SyncEnv:
         """Create a SyncEnv for a specified user home directory."""
         home_path = Path(home)
         agents_home = str(home_path / ".config" / "agents")
-        runtime_home = str(home_path / ".local" / "share" / "agents")
         harnesses_home = str(home_path / ".config" / "agents" / "harnesses")
         resolved_platform = (
             platform if platform is not None else platform_from_process()
         )
         env_path = str(home_path / ".config" / "agents" / ".env")
-        root_env = load_root_env(env_path)
-        harnesses = discover_harnesses(home, harnesses_home, resolved_platform)
         return cls(
             home=home,
             ssot_home=agents_home,
-            runtime_home=runtime_home,
+            runtime_home=str(home_path / ".local" / "share" / "agents"),
             skills_home=str(home_path / ".config" / "agents" / "skills"),
             harnesses_home=harnesses_home,
             mcporter_home=str(home_path / ".mcporter"),
             summarize_home=str(home_path / ".summarize"),
             managed_state_home=str(home_path / MANAGED_STATE_SUBDIR),
             install_timeout_ms=install_timeout_ms,
-            harnesses=harnesses,
+            harnesses=discover_harnesses(home, harnesses_home, resolved_platform),
             platform=resolved_platform,
-            root_env=root_env,
+            root_env=load_root_env(env_path),
         )
 
     def harness(self, harness_id: HarnessId) -> Harness | None:
         """Look up a discovered harness by its identifier."""
-        for candidate in self.harnesses:
-            if candidate.id == harness_id:
-                return candidate
-        return None
+        return next((h for h in self.harnesses if h.id == harness_id), None)
 
 
 class RootEnvReadError(Exception):
@@ -180,49 +174,17 @@ def read_root_env_content(env_path: str) -> str | None:
         raise RootEnvReadError(env_path, err) from err
 
 
-def parse_dotenv_fallback(content: str) -> dict[str, str]:
-    """Parse .env content without external dependencies as a fallback."""
-    result: dict[str, str] = {}
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if "=" not in stripped:
-            continue
-        key, _, val = stripped.partition("=")
-        key = key.strip()
-        val = val.strip()
-        if not key:
-            continue
-        if (val.startswith('"') and val.endswith('"')) or (
-            val.startswith("'") and val.endswith("'")
-        ):
-            val = val[1:-1]
-        else:
-            comment_idx = val.find(" #")
-            if comment_idx != -1:
-                val = val[:comment_idx].rstrip()
-        if val:
-            result[key] = val
-    return result
-
-
 def decode_root_env(content: str | None) -> dict[str, str]:
     """Decode root .env content into a key-value dictionary.
 
-    Precedence and semantics match Effect ConfigProvider.fromDotEnvContents
-    in sync/src/core/harness.ts lines 162-212:
-    - Variable expansion is disabled (expandVariables: false).
-    - Empty string values are excluded (preserveEmptyStrings: false).
+    - Variable expansion is disabled (interpolate=False).
+    - Empty string values are excluded.
     - Purely file-based; values are not merged with or overridden by os.environ.
     """
     if content is None:
         return {}
-    try:
-        raw = dotenv.dotenv_values(stream=io.StringIO(content), interpolate=False)
-        return {k: v for k, v in raw.items() if v is not None and v != ""}
-    except (OSError, ValueError, TypeError):
-        return parse_dotenv_fallback(content)
+    raw = dotenv.dotenv_values(stream=io.StringIO(content), interpolate=False)
+    return {k: v for k, v in raw.items() if v is not None and v != ""}
 
 
 def load_root_env(env_path: str) -> dict[str, str]:
@@ -280,6 +242,31 @@ def build_harness(spec: HarnessSpec) -> Harness:
     )
 
 
+def _adapter_target_home(adapter: HarnessAdapter, user_home: str) -> str:
+    for segment in adapter.home_segments:
+        assert_path_component(segment, f"{adapter.id} home segment")
+    return str(Path(user_home).joinpath(*adapter.home_segments))
+
+
+def _adapter_to_harness(
+    adapter: HarnessAdapter,
+    user_home: str,
+    source_name: str | None = None,
+) -> Harness:
+    target_home = _adapter_target_home(adapter, user_home)
+    spec = HarnessSpec(
+        id=adapter.id,
+        source_name=source_name if source_name is not None else adapter.id,
+        home=target_home,
+        launcher=adapter.launcher,
+        instruction_file=adapter.instruction_file,
+        runtime_subdir=adapter.runtime_subdir,
+        compat_managed_entries=adapter.compat_managed_entries,
+        hooks=adapter.hooks,
+    )
+    return build_harness(spec)
+
+
 def discover_harnesses(
     home: str,
     harnesses_home: str,
@@ -287,27 +274,13 @@ def discover_harnesses(
 ) -> tuple[Harness, ...]:
     """Discover active harnesses based on installed directories and target platform."""
     resolved_platform = platform if platform is not None else platform_from_process()
-    results: list[Harness] = []
     harnesses_path = Path(harnesses_home)
-    home_path = Path(home)
-    for adapter in HARNESS_ADAPTERS:
-        adapter_dir = str(harnesses_path / adapter.id)
-        if resolved_platform in adapter.platforms and is_directory(adapter_dir):
-            for segment in adapter.home_segments:
-                assert_path_component(segment, f"{adapter.id} home segment")
-            target_home = str(home_path.joinpath(*adapter.home_segments))
-            spec = HarnessSpec(
-                id=adapter.id,
-                source_name=adapter.id,
-                home=target_home,
-                launcher=adapter.launcher,
-                instruction_file=adapter.instruction_file,
-                runtime_subdir=adapter.runtime_subdir,
-                compat_managed_entries=adapter.compat_managed_entries,
-                hooks=adapter.hooks,
-            )
-            results.append(build_harness(spec))
-    return tuple(results)
+    return tuple(
+        _adapter_to_harness(adapter, home)
+        for adapter in HARNESS_ADAPTERS
+        if resolved_platform in adapter.platforms
+        and is_directory(str(harnesses_path / adapter.id))
+    )
 
 
 def supported_harness(
@@ -316,23 +289,9 @@ def supported_harness(
     platform: HostPlatform,
 ) -> Harness | None:
     """Find a supported harness adapter by name and platform."""
-    home_path = Path(home)
     for adapter in HARNESS_ADAPTERS:
         if adapter.id == source_name and platform in adapter.platforms:
-            for segment in adapter.home_segments:
-                assert_path_component(segment, f"{adapter.id} home segment")
-            target_home = str(home_path.joinpath(*adapter.home_segments))
-            spec = HarnessSpec(
-                id=adapter.id,
-                source_name=adapter.id,
-                home=target_home,
-                launcher=adapter.launcher,
-                instruction_file=adapter.instruction_file,
-                runtime_subdir=adapter.runtime_subdir,
-                compat_managed_entries=adapter.compat_managed_entries,
-                hooks=adapter.hooks,
-            )
-            return build_harness(spec)
+            return _adapter_to_harness(adapter, home, source_name=source_name)
     return None
 
 
@@ -396,42 +355,34 @@ def harness_managed_state_path(harness: Harness, managed_state_home: str) -> str
 
 
 def normalize_hooks(
-    hooks: Sequence[HarnessHookSpec],
+    hooks: Sequence[HarnessHookSpec] = (),
 ) -> tuple[HarnessHook, ...]:
     """Normalize harness hook specifications with default file paths."""
-    normalized: list[HarnessHook] = []
+    result: list[HarnessHook] = []
     for hook in hooks:
-        match hook:
-            case PackageBootstrapHook():
-                manifest = (
-                    hook.manifest_file
-                    if hook.manifest_file is not None
-                    else "packages.json"
+        if isinstance(hook, PackageBootstrapHook):
+            result.append(
+                PackageBootstrapHook(
+                    manifest_file=(
+                        hook.manifest_file
+                        if hook.manifest_file is not None
+                        else "packages.json"
+                    ),
+                    settings_file=(
+                        hook.settings_file
+                        if hook.settings_file is not None
+                        else "settings.json"
+                    ),
+                    cache_subdir=(
+                        hook.cache_subdir
+                        if hook.cache_subdir is not None
+                        else DEFAULT_PACKAGE_CACHE_SUBDIR
+                    ),
                 )
-                settings = (
-                    hook.settings_file
-                    if hook.settings_file is not None
-                    else "settings.json"
-                )
-                cache = (
-                    hook.cache_subdir
-                    if hook.cache_subdir is not None
-                    else DEFAULT_PACKAGE_CACHE_SUBDIR
-                )
-                normalized.append(
-                    PackageBootstrapHook(
-                        manifest_file=manifest,
-                        settings_file=settings,
-                        cache_subdir=cache,
-                    )
-                )
-            case ExtensionDepsHook():
-                normalized.append(
-                    ExtensionDepsHook(
-                        root_dir=hook.root_dir,
-                    )
-                )
-    return tuple(normalized)
+            )
+        else:
+            result.append(hook)
+    return tuple(result)
 
 
 __all__ = [

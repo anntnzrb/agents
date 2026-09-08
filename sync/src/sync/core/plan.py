@@ -19,12 +19,12 @@ from sync.core.cliproxy_deployment import (
     read_cliproxy_deployment,
 )
 from sync.core.harness import (
+    DEFAULT_PACKAGE_CACHE_SUBDIR,
     SKILLS_DST_DIR,
     SKILLS_SOURCE_SUBDIR,
     SOURCE_AGENT_FILE,
     Harness,
     SyncEnv,
-    harness_instruction_file_name,
     harness_instruction_target,
     harness_managed_state_path,
     harness_root,
@@ -187,32 +187,21 @@ CLIPROXY_ENDPOINT_TEMPLATE_PATHS: dict[str, tuple[str, ...]] = {
     "omp": ("models.yml",),
 }
 
-DEFAULT_PACKAGE_CACHE_SUBDIR = ".local/share/agents/pi-packages"
 
-
-def _dir_entry_names(root: str) -> list[str]:
+def top_level_entry_names(root: str) -> list[str]:
+    """Return sorted unique top-level entry names in a directory."""
     path = Path(root)
     if not path.is_dir():
         return []
     try:
-        entries = [entry.name for entry in path.iterdir()]
+        return sorted({entry.name for entry in path.iterdir()})
     except OSError as error:
         message = f"read {root} ({panic_message(error)})"
         raise RuntimeError(message) from error
-    return sorted(set(entries))
-
-
-def top_level_entry_names(root: str) -> list[str]:
-    """Return sorted unique top-level entry names in a directory."""
-    return _dir_entry_names(root)
 
 
 def _skills_source_exists(sync_env: SyncEnv) -> bool:
     return (Path(sync_env.skills_home) / SKILLS_SOURCE_SUBDIR).is_dir()
-
-
-def _extension_hook_state_path(managed_state_home: str, harness: Harness) -> str:
-    return str(Path(managed_state_home) / f"{harness.source_name}.extension-deps.json")
 
 
 def _build_hook_plans(
@@ -225,33 +214,33 @@ def _build_hook_plans(
     for hook in harness.hooks:
         match hook:
             case PackageBootstrapHook():
-                manifest_file = hook.manifest_file or ""
-                settings_file = hook.settings_file or ""
-                cache_subdir = (
-                    hook.cache_subdir
-                    if hook.cache_subdir is not None
-                    else DEFAULT_PACKAGE_CACHE_SUBDIR
-                )
                 hook_plans.append(
                     PackageBootstrapHookPlan(
                         harness=harness,
-                        manifest_path=str(Path(source_root) / manifest_file),
-                        runtime_settings_path=str(Path(root) / settings_file),
-                        cache_root=str(Path(sync_env.home) / cache_subdir),
+                        manifest_path=str(
+                            Path(source_root) / (hook.manifest_file or "")
+                        ),
+                        runtime_settings_path=str(
+                            Path(root) / (hook.settings_file or "")
+                        ),
+                        cache_root=str(
+                            Path(sync_env.home)
+                            / (hook.cache_subdir or DEFAULT_PACKAGE_CACHE_SUBDIR)
+                        ),
                         timeout_ms=sync_env.install_timeout_ms,
                     )
                 )
             case ExtensionDepsHook():
-                relative_root = "" if hook.root_dir == "." else hook.root_dir
                 hook_plans.append(
                     ExtensionDepsHookPlan(
                         harness=harness,
                         job_root=root,
                         root=str(Path(root) / hook.root_dir),
                         source_root=str(Path(source_root) / hook.root_dir),
-                        relative_root=relative_root,
-                        state_path=_extension_hook_state_path(
-                            sync_env.managed_state_home, harness
+                        relative_root="" if hook.root_dir == "." else hook.root_dir,
+                        state_path=str(
+                            Path(sync_env.managed_state_home)
+                            / f"{harness.source_name}.extension-deps.json"
                         ),
                         timeout_ms=sync_env.install_timeout_ms,
                     )
@@ -268,12 +257,11 @@ def _build_skill_hook_plan(
 ) -> ExtensionDepsHookPlan | None:
     if not _skills_source_exists(sync_env):
         return None
-    skills_source = str(Path(sync_env.skills_home) / SKILLS_SOURCE_SUBDIR)
     return ExtensionDepsHookPlan(
         harness=harness,
         job_root=str(Path(root) / SKILLS_DST_DIR),
         root=str(Path(root) / SKILLS_DST_DIR),
-        source_root=skills_source,
+        source_root=str(Path(sync_env.skills_home) / SKILLS_SOURCE_SUBDIR),
         relative_root="",
         state_path=str(
             Path(sync_env.managed_state_home)
@@ -289,9 +277,7 @@ def _current_managed_entry_names(
     *,
     has_skills_source: bool,
 ) -> list[str]:
-    names: set[str] = {harness_instruction_file_name(harness)}
-    for entry_name in top_level_entry_names(source_root):
-        names.add(entry_name)
+    names: set[str] = {harness.instruction_file, *top_level_entry_names(source_root)}
     if has_skills_source:
         names.add(SKILLS_DST_DIR)
     return sorted(names)
@@ -308,9 +294,8 @@ def _build_harness_plan(sync_env: SyncEnv, harness: Harness) -> HarnessPlan:
     cleanup_entry_names = tuple(
         sorted(set(current_entry_names) | set(harness.compat_managed_entries))
     )
-    skill_hook = _build_skill_hook_plan(sync_env, harness, root)
     hooks: list[SyncHookPlan] = _build_hook_plans(sync_env, harness, root, source_root)
-    if skill_hook is not None:
+    if (skill_hook := _build_skill_hook_plan(sync_env, harness, root)) is not None:
         hooks.append(skill_hook)
 
     return HarnessPlan(
@@ -325,103 +310,41 @@ def _build_harness_plan(sync_env: SyncEnv, harness: Harness) -> HarnessPlan:
     )
 
 
-def _cli_proxy_endpoint_template_paths(plan: HarnessPlan) -> list[str]:
-    relative_paths = CLIPROXY_ENDPOINT_TEMPLATE_PATHS.get(plan.harness.id)
-    if relative_paths is None:
-        return []
-    result: list[str] = []
-    for relative_path in relative_paths:
-        source_path = Path(plan.source_root) / relative_path
-        if source_path.is_file():
-            try:
-                with source_path.open(encoding="utf-8") as file_handle:
-                    content = file_handle.read()
-                if CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER in content:
-                    result.append(relative_path)
-            except OSError:
-                pass
-    return result
-
-
-def _runtime_jobs(sync_env: SyncEnv) -> list[Job]:
-    source_root = str(Path(sync_env.ssot_home) / "sync")
-    return [
-        SyncRuntimeInstallJob(
-            source_root=source_root,
-            releases_root=str(Path(sync_env.runtime_home) / "sync-releases"),
-            current_link=str(Path(sync_env.runtime_home) / "sync-current"),
-            timeout_ms=sync_env.install_timeout_ms,
-        )
-    ]
-
-
-def _harness_dir_jobs(harnesses: Sequence[HarnessPlan]) -> list[Job]:
-    jobs: list[Job] = []
-    for plan in harnesses:
-        endpoint_template_paths = _cli_proxy_endpoint_template_paths(plan)
-        preserve_paths = (
-            tuple(endpoint_template_paths) if endpoint_template_paths else ()
-        )
-        jobs.append(
-            DirJob(
-                src=plan.source_root,
-                dst=plan.root,
-                scope="Children",
-                preserve_paths=preserve_paths,
-            )
-        )
-    return jobs
-
-
-def _skills_jobs(sync_env: SyncEnv, harnesses: Sequence[HarnessPlan]) -> list[Job]:
-    skills_source = str(Path(sync_env.skills_home) / SKILLS_SOURCE_SUBDIR)
-    return [
-        DirJob(
-            src=skills_source,
-            dst=str(Path(plan.root) / SKILLS_DST_DIR),
-            scope="Tree",
-        )
-        for plan in harnesses
-    ]
-
-
-def _instruction_jobs(sync_env: SyncEnv, harnesses: Sequence[HarnessPlan]) -> list[Job]:
-    return [
-        FileJob(
-            src=str(Path(sync_env.ssot_home) / SOURCE_AGENT_FILE),
-            dst=plan.instruction_target,
-        )
-        for plan in harnesses
-    ]
+def _cli_proxy_template_paths(source_root: str, harness_id: str) -> tuple[str, ...]:
+    candidates = CLIPROXY_ENDPOINT_TEMPLATE_PATHS.get(harness_id, ())
+    found: list[str] = []
+    for rel_path in candidates:
+        source_path = Path(source_root) / rel_path
+        if (
+            source_path.is_file()
+            and CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER
+            in source_path.read_text(encoding="utf-8")
+        ):
+            found.append(rel_path)
+    return tuple(found)
 
 
 def _config_jobs(
     sync_env: SyncEnv,
     harnesses: Sequence[HarnessPlan],
     deployment: CliProxyDeployment,
+    template_paths_by_id: dict[str, tuple[str, ...]],
     *,
     gateway_host: bool,
 ) -> list[Job]:
-    endpoint_targets: list[CliProxyEndpointTarget] = []
-    for plan in harnesses:
-        relative_paths = _cli_proxy_endpoint_template_paths(plan)
-        for relative_path in relative_paths:
-            source_path = str(Path(plan.source_root) / relative_path)
-            if plan.harness.id == "codex" and relative_path == "config.toml":
-                endpoint_targets.append(
-                    CliProxyEndpointTarget(
-                        src=source_path,
-                        dst=str(Path(plan.root) / relative_path),
-                        preserve_top_levels=("hooks.state", "projects"),
-                    )
-                )
-            else:
-                endpoint_targets.append(
-                    CliProxyEndpointTarget(
-                        src=source_path,
-                        dst=str(Path(plan.root) / relative_path),
-                    )
-                )
+    endpoint_targets: list[CliProxyEndpointTarget] = [
+        CliProxyEndpointTarget(
+            src=str(Path(plan.source_root) / rel_path),
+            dst=str(Path(plan.root) / rel_path),
+            preserve_top_levels=(
+                ("hooks.state", "projects")
+                if plan.harness.id == "codex" and rel_path == "config.toml"
+                else ()
+            ),
+        )
+        for plan in harnesses
+        for rel_path in template_paths_by_id.get(plan.harness.id, ())
+    ]
 
     jobs: list[Job] = [
         CliProxyReadinessJob(
@@ -480,17 +403,50 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
         str(Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / "deployment.json")
     )
     gateway_host = is_cliproxy_gateway_host(cli_proxy_deployment)
+    template_paths_by_id = {
+        plan.harness.id: _cli_proxy_template_paths(plan.source_root, plan.harness.id)
+        for plan in harnesses
+    }
 
-    jobs: list[Job] = []
-    jobs.extend(_runtime_jobs(sync_env))
-    jobs.extend(_harness_dir_jobs(harnesses))
-    jobs.extend(_skills_jobs(sync_env, harnesses))
-    jobs.extend(_instruction_jobs(sync_env, harnesses))
-    jobs.extend(
-        _config_jobs(
-            sync_env, harnesses, cli_proxy_deployment, gateway_host=gateway_host
-        )
-    )
+    jobs: list[Job] = [
+        SyncRuntimeInstallJob(
+            source_root=str(Path(sync_env.ssot_home) / "sync"),
+            releases_root=str(Path(sync_env.runtime_home) / "sync-releases"),
+            current_link=str(Path(sync_env.runtime_home) / "sync-current"),
+            timeout_ms=sync_env.install_timeout_ms,
+        ),
+        *(
+            DirJob(
+                src=plan.source_root,
+                dst=plan.root,
+                scope="Children",
+                preserve_paths=template_paths_by_id.get(plan.harness.id, ()),
+            )
+            for plan in harnesses
+        ),
+        *(
+            DirJob(
+                src=str(Path(sync_env.skills_home) / SKILLS_SOURCE_SUBDIR),
+                dst=str(Path(plan.root) / SKILLS_DST_DIR),
+                scope="Tree",
+            )
+            for plan in harnesses
+        ),
+        *(
+            FileJob(
+                src=str(Path(sync_env.ssot_home) / SOURCE_AGENT_FILE),
+                dst=plan.instruction_target,
+            )
+            for plan in harnesses
+        ),
+        *_config_jobs(
+            sync_env,
+            harnesses,
+            cli_proxy_deployment,
+            template_paths_by_id,
+            gateway_host=gateway_host,
+        ),
+    ]
 
     hooks = tuple(hook for plan in harnesses for hook in plan.hooks)
 
