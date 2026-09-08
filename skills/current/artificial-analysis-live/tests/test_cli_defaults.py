@@ -25,7 +25,6 @@ from artificial_analysis.cli import (
     _fetch_namespace,  # pyright: ignore[reportPrivateUsage]
     _fetch_payload,  # pyright: ignore[reportPrivateUsage]
     _handle_fetch,  # pyright: ignore[reportPrivateUsage]
-    _harness_payload,  # pyright: ignore[reportPrivateUsage]
     _load_dotenv,  # pyright: ignore[reportPrivateUsage]
     _normalize_argv,  # pyright: ignore[reportPrivateUsage]
     _query_payload,  # pyright: ignore[reportPrivateUsage]
@@ -234,20 +233,9 @@ class TestCliDefaultPaths(unittest.TestCase):
                     limit=10,
                 ),
             )
-            harness = _harness_payload(
-                argparse.Namespace(
-                    snapshot=snapshot_path,
-                    model=None,
-                    creator=None,
-                    open_weights_only=False,
-                    limit=10,
-                ),
-            )
         query_rows = cast("list[dict[str, object]]", query["rows"])
         assert query_rows[0]["model_name"] == "Model A"
         assert query_rows[0]["price_blended"] == 4
-        harness_rows = cast("list[dict[str, object]]", harness["rows"])
-        assert harness_rows[0]["creator"] == "Lab"
 
     def test_fetch_uses_last_good_snapshot_when_required_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

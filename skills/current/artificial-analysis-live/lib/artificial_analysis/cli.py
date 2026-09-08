@@ -562,42 +562,6 @@ def _add_diagnose_parser(subparsers: _Subparsers) -> None:
     diagnose_parser.set_defaults(handler=_handle_diagnose)
 
 
-def _add_model_filters(parser: argparse.ArgumentParser) -> None:
-    _ = parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model slug/name contains filter.",
-    )
-    _ = parser.add_argument(
-        "--creator",
-        type=str,
-        default=None,
-        help="Creator/lab name contains filter.",
-    )
-    _ = parser.add_argument(
-        "--open-weights-only",
-        action="store_true",
-        help="Return only open-weights models.",
-    )
-
-
-def _add_harness_parser(subparsers: _Subparsers) -> None:
-    harness_parser = subparsers.add_parser(
-        "harness",
-        help="Rank unique models by Harness = 50%% Agentic Index + 50%% Coding Index.",
-    )
-    _ = harness_parser.add_argument(
-        "snapshot",
-        nargs="?",
-        type=Path,
-        default=DEFAULT_OUTPUT_JSON,
-    )
-    _add_model_filters(harness_parser)
-    _ = harness_parser.add_argument("--limit", type=int, default=50)
-    harness_parser.set_defaults(handler=_handle_harness)
-
-
 def _add_order(parser: argparse.ArgumentParser, *, default: str) -> None:
     _ = parser.add_argument(
         "--order",
@@ -725,7 +689,6 @@ def _add_query_parser(subparsers: _Subparsers) -> None:
         type=str,
         default="intelligence",
         choices=(
-            "harness",
             "intelligence",
             "agentic",
             "coding",
@@ -774,7 +737,6 @@ def _add_qa_parser(subparsers: _Subparsers) -> None:
         type=str,
         default=None,
         choices=(
-            "harness",
             "intelligence",
             "agentic",
             "coding",
@@ -784,7 +746,6 @@ def _add_qa_parser(subparsers: _Subparsers) -> None:
             "ttfc",
             "e2e",
         ),
-        help="Override inferred sort metric.",
     )
     _ = qa_parser.add_argument(
         "--order",
@@ -986,14 +947,6 @@ def _model_rows(snapshot: dict[str, object]) -> list[dict[str, object]]:
                 if isinstance(model_d.get("slug"), str):
                     result.append(model_d)
     return result
-
-
-def _creator(model: dict[str, object]) -> dict[str, object]:
-    creator = model.get("creator")
-    if isinstance(creator, dict):
-        return _as_dict(creator)  # pyright: ignore[reportUnknownArgumentType]
-    legacy_creator = model.get("model_creators")
-    return _as_dict(legacy_creator) if isinstance(legacy_creator, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
 
 
 def _artifact_record_metadata(record: dict[str, object]) -> dict[str, object]:
@@ -1293,11 +1246,6 @@ def _ns_float(args: object, name: str, default: float = 0.0) -> float:
         except ValueError:
             return default
     return default
-
-
-def _ns_bool(args: object, name: str, default: bool = False) -> bool:
-    val = getattr(args, name, default)
-    return bool(val)
 
 
 def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -1794,664 +1742,6 @@ def _matches_any(needle: str, values: Sequence[object]) -> bool:
     return any(isinstance(value, str) and needle in value.lower() for value in values)
 
 
-def _harness_payload(args: argparse.Namespace) -> dict[str, object]:
-    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
-    model_arg = _ns_optional_str(args, "model")
-    creator_arg = _ns_optional_str(args, "creator")
-    open_weights_only = _ns_bool(args, "open_weights_only", False)
-    limit_arg = _ns_int(args, "limit", 50)
-
-    snapshot = _load_reader_snapshot(snapshot_path)
-    models = _model_rows(snapshot)
-
-    model_filter = model_arg.lower() if model_arg else None
-    creator_filter = creator_arg.lower() if creator_arg else None
-
-    rows: list[dict[str, object]] = []
-    skipped_missing = 0
-
-    for model in models:
-        model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-        if not model_slug:
-            continue
-        if model.get("deleted") or model.get("deprecated"):
-            continue
-
-        model_name = model.get("name") if isinstance(model.get("name"), str) else None
-        creator = _creator(model)
-        creator_name = (
-            creator.get("name") if isinstance(creator.get("name"), str) else None
-        )
-
-        if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
-            continue
-        if creator_filter and not _matches_any(
-            creator_filter,
-            [
-                creator_name,
-                creator.get("slug") if isinstance(creator.get("slug"), str) else None,
-            ],
-        ):
-            continue
-        if open_weights_only and model.get("is_open_weights") is not True:
-            continue
-
-        agentic = model.get("agentic_index")
-        coding = model.get("coding_index")
-        if (
-            not _finite_number(agentic)
-            or not _finite_number(coding)
-            or not isinstance(agentic, (int, float))
-            or not isinstance(coding, (int, float))
-        ):
-            skipped_missing += 1
-            continue
-
-        agentic_f = float(agentic)
-        coding_f = float(coding)
-        computed_harness = round((agentic_f + coding_f) / 2.0, 4)
-        computed_gap = round(agentic_f - coding_f, 4)
-        published_harness = model.get("harness")
-        published_gap = model.get("execution_gap")
-        row: dict[str, object] = {
-            "rank": 0,
-            "model_slug": model_slug,
-            "model_name": model_name,
-            "creator": creator_name,
-            "harness": (
-                published_harness
-                if _finite_number(published_harness)
-                else computed_harness
-            ),
-            "agentic": agentic,
-            "coding": coding,
-            "execution_gap": (
-                published_gap if _finite_number(published_gap) else computed_gap
-            ),
-            "intelligence": model.get("intelligence_index"),
-            "release_date": model.get("release_date"),
-            "reasoning_model": model.get("reasoning_model"),
-            "is_open_weights": model.get("is_open_weights"),
-            "context_window_tokens": model.get("context_window_tokens"),
-            "derived": {
-                "harness": {
-                    "value": computed_harness,
-                    "formula": "0.5 * agentic + 0.5 * coding",
-                    "input_paths": ["$.agentic", "$.coding"],
-                },
-                "execution_gap": {
-                    "value": computed_gap,
-                    "formula": "agentic - coding",
-                    "input_paths": ["$.agentic", "$.coding"],
-                },
-            },
-        }
-        for preserved_key in ("raw_fields", "unknowns"):
-            preserved = model.get(preserved_key)
-            if isinstance(preserved, (dict, list)):
-                row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
-        _ = _attach_row_evidence(
-            row,
-            metric_paths=(
-                "rank",
-                "harness",
-                "agentic",
-                "coding",
-                "execution_gap",
-                "intelligence",
-                "context_window_tokens",
-                "derived.harness.value",
-                "derived.execution_gap.value",
-            ),
-            source_prefix=f"$.models[{len(rows)}]",
-            derived_paths={
-                "harness": (
-                    "0.5 * agentic + 0.5 * coding",
-                    ("$.agentic", "$.coding"),
-                )
-                if not _finite_number(published_harness)
-                else None,
-                "execution_gap": (
-                    "agentic - coding",
-                    ("$.agentic", "$.coding"),
-                )
-                if not _finite_number(published_gap)
-                else None,
-                "derived.harness.value": (
-                    "0.5 * agentic + 0.5 * coding",
-                    ("$.agentic", "$.coding"),
-                ),
-                "derived.execution_gap.value": (
-                    "agentic - coding",
-                    ("$.agentic", "$.coding"),
-                ),
-            },
-            raw_values={
-                "agentic": model.get("agentic_index"),
-                "coding": model.get("coding_index"),
-                "intelligence": model.get("intelligence_index"),
-                "context_window_tokens": model.get("context_window_tokens"),
-            },
-        )
-        rows.append(row)
-
-    def _harness_sort_key(r: dict[str, object]) -> tuple[float, str]:
-        h = r.get("harness")
-        h_val = float(h) if _finite_number(h) and isinstance(h, (int, float)) else 0.0
-        s_val = str(r.get("model_slug") or "")
-        return (-h_val, s_val)
-
-    rows.sort(key=_harness_sort_key)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-        _ = _attach_row_evidence(
-            row,
-            metric_paths=("rank",),
-            source_prefix=f"$.rows[{index - 1}]",
-            derived_paths={
-                "rank": ("deterministic descending sort rank", ("$.harness",)),
-            },
-        )
-
-    limited = rows[: max(limit_arg, 0)]
-    payload: dict[str, object] = {
-        "snapshot": str(snapshot_path),
-        "definition": {
-            "name": "Harness",
-            "formula": "0.5 * Agentic Index + 0.5 * Coding Index",
-            "execution_gap": (
-                "Agentic Index - Coding Index; high positive values indicate "
-                "executable-precision risk."
-            ),
-            "dependencies": [
-                {"canonical_id": "agentic_index", "release": None},
-                {"canonical_id": "coding_index", "release": None},
-            ],
-            "independence": [],
-        },
-        "applied_filters": {
-            "model": model_arg,
-            "creator": creator_arg,
-            "open_weights_only": open_weights_only,
-            "limit": limit_arg,
-        },
-        "counts": {
-            "ranked_models": len(rows),
-            "returned_models": len(limited),
-            "skipped_missing_agentic_or_coding": skipped_missing,
-        },
-        "rows": limited,
-        "overlap": overlap_metadata(
-            dependencies=[
-                {"canonical_id": "agentic_index", "release": None},
-                {"canonical_id": "coding_index", "release": None},
-            ],
-            independence=[],
-        ),
-    }
-    return _attach_payload_evidence(payload)
-
-
-REASONING_EXTREME_FLOOR = 0.10
-REASONING_EXTREME_SELECTIVITY = 0.75
-REASONING_SELECTIVE_FLOOR = 0.25
-REASONING_SELECTIVE_SELECTIVITY = 0.60
-REASONING_MODERATE_FLOOR = 0.50
-REASONING_HARD_UNIFORM_FLOOR = 0.60
-REASONING_HARD_UNIFORM_SHARE = 0.85
-REASONING_UNIFORM_SHARE = 0.80
-
-
-def _aggregate_only_reasoning_profile(
-    model: dict[str, object],
-) -> dict[str, object] | None:
-    iitc = _as_dict(model.get("intelligence_index_token_counts"))
-    if not iitc:
-        return None
-    answer = _number_or_none(iitc.get("answer"))
-    reasoning = _number_or_none(iitc.get("reasoning"))
-    output = _number_or_none(iitc.get("output_tokens"))
-    if (
-        not _finite_number(answer)
-        or not _finite_number(reasoning)
-        or not _finite_number(output)
-        or not isinstance(reasoning, (int, float))
-        or not isinstance(output, (int, float))
-        or float(output) <= 0
-    ):
-        return None
-    reasoning_f = float(reasoning)
-    output_f = float(output)
-    return {
-        "reasoning_floor": None,
-        "reasoning_floor_benchmark": None,
-        "reasoning_ceiling": None,
-        "reasoning_ceiling_benchmark": None,
-        "selectivity_score": None,
-        "weighted_reasoning_share": round(reasoning_f / output_f, 4),
-        "classification": None,
-        "benchmark_count": 0,
-        "warning": (
-            "Aggregate only; per-benchmark canonical_eval_token_counts unavailable."
-        ),
-    }
-
-
-def _reasoning_shares(
-    canonical: dict[str, object],
-) -> tuple[list[tuple[float, str]], int, int]:
-    shares: list[tuple[float, str]] = []
-    total_answer = 0.0
-    total_reasoning = 0.0
-    for bench_name, vals in canonical.items():
-        if not isinstance(vals, dict):
-            continue
-        vals_dict = _as_dict(vals)  # pyright: ignore[reportUnknownArgumentType]
-        answer = vals_dict.get("answer")
-        if answer is None:
-            answer = vals_dict.get("answer_tokens")
-        reasoning = vals_dict.get("reasoning")
-        if reasoning is None:
-            reasoning = vals_dict.get("reasoning_tokens")
-        if (
-            not _finite_number(answer)
-            or not _finite_number(reasoning)
-            or not isinstance(answer, (int, float))
-            or not isinstance(reasoning, (int, float))
-            or float(answer) + float(reasoning) <= 0
-        ):
-            continue
-        ans_f = float(answer)
-        reas_f = float(reasoning)
-        share = reas_f / (ans_f + reas_f)
-        shares.append((share, str(bench_name)))
-        total_answer += ans_f
-        total_reasoning += reas_f
-    return shares, int(total_answer), int(total_reasoning)
-
-
-def _reasoning_classification(
-    floor: float,
-    selectivity: float,
-    weighted_share: float,
-) -> str:
-    if floor < REASONING_EXTREME_FLOOR and selectivity > REASONING_EXTREME_SELECTIVITY:
-        return "selective_extreme"
-    if (
-        floor < REASONING_SELECTIVE_FLOOR
-        and selectivity > REASONING_SELECTIVE_SELECTIVITY
-    ):
-        return "selective"
-    if floor < REASONING_MODERATE_FLOOR:
-        return "moderate"
-    if (
-        floor >= REASONING_HARD_UNIFORM_FLOOR
-        and weighted_share >= REASONING_HARD_UNIFORM_SHARE
-    ):
-        return "hard_uniform_heavy"
-    if floor >= REASONING_MODERATE_FLOOR and weighted_share >= REASONING_UNIFORM_SHARE:
-        return "uniform_heavy"
-    return "unclassified"
-
-
-def _compute_reasoning_profile(
-    model: dict[str, object],
-) -> dict[str, object] | None:
-    """Compute reasoning selectivity profile from canonical evaluation counts."""
-    raw_canonical = model.get("canonical_eval_token_counts")
-    if not isinstance(raw_canonical, dict) or not raw_canonical:
-        return _aggregate_only_reasoning_profile(model)
-    canonical = _as_dict(raw_canonical)  # pyright: ignore[reportUnknownArgumentType]
-
-    shares, total_answer, total_reasoning = _reasoning_shares(canonical)
-    if not shares:
-        return None
-
-    total_output = total_answer + total_reasoning
-    floor = min(shares, key=lambda share: share[0])
-    ceiling = max(shares, key=lambda share: share[0])
-    weighted_share = total_reasoning / total_output if total_output else 0.0
-    selectivity = ceiling[0] - floor[0]
-    return {
-        "reasoning_floor": round(floor[0], 4),
-        "reasoning_floor_benchmark": floor[1],
-        "reasoning_ceiling": round(ceiling[0], 4),
-        "reasoning_ceiling_benchmark": ceiling[1],
-        "selectivity_score": round(selectivity, 4),
-        "weighted_reasoning_share": round(weighted_share, 4),
-        "classification": _reasoning_classification(
-            floor[0],
-            selectivity,
-            weighted_share,
-        ),
-        "benchmark_count": len(shares),
-    }
-
-
-def _reasoning_benchmarks(
-    model: dict[str, object],
-) -> list[dict[str, object]]:
-    """Extract per-benchmark reasoning share breakdown."""
-    canonical = model.get("canonical_eval_token_counts")
-    if not isinstance(canonical, dict):
-        return []
-    result: list[dict[str, object]] = []
-    for bench_name, vals in _as_dict(canonical).items():  # pyright: ignore[reportUnknownArgumentType]
-        if not isinstance(vals, dict):
-            continue
-        vals_dict = _as_dict(vals)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
-        a = vals_dict.get("answer")
-        if a is None:
-            a = vals_dict.get("answer_tokens")
-        r = vals_dict.get("reasoning")
-        if r is None:
-            r = vals_dict.get("reasoning_tokens")
-        if (
-            not _finite_number(a)
-            or not _finite_number(r)
-            or not isinstance(a, (int, float))
-            or not isinstance(r, (int, float))
-            or float(a) + float(r) <= 0
-        ):
-            continue
-        a_f = float(a)
-        r_f = float(r)
-        output = a_f + r_f
-        result.append(
-            {
-                "benchmark": str(bench_name),
-                "answer_tokens": int(a_f),
-                "reasoning_tokens": int(r_f),
-                "output_tokens": int(output),
-                "reasoning_share": round(r_f / output, 4),
-            },
-        )
-
-    def _bench_sort_key(b: dict[str, object]) -> float:
-        val = b.get("reasoning_share")
-        if _finite_number(val) and isinstance(val, (int, float)):
-            return float(val)
-        return 0.0
-
-    result.sort(key=_bench_sort_key)
-    return result
-
-
-def _reasoning_row(
-    model: dict[str, object],
-    args: argparse.Namespace,
-    model_filter: str | None,
-    creator_filter: str | None,
-) -> tuple[dict[str, object] | None, bool]:
-    open_weights_only = _ns_bool(args, "open_weights_only", False)
-    classification_arg = _ns_optional_str(args, "classification")
-    selective_only = _ns_bool(args, "selective_only", False)
-    benchmarks = _ns_bool(args, "benchmarks", False)
-
-    model_slug = model.get("slug") if isinstance(model.get("slug"), str) else None
-    if not model_slug or model.get("deleted") or model.get("deprecated"):
-        return None, False
-
-    model_name = model.get("name") if isinstance(model.get("name"), str) else None
-    creator = _creator(model)
-    creator_name = creator.get("name") if isinstance(creator.get("name"), str) else None
-    if model_filter and not _matches_any(model_filter, [model_slug, model_name]):
-        return None, False
-    if creator_filter and not _matches_any(
-        creator_filter,
-        [
-            creator_name,
-            creator.get("slug") if isinstance(creator.get("slug"), str) else None,
-        ],
-    ):
-        return None, False
-    if open_weights_only and model.get("is_open_weights") is not True:
-        return None, False
-
-    profile = _compute_reasoning_profile(model)
-    if profile is None:
-        return None, True
-    classification = profile.get("classification")
-    if classification_arg and classification != classification_arg:
-        return None, False
-    if selective_only and (
-        not isinstance(classification, str)
-        or not classification.startswith("selective")
-    ):
-        return None, False
-
-    agentic = model.get("agentic_index")
-    coding = model.get("coding_index")
-    computed_harness = (
-        round(
-            (float(agentic) + float(coding)) / 2.0,
-            4,
-        )
-        if _finite_number(agentic)
-        and _finite_number(coding)
-        and isinstance(agentic, (int, float))
-        and isinstance(coding, (int, float))
-        else None
-    )
-    published_harness = model.get("harness")
-    harness = (
-        published_harness if _finite_number(published_harness) else computed_harness
-    )
-    profile_numeric = {
-        key: value for key, value in profile.items() if _numeric_scalar(value)
-    }
-    derived_profile = {
-        "formula": "reasoning shares derived from canonical_eval_token_counts",
-        "input_paths": ["$.canonical_eval_token_counts"],
-        "values": profile,
-    }
-    row: dict[str, object] = {
-        "model_slug": model_slug,
-        "model_name": model_name,
-        "creator": creator_name,
-        "reasoning_model": model.get("reasoning_model"),
-        "is_open_weights": model.get("is_open_weights"),
-        "release_date": model.get("release_date"),
-        "context_window_tokens": model.get("context_window_tokens"),
-        "intelligence": model.get("intelligence_index"),
-        "agentic": agentic,
-        "coding": coding,
-        "harness": harness,
-        "reasoning_profile": profile,
-        "derived": {
-            "harness": {
-                "value": computed_harness,
-                "formula": "0.5 * agentic + 0.5 * coding",
-                "input_paths": ["$.agentic", "$.coding"],
-            },
-            "reasoning_profile": derived_profile,
-        },
-    }
-    if benchmarks:
-        row["per_benchmark"] = _reasoning_benchmarks(model)
-    for preserved_key in ("raw_fields", "unknowns"):
-        preserved = model.get(preserved_key)
-        if isinstance(preserved, (dict, list)):
-            row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
-    derived_paths: dict[str, tuple[str, tuple[str, ...]] | None] = {
-        "harness": (
-            "0.5 * agentic + 0.5 * coding",
-            ("$.agentic", "$.coding"),
-        )
-        if not _finite_number(published_harness)
-        else None,
-        "derived.harness.value": (
-            "0.5 * agentic + 0.5 * coding",
-            ("$.agentic", "$.coding"),
-        ),
-    }
-    for key in profile_numeric:
-        derived_paths[f"reasoning_profile.{key}"] = (
-            "derived from canonical_eval_token_counts",
-            ("$.canonical_eval_token_counts",),
-        )
-        derived_paths[f"derived.reasoning_profile.values.{key}"] = (
-            "derived from canonical_eval_token_counts",
-            ("$.canonical_eval_token_counts",),
-        )
-    if benchmarks:
-        raw_benchmarks = row.get("per_benchmark")
-        if isinstance(raw_benchmarks, list):
-            for index, benchmark in enumerate(_as_list(raw_benchmarks)):  # pyright: ignore[reportUnknownArgumentType]
-                if isinstance(benchmark, dict):
-                    for key, value in _as_dict(benchmark).items():  # pyright: ignore[reportUnknownArgumentType]
-                        if _numeric_scalar(value):
-                            derived_paths[f"per_benchmark[{index}].{key}"] = (
-                                "reasoning_tokens / (answer_tokens + reasoning_tokens)",
-                                ("$.canonical_eval_token_counts",),
-                            )
-    _ = _attach_row_evidence(
-        row,
-        metric_paths=(
-            "harness",
-            "intelligence",
-            "agentic",
-            "coding",
-            "context_window_tokens",
-            *tuple(f"reasoning_profile.{key}" for key in profile_numeric),
-        ),
-        source_prefix=f"$.models[{model_slug}]",
-        raw_values={
-            "intelligence": model.get("intelligence_index"),
-            "agentic": agentic,
-            "coding": coding,
-            "context_window_tokens": model.get("context_window_tokens"),
-        },
-        derived_paths=derived_paths,
-    )
-    return row, False
-
-
-def _reasoning_payload(args: argparse.Namespace) -> dict[str, object]:
-    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
-    model_arg = _ns_optional_str(args, "model")
-    creator_arg = _ns_optional_str(args, "creator")
-    open_weights_only = _ns_bool(args, "open_weights_only", False)
-    classification_arg = _ns_optional_str(args, "classification")
-    selective_only = _ns_bool(args, "selective_only", False)
-    sort_by_arg = _ns_str(args, "sort_by", "harness")
-    order_arg = _ns_str(args, "order", "auto")
-    limit_arg = _ns_int(args, "limit", 50)
-    benchmarks = _ns_bool(args, "benchmarks", False)
-
-    snapshot = _load_reader_snapshot(snapshot_path)
-    models = _model_rows(snapshot)
-
-    model_filter = model_arg.lower() if model_arg else None
-    creator_filter = creator_arg.lower() if creator_arg else None
-
-    rows: list[dict[str, object]] = []
-    skipped_missing = 0
-
-    for model in models:
-        row, missing_profile = _reasoning_row(
-            model,
-            args,
-            model_filter,
-            creator_filter,
-        )
-        if missing_profile:
-            skipped_missing += 1
-        if row is not None:
-            rows.append(row)
-
-    sort_key_map = {
-        "harness": ("harness", True),
-        "selectivity": ("reasoning_profile.selectivity_score", True),
-        "reasoning_floor": ("reasoning_profile.reasoning_floor", False),
-        "weighted_reasoning_share": (
-            "reasoning_profile.weighted_reasoning_share",
-            False,
-        ),
-        "intelligence": ("intelligence", True),
-        "agentic": ("agentic", True),
-        "coding": ("coding", True),
-    }
-    sort_path, desc_default = sort_key_map.get(sort_by_arg, ("harness", True))
-    reverse = desc_default
-    if order_arg == "asc":
-        reverse = False
-    elif order_arg == "desc":
-        reverse = True
-
-    rows.sort(
-        key=lambda row: _nested_sort_metric(
-            row,
-            sort_path,
-            reverse=reverse,
-        ),
-    )
-    limited = rows[: max(limit_arg, 0)]
-    for index, row in enumerate(limited, start=1):
-        row["rank"] = index
-        _ = _attach_row_evidence(
-            row,
-            metric_paths=("rank",),
-            source_prefix=f"$.rows[{index - 1}]",
-            derived_paths={
-                "rank": (
-                    "deterministic sort rank",
-                    (f"$.{sort_path}",),
-                ),
-            },
-        )
-
-    payload: dict[str, object] = {
-        "snapshot": str(snapshot_path),
-        "definition": {
-            "name": "Reasoning Selectivity",
-            "scope": (
-                "max-effort Intelligence Index evaluation (canonical_eval_token_counts)"
-            ),
-            "metrics": {
-                "reasoning_floor": (
-                    "min(reasoning_share) across benchmarks — lower = more selective"
-                ),
-                "reasoning_ceiling": "max(reasoning_share) across benchmarks",
-                "weighted_reasoning_share": "Σ reasoning_tokens / Σ (answer+reasoning)",
-                "selectivity_score": "reasoning_ceiling - reasoning_floor",
-            },
-            "classifications": {
-                "selective_extreme": "floor < 0.10 and selectivity_score > 0.75",
-                "selective": "floor < 0.25 and selectivity_score > 0.60",
-                "moderate": "0.25 <= floor < 0.50",
-                "uniform_heavy": "floor >= 0.50 and weighted_reasoning_share >= 0.80",
-                "hard_uniform_heavy": (
-                    "floor >= 0.60 and weighted_reasoning_share >= 0.85"
-                ),
-            },
-            "dependencies": [
-                {"canonical_id": "canonical_eval_token_counts", "release": None},
-            ],
-            "independence": [],
-        },
-        "applied_filters": {
-            "model": model_arg,
-            "creator": creator_arg,
-            "open_weights_only": open_weights_only,
-            "classification": classification_arg,
-            "selective_only": selective_only,
-            "sort_by": sort_by_arg,
-            "order": order_arg,
-            "limit": limit_arg,
-            "benchmarks": benchmarks,
-        },
-        "counts": {
-            "ranked_models": len(rows),
-            "returned_models": len(limited),
-            "skipped_missing_profile": skipped_missing,
-        },
-        "rows": limited,
-        "overlap": _snapshot_overlap(snapshot),
-    }
-    return _attach_payload_evidence(payload)
-
-
 def _query_row(
     item: object,
     canonical_models: dict[str, dict[str, object]],
@@ -2511,7 +1801,6 @@ def _query_row(
         "model_name": model_name,
         "provider_slug": provider_slug,
         "provider_name": provider_name,
-        "harness": harness,
         "intelligence": model.get("intelligence_index"),
         "agentic": model.get("agentic_index"),
         "coding": model.get("coding_index"),
@@ -2534,13 +1823,6 @@ def _query_row(
         "e2e": e2e.get("total_time"),
         "context_window_tokens": item_dict.get("context_window_tokens"),
         "host_api_id": item_dict.get("host_api_id"),
-        "derived": {
-            "harness": {
-                "value": computed_harness,
-                "formula": "0.5 * agentic + 0.5 * coding",
-                "input_paths": ["$.agentic", "$.coding"],
-            },
-        },
     }
     for preserved_key in ("raw_fields", "unknowns"):
         for source in (item_dict, model):
@@ -2551,7 +1833,6 @@ def _query_row(
     _ = _attach_row_evidence(
         row,
         metric_paths=(
-            "harness",
             "intelligence",
             "agentic",
             "coding",
@@ -2591,18 +1872,6 @@ def _query_row(
             "ttfc": timescale.get("median_time_to_first_chunk"),
             "e2e": e2e.get("total_time"),
             "context_window_tokens": item_dict.get("context_window_tokens"),
-        },
-        derived_paths={
-            "harness": (
-                "0.5 * agentic + 0.5 * coding",
-                ("$.agentic", "$.coding"),
-            )
-            if not _finite_number(published_harness)
-            else None,
-            "derived.harness.value": (
-                "0.5 * agentic + 0.5 * coding",
-                ("$.agentic", "$.coding"),
-            ),
         },
     )
     return row
@@ -2683,22 +1952,6 @@ def _query_payload(args: argparse.Namespace) -> dict[str, object]:
         "overlap": _snapshot_overlap(snapshot),
     }
     return _attach_payload_evidence(payload)
-
-
-def _harness_score(model: dict[str, object]) -> float | None:
-    agentic = model.get("agentic_index")
-    coding = model.get("coding_index")
-    if (
-        _finite_number(agentic)
-        and _finite_number(coding)
-        and isinstance(agentic, (int, float))
-        and isinstance(coding, (int, float))
-    ):
-        return round(
-            (float(agentic) + float(coding)) / 2.0,
-            4,
-        )
-    return None
 
 
 def _resolve_reverse(*, sort_key: str, order: str) -> bool:
@@ -2906,10 +2159,6 @@ def _infer_sort(question: str) -> tuple[str, str]:
             ),
             ("speed", "desc"),
         ),
-        (
-            ("harness", "agent harness", "coding agent", "agentic coding"),
-            ("harness", "desc"),
-        ),
         (("agentic", "agent", "autonomous"), ("agentic", "desc")),
         (("coding", "code", "programming", "codificación"), ("coding", "desc")),
         (("math", "matemática", "matematica"), ("math", "desc")),
@@ -3109,8 +2358,7 @@ def _capability_schema() -> dict[str, object]:
                     "provider": "str contains filter on provider slug/name",
                     "endpoint": "str contains filter on endpoint slug",
                     "sort_by": (
-                        "harness|intelligence|agentic|coding|math|"
-                        "price_blended|speed|ttfc|e2e"
+                        "intelligence|agentic|coding|math|price_blended|speed|ttfc|e2e"
                     ),
                     "order": "auto|asc|desc",
                     "limit": "int max rows (default 20)",
