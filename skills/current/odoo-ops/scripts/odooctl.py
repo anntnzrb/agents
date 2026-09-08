@@ -38,11 +38,12 @@ RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
 
 # Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
+DEFAULT_TEST_HTTP_PORT = int(os.environ.get("ODOO_TEST_HTTP_PORT", "8079"))
 DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
 DEFAULT_DB_USER = "odoo"
 DEFAULT_DB_PASS = "odoo"  # noqa: S105 - default dev password for local container
-DEFAULT_DB_NAME = "erptech_0817"
+DEFAULT_DB_NAME = "erptech_0908"
 
 # Container Topology (Local Podman Pod)
 DEFAULT_POD_NAME = "odoo-pod"
@@ -1097,8 +1098,7 @@ def _build_test_cmd(
         "--test-enable",
         f"--test-tags={tags_str}",
         "--stop-after-init",
-        "--no-http",
-        "--http-port=0",
+        f"--http-port={DEFAULT_TEST_HTTP_PORT}",
         "--log-level=test",
     ]
     if update_str:
