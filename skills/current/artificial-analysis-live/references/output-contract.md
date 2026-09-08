@@ -112,4 +112,9 @@ Each `query` row MAY contain nulls for upstream-unprovided metrics. High-signal 
 
 Generic evaluation extraction is schema-dependent and does not guarantee parsing every benchmark page layout or frontend revision.
 
+Live evaluation responses include `population_source` and `coverage` when a public
+manifest supplies the full catalog. Its ciphertext SHA-256 identifies the source
+of decoded row values; the page retains its own source hash. Offline HTML replay
+reports `initial_models_only` when a manifest is present but is not fetched.
+
 Rows preserve source fields and use `value_status=published`. Sorting, limiting, and post-extraction arithmetic are derived. Preserve unknown fields; benchmark-specific normalization stays outside this generic extractor.

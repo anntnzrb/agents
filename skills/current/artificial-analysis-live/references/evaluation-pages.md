@@ -29,11 +29,14 @@ Returns source metadata, frame/row counts, applied filters, and rows. Page-copie
 
 ## Extraction
 - Parse Next.js `self.__next_f.push(...)` payloads and standard colon-delimited RSC frames.
-- Select the largest list containing recognizable model identity and numeric score fields.
-- Generic evaluation extraction is schema-dependent and does not guarantee parsing every benchmark page layout or frontend revision.
-- Preserve unknown fields; NEVER reduce a dedicated page to a fixed benchmark-specific schema.
-- Use `--input` for cached or saved source when a result must be replayed deterministically.
-- If no recognizable rows exist, report an extraction error; NEVER guess a nested list.
+- Current evaluation pages publish an initial model subset and a public catalog manifest. Live `evaluation` follows the same-origin HTTPS manifest and decodes the frontend's AES-GCM/gzip format to retrieve the full catalog.
+- `coverage: manifest_models` identifies catalog retrieval. `population_source` records its URL, retrieval time, and SHA-256 separately from the page.
+- Saved HTML replay never fetches. A page containing a manifest but only initial rows reports `coverage: initial_models_only`; do not present it as the full population.
+- Legacy embedded score rows remain supported. Generic extraction cannot guarantee every future page layout.
+- Preserve unknown fields. Field preservation does not establish units or benchmark semantics.
+- If no recognizable rows exist, report an extraction error. If a manifest fails, do not silently fall back to initial rows.
+- Select published metric paths explicitly. Current examples are `terminalbenchV40`, `automationBenchPartialScore`, and `automationBenchBreakdown.strictScore`. The last is full-workflow success; `completion` is a different measure.
+- Missing metrics remain missing even when their model exists in the catalog. A requested sort with no comparable values fails rather than returning an unsorted list as a ranking.
 
 ## Comparability
 - Dedicated benchmark scores remain separate from official model snapshot metrics (`intelligence`, `coding`, `agentic`).

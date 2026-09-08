@@ -39,8 +39,10 @@ from .rsc import (
     build_full_url,
     build_snapshot_payload,
     endpoint_slugs,
+    extract_evaluation_manifest,
     extract_evaluation_rows,
     extract_lists,
+    fetch_manifest_models,
     fetch_models,
     fetch_page,
     fetch_rsc,
@@ -1544,7 +1546,23 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
         byte_length = _result_byte_length(result)
 
     frames = parse_next_payload(body)
-    rows = extract_evaluation_rows(frames, min_rows=min_rows)
+    manifest = extract_evaluation_manifest(frames)
+    population_source: dict[str, object] | None = None
+    if manifest is not None and input_path is None:
+        rows, population_source = fetch_manifest_models(
+            manifest,
+            base_url=source_url,
+            timeout_seconds=timeout_seconds,
+        )
+        if len(rows) < min_rows:
+            _raise_extraction_error(
+                "Evaluation manifest has fewer than min_rows models"
+            )
+    else:
+        rows = extract_evaluation_rows(frames, min_rows=min_rows)
+    rows_digest = (
+        str(population_source["sha256"]) if population_source is not None else digest
+    )
     for row_index, row in enumerate(rows):
         row["value_status"] = "published"
         metric_paths = tuple(
@@ -1568,18 +1586,29 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
             "overall",
             "mean",
             "median",
+            "terminalbenchv40",
+            "terminalbenchv21",
+            "automationbenchpartialscore",
+            "intelligenceindex",
+            "gdppdfallpass",
         }
         _ = _attach_row_evidence(
             row,
             metric_paths=metric_paths,
             source_prefix=f"$.rows[{row_index}]",
-            artifact_hash=digest,
+            artifact_hash=rows_digest,
             raw_values={key: row.get(key) for key in metric_paths},
             unknown_paths=tuple(
                 key for key in metric_paths if key.casefold() not in known_metric_fields
             ),
         )
     if sort_by:
+        if not any(
+            _nested_sort_metric(row, sort_by, reverse=False)[0] == 0 for row in rows
+        ):
+            _raise_cli_usage_error(
+                f"No comparable published values for sort field {sort_by!r}"
+            )
         reverse = order in {"auto", "desc"}
         rows.sort(
             key=lambda row: _nested_sort_metric(
@@ -1610,6 +1639,14 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
     payload: dict[str, object] = {
         "meta": {
             "source": source,
+            "population_source": population_source,
+            "coverage": (
+                "manifest_models"
+                if population_source is not None
+                else "initial_models_only"
+                if manifest is not None
+                else "embedded_rows"
+            ),
             "filters_applied": filters,
             "freshness": {"mode": freshness, "stale": False, "fallback": False},
         },
@@ -1636,6 +1673,14 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
     result_payload: dict[str, object] = {
         "value_status": "published",
         "source": source,
+        "population_source": population_source,
+        "coverage": (
+            "manifest_models"
+            if population_source is not None
+            else "initial_models_only"
+            if manifest is not None
+            else "embedded_rows"
+        ),
         "filters_applied": filters,
         "freshness": {"mode": freshness, "stale": False, "fallback": False},
         "counts": {

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = []
+# dependencies = ["cryptography>=44"]
 # ///
 """Run the Artificial Analysis CLI without installing the skill package."""
 

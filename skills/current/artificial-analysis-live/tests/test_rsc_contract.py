@@ -3,6 +3,9 @@
 # ruff: noqa: E501
 from __future__ import annotations
 
+import gzip
+import hashlib
+import json
 import unittest
 from typing import TYPE_CHECKING, cast
 
@@ -15,6 +18,8 @@ from artificial_analysis.rsc import (
     ExtractionError,
     FetchResult,
     build_snapshot_payload,
+    decode_manifest_payload,
+    extract_evaluation_manifest,
     extract_evaluation_rows,
     extract_lists,
     normalize_official_models,
@@ -238,6 +243,178 @@ class TestRscExtraction(unittest.TestCase):
             _ = extract_evaluation_rows(
                 cast("list[tuple[str, object]]", [("0", {"rows": [{"value": 1}]})])
             )
+
+    def test_extract_evaluation_rows_supports_dynamic_metrics_and_breakdowns(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "slug": "test-eval",
+                    "manifest": {"path": "/data/test.txt", "key": "abcd"},
+                    "fallbackPriceByModelSlug": {"claude-opus-4-8": {"input": 5}},
+                    "initialModels": [
+                        {
+                            "id": "model-1",
+                            "slug": "claude-fable-5-1",
+                            "name": "Claude Fable 5.1",
+                            "terminalbenchV40": 0.5202,
+                            "terminalbenchV21": 0.9138,
+                            "automationBenchBreakdown": {
+                                "strictScore": 0.3211,
+                                "completion": 0.8808,
+                                "violationsTotal": 467,
+                            },
+                            "creator": {"slug": "anthropic", "name": "Anthropic"},
+                            "isReasoning": True,
+                        },
+                        {
+                            "id": "model-2",
+                            "slug": "gpt-6-astra",
+                            "name": "GPT-6 Astra",
+                            "automationBenchPartialScore": 0.6849,
+                            "automationBenchBreakdown": {
+                                "strictScore": 0.4512,
+                                "completion": 0.9234,
+                            },
+                            "creator": {"slug": "openai", "name": "OpenAI"},
+                            "isReasoning": True,
+                        },
+                    ],
+                },
+            ),
+        ]
+        rows = extract_evaluation_rows(frames)
+        assert len(rows) == 2
+        assert rows[0]["slug"] == "claude-fable-5-1"
+        assert rows[0]["terminalbenchV40"] == 0.5202
+        assert (
+            cast("dict[str, object]", rows[0]["automationBenchBreakdown"])["completion"]
+            == 0.8808
+        )
+        assert cast("dict[str, object]", rows[0]["creator"])["slug"] == "anthropic"
+
+    def test_extract_evaluation_manifest_locates_path_and_key(self) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "slug": "test-eval",
+                    "manifest": {"path": "/data/f0e5.txt", "key": "12ff9b"},
+                    "initialModels": [],
+                },
+            ),
+        ]
+        manifest = extract_evaluation_manifest(frames)
+        assert manifest == {"path": "/data/f0e5.txt", "key": "12ff9b"}
+
+        frames_without_manifest: list[tuple[str, object]] = [
+            ("0", {"slug": "test-eval"})
+        ]
+        assert extract_evaluation_manifest(frames_without_manifest) is None
+
+    def test_decode_manifest_payload_roundtrip_and_tamper_rejection(self) -> None:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        raw_payload: dict[str, object] = {
+            "models": [
+                {"slug": "test-model", "name": "Test Model", "score": 99.5},
+            ],
+            "fallbackPriceByModelSlug": {},
+        }
+        uncompressed_json = json.dumps(raw_payload).encode("utf-8")
+        compressed_data = gzip.compress(uncompressed_json)
+        key_hex = "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
+        key_bytes = bytes.fromhex(key_hex)
+        iv = hashlib.sha256(key_bytes).digest()[:12]
+
+        encrypted = AESGCM(key_bytes).encrypt(iv, compressed_data, None)
+        decoded = decode_manifest_payload(encrypted, key_hex)
+        assert decoded == raw_payload
+
+        tampered = encrypted[:-1] + (b"\x00" if encrypted[-1:] != b"\x00" else b"\x01")
+        with pytest.raises(ExtractionError):
+            _ = decode_manifest_payload(tampered, key_hex)
+
+    def test_extract_evaluation_rows_rejects_initial_models_without_valid_container(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "initialModels": [
+                        {
+                            "slug": "price-only-model",
+                            "name": "Price Only",
+                            "price1mInputTokens": 10,
+                        },
+                    ],
+                },
+            ),
+        ]
+        with pytest.raises(ExtractionError, match="recognizable model rows"):
+            _ = extract_evaluation_rows(frames)
+
+    def test_extract_evaluation_rows_rejects_unscored_catalogs_and_metadata(
+        self,
+    ) -> None:
+        frames: list[tuple[str, object]] = [
+            (
+                "0",
+                {
+                    "models": [
+                        {
+                            "slug": "claude-fable-5-1",
+                            "name": "Claude Fable 5.1",
+                            "effort": {"slug": "max", "level": 60},
+                            "release": {
+                                "slug": "claude-fable-5-1",
+                                "name": "Claude Fable 5.1",
+                            },
+                        },
+                        {
+                            "slug": "gpt-6-astra",
+                            "name": "GPT-6 Astra",
+                            "effort": {"slug": "max", "level": 60},
+                        },
+                    ],
+                    "pricing_only_models": [
+                        {
+                            "slug": "price-model-1",
+                            "name": "Price Model 1",
+                            "price1mInputTokens": 10,
+                            "price1mOutputTokens": 30,
+                        },
+                    ],
+                    "hosts": [
+                        {"slug": "anthropic", "name": "Anthropic"},
+                        {"slug": "openai", "name": "OpenAI"},
+                    ],
+                    "paging": [
+                        {
+                            "name": "page_info",
+                            "count": 2,
+                            "total": 100,
+                            "offset": 0,
+                            "limit": 50,
+                        },
+                    ],
+                    "layout": [
+                        {
+                            "name": "box",
+                            "width": 100,
+                            "height": 200,
+                            "size": 50,
+                            "position": 1,
+                        },
+                    ],
+                },
+            ),
+        ]
+        with pytest.raises(ExtractionError, match="recognizable model rows"):
+            _ = extract_evaluation_rows(frames)
 
     def test_snapshot_slugs_accepts_aliases(self) -> None:
         snapshot: dict[str, object] = {
