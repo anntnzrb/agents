@@ -30,7 +30,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "DEFAULT_LAUNCH_TIMEOUT_MS",
-    "LauncherProcessResult",
     "LauncherRuntime",
     "NpmCacheLayout",
     "NpmPackageSpec",
@@ -54,6 +53,7 @@ MILLISECONDS_PER_SECOND: float = 1000.0
 EXEC_PERM_MASK: int = 0o111
 EXIT_TIMED_OUT: int = 124
 MAX_DETAIL_CHARS: int = 2000
+_PACKAGE_MANIFEST = TypeAdapter(dict[str, object])
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,16 +86,6 @@ class PreparedNpmPackage:
     layout: NpmCacheLayout
     resolved_version: str
     current_bin: str
-
-
-@dataclass(frozen=True, slots=True)
-class LauncherProcessResult:
-    """Captured result of a launcher subprocess execution."""
-
-    exit_code: int
-    stdout: str
-    stderr: str
-    timed_out: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,34 +131,6 @@ def npm_cache_layout(
     )
 
 
-async def _resolve_package_version(
-    layout: NpmCacheLayout,
-    spec: NpmPackageSpec,
-    options: PreparePackageOptions,
-    timeout_ms: int,
-    cached: tuple[str, str] | None,
-) -> str | PreparedNpmPackage:
-    runtime = options.runtime
-    resolver = (
-        runtime.resolve_version
-        if (runtime is not None and runtime.resolve_version is not None)
-        else resolve_version
-    )
-    dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
-    try:
-        raw_version = await resolver(spec.package, dist_tag, timeout_ms)
-        return validate_resolved_version(raw_version)
-    except Exception as error:
-        if cached is None:
-            raise
-        warn_using_cached_package(spec, cached[0], error)
-        return PreparedNpmPackage(
-            layout=layout,
-            resolved_version=cached[0],
-            current_bin=cached[1],
-        )
-
-
 async def _install_staged_package(
     runner: Callable[[Sequence[str], RunProcessOptions], Awaitable[ProcessResult]],
     spec: NpmPackageSpec,
@@ -176,7 +138,7 @@ async def _install_staged_package(
     stage_dir: str,
     timeout_ms: int,
 ) -> None:
-    await asyncio.to_thread(_create_dir, stage_dir)
+    await asyncio.to_thread(Path(stage_dir).mkdir, parents=True, exist_ok=True)
     install_cmd = [
         "npm",
         "install",
@@ -240,7 +202,7 @@ async def _ensure_version_installed(
             raise RuntimeError(message)
         return
 
-    if await asyncio.to_thread(_path_exists, version_dir):
+    if await asyncio.to_thread(Path(version_dir).exists):
         message = f"cached package is incomplete: {resolved_version}"
         raise RuntimeError(message)
 
@@ -256,26 +218,9 @@ async def _ensure_version_installed(
         await _install_staged_package(
             runner, spec, resolved_version, stage_dir, timeout_ms
         )
-        await asyncio.to_thread(_replace_dir, stage_dir, version_dir)
+        _ = await asyncio.to_thread(Path(stage_dir).replace, version_dir)
     finally:
-        await asyncio.to_thread(_cleanup_dir, stage_dir)
-
-
-def _create_dir(path: str) -> None:
-    Path(path).mkdir(parents=True, exist_ok=True)
-
-
-def _cleanup_dir(path: str) -> None:
-    if Path(path).exists():
-        shutil.rmtree(path, ignore_errors=True)
-
-
-def _replace_dir(src: str, dest: str) -> None:
-    _ = Path(src).replace(dest)
-
-
-def _path_exists(path: str) -> bool:
-    return Path(path).exists()
+        await asyncio.to_thread(shutil.rmtree, stage_dir, ignore_errors=True)
 
 
 def _validate_current_bin(bin_path: str, bin_name: str) -> None:
@@ -290,14 +235,17 @@ async def _prepare_locked_package(
     options: PreparePackageOptions,
     timeout_ms: int,
 ) -> PreparedNpmPackage:
-    cached = current_cached_package(layout, spec)
+    runtime = options.runtime
+    resolver = (
+        runtime.resolve_version
+        if runtime is not None and runtime.resolve_version is not None
+        else resolve_version
+    )
+    dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
     try:
-        resolved = await _resolve_package_version(
-            layout, spec, options, timeout_ms, cached
+        resolved_version = validate_resolved_version(
+            await resolver(spec.package, dist_tag, timeout_ms)
         )
-        if isinstance(resolved, PreparedNpmPackage):
-            return resolved
-        resolved_version = resolved
         await _ensure_version_installed(
             layout, spec, resolved_version, options, timeout_ms
         )
@@ -336,7 +284,9 @@ async def prepare_npm_package(
         else DEFAULT_LAUNCH_TIMEOUT_MS
     )
     layout = npm_cache_layout(options.home, spec, options.cache_home)
-    await asyncio.to_thread(_create_dir, layout.versions_dir)
+    await asyncio.to_thread(
+        Path(layout.versions_dir).mkdir, parents=True, exist_ok=True
+    )
 
     lock = await acquire_cache_lock(layout, timeout_ms)
     try:
@@ -386,17 +336,10 @@ async def launch_harness(
     runtime: LauncherRuntime | None = None,
 ) -> int:
     """Launch a harness executable, resolving environment variables and cache."""
-    # Preserves TS env-merge precedence from launcher.ts:230-240:
-    # 1. System environment (os.environ) wins over root_env (.env file).
-    #    Root env variables that already exist in os.environ are filtered out.
-    # 2. Adapter-specific launcher env (harness.launcher.env) overrides root_env.
-    root_filtered = {k: v for k, v in sync_env.root_env.items() if k not in os.environ}
-    merged: dict[str, str] = (
-        {**root_filtered, **harness.launcher.env}
-        if harness.launcher.env is not None
-        else root_filtered
-    )
-    env = merged if len(merged) > 0 else None
+    # Parent environment beats .env defaults; explicit adapter values win over both.
+    merged = {k: v for k, v in sync_env.root_env.items() if k not in os.environ}
+    if harness.launcher.env is not None:
+        merged.update(harness.launcher.env)
 
     spec = NpmPackageSpec(
         tool=harness.source_name,
@@ -404,7 +347,7 @@ async def launch_harness(
         bin=harness.launcher.bin,
         dist_tag=harness.launcher.dist_tag,
         smoke_check=harness.launcher.smoke_check,
-        env=env,
+        env=merged or None,
     )
     return await launch_npm_package(sync_env, spec, args, runtime)
 
@@ -612,11 +555,9 @@ def installed_package_matches(
             / Path(*spec.package.split("/"))
             / "package.json"
         )
-        if not manifest_path.exists():
-            return False
         with manifest_path.open(encoding="utf-8") as f:
             data: object = json.load(f)  # pyright: ignore[reportAny]
-        raw_dict = TypeAdapter(dict[str, object]).validate_python(data)
+        raw_dict = _PACKAGE_MANIFEST.validate_python(data)
         return bool(
             raw_dict.get("name") == spec.package and raw_dict.get("version") == version
         )
