@@ -67,6 +67,7 @@ class TestCliDefaultPaths(unittest.TestCase):
             "evaluation",
             "query",
             "qa",
+            "compare",
             "schema",
         }
 

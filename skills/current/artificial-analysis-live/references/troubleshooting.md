@@ -5,10 +5,12 @@ Use when credentials, extraction, freshness, caching, or upstream requests fail.
 ## Missing credentials or uncertain effort variants
 
 - Without an authorized API key, use the existing public `evaluation` route when its scope answers the question. Snapshot readers still require an existing snapshot; label explicit historical input accordingly.
-- For variant discovery, inspect the official models catalog or model page with the available URL reader. If structured catalog data is available, associate release and effort records through their containing objects or explicit identifiers, never nearest-text windows.
+- For variant discovery, run `compare --select "<release>"` against a fresh snapshot. If release metadata is unavailable, inspect the official models catalog or model page. Associate release and effort records through their containing objects or explicit identifiers, never nearest-text windows.
 - Treat catalog shapes and effort ladders as unversioned. Preserve the published model identifier, effort label, source URL, and retrieval date. Do not assume a bare slug means maximum or default effort.
 - One discovered effort means one observed entry, not proof that other efforts do not exist. If the source cannot establish completeness or model identity, report the gap rather than synthesizing a comparison.
 - Keep catalog discovery separate from benchmark scores. Do not infer authenticated API equivalence, recover numbers from garbled reader text, or search unrelated files for credentials.
+- An ambiguous selector requires a more specific published release name or slug. A missing requested effort is not permission to substitute another effort.
+- A new field surviving in `raw_fields` proves preservation, not understood units or equivalence to a metric on a dedicated benchmark page.
 
 ## Fresh fetch failure after upstream change
 

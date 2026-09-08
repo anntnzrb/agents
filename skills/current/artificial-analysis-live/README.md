@@ -7,6 +7,23 @@ matrix.
 
 No human prose output. JSON only. Deterministic envelopes.
 
+## Contents
+
+- [Fetch credentials](#fetch-credentials)
+- [Entry point](#entry-point)
+- [CLI mode](#cli-mode-default)
+- [Stats](#stats)
+- [Diff](#diff)
+- [Compare releases and efforts](#compare-releases-and-efforts)
+- [Dedicated evaluation pages](#dedicated-evaluation-pages)
+- [Query](#query-modelprovider-benchmark-questions)
+- [QA](#qa-minimum-natural-language-command)
+- [Schema](#schema)
+- [RPC mode](#rpc-mode-jsonl)
+- [Contracts and recovery](#contracts-and-recovery)
+- [Released additive contracts](#released-additive-contracts)
+- [Lightweight tests](#lightweight-tests)
+
 Live `fetch` combines two required sources:
 
 - provider endpoints from `https://artificialanalysis.ai/leaderboards/providers`
@@ -128,6 +145,32 @@ Returns:
 - removed endpoint slugs
 - provider endpoint deltas
 
+## Compare releases and efforts
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py fetch
+uv run --script <skill-dir>/scripts/cli.py compare \
+  --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"
+```
+
+`compare [snapshot]` reads canonical models, not provider-endpoint rows.
+Repeat `--select` for each release. Omit the effort suffix to include every
+variant published in the source. Add `:effort,effort` to restrict that release.
+
+Release matching uses published names and slugs, preferring exact matches,
+then an unambiguous whole-token substring. Missing or ambiguous releases and
+missing requested efforts fail rather than returning a partial comparison.
+Effort labels come from the source, not a fixed list. Non-reasoning requires
+an explicit false reasoning flag; missing effort metadata does not imply it.
+
+Rows preserve the original model data and unknown fields. Keep published
+metric units and source scopes separate. Model token prices are not benchmark
+cost per task. "All variants" describes the fetched catalog, not all vendor
+configurations or support for every benchmark.
+
+For natural-language comparisons, the agent translates the request into these
+selectors. `qa` remains a limited single-model/provider query helper.
+
 ## Dedicated evaluation pages
 
 Use `evaluation` for a standalone public benchmark page. It parses standard RSC
@@ -152,6 +195,10 @@ The result preserves source metadata and unknown row fields. Page rows are
 published values; sorting, limiting, and arithmetic are derived. Generic
 evaluation extraction is schema-dependent and does not guarantee parsing every
 benchmark page layout.
+
+Live pages with a public catalog manifest load the full model population.
+Saved HTML replay stays offline and labels initial-only coverage. The manifest
+decoder uses `cryptography`, installed by the entrypoint's PEP 723 environment.
 
 Do not merge a dedicated evaluation score with official model snapshot metrics
 without checking benchmark population, task count, repeats, test harness, and
@@ -182,6 +229,7 @@ uv run --script <skill-dir>/scripts/cli.py qa "cheapest deepinfra top 5"
 ```
 
 It returns parsed intent + delegated `query` result in one JSON object.
+Multi-model requests using versus or against must use `compare` instead.
 
 ## Schema
 
@@ -212,6 +260,7 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `diagnose` (offline snapshot/cache health)
 - `evaluation`
 - `query`
+- `compare`
 - `qa`
 
 ### Response format

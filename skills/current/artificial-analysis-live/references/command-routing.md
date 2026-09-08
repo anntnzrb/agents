@@ -18,6 +18,19 @@ Schema-v2 snapshot:
 - RSC endpoint pricing uses a 7:2:1 blend.
 These blends are intentional: different scopes, not duplicate prices.
 
+### compare
+Compare canonical models across published releases and reasoning efforts, without duplicating provider endpoints:
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" compare \
+  --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"
+```
+
+Run `fetch` first for current questions. Each repeated `--select` names a release, optionally followed by `:effort,effort`. An unrestricted release selects all observed variants. Family matching uses published release names and slugs; ambiguous names and missing requested efforts fail instead of narrowing silently.
+
+Translate the user's natural-language request into selectors. The `qa` command is not a multi-model comparison parser. Unknown effort labels require source discovery, not a hardcoded effort ladder.
+For dedicated benchmark comparisons, discover variants with `compare`, then read the benchmark with `evaluation`. Match exact canonical model slugs, preserve page metric names, and report missing variants. Keep page results separate from API composite scores.
+
 ### query
 Deterministic filter/sort over snapshot rows.
 

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from typing import NoReturn, TextIO
 
+from .comparison import compare_models
 from .contracts import compact_json
 from .diagnose import diagnose
 from .diagnostics import redact, redact_query
@@ -472,6 +473,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_evaluation_parser(subparsers)
     _add_query_parser(subparsers)
     _add_qa_parser(subparsers)
+    _add_compare_parser(subparsers)
     _add_schema_parser(subparsers)
     for command_parser in subparsers.choices.values():
         _add_cli_error_flags(command_parser, suppress_defaults=True)
@@ -704,6 +706,26 @@ def _add_qa_parser(subparsers: _Subparsers) -> None:
     qa_parser.set_defaults(handler=_handle_qa)
 
 
+def _add_compare_parser(subparsers: _Subparsers) -> None:
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare model family and effort variants from a snapshot.",
+    )
+    _ = compare_parser.add_argument(
+        "snapshot",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_OUTPUT_JSON,
+    )
+    _ = compare_parser.add_argument(
+        "--select",
+        action="append",
+        required=True,
+        help="Repeatable selector: 'family' or 'family:effort1,effort2,...'",
+    )
+    compare_parser.set_defaults(handler=_handle_compare)
+
+
 def _add_schema_parser(subparsers: _Subparsers) -> None:
     schema_parser = subparsers.add_parser(
         "schema",
@@ -726,6 +748,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "evaluation",
         "query",
         "qa",
+        "compare",
         "schema",
     }
     if any(token in known_subcommands for token in values):
@@ -1998,11 +2021,25 @@ def _provider_counts_from_snapshot(snapshot: dict[str, object]) -> dict[str, int
     return counts
 
 
+def _is_multi_model_question(question: str) -> bool:
+    q = question.lower().strip()
+    if re.search(r"\b(vs\.?|versus|against|compared\s+to)\b", q):
+        return True
+    return bool(re.search(r"\bcompare\b", q) and re.search(r"\b(and|with|to)\b", q))
+
+
 def _qa_payload(args: argparse.Namespace) -> dict[str, object]:
     question_arg = _ns_str(args, "question")
     question = question_arg.strip()
     if not question:
         _raise_cli_usage_error("qa requires a non-empty question")
+    if _is_multi_model_question(question):
+        msg = (
+            "Multi-model comparison questions are not supported by the 'qa' command. "
+            "Use the 'compare' command with repeatable '--select' selectors instead, "
+            "e.g.: compare --select '<family1>' --select '<family2>'."
+        )
+        _raise_cli_usage_error(msg)
 
     snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
     model_arg = _ns_optional_str(args, "model")
@@ -2194,6 +2231,57 @@ def _handle_qa(args: argparse.Namespace) -> int:
     return 0
 
 
+def _compare_payload(args: argparse.Namespace) -> dict[str, object]:
+    snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
+    select_arg = cast("object", getattr(args, "select", None))
+    selectors: list[str] = []
+    if isinstance(select_arg, str):
+        selectors = [select_arg]
+    elif isinstance(select_arg, (list, tuple)):
+        items = cast("Sequence[object]", select_arg)
+        if any(not isinstance(value, str) for value in items):
+            _raise_cli_usage_error("compare selectors must be strings")
+        selectors = [cast("str", value) for value in items]
+    elif select_arg is not None:
+        _raise_cli_usage_error("compare selectors must be strings")
+    if not selectors:
+        _raise_cli_usage_error("compare requires at least one --select selector")
+
+    snapshot = _load_reader_snapshot(snapshot_path)
+    payload = compare_models(
+        snapshot,
+        snapshot_path,
+        selectors,
+        usage_error_factory=CliUsageError,
+    )
+    meta = _as_dict(snapshot.get("meta"))
+    historical = snapshot_path != DEFAULT_OUTPUT_JSON
+    freshness = _as_dict(meta.get("freshness"))
+    payload["freshness"] = {
+        **freshness,
+        "mode": "snapshot" if historical else freshness.get("mode", "fresh"),
+        "historical": historical,
+        "stale": False if historical else freshness.get("stale", False),
+    }
+    payload["overlap"] = _snapshot_overlap(snapshot)
+    model_positions = {
+        model.get("slug"): index for index, model in enumerate(_model_rows(snapshot))
+    }
+    for row in cast("list[dict[str, object]]", payload["rows"]):
+        source_index = model_positions[row.get("slug")]
+        _ = _attach_row_evidence(
+            row,
+            source_prefix=f"$.models[{source_index}]",
+            artifact_hash=_source_hash_from_payload(snapshot),
+        )
+    return payload
+
+
+def _handle_compare(args: argparse.Namespace) -> int:
+    _emit_json(_envelope("compare", _compare_payload(args)), stdout=sys.stdout)
+    return 0
+
+
 def _handle_schema(_: argparse.Namespace) -> int:
     _emit_json(_envelope("schema", _capability_schema()), stdout=sys.stdout)
     return 0
@@ -2318,6 +2406,18 @@ def _capability_schema() -> dict[str, object]:
                     "sort_by": "override inferred metric",
                     "order": "override inferred order",
                     "limit": "override inferred limit",
+                },
+            },
+            "compare": {
+                "description": (
+                    "Compare canonical model family and reasoning effort variants "
+                    "from a snapshot."
+                ),
+                "args": ["snapshot (optional)"],
+                "flags": {
+                    "select": (
+                        "Repeatable selector: 'family' or 'family:effort1,effort2,...'"
+                    ),
                 },
             },
             "schema": {
@@ -2572,6 +2672,26 @@ def _qa_namespace(args: dict[str, object]) -> argparse.Namespace:
     )
 
 
+def _compare_namespace(args: dict[str, object]) -> argparse.Namespace:
+    select_val = _arg_value(args, "select")
+    selectors: list[str] = []
+    if isinstance(select_val, str):
+        selectors = [select_val]
+    elif isinstance(select_val, list):
+        items = cast("list[object]", select_val)
+        if any(not isinstance(value, str) for value in items):
+            _raise_cli_usage_error("compare selectors must be strings")
+        selectors = [cast("str", value) for value in items]
+    elif select_val is not None:
+        _raise_cli_usage_error("compare selectors must be strings")
+    if not selectors:
+        _raise_cli_usage_error("compare requires at least one --select selector")
+    return argparse.Namespace(
+        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
+        select=selectors,
+    )
+
+
 def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int:
     input_stream = sys.stdin if stdin is None else stdin
     output_stream = sys.stdout if stdout is None else stdout
@@ -2686,6 +2806,12 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                     command,
                     _qa_payload(_qa_namespace(args_payload)),
                 )
+            elif command == "compare":
+                response = _success_response(
+                    request_id,
+                    command,
+                    _compare_payload(_compare_namespace(args_payload)),
+                )
             else:
                 response = _error_response(
                     request_id,
@@ -2754,6 +2880,7 @@ def _command_from_argv(values: Sequence[str]) -> str:
         "evaluation",
         "query",
         "qa",
+        "compare",
         "schema",
     }
     for index, value in enumerate(values):

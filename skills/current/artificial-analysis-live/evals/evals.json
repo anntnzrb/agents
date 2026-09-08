@@ -91,6 +91,18 @@
         "The real skill .env is excluded from deterministic scans.",
         "Credential-like values are redacted while safe scores, token metrics, and public URL structure remain observable."
       ]
+    },
+    {
+      "id": 10,
+      "prompt": "Compare Muse Spark 1.3 across all reasoning efforts against Astra on low and non-reasoning using fresh data.",
+      "expected_output": "Refresh the snapshot and translate the request into compare selectors. Report every observed Muse Spark 1.3 variant and only Astra low/non-reasoning, preserving model identity, source scope, prices, unknown fields, and missing metrics.",
+      "files": [],
+      "expectations": [
+        "Use compare --select \"Muse Spark 1.3\" --select \"Astra:low,non-reasoning\", not a single-model qa query.",
+        "Do not hardcode the number of Muse variants or infer effort labels from model-name suffixes.",
+        "Missing or ambiguous requested variants are reported rather than silently omitted.",
+        "Per-token prices are not reported as benchmark cost per task."
+      ]
     }
   ]
 }

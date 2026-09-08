@@ -5,10 +5,10 @@ All command outputs: JSON.
 ## CLI
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|evaluation|query|qa|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|evaluation|compare|query|qa|schema","data":{...}}
 ```
 
-One documented CLI entry point; omitted command defaults to `fetch`. Retain `fetch`, `stats`, `diff`, `diagnose`, `evaluation`, `query`, `qa`, `schema`; never rename or remove the entry point or a command. Success MUST retain `ok: true`, string `version: "1"`, `command`, `data` and their types; additions MUST NOT rename, remove, or retype them.
+One documented CLI entry point; omitted command defaults to `fetch`. Retain `fetch`, `stats`, `diff`, `diagnose`, `evaluation`, `compare`, `query`, `qa`, `schema`; never rename or remove the entry point or a command. Success MUST retain `ok: true`, string `version: "1"`, `command`, `data` and their types; additions MUST NOT rename, remove, or retype them.
 
 Default artifacts: `<temp-dir>/artifacts/artificial-analysis/{full-data.json,endpoints.txt,full-url.txt}`. Preserve these paths; custom output paths opt-in.
 
@@ -89,9 +89,21 @@ Raw source bytes: content-addressed under `<cache>/artifacts/`, with redacted me
 
 `evaluation <url>`: HTTPS only; redact credential query parameters. Local/deterministic replay: `evaluation --input <file>`.
 
+## Model comparison
+
+`compare` selects canonical models by published release and effort metadata, independently of provider endpoints. Repeated `--select` values use `release[:effort,effort]`.
+
+- A release without an effort suffix selects every observed variant for that release.
+- Matching prefers normalized exact release name/slug, then a unique whole-token substring. Ambiguous or missing releases and missing requested efforts are usage errors.
+- Effort slug, label, and level come from source objects. New published efforts need no fixed ladder update. Non-reasoning requires an explicit false reasoning flag.
+- Original model records and unknown fields remain available. Selection is derived; source values are published. Preserved unknown metrics do not acquire inferred units or comparison eligibility.
+- The response reports resolved selections, available efforts, source/freshness, and model rows. Coverage is limited to the fetched catalog, not every vendor configuration.
+- Canonical model pricing keeps its model/API scope. Do not convert it to evaluation task cost without published task-level evidence.
+
 ## QA and query
 
 `qa` returns `question`, `parsed_intent` (`model`, `provider`, `sort_by`, `order`, `limit`), and full `query` payload.
+Multi-model comparisons belong to `compare`; `qa` rejects versus/against comparisons instead of silently selecting one model.
 
 Each `query` row MAY contain nulls for upstream-unprovided metrics. High-signal fields:
 

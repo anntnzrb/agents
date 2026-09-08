@@ -29,13 +29,25 @@ Before `fetch`, inject credentials by one supported path:
 1. `ARTIFICIAL_ANALYSIS_API_KEY` in process environment (preferred).
 2. `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted dotenv file outside the skill tree, e.g. mode `0600`.
 
-`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers `query`, `qa`, `stats`, `diff` do not. Process-injected values win; otherwise read the explicitly supplied external env file.
+`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers `compare`, `query`, `qa`, `stats`, `diff` do not. Process-injected values win; otherwise read the explicitly supplied external env file.
 
 NEVER copy `.env.example` into the skill tree or generated tool home; it is a tracked template, not a secret store. NEVER pass keys through CLI or RPC. Older skill-root/ancestor `.env` discovery is transitional compatibility only, unsupported for new setups. This release has no `AA_LEGACY_DOTENV`; do not rely on it. The asset-sync owner MUST exclude skill-local `.env` and other secret files from generated tool homes; `.gitignore` controls Git tracking only and cannot enforce sync exclusion.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
+
+## Model and effort comparisons
+
+- Translate natural-language comparisons into repeatable `compare --select` selectors. Use `qa` only for single-model/provider questions.
+- A selector names a published release. Without `:efforts`, include every variant observed for that release. Add comma-separated effort labels to restrict that release.
+- Refresh first. Example: `compare --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"`.
+- Report the resolved model names, efforts, source time, and available variants. "All" means all variants in the fetched source, not every configuration a vendor offers.
+- Use published release/effort metadata. Do not infer maximum effort from a bare model slug or non-reasoning from missing effort metadata.
+- Missing or ambiguous families and requested efforts must be resolved before comparing. Never silently drop a requested variant.
+- Preserve newly published fields without assuming their units or comparability. Do not equate per-token prices with evaluation cost per task.
+- For a current dedicated benchmark, use `evaluation` and match its rows to selected canonical model slugs. Keep those scores in a separate source-scoped table. Never join only by display name or substitute another effort when a page omits one.
+- A fresh API response does not establish an Intelligence Index release number. Report a benchmark version only when that source publishes it.
 
 ## Output policy
 
@@ -44,7 +56,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 - Keep published model coding and agentic snapshot metrics (`query`, `qa`) distinct from standalone evaluation pages.
 - Mark page rows `published`; mark sorting, limiting, and arithmetic `derived`; preserve source URL and scope.
 - Read `references/evaluation-pages.md` before selecting an evaluation URL or comparing benchmark populations. Public evaluation URLs MUST use HTTPS.
-- When freshness matters, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths intentionally represent historical data.
+- When freshness matters, run `fetch` immediately before `compare`, `query`, or `qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths intentionally represent historical data.
 
 ## Hardening
 
