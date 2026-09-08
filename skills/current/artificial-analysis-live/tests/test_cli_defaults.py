@@ -64,10 +64,7 @@ class TestCliDefaultPaths(unittest.TestCase):
             "stats",
             "diff",
             "diagnose",
-            "coding",
-            "harness",
             "evaluation",
-            "reasoning",
             "query",
             "qa",
             "schema",
@@ -106,7 +103,7 @@ class TestCliDefaultPaths(unittest.TestCase):
 
     def test_reader_commands_default_to_tmp_snapshot(self) -> None:
         parser = cli.build_parser()
-        for command in (["stats"], ["harness"], ["reasoning"], ["query"]):
+        for command in (["stats"], ["query"]):
             with self.subTest(command=command[0]):
                 args = _ns_dict(parser.parse_args(command))
                 assert args["snapshot"] == TMP_SNAPSHOT

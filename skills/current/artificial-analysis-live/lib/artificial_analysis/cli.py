@@ -467,10 +467,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_stats_parser(subparsers)
     _add_diff_parser(subparsers)
     _add_diagnose_parser(subparsers)
-    _add_harness_parser(subparsers)
-    _add_coding_parser(subparsers)
     _add_evaluation_parser(subparsers)
-    _add_reasoning_parser(subparsers)
     _add_query_parser(subparsers)
     _add_qa_parser(subparsers)
     _add_schema_parser(subparsers)
@@ -595,64 +592,6 @@ def _add_evaluation_parser(subparsers: _Subparsers) -> None:
     )
     _ = evaluation_parser.add_argument("--limit", type=int)
     evaluation_parser.set_defaults(handler=_handle_evaluation)
-
-
-def _add_reasoning_parser(subparsers: _Subparsers) -> None:
-    reasoning_parser = subparsers.add_parser(
-        "reasoning",
-        help=(
-            "Profile models by reasoning selectivity (per-benchmark answer vs "
-            "thinking token split)."
-        ),
-    )
-    _ = reasoning_parser.add_argument(
-        "snapshot",
-        nargs="?",
-        type=Path,
-        default=DEFAULT_OUTPUT_JSON,
-    )
-    _add_model_filters(reasoning_parser)
-    _ = reasoning_parser.add_argument(
-        "--class",
-        type=str,
-        default=None,
-        dest="classification",
-        choices=(
-            "selective_extreme",
-            "selective",
-            "moderate",
-            "uniform_heavy",
-            "hard_uniform_heavy",
-        ),
-        help="Filter by reasoning selectivity classification.",
-    )
-    _ = reasoning_parser.add_argument(
-        "--selective-only",
-        action="store_true",
-        help="Return only selective thinkers (classification starts with selective).",
-    )
-    _ = reasoning_parser.add_argument(
-        "--sort-by",
-        type=str,
-        default="harness",
-        choices=(
-            "harness",
-            "selectivity",
-            "reasoning_floor",
-            "weighted_reasoning_share",
-            "intelligence",
-            "agentic",
-            "coding",
-        ),
-    )
-    _add_order(reasoning_parser, default="auto")
-    _ = reasoning_parser.add_argument("--limit", type=int, default=50)
-    _ = reasoning_parser.add_argument(
-        "--benchmarks",
-        action="store_true",
-        help="Include per-benchmark reasoning share breakdown in each row.",
-    )
-    reasoning_parser.set_defaults(handler=_handle_reasoning)
 
 
 def _add_query_parser(subparsers: _Subparsers) -> None:
@@ -782,10 +721,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "stats",
         "diff",
         "diagnose",
-        "harness",
-        "coding",
         "evaluation",
-        "reasoning",
         "query",
         "qa",
         "schema",
@@ -1784,11 +1720,6 @@ def _query_row(
 
     timescale = _as_dict(item_dict.get("timescaleData"))
     e2e = _as_dict(item_dict.get("end_to_end_response_time_metrics"))
-    computed_harness = _harness_score(model)
-    published_harness = model.get("harness")
-    harness = (
-        published_harness if _finite_number(published_harness) else computed_harness
-    )
     blended_field = (
         "price_1m_blended_7_to_2_to_1"
         if "price_1m_blended_7_to_2_to_1" in item_dict
@@ -2208,14 +2139,6 @@ def _handle_evaluation(args: argparse.Namespace) -> int:
     return 0
 
 
-def _handle_reasoning(args: argparse.Namespace) -> int:
-    _emit_json(
-        _envelope("reasoning", _reasoning_payload(args)),
-        stdout=sys.stdout,
-    )
-    return 0
-
-
 def _handle_query(args: argparse.Namespace) -> int:
     _emit_json(_envelope("query", _query_payload(args)), stdout=sys.stdout)
     return 0
@@ -2321,32 +2244,6 @@ def _capability_schema() -> dict[str, object]:
                     "limit": "optional maximum returned rows",
                 },
                 "value_status": "published rows; filters/counts are derived",
-            },
-            "reasoning": {
-                "description": (
-                    "Profile models by reasoning selectivity using per-benchmark "
-                    "canonical eval token counts."
-                ),
-                "args": ["snapshot (optional)"],
-                "flags": {
-                    "model": "str contains filter on model slug/name",
-                    "creator": "str contains filter on creator/lab name",
-                    "open_weights_only": "bool only include open-weights models",
-                    "class": (
-                        "classification filter: selective_extreme|selective|"
-                        "moderate|uniform_heavy|hard_uniform_heavy"
-                    ),
-                    "selective_only": "bool only include selective thinkers",
-                    "sort_by": (
-                        "harness|selectivity|reasoning_floor|"
-                        "weighted_reasoning_share|intelligence|agentic|coding"
-                    ),
-                    "order": "auto|asc|desc",
-                    "limit": "int max rows (default 50)",
-                    "benchmarks": (
-                        "bool include per-benchmark reasoning share breakdown"
-                    ),
-                },
             },
             "query": {
                 "description": (
@@ -2576,21 +2473,6 @@ def _evaluation_namespace(args: dict[str, object]) -> argparse.Namespace:
     )
 
 
-def _reasoning_namespace(args: dict[str, object]) -> argparse.Namespace:
-    return argparse.Namespace(
-        snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
-        model=_dict_optional_str(args, "model"),
-        creator=_dict_optional_str(args, "creator"),
-        open_weights_only=_dict_bool(args, "open_weights_only", False),
-        classification=_dict_optional_str(args, "class"),
-        selective_only=_dict_bool(args, "selective_only", False),
-        sort_by=_dict_str(args, "sort_by", "harness"),
-        order=_dict_str(args, "order", "auto"),
-        limit=_dict_int(args, "limit", 50),
-        benchmarks=_dict_bool(args, "benchmarks", False),
-    )
-
-
 def _diff_namespace(args: dict[str, object]) -> argparse.Namespace:
     old_snapshot = _dict_optional_str(args, "old_snapshot")
     new_snapshot = _dict_optional_str(args, "new_snapshot")
@@ -2741,29 +2623,11 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                     command,
                     _diagnose_payload(_diagnose_namespace(args_payload)),
                 )
-            elif command == "harness":
-                response = _success_response(
-                    request_id,
-                    command,
-                    _harness_payload(_harness_namespace(args_payload)),
-                )
-            elif command == "coding":
-                response = _success_response(
-                    request_id,
-                    command,
-                    _coding_payload(_coding_namespace(args_payload)),
-                )
             elif command == "evaluation":
                 response = _success_response(
                     request_id,
                     command,
                     _evaluation_payload(_evaluation_namespace(args_payload)),
-                )
-            elif command == "reasoning":
-                response = _success_response(
-                    request_id,
-                    command,
-                    _reasoning_payload(_reasoning_namespace(args_payload)),
                 )
             elif command == "query":
                 response = _success_response(
@@ -2842,10 +2706,7 @@ def _command_from_argv(values: Sequence[str]) -> str:
         "stats",
         "diff",
         "diagnose",
-        "harness",
-        "coding",
         "evaluation",
-        "reasoning",
         "query",
         "qa",
         "schema",
