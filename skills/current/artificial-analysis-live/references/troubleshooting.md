@@ -4,24 +4,23 @@ Use when credentials, extraction, freshness, caching, or upstream requests fail.
 
 ## Missing credentials or uncertain effort variants
 
-- Without an authorized API key, use the existing public `coding` or `evaluation` route when its scope answers the question. Snapshot readers still require an existing snapshot; label explicit historical input accordingly.
+- Without an authorized API key, use the existing public `evaluation` route when its scope answers the question. Snapshot readers still require an existing snapshot; label explicit historical input accordingly.
 - For variant discovery, inspect the official models catalog or model page with the available URL reader. If structured catalog data is available, associate release and effort records through their containing objects or explicit identifiers, never nearest-text windows.
 - Treat catalog shapes and effort ladders as unversioned. Preserve the published model identifier, effort label, source URL, and retrieval date. Do not assume a bare slug means maximum or default effort.
 - One discovered effort means one observed entry, not proof that other efforts do not exist. If the source cannot establish completeness or model identity, report the gap rather than synthesizing a comparison.
 - Keep catalog discovery separate from benchmark scores. Do not infer authenticated API equivalence, recover numbers from garbled reader text, or search unrelated files for credentials.
 
-## Fresh fetch or capability command failure after upstream change
+## Fresh fetch failure after upstream change
 
-Signals: `extraction_error` with missing sections; capability command returns no rows after page change.
+Signals: `extraction_error` with missing sections.
 
 Built-ins: key alias matching `hostsModels`, `host_models`, `endpoints`; structural heuristics for list detection; refresh default policy `error` (`--strict` compatibility alias); explicit last-good fallback only with `--allow-stale` or `--stale-policy allow-last-good`, marked `stale-last-good`.
 
 Actions:
 1. For current-data questions, keep the default policy; NEVER silently answer with a stale last-good artifact.
 2. Inspect `schema` and `diagnose --snapshot <path> --cache-dir <dir>`.
-3. For `coding`, follow `capability-schema-drift.md` before changing extraction.
-4. Inspect the current public RSC payload; add the smallest alias/structural repair.
-5. Add offline legacy, current, and negative fixtures; after credential rotation, validate one gated live command only.
+3. Inspect the current public RSC payload and official API response.
+4. Add offline legacy, current, and negative fixtures; after credential rotation, validate one gated live command only.
 
 ## 304, validator, or artifact-integrity failure
 

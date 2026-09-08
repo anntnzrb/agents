@@ -128,59 +128,6 @@ Returns:
 - removed endpoint slugs
 - provider endpoint deltas
 
-`type` supports:
-
-- `ping`
-- `get_schema` (alias: `schema`)
-- `fetch`
-- `stats`
-- `diff` (`schema_aware:true` is additive)
-- `diagnose` (offline snapshot/cache health)
-- `harness`
-- `coding`
-- `evaluation`
-- `query`
-- `qa`
-
-## Harness
-
-Rank unique models by Harness, a coding-agent score that avoids Intelligence Index benchmark soup:
-
-```text
-Harness = 0.5 * Agentic Index + 0.5 * Coding Index
-Execution Gap = Agentic Index - Coding Index
-```
-
-```bash
-uv run --script <skill-dir>/scripts/cli.py harness --limit 25
-uv run --script <skill-dir>/scripts/cli.py harness --creator anthropic --limit 10
-uv run --script <skill-dir>/scripts/cli.py harness --open-weights-only --limit 25
-uv run --script <skill-dir>/scripts/cli.py query --sort-by harness --order desc --limit 20
-```
-
-Use `Harness` for model picking. Use `Execution Gap` as a risk flag: large positive gaps mean the model may pursue tasks well but have weaker executable/code precision.
-
-## Coding Index token composition
-
-Fetches `https://artificialanalysis.ai/models/capabilities/coding` directly. No long `models=` URL required.
-
-```bash
-uv run --script <skill-dir>/scripts/cli.py coding --limit 25
-uv run --script <skill-dir>/scripts/cli.py coding --model gpt-5-5 --include-benchmark-counts
-uv run --script <skill-dir>/scripts/cli.py coding --sort-by output_tokens --order desc --limit 10
-```
-
-Returns unique model rows with `coding_token_counts`:
-
-- scope: `coding_index_only`
-- `input_tokens`
-- `answer_tokens`
-- `reasoning_tokens`
-- `output_tokens = answer_tokens + reasoning_tokens`
-- answer/reasoning output shares
-
-Important: these counts are tied to the Coding Index capability evaluation, not global `intelligence_index_token_counts`. The current Coding Index components are Terminal-Bench Hard and SciCode; pass `--include-benchmark-counts` to include each component's token counts.
-
 ## Dedicated evaluation pages
 
 Use `evaluation` for a standalone public benchmark page. It parses standard RSC
@@ -189,9 +136,9 @@ row schema:
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py evaluation \
-  https://artificialanalysis.ai/evaluations/terminalbench-v2-1 \
+  https://artificialanalysis.ai/evaluations/<benchmark-slug> \
   --sort-by score --order desc --limit 25 \
-  --output-json <temp-dir>/terminalbench.json
+  --output-json <temp-dir>/benchmark.json
 ```
 
 Replay a saved page response:
@@ -202,10 +149,14 @@ uv run --script <skill-dir>/scripts/cli.py evaluation \
 ```
 
 The result preserves source metadata and unknown row fields. Page rows are
-published values; sorting, limiting, and arithmetic are derived. Do not merge a
-dedicated evaluation score with the Coding Index or Coding Agent Index without
-checking benchmark population, task count, repeats, harness, and metric scope.
-See `references/evaluation-pages.md` for routing and comparability rules.
+published values; sorting, limiting, and arithmetic are derived. Generic
+evaluation extraction is schema-dependent and does not guarantee parsing every
+benchmark page layout.
+
+Do not merge a dedicated evaluation score with official model snapshot metrics
+without checking benchmark population, task count, repeats, test harness, and
+metric scope. See `references/evaluation-pages.md` for routing and comparability
+rules.
 
 ## Query (model/provider benchmark questions)
 
@@ -259,8 +210,6 @@ uv run --script <skill-dir>/scripts/cli.py --mode rpc
 - `stats`
 - `diff` (`schema_aware:true` is additive)
 - `diagnose` (offline snapshot/cache health)
-- `harness`
-- `coding`
 - `evaluation`
 - `query`
 - `qa`
@@ -299,9 +248,10 @@ printf '%s\n' \
 
 ## Contracts and recovery
 
+- `references/command-routing.md`
+- `references/evaluation-pages.md`
 - `references/output-contract.md`
 - `references/troubleshooting.md`
-
 ## Released additive contracts
 
 ### Freshness and evidence

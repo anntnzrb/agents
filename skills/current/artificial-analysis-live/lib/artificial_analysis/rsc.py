@@ -43,7 +43,6 @@ BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
 MODEL_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
 MODEL_API_KEY_ENV = "ARTIFICIAL_ANALYSIS_API_KEY"
 MODEL_API_BASE_URL_ENV = "ARTIFICIAL_ANALYSIS_API_BASE_URL"
-CODING_CAPABILITY_URL = "https://artificialanalysis.ai/models/capabilities/coding"
 CACHE_META_FILE = "providers-cache.json"
 CACHE_BODY_FILE = "providers.rsc"
 CACHE_LAST_GOOD_FILE = "last-good.json"
@@ -2171,7 +2170,6 @@ __all__ = [
     "CACHE_BODY_FILE",
     "CACHE_LAST_GOOD_FILE",
     "CACHE_META_FILE",
-    "CODING_CAPABILITY_URL",
     "DEFAULT_MIN_EVALUATION_ROWS",
     "MIN_NEXT_PUSH_ITEMS",
     "MIN_SAMPLE_SIZE",

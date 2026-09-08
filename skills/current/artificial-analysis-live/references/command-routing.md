@@ -26,33 +26,22 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" query --mo
 ```
 
 ### qa
-Minimal NL command: question → query args.
+Minimal natural-language command: question to query args.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best provider for claude opus 4.7 by speed top 3"
 ```
 
-### coding
-Fetch/query Coding Index capability page; returns scored rows + Coding-evaluation task evidence when live page publishes it.
+### evaluation
+Extract model scores from a dedicated public benchmark page or replayed HTML/RSC file:
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --sort-by coding --limit 10
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" coding --model gpt-5-5 --include-benchmark-counts
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation \
+  https://artificialanalysis.ai/evaluations/<benchmark-slug> --sort-by score --order desc --limit 10
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation --input <temp-dir>/evaluation.html
 ```
 
-Coding Index evidence scope: its own evaluation, not global Intelligence Index or subscription quota. Current rows may include per-task output composition, API USD cost, weighted decode time; optional evidence is `null` when absent. Index: Terminal-Bench v2.1 + SciCode; component scores never synthesized.
-
-### reasoning
-Model profiles by reasoning selectivity: per-benchmark answer/thinking token splits at max effort.
-
-```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --sort-by selectivity --limit 10
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --model minimax-m3 --benchmarks
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --selective-only
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" reasoning --class selective_extreme
-```
-
-Uses `canonical_eval_token_counts` from the local snapshot; no live fetch needed. Metrics: reasoning floor (minimum reasoning share), reasoning ceiling, weighted reasoning share, selectivity classification. Definitions/caveats: `references/output-contract.md`.
+Generic evaluation extraction is schema-dependent and does not guarantee parsing every benchmark page layout. Dedicated page scores remain separate from official model snapshot metrics.
 
 ### stats
 Snapshot counts + top providers.

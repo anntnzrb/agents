@@ -40,7 +40,7 @@ def _run_cli(args: list[str], *, env: dict[str, str]) -> dict[str, object]:
     return payload
 
 
-def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> None:
+def test_live_fetch_and_stats_smoke_are_shape_only(tmp_path: Path) -> None:
     process_key = os.environ["ARTIFICIAL_ANALYSIS_API_KEY"]
     env = dict(os.environ)
     env["ARTIFICIAL_ANALYSIS_API_KEY"] = process_key
@@ -82,16 +82,6 @@ def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> No
     counts = cast("dict[str, object]", stats_data["counts"])
     assert isinstance(counts, dict)
 
-    coding = _run_cli(
-        ["coding", "--limit", "1", "--output-json", str(tmp_path / "coding.json")],
-        env=env,
-    )
-    assert coding["ok"] is True
-    coding_data = cast("dict[str, object]", coding["data"])
-    assert isinstance(coding_data, dict)
-    rows = cast("list[object]", coding_data["rows"])
-    assert isinstance(rows, list)
-
     sources = cast("dict[str, dict[str, object]]", data["sources"])
     evidence: dict[str, object] = {
         "fetch": {
@@ -109,7 +99,6 @@ def test_live_fetch_reader_and_coding_smoke_are_shape_only(tmp_path: Path) -> No
             },
         },
         "stats_shape": sorted(counts),
-        "coding_shape": sorted(coding_data),
     }
     evidence_path = tmp_path / "live-smoke-evidence.json"
     _ = evidence_path.write_text(json.dumps(evidence, sort_keys=True), encoding="utf-8")

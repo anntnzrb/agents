@@ -18,7 +18,6 @@ import pytest
 from artificial_analysis import cli
 from artificial_analysis.cli import (
     _capability_schema,  # pyright: ignore[reportPrivateUsage]
-    _coding_namespace,  # pyright: ignore[reportPrivateUsage]
     _ensure_default_snapshot_fresh,  # pyright: ignore[reportPrivateUsage]
     _envelope,  # pyright: ignore[reportPrivateUsage]
     _evaluation_namespace,  # pyright: ignore[reportPrivateUsage]
@@ -39,7 +38,6 @@ TMP_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analy
 TMP_SNAPSHOT = TMP_ARTIFACT_DIR / "full-data.json"
 TMP_ENDPOINTS = TMP_ARTIFACT_DIR / "endpoints.txt"
 TMP_URL = TMP_ARTIFACT_DIR / "full-url.txt"
-TMP_CODING = TMP_ARTIFACT_DIR / "coding-data.json"
 
 
 def _ns_dict(namespace: argparse.Namespace) -> dict[str, object]:
@@ -117,11 +115,6 @@ class TestCliDefaultPaths(unittest.TestCase):
         args = _ns_dict(parser.parse_args(["qa", "best provider"]))
         assert args["snapshot"] == TMP_SNAPSHOT
 
-    def test_coding_parser_uses_tmp_output_default(self) -> None:
-        args = _ns_dict(cli.build_parser().parse_args(["coding"]))
-
-        assert args["output_json"] == TMP_CODING
-
     def test_evaluation_parser_accepts_url_and_generic_controls(self) -> None:
         args = _ns_dict(
             cli.build_parser().parse_args(
@@ -149,7 +142,6 @@ class TestCliDefaultPaths(unittest.TestCase):
         assert fetch_args["output_endpoints"] == TMP_ENDPOINTS
         assert fetch_args["output_url"] == TMP_URL
         assert _ns_dict(_stats_namespace({}))["snapshot"] == TMP_SNAPSHOT
-        assert _ns_dict(_coding_namespace({}))["output_json"] == TMP_CODING
 
     def test_capability_schema_reports_tmp_fetch_defaults(self) -> None:
         schema = _capability_schema()

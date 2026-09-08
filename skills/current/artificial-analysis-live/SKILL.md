@@ -15,7 +15,7 @@ AI-first skill for **fresh** Artificial Analysis endpoint data.
 
 MUST run the tool before answering benchmark/provider questions; NEVER use stale memory.
 
-## Commands
+## Public entrypoint
 
 With `SKILLS_DIR`:
 `uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" ...`
@@ -29,7 +29,7 @@ Before `fetch`, inject credentials by one supported path:
 1. `ARTIFICIAL_ANALYSIS_API_KEY` in process environment (preferred).
 2. `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted dotenv file outside the skill tree, e.g. mode `0600`.
 
-`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers `query`, `qa`, `stats`, `diff`, `harness`, `reasoning` do not. Process-injected values win; otherwise read the explicitly supplied external env file.
+`fetch` requires `ARTIFICIAL_ANALYSIS_API_KEY`; snapshot readers `query`, `qa`, `stats`, `diff` do not. Process-injected values win; otherwise read the explicitly supplied external env file.
 
 NEVER copy `.env.example` into the skill tree or generated tool home; it is a tracked template, not a secret store. NEVER pass keys through CLI or RPC. Older skill-root/ancestor `.env` discovery is transitional compatibility only, unsupported for new setups. This release has no `AA_LEGACY_DOTENV`; do not rely on it. The asset-sync owner MUST exclude skill-local `.env` and other secret files from generated tool homes; `.gitignore` controls Git tracking only and cannot enforce sync exclusion.
 
@@ -39,10 +39,11 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ## Output policy
 
-- `evaluation` preferred for a dedicated public benchmark page; `--input` replays a saved HTML/RSC response and is used for local replay.
-- Keep dedicated evaluation scores separate from Coding Index, Coding Agent Index, and provider-matrix data.
+- `evaluation` parses a dedicated public benchmark page, or replays a saved HTML/RSC response with `--input`.
+- Generic evaluation extraction is schema-dependent and does not guarantee parsing every benchmark page layout.
+- Keep published model coding and agentic snapshot metrics (`query`, `qa`) distinct from standalone evaluation pages.
 - Mark page rows `published`; mark sorting, limiting, and arithmetic `derived`; preserve source URL and scope.
-- Read `references/evaluation-pages.md` before selecting a dedicated evaluation URL or comparing benchmark populations. Public evaluation URLs MUST use HTTPS.
+- Read `references/evaluation-pages.md` before selecting an evaluation URL or comparing benchmark populations. Public evaluation URLs MUST use HTTPS.
 - When freshness matters, run `fetch` immediately before `query`/`qa`. Default `<temp-dir>/artifacts/artificial-analysis/full-data.json` readers reject snapshots older than 24h; explicit paths intentionally represent historical data.
 
 ## Hardening
@@ -54,9 +55,10 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 
 ## Required follow-up reads
 
-- Command selection/reliability: `references/command-routing.md`; before choosing commands, using RPC, or relying on cache/fallback behavior.
-- Full command/flag usage: `README.md`; when fast-path commands are insufficient.
-- JSON envelopes, fields, reasoning metrics: `references/output-contract.md`; before consuming structured output or reasoning classifications.
-- Capability-page schema repair: `references/capability-schema-drift.md`; when `coding` fails after upstream drift.
-- Dedicated evaluation pages: `references/evaluation-pages.md`; when using `evaluation` or separating standalone pages from composite indexes.
-- Recovery: `references/troubleshooting.md`; for fetch, extraction, cache, freshness, or credential failures.
+| Need | Read | When |
+| --- | --- | --- |
+| Command routing and RPC | [references/command-routing.md](references/command-routing.md) | Choosing CLI commands, running RPC mode, or configuring cache and fallback behavior |
+| Full CLI reference and flags | [README.md](README.md) | Detailed command syntax, options, and full flag definitions |
+| JSON output contract and schemas | [references/output-contract.md](references/output-contract.md) | Consuming JSON envelopes, evidence fields, or freshness statuses |
+| Dedicated evaluation pages | [references/evaluation-pages.md](references/evaluation-pages.md) | Running `evaluation` or replaying standalone benchmark pages |
+| Troubleshooting and recovery | [references/troubleshooting.md](references/troubleshooting.md) | Resolving fetch, credential, cache, integrity, or parsing failures |
