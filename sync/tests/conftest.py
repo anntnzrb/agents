@@ -22,14 +22,16 @@ if TYPE_CHECKING:
 
 SYNC_ROOT: Path = Path(__file__).resolve().parent.parent
 
-# Shared temporary cache directory for isolated test execution
-SHARED_CACHE_DIR: Path = Path(tempfile.mkdtemp(prefix="agents-test-cache-"))
-
+# Resolve uv's configured paths before fixtures replace HOME/XDG_CACHE_HOME.
+# Workers share dependency caches, not test homes or installed releases.
+UV_BIN = shutil.which("uv") or "uv"
 shared_tool_cache_env: dict[str, str] = {
-    "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", str(SHARED_CACHE_DIR / "uv")),
-    "UV_PYTHON_INSTALL_DIR": os.environ.get(
-        "UV_PYTHON_INSTALL_DIR", str(SHARED_CACHE_DIR / "uv-python")
-    ),
+    "UV_CACHE_DIR": subprocess.check_output(  # noqa: S603 - fixed uv query
+        [UV_BIN, "cache", "dir"], text=True
+    ).strip(),
+    "UV_PYTHON_INSTALL_DIR": subprocess.check_output(  # noqa: S603 - fixed uv query
+        [UV_BIN, "python", "dir"], text=True
+    ).strip(),
 }
 
 PRISTINE_PATH: str = os.environ.get("PATH", "")
@@ -57,7 +59,6 @@ def _cleanup_shared_caches() -> None:
     if _RELEASE_CACHE.release is not None:
         shutil.rmtree(_RELEASE_CACHE.release.template_home, ignore_errors=True)
         _RELEASE_CACHE.release = None
-    shutil.rmtree(SHARED_CACHE_DIR, ignore_errors=True)
 
 
 _ = atexit.register(_cleanup_shared_caches)

@@ -31,6 +31,13 @@ cd sync
 uv run pytest tests/test_integration.py -q -o addopts=""
 ```
 
+Tests resolve `uv cache dir` and `uv python dir` before isolating `HOME` and
+`XDG_CACHE_HOME`, then preserve those paths in child processes. Workers reuse uv's
+dependency cache and managed Python installations; test homes and runtime releases
+remain temporary. `UV_CACHE_DIR` and `UV_PYTHON_INSTALL_DIR` overrides are honored.
+The suite does not delete these uv-owned caches. A cold cache still needs its
+initial downloads; subsequent runs reuse them.
+
 ## Run a focused test
 
 Pass the test file to pytest:
