@@ -5,41 +5,39 @@ Scope: exact command selection, invocation examples, RPC mode, reliability behav
 ## Commands
 
 ### fetch
-Live snapshot from provider-leaderboard RSC source + authenticated official model API.
+Fetch a live snapshot from the provider leaderboard RSC source and authenticated official model API.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 ```
 
-Schema-v2 snapshot:
-- one canonical model record per slug;
-- slim provider-endpoint records joined by `model_slug`;
-- official-API canonical model pricing uses a 3:1 blend;
+Schema-v2 snapshot structure:
+- One canonical model record per slug.
+- Slim provider endpoint records joined by `model_slug`.
+- Official API canonical model pricing uses a 3:1 blend.
 - RSC endpoint pricing uses a 7:2:1 blend.
-These blends are intentional: different scopes, not duplicate prices.
 
 ### compare
-Compare canonical models across published releases and reasoning efforts, without duplicating provider endpoints:
+Compare canonical models across published releases and reasoning efforts without duplicating provider endpoints:
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" compare \
   --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"
 ```
 
-Run `fetch` first for current questions. Each repeated `--select` names a release, optionally followed by `:effort,effort`. An unrestricted release selects all observed variants. Family matching uses published release names and slugs; ambiguous names and missing requested efforts fail instead of narrowing silently.
+Run `fetch` first for current questions. Each repeated `--select` names a release, optionally followed by `:effort,effort`. An unrestricted release selects all observed variants. Family matching uses published release names and slugs. Ambiguous names and missing requested efforts raise errors.
 
-Translate the user's natural-language request into selectors. The `qa` command is not a multi-model comparison parser. Unknown effort labels require source discovery, not a hardcoded effort ladder.
+Translate user natural-language requests into selectors. Use `compare` for multi-model comparison. Discover unknown effort labels from the source.
 For dedicated benchmark comparisons, discover variants with `compare`, then read the benchmark with `evaluation`. Match exact canonical model slugs, preserve page metric names, and report missing variants. Keep page results separate from API composite scores.
-
 ### query
-Deterministic filter/sort over snapshot rows.
+Filter and sort snapshot rows deterministically.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
 ```
 
 ### qa
-Minimal natural-language command: question to query args.
+Translate a natural-language question into query arguments.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best provider for claude opus 4.7 by speed top 3"
@@ -54,24 +52,24 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation --input <temp-dir>/evaluation.html
 ```
 
-Generic evaluation extraction is schema-dependent and does not guarantee parsing every benchmark page layout. Dedicated page scores remain separate from official model snapshot metrics.
+Generic evaluation extraction depends on page schema structure. Dedicated page scores remain separate from official model snapshot metrics.
 
 ### stats
-Snapshot counts + top providers.
+Display snapshot counts and top providers.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" stats
 ```
 
 ### diff
-Compare snapshots while keeping legacy endpoint/provider keys:
+Compare snapshots while preserving legacy endpoint and provider keys:
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json --schema-aware
 ```
 
-Use `--schema-aware` only for needed model, field, metric, evidence/status, freshness/parser/schema, duplicate, or diagnostic changes. Matching uses stable IDs first; possible renames are suggestions only and never merges.
+Pass `--schema-aware` to inspect model, field, metric, evidence/status, freshness/parser/schema, duplicate, or diagnostic changes. Matching uses stable IDs first. Treat possible renames as suggestions without merging records.
 
 ### diagnose
 Inspect local health without fetching:
@@ -81,33 +79,33 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diagnose \
   --snapshot <temp-dir>/snapshot.json --cache-dir <temp-dir>/aa-cache
 ```
 
-Reports redacted snapshot/cache/schema/parser/freshness/artifact + diagnostic state. Never performs a live refresh. RPC command is additive and returns one response per input line.
+Reports redacted snapshot, cache, schema, parser, freshness, artifact, and diagnostic state. Runs locally without network requests. RPC mode returns one response per input line.
 
 ### Error and credential routing
-- `--json-errors`: stages one compact redacted CLI error object on stdout; `--legacy-errors`: preserves human-readable stderr errors.
-- RPC retains stable error codes and one response for every non-empty request.
-- Set `ARTIFICIAL_ANALYSIS_API_KEY` in the process, or use `ARTIFICIAL_ANALYSIS_ENV_FILE` pointing to a permissions-restricted file outside the skill tree. Never pass keys in arguments.
-- Older installations may discover a skill-root or ancestor `.env`: transitional compatibility only, unsupported setup.
-- Asset-sync owner MUST exclude `.env` and other secret files from generated homes. `.gitignore` controls Git tracking only and cannot enforce that exclusion.
-- `evaluation` accepts HTTPS URLs only. Use `--input` for local saved HTML/RSC; credential query parameters are redacted.
+- Pass `--json-errors` to write one compact redacted error object to stdout. Pass `--legacy-errors` for human-readable stderr errors.
+- RPC returns stable error codes and one response per non-empty request.
+- Set `ARTIFICIAL_ANALYSIS_API_KEY` in the environment or set `ARTIFICIAL_ANALYSIS_ENV_FILE` to a restricted file path outside the skill tree. Pass credentials through environment variables rather than command arguments.
+- Treat skill-root or ancestor `.env` files as transitional compatibility.
+- Asset-sync processes MUST exclude `.env` and secret files when generating homes.
+- Provide HTTPS URLs to `evaluation`, or use `--input` for local saved HTML/RSC files. Credential query parameters are redacted automatically.
 
 ### schema
-Machine-readable capability contract.
+Output the machine-readable capability contract.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" schema
 ```
 
 ## RPC mode
-Use when another agent/process needs JSONL envelopes.
+Use RPC mode when another process consumes JSONL envelopes.
 
 ```bash
 uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
 ```
 
 ## Reliability defaults
-- ETag cache + 304 reuse: `freshness.mode: "cache-revalidated"`.
-- Last-good fallback only when explicitly enabled with `--stale-policy allow-last-good` or `--allow-stale`.
-- `--strict` remains the `error` policy alias.
-- Sanity thresholds: `--min-endpoints`, `--min-providers`.
-- Explicit local inputs use `freshness.mode: "snapshot"` and `historical:true`; they are not outage-stale.
+- ETag cache and 304 reuse use `freshness.mode: "cache-revalidated"`.
+- Fall back to the last-good snapshot when `--stale-policy allow-last-good` or `--allow-stale` is enabled.
+- `--strict` serves as the alias for the `error` policy.
+- Enforce sanity thresholds with `--min-endpoints` and `--min-providers`.
+- Local inputs set `freshness.mode: "snapshot"` and `historical: true`.
