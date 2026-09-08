@@ -139,10 +139,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
                 }
             )
 
-    with pytest.raises(
-        ValueError,
-        match="unknown field typo",
-    ):
+    try:
         _ = parse_cliproxy_deployment(
             {
                 "server": {"hostname": "test-gateway"},
@@ -150,6 +147,10 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
                 "client": {"baseUrl": "https://gateway.example.test:9443/v1"},
             }
         )
+    except ValueError:
+        pass
+    else:
+        pytest.fail("unknown deployment field was accepted")
 
 
 def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None:
@@ -422,6 +423,9 @@ name = "p1"
 [[projects.items]]
 name = "p2"
 
+["pr\\u006fjects"."escaped"]
+name = "unicode"
+
 [project]
 other = 1
 
@@ -442,7 +446,9 @@ name = "gpt"
         "[[projects.items]]\n"
         'name = "p1"\n\n'
         "[[projects.items]]\n"
-        'name = "p2"\n'
+        'name = "p2"\n\n'
+        '["pr\\u006fjects"."escaped"]\n'
+        'name = "unicode"\n'
     )
     assert preserved == expected
 

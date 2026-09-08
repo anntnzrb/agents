@@ -10,6 +10,7 @@ import re
 import shutil
 import socket
 import stat
+import tomllib
 import urllib.parse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -30,12 +31,6 @@ IPV4_ZERO_PATTERN: Final[re.Pattern[str]] = re.compile(
     r"^(?:0+(?:\.0+){0,3}|0x0+)$",
     re.IGNORECASE,
 )
-IPV4_PART_PATTERN: Final[re.Pattern[str]] = re.compile(r"^\d{1,3}$")
-ZERO_IPV6_GROUP_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"^0{1,4}$",
-    re.IGNORECASE,
-)
-TRAILING_SLASH_PATTERN: Final[re.Pattern[str]] = re.compile(r"/+$")
 CLIENT_BASE_URL_PLACEHOLDER_NAME: Final[str] = "CLIPROXY_CLIENT_BASE_URL"
 CLI_PROXY_SOURCE_DIR: Final[str] = "tools/cliproxyapi"
 CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER: Final[str] = (
@@ -46,72 +41,26 @@ ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
 MIN_PORT: Final[int] = 1
 MAX_PORT: Final[int] = 65535
 DEFAULT_FILE_MODE: Final[int] = 0o644
-IPV6_GROUPS_COUNT: Final[int] = 8
-IPV4_PARTS_COUNT: Final[int] = 4
-MAX_IPV4_OCTET: Final[int] = 255
-BARE_KEY_DELIMITERS: Final[frozenset[str]] = frozenset(
-    (".", "]", "[", " ", "\t", "#", "\r", "\n", "=")
-)
 
 
-def is_unspecified_ipv4(host: str) -> bool:
-    """Check if host matches unspecified IPv4 zero patterns."""
-    return bool(IPV4_ZERO_PATTERN.match(host))
+def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(val, dict)
 
 
-def _is_zero_ipv6_group(group: str) -> bool:
-    return bool(ZERO_IPV6_GROUP_PATTERN.match(group))
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
 
 
-def _ipv4_tail_groups(address: str) -> list[str] | None:
-    separator = address.rfind(":")
-    if separator < 0:
-        return None
-    ipv4_str = address[separator + 1 :]
-    parts = ipv4_str.split(".")
-    if len(parts) != IPV4_PARTS_COUNT or any(
-        not IPV4_PART_PATTERN.match(part) for part in parts
-    ):
-        return None
-    try:
-        bytes_val = [int(p) for p in parts]
-    except ValueError:
-        return None
-    if any(b > MAX_IPV4_OCTET for b in bytes_val):
-        return None
-    first, second, third, fourth = bytes_val
-    tail1 = f"{(first << 8) | second:x}"
-    tail2 = f"{(third << 8) | fourth:x}"
-    head = address[:separator].split(":")
-    return [*head, tail1, tail2]
-
-
-def is_unspecified_ipv6(host: str) -> bool:
-    """Check if host represents an unspecified IPv6 address (:: or all zero groups)."""
+def _is_unspecified_host(host: str) -> bool:
+    if IPV4_ZERO_PATTERN.match(host):
+        return True
     address = host.split("%", maxsplit=1)[0]
     try:
-        ip = ipaddress.IPv6Address(address)
+        ip = ipaddress.ip_address(address)
     except ValueError:
         return False
-
-    if ip.is_unspecified:
-        return True
-
-    groups = _ipv4_tail_groups(address) if "." in address else address.split(":")
-    if groups is None:
-        return False
-    compression = address.find("::")
-    if compression >= 0:
-        if address.find("::", compression + 2) >= 0:
-            return False
-        explicit = [g for g in groups if g]
-        return (
-            all(_is_zero_ipv6_group(g) for g in explicit)
-            and len(explicit) < IPV6_GROUPS_COUNT
-        )
-    return len(groups) == IPV6_GROUPS_COUNT and all(
-        _is_zero_ipv6_group(g) for g in groups
-    )
+    else:
+        return ip.is_unspecified
 
 
 class ServerConfig(BaseModel):
@@ -150,8 +99,7 @@ class ListenConfig(BaseModel):
             or "://" in host
             or "[" in host
             or "]" in host
-            or is_unspecified_ipv4(host)
-            or is_unspecified_ipv6(host)
+            or _is_unspecified_host(host)
         ):
             msg = "expected a specific host or interface address"
             raise ValueError(msg)
@@ -218,67 +166,11 @@ class CliProxyDeployment(BaseModel):
     client: ClientConfig
 
 
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
-
-
-def _reject_unknown_fields(
-    record: dict[str, object],
-    allowed_fields: tuple[str, ...],
-    label: str,
-) -> None:
-    allowed = set(allowed_fields)
-    for field in record:
-        if field not in allowed:
-            msg = f"invalid {label}: unknown field {field}"
-            raise ValueError(msg)
-
-
 def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:
     """Parse and validate CLIProxyAPI deployment dictionary."""
     if not _is_obj_dict(value):
         msg = "invalid CLIProxyAPI deployment: expected object"
-        raise TypeError(msg)
-    _reject_unknown_fields(
-        value,
-        ("server", "listen", "client"),
-        "CLIProxyAPI deployment",
-    )
-
-    server_raw = value.get("server")
-    if not _is_obj_dict(server_raw):
-        msg = "invalid CLIProxyAPI deployment.server: expected object"
-        raise TypeError(msg)
-    _reject_unknown_fields(
-        server_raw,
-        ("hostname",),
-        "CLIProxyAPI deployment.server",
-    )
-
-    listen_raw = value.get("listen")
-    if not _is_obj_dict(listen_raw):
-        msg = "invalid CLIProxyAPI deployment.listen: expected object"
-        raise TypeError(msg)
-    _reject_unknown_fields(
-        listen_raw,
-        ("host", "port"),
-        "CLIProxyAPI deployment.listen",
-    )
-
-    client_raw = value.get("client")
-    if not _is_obj_dict(client_raw):
-        msg = "invalid CLIProxyAPI deployment.client: expected object"
-        raise TypeError(msg)
-    _reject_unknown_fields(
-        client_raw,
-        ("baseUrl", "base_url"),
-        "CLIProxyAPI deployment.client",
-    )
-
+        raise ValueError(msg)
     try:
         return CliProxyDeployment.model_validate(value)
     except ValidationError as error:
@@ -342,10 +234,11 @@ def is_cliproxy_target_ready(
         "Cache-Control": "no-cache",
     }
     try:
-        if opts.fetch is not None:
-            resp = opts.fetch(url, headers=headers, timeout=timeout_sec)
-        else:
-            resp = httpx.get(url, headers=headers, timeout=timeout_sec)
+        resp = (
+            opts.fetch(url, headers=headers, timeout=timeout_sec)
+            if opts.fetch is not None
+            else httpx.get(url, headers=headers, timeout=timeout_sec)
+        )
         if not resp.is_success:
             return False
         payload: object = resp.json()  # pyright: ignore[reportAny]
@@ -374,171 +267,44 @@ def render_cliproxy_endpoint_template(
     )
 
 
-def _skip_spaces(raw: str, i: int) -> int:
-    length = len(raw)
-    while i < length and raw[i] in (" ", "\t"):
-        i += 1
-    return i
-
-
-def _parse_double_quoted(raw: str, i: int) -> tuple[str, int] | None:
-    length = len(raw)
-    value = ""
-    escape_map = {"n": "\n", "t": "\t", "r": "\r"}
-    while i < length:
-        c = raw[i]
-        if c == "\\":
-            i += 1
-            if i >= length:
-                return None
-            esc = raw[i]
-            value += escape_map.get(esc, esc)
-            i += 1
-        elif c == '"':
-            return value, i + 1
-        else:
-            value += c
-            i += 1
-    return None
-
-
-def _parse_single_quoted(raw: str, i: int) -> tuple[str, int] | None:
-    length = len(raw)
-    value = ""
-    while i < length:
-        c = raw[i]
-        if c == "'":
-            return value, i + 1
-        value += c
-        i += 1
-    return None
-
-
-def _parse_bare_key(raw: str, i: int) -> tuple[str, int] | None:
-    length = len(raw)
-    key = ""
-    while i < length and raw[i] not in BARE_KEY_DELIMITERS:
-        key += raw[i]
-        i += 1
-    if not key:
-        return None
-    return key, i
-
-
 def parse_toml_key_path(raw: str) -> list[str] | None:
     """Parse a dotted/quoted TOML key path into a list of key segments."""
-    segments: list[str] = []
-    i = 0
-    length = len(raw)
-
-    while i < length:
-        i = _skip_spaces(raw, i)
-        if i >= length:
-            break
-
-        char = raw[i]
-        if char == '"':
-            res = _parse_double_quoted(raw, i + 1)
-        elif char == "'":
-            res = _parse_single_quoted(raw, i + 1)
-        else:
-            res = _parse_bare_key(raw, i)
-
-        if res is None:
-            return None
-        segment, i = res
-        segments.append(segment)
-
-        i = _skip_spaces(raw, i)
-        if i < length and raw[i] == ".":
-            i = _skip_spaces(raw, i + 1)
-            if i >= length:
-                return None
-        else:
-            break
-
-    i = _skip_spaces(raw, i)
-    if i < length:
+    if not raw or not raw.strip():
         return None
-    return segments or None
-
-
-def _find_closing_bracket(trimmed: str, *, is_array: bool) -> int:
-    i = 2 if is_array else 1
-    length = len(trimmed)
-    in_double = False
-    in_single = False
-
-    while i < length:
-        c = trimmed[i]
-        if in_double:
-            if c == "\\":
-                i += 2
-                continue
-            in_double = c != '"'
-            i += 1
-            continue
-        if in_single:
-            in_single = c != "'"
-            i += 1
-            continue
-        if c == '"':
-            in_double = True
-        elif c == "'":
-            in_single = True
-        elif (is_array and trimmed[i : i + 2] == "]]") or (not is_array and c == "]"):
-            return i
-        i += 1
-    return -1
+    try:
+        data: object = tomllib.loads(f"[{raw}]\n")
+    except tomllib.TOMLDecodeError:
+        return None
+    keys: list[str] = []
+    curr: object = data
+    while _is_obj_dict(curr) and curr:
+        k = next(iter(curr.keys()))
+        keys.append(k)
+        curr = curr.get(k)
+    return keys or None
 
 
 def parse_toml_table_header(line: str) -> list[str] | None:
     """Parse a TOML table header [a.b] or array header [[a.b]] into segments."""
-    trimmed = line[:-1].rstrip("\r").strip() if line.endswith("\n") else line.strip()
+    trimmed = line.strip()
     if not trimmed.startswith("["):
         return None
-
-    is_array = trimmed.startswith("[[")
-    open_bracket_count = 2 if is_array else 1
-    close_bracket_index = _find_closing_bracket(trimmed, is_array=is_array)
-    if close_bracket_index == -1:
+    try:
+        data: object = tomllib.loads(trimmed + "\n")
+    except tomllib.TOMLDecodeError:
         return None
-
-    rest = trimmed[close_bracket_index + open_bracket_count :].strip()
-    if len(rest) > 0 and not rest.startswith("#"):
-        return None
-
-    inner = trimmed[open_bracket_count:close_bracket_index]
-    return parse_toml_key_path(inner)
-
-
-@dataclass
-class _TomlSection:
-    header_segments: list[str] | None
-    lines: list[str]
-
-
-def _split_toml_sections(lines: list[str]) -> list[_TomlSection]:
-    sections: list[_TomlSection] = []
-    current_section = _TomlSection(header_segments=None, lines=[])
-    for line in lines:
-        header = parse_toml_table_header(line)
-        if header is not None:
-            if (
-                current_section.header_segments is not None
-                or len(current_section.lines) > 0
-            ):
-                sections.append(current_section)
-            current_section = _TomlSection(header_segments=header, lines=[line])
+    keys: list[str] = []
+    curr: object = data
+    while True:
+        if _is_obj_dict(curr) and curr:
+            k = next(iter(curr.keys()))
+            keys.append(k)
+            curr = curr.get(k)
+        elif _is_obj_list(curr) and curr:
+            curr = curr[0]
         else:
-            current_section.lines.append(line)
-    if current_section.header_segments is not None or len(current_section.lines) > 0:
-        sections.append(current_section)
-    return sections
-
-
-def _header_matches_prefix(hdr: list[str], target: list[str]) -> bool:
-    return len(hdr) >= len(target) and hdr[: len(target)] == target
+            break
+    return keys or None
 
 
 def extract_preserved_top_levels(
@@ -556,18 +322,20 @@ def extract_preserved_top_levels(
     if not parsed_top_levels:
         return ""
 
-    sections = _split_toml_sections(existing.splitlines(keepends=True))
-    preserved = [
-        s
-        for s in sections
-        if s.header_segments is not None
-        and any(_header_matches_prefix(s.header_segments, t) for t in parsed_top_levels)
-    ]
+    preserved: list[list[str]] = []
+    current: list[str] | None = None
+    for line in existing.splitlines(keepends=True):
+        header = parse_toml_table_header(line)
+        if header is not None:
+            current = None
+            if any(header[: len(prefix)] == prefix for prefix in parsed_top_levels):
+                current = []
+                preserved.append(current)
+        if current is not None:
+            current.append(line)
     if not preserved:
         return ""
-
-    joined = "\n\n".join("".join(s.lines).rstrip() for s in preserved)
-    return f"{joined}\n"
+    return "\n\n".join("".join(lines).rstrip() for lines in preserved) + "\n"
 
 
 def read_preserved_top_levels(
@@ -721,29 +489,25 @@ def _snapshot_endpoint_target(path: Path) -> EndpointTargetSnapshot:
         raise
 
 
-def _restore_single_snapshot(snapshot: EndpointTargetSnapshot) -> None:
-    match snapshot:
-        case MissingEndpointTarget(path=path):
-            with contextlib.suppress(OSError):
-                if path.is_symlink() or path.is_file():
-                    path.unlink(missing_ok=True)
-                elif path.is_dir():
-                    shutil.rmtree(path, ignore_errors=True)
-        case FileEndpointTarget(path=path, content=content, mode=mode):
-            sync_text_file(path, content, mode)
-        case SymlinkEndpointTarget(path=path, link=link):
-            with contextlib.suppress(OSError):
-                path.unlink(missing_ok=True)
-            path.symlink_to(link)
-        case OtherEndpointTarget():
-            pass
-
-
 def _restore_endpoint_targets(
     snapshots: Sequence[EndpointTargetSnapshot],
 ) -> None:
-    for snapshot in snapshots:
-        _restore_single_snapshot(snapshot)
+    for snap in snapshots:
+        match snap:
+            case MissingEndpointTarget(path=path):
+                with contextlib.suppress(OSError):
+                    if path.is_symlink() or path.is_file():
+                        path.unlink(missing_ok=True)
+                    elif path.is_dir():
+                        shutil.rmtree(path, ignore_errors=True)
+            case FileEndpointTarget(path=path, content=content, mode=mode):
+                sync_text_file(path, content, mode)
+            case SymlinkEndpointTarget(path=path, link=link):
+                with contextlib.suppress(OSError):
+                    path.unlink(missing_ok=True)
+                path.symlink_to(link)
+            case OtherEndpointTarget():
+                pass
 
 
 def publish_cliproxy_endpoint_templates(
