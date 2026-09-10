@@ -36,7 +36,8 @@ tier:
 
 retry:
   enabled: true
-  maxRetries: 10
+  maxRetries: 50
+  maxDelayMs: 300000
   # fallbackChains:
   #   default:
   #     - google-antigravity/gemini-3.7-flash:medium
