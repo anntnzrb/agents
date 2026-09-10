@@ -242,6 +242,11 @@ bashInterceptor:
       tool: write
       message: "Use the `write` tool instead of echo/cat redirection. It handles encoding and provides confirmation."
 
+    # --- Local: read-only sed routed to read ---
+    - pattern: "^\\s*sed\\s+(-[a-zA-Z]*n|--quiet)"
+      tool: read
+      message: "Use the `read` tool with a line selector (e.g. `file.ts:10-50`) instead of sed -n. It provides numbered, anchored output."
+
     # --- Custom Python / uv Invariants ---
     - pattern: "(?:^|[;&|]\\s*)\\s*(?:sudo\\s+|env\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:pip-compile|pip-sync|pipdeptree)(?:\\.exe)?\\b"
       flags: i
