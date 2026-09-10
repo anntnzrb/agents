@@ -31,6 +31,12 @@ cd sync
 uv run pytest tests/test_integration.py -q -o addopts=""
 ```
 
+Pytest uses work-stealing scheduling so idle workers can take queued cases from
+busy workers. CLI help and syntax cases run independently without provisioning a
+runtime; pruning tests arrange release files directly, while installation tests
+still build real environments. Every push still runs all static gates and the
+full suite; successful validation results are not cached.
+
 Tests resolve `uv cache dir` and `uv python dir` before isolating `HOME` and
 `XDG_CACHE_HOME`, then preserve those paths in child processes. Workers reuse uv's
 dependency cache and managed Python installations; test homes and runtime releases

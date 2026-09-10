@@ -43,7 +43,7 @@ pythonVersion = "3.12"
 pythonPlatform = "All"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-n auto -q"
+addopts = "-n auto --dist worksteal -q"
 
 [dependency-groups]
 dev = [
