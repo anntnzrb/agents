@@ -18,6 +18,10 @@ Use `--allow-rpc` only after that approval. The Python client uses the same defa
 
 Read permission does not permit mutation. `--write` or `allow_write=True` requires separate approval specifying the method, exact record IDs or create payload, values, exclusions, and expected side effects. Show the no-write preview first. Do not silently broaden a domain, replace missing IDs, change values, or retry an ambiguous write.
 
+When an instruction is ambiguous, propose the intended records, values, exclusions, and effects, then ask for approval. The user does not need to know flag names or internal method names. Do not silently narrow or broaden their goal to avoid that clarification.
+
+Long-lived sessions and worker pools may retain clients, credentials, and partial results. Reusing those objects does not extend approval. Keep read and write phases separate, keep mutations with one owner, and reconcile in-flight requests after cancellation before proceeding.
+
 Read and write flags are caller attestations. An agent that can execute arbitrary code and read a production token can bypass a client library. These guardrails prevent accidental use through supported paths; they cannot independently verify what the user approved.
 
 ## Read-only limitations

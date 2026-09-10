@@ -21,6 +21,10 @@ uv run --script <skill-dir>/scripts/cli.py env --json
 
 Inspect `runtime_path`, `config_path`, `custom_addons_path`, `effective_database`, and the requested workflow before destructive work. `env` reports configuration, not a proof that the database is connected or disposable.
 
+Keep the analysis interpreter, Odoo runtime interpreter, and subprocess environment distinct. A variable defined in an analysis session is not available inside a newly launched Odoo shell. Pass required inputs explicitly and check process exit status before parsing stdout.
+
+After an unknown CLI argument or missing path, consult the installed command's `--help` or use directory discovery once. Correct the invocation rather than repeating a guessed command or hard-coding a versioned source directory.
+
 ## Isolation
 
 Keep Podman pointed at the local host or local Podman machine. Never use production container connections for replica commands. Loopback connections can still be tunnels; verify their purpose locally.

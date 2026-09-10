@@ -41,6 +41,7 @@ In examples below, `odoo-ops` means this exact command. Use `--help` for current
 | Sandbox restrictions | [safe_eval reference](references/server-action-safe-eval.md) | Writing Server Action Python |
 | Direct SQL writes | [SQL safety](references/server-action-sql-safety.md) | Preparing set-based Server Actions |
 | Template contracts | [Template catalog](references/server-action-templates.md) | Rendering any bundled template |
+| Optional OMP analysis and orchestration | [OMP Eval companion](references/omp-eval.md) | Only when this skill is used through OMP Eval or workflowz |
 
 ## Common calls
 

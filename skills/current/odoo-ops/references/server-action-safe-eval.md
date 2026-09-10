@@ -18,6 +18,10 @@ Syntax requires both: (1) Python 3.10 compilation; (2) every generated opcode, i
 
 Installed packages are not automatically usable: imports blocked; Server Actions see only Odoo-injected names and restricted built-ins.
 
+Do not import the full Odoo application into a general analysis interpreter merely to validate a snippet. A missing application dependency belongs to that runtime, not automatically to the analysis environment. Use the confirmed local Odoo runtime for actual sandbox validation.
+
+Local `compile()` or a hand-picked opcode denylist is only a preliminary check. It does not prove compatibility with the target Python version, nested code objects, allowed built-ins, or Odoo's complete opcode allowlist. Report that limitation rather than labeling a compilation result production-ready.
+
 ## Available names
 
 `env`, `model`, `record`, `records`, `time`, `datetime`, `dateutil`, `timezone`, `float_compare`, `log`, `_logger`, `UserError`, `Command`, `uid`, `user`, `b64encode`, `b64decode`.
