@@ -565,26 +565,22 @@ def test_process_timeout_kills_descendant_holding_stdout(
 ) -> None:
     """Verify timeout terminates entire process tree holding standard output."""
     pids_file = tmp_path / "pids.txt"
-    fixture = tmp_path / "descendant.py"
-    _ = fixture.write_text(
-        f"""import os, subprocess, time
-pids_file = {str(pids_file)!r}
-parent_pid = os.getpid()
-child = subprocess.Popen(
-    ['sh', '-c', 'while :; do sleep 1; done'],
-    stdin=subprocess.DEVNULL,
-)
-with open(pids_file, 'w', encoding='utf-8') as f:
-    f.write(f'{{parent_pid}} {{child.pid}}')
-time.sleep(10)
+    fixture = tmp_path / "descendant.sh"
+    _write_file(
+        fixture,
+        f"""#!/bin/sh
+sleep 10 &
+child_pid=$!
+echo "$$ $child_pid" > "{pids_file}"
+sleep 10
 """,
-        encoding="utf-8",
     )
+    fixture.chmod(MODE_EXECUTABLE)
 
     started_at = time.perf_counter()
     result = asyncio.run(
         run_process(
-            [sys.executable, "-u", str(fixture)],
+            [str(fixture)],
             RunProcessOptions(timeout_ms=1000, stdio="pipe"),
         )
     )
