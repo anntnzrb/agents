@@ -221,23 +221,30 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     tmp_path: Path,
 ) -> None:
     """Test pruning unreferenced complete releases and dead process stages."""
-    home = make_home(tmp_path)
-    source_root = seed_source_root(home)
-    _, job = get_runtime_install_job(home)
-    _ = asyncio.run(run_jobs_with_preserve([job]))
+    releases_path = tmp_path / "sync-releases"
+    releases_path.mkdir(parents=True, exist_ok=True)
+    current_link = tmp_path / "sync-current"
 
-    first_release_name = read_dir_names(job.releases_root)[0]
+    first_release_name = "1" * 64
+    first_release_dir = releases_path / first_release_name
+    (first_release_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (first_release_dir / ".venv" / "bin" / "python").touch()
+    (first_release_dir / "src" / "sync").mkdir(parents=True, exist_ok=True)
+    _ = (first_release_dir / "src" / "sync" / "cli.py").write_text(
+        'print("v1")\n', encoding="utf-8"
+    )
 
-    source_path = Path(source_root)
-    cli_path = source_path / "src" / "sync" / "cli.py"
-    if not cli_path.exists():
-        cli_path = source_path / "src" / "cli.py"
-    _ = cli_path.write_text('print("updated")\n', encoding="utf-8")
+    current_release_name = "2" * 64
+    current_release_dir = releases_path / current_release_name
+    (current_release_dir / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (current_release_dir / ".venv" / "bin" / "python").touch()
+    (current_release_dir / "src" / "sync").mkdir(parents=True, exist_ok=True)
+    _ = (current_release_dir / "src" / "sync" / "cli.py").write_text(
+        'print("v2")\n', encoding="utf-8"
+    )
 
-    _, job2 = get_runtime_install_job(home)
-    _ = asyncio.run(run_jobs_with_preserve([job2]))
+    current_link.symlink_to(current_release_dir)
 
-    releases_path = Path(job.releases_root)
     unrecognized_dir = releases_path / "custom-unrecognized-dir"
     unrecognized_dir.mkdir(parents=True, exist_ok=True)
     _ = (unrecognized_dir / "data.txt").write_text("preserve-me", encoding="utf-8")
@@ -260,20 +267,21 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     live_pid_stage.mkdir(parents=True, exist_ok=True)
     _ = (live_pid_stage / "pyproject.toml").write_text("{}", encoding="utf-8")
 
-    prune_unreferenced_releases(job2.releases_root, job2.current_link)
+    prune_unreferenced_releases(str(releases_path), str(current_link))
 
-    remaining = [entry.name for entry in Path(job2.releases_root).iterdir()]
+    remaining = [entry.name for entry in releases_path.iterdir()]
     assert ".stage-test-keep" in remaining
     assert "custom-unrecognized-dir" in remaining
     assert "a" * 64 in remaining
     assert f".stage-{os.getpid()}-livebeef12345678" in remaining
 
-    current_release_name = next(
+    active_release_name = next(
         name
-        for name in read_dir_names(job2.releases_root)
+        for name in read_dir_names(str(releases_path))
         if name not in ("custom-unrecognized-dir", "a" * 64)
     )
-    assert current_release_name in remaining
+    assert active_release_name in remaining
+    assert active_release_name == current_release_name
     assert first_release_name not in remaining
     assert ".stage-99999999-deadbeef12345678" not in remaining
 
