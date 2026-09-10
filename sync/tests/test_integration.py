@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeGuard
 
+import pytest
 import yaml
 
 from sync.core.cliproxy_deployment import CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER
@@ -446,50 +447,47 @@ def _walk(abs_path: Path, rel_path: str, out: list[SnapshotEntry]) -> None:
     out.append(SnapshotEntry(path=normalized, kind="file", content=content))
 
 
-def test_integration_cli_help_flags_exit_0(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("args", "golden_file"),
+    [
+        (["--help"], "help.txt"),
+        (["-h"], "help.txt"),
+        (["help"], "help.txt"),
+        (["sync", "--help"], "help.txt"),
+        (["sync", "-h"], "help.txt"),
+        (["sync", "help"], "help.txt"),
+        (["launch", "--help"], "launch-help.txt"),
+        (["launch", "-h"], "launch-help.txt"),
+        (["launch", "help"], "launch-help.txt"),
+    ],
+)
+def test_integration_cli_help_flags_exit_0(
+    tmp_path: Path, args: Sequence[str], golden_file: str
+) -> None:
     """Test CLI help flags produce exit code 0 and match golden text."""
-    home = make_fixture(tmp_path)
-    golden_help = (SYNC_ROOT / "tests" / "golden" / "help.txt").read_text(
+    golden_text = (SYNC_ROOT / "tests" / "golden" / golden_file).read_text(
         encoding="utf-8"
     )
-    golden_launch_help = (SYNC_ROOT / "tests" / "golden" / "launch-help.txt").read_text(
-        encoding="utf-8"
-    )
-
-    general_flags = [
-        ["--help"],
-        ["-h"],
-        ["help"],
-        ["sync", "--help"],
-        ["sync", "-h"],
-        ["sync", "help"],
-    ]
-    for args in general_flags:
-        result = run_sync_process(home, args)
-        assert result.exit_code == 0, f"args {args} failed: {result.stderr}"
-        assert result.stdout.strip() == golden_help.strip()
-
-    launch_flags = [["launch", "--help"], ["launch", "-h"], ["launch", "help"]]
-    for args in launch_flags:
-        result = run_sync_process(home, args)
-        assert result.exit_code == 0, f"args {args} failed: {result.stderr}"
-        assert result.stdout.strip() == golden_launch_help.strip()
+    result = run_sync_process(tmp_path, args)
+    assert result.exit_code == 0, f"args {args} failed: {result.stderr}"
+    assert result.stdout.strip() == golden_text.strip()
 
 
-def test_integration_cli_syntax_errors_exit_2(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("args", "expected_stderr"),
+    [
+        (["invalid-subcommand"], "sync: usage: sync"),
+        (["launch"], "sync: usage: launch NAME -- [ARGS...]"),
+        (["launch", "codex", "no-separator"], "sync: usage: launch NAME -- [ARGS...]"),
+    ],
+)
+def test_integration_cli_syntax_errors_exit_2(
+    tmp_path: Path, args: Sequence[str], expected_stderr: str
+) -> None:
     """Test invalid subcommands and bad syntax return exit code 2."""
-    home = make_fixture(tmp_path)
-    bad_cmd = run_sync_process(home, ["invalid-subcommand"])
-    assert bad_cmd.exit_code == EXIT_SYNTAX_ERROR
-    assert "sync: usage: sync" in bad_cmd.stderr
-
-    bad_launch_no_name = run_sync_process(home, ["launch"])
-    assert bad_launch_no_name.exit_code == EXIT_SYNTAX_ERROR
-    assert "sync: usage: launch NAME -- [ARGS...]" in bad_launch_no_name.stderr
-
-    bad_launch_no_sep = run_sync_process(home, ["launch", "codex", "no-separator"])
-    assert bad_launch_no_sep.exit_code == EXIT_SYNTAX_ERROR
-    assert "sync: usage: launch NAME -- [ARGS...]" in bad_launch_no_sep.stderr
+    result = run_sync_process(tmp_path, args)
+    assert result.exit_code == EXIT_SYNTAX_ERROR
+    assert expected_stderr in result.stderr
 
 
 def test_integration_missing_runtime_sources_fails_sync_exit_1(
