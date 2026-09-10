@@ -10,6 +10,7 @@ import argparse
 import ast
 import concurrent.futures
 import configparser
+import ipaddress
 import json
 import os
 import re
@@ -17,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
@@ -434,11 +436,62 @@ def _run(
         raise CliError(msg, code=127) from err
 
 
+def _is_local_container_endpoint(uri: str) -> bool:
+    """Recognize local sockets and loopback Podman machine connections."""
+    if uri.startswith("/"):
+        return True
+    try:
+        parsed = urllib.parse.urlsplit(uri)
+        host = parsed.hostname
+    except ValueError:
+        return False
+    if parsed.scheme == "unix":
+        return not parsed.netloc and bool(parsed.path)
+    if parsed.scheme not in {"ssh", "tcp", "http", "https"} or not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    else:
+        return address.is_loopback
+
+
 def _ensure_podman() -> None:
-    """Validate that podman binary is available in PATH."""
+    """Validate that podman is available and operating on a local container host."""
     if not shutil.which("podman"):
         msg = "Podman binary not found. Please install podman."
         raise CliError(msg, code=127)
+
+    container_host = os.environ.get("CONTAINER_HOST", "").strip()
+    if not container_host:
+        # This command reads local connection metadata; it does not contact a server.
+        result = _run(["podman", "system", "connection", "list", "--format", "json"])
+        connections = cast("object", json.loads(result.stdout))
+        if not isinstance(connections, list):
+            raise CliError("Cannot resolve the local Podman connection.")
+        selected = os.environ.get("CONTAINER_CONNECTION")
+        for connection in cast("list[object]", connections):
+            if not isinstance(connection, dict):
+                raise CliError("Invalid Podman connection metadata.")
+            entry = cast("dict[str, object]", connection)
+            is_selected = (
+                entry.get("Name") == selected
+                if selected
+                else entry.get("Default") is True
+            )
+            if is_selected:
+                endpoint = entry.get("URI")
+                if not isinstance(endpoint, str):
+                    raise CliError("Podman connection has no endpoint.")
+                container_host = endpoint
+                break
+        if selected and not container_host:
+            raise CliError("Selected Podman connection was not found.")
+    if container_host and not _is_local_container_endpoint(container_host):
+        raise CliError("Remote Podman host detected. Use the confirmed local replica.")
 
 
 # ==============================================================================
@@ -555,13 +608,29 @@ def _resolve_workspace() -> WorkspaceContext:
     )
 
 
+_SAFE_IDENTIFIER_RE = re.compile(r"\A[a-zA-Z0-9_-]+\Z")
+
+
+def _validate_db_name(name: str) -> str:
+    """Validate database identifier to prevent SQL injection and quoting attacks."""
+    if not name or not _SAFE_IDENTIFIER_RE.fullmatch(name):
+        msg = (
+            f"Invalid database name {name!r}. Database identifiers must contain only "
+            "alphanumeric characters, underscores, or hyphens."
+        )
+        raise CliError(msg)
+    return name
+
+
 def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
     """Load and parse workflow profile from JSON configuration."""
+    if not profile or not _SAFE_IDENTIFIER_RE.match(profile):
+        msg = f"invalid profile name: {profile!r}"
+        raise CliError(msg)
     pfile = PROFILE_DIR / f"{profile}.json"
-    if not pfile.is_file():
+    if not pfile.is_file() or pfile.resolve().parent != PROFILE_DIR.resolve():
         msg = f"workflow profile not found: {pfile}"
         raise CliError(msg)
-
     data_raw: object = cast("object", json.loads(pfile.read_text(encoding="utf-8")))
     data = cast("dict[str, object]", data_raw) if isinstance(data_raw, dict) else {}
     workflows_obj = data.get("workflows")
@@ -626,7 +695,6 @@ def _resolve_target_paths(
     if direct_file.is_file():
         return [direct_file]
 
-
     # 1. Single module direct directory check
     mod_path = addons / target
     if mod_path.is_dir():
@@ -658,9 +726,19 @@ def _resolve_target_paths(
 # ==============================================================================
 
 
-def _exec_sql(sql: str, *, db: str = DEFAULT_DB_NAME) -> str:
+def _exec_sql(
+    sql: str,
+    *,
+    db: str = DEFAULT_DB_NAME,
+    readonly: bool = False,
+    tuples_only: bool = False,
+) -> str:
     """Execute SQL statement via podman psql container."""
     _ensure_podman()
+    safe_db = _validate_db_name(db)
+    final_sql = (
+        f"BEGIN TRANSACTION READ ONLY;\n{sql}\n;\nROLLBACK;" if readonly else sql
+    )
     cmd = [
         "podman",
         "exec",
@@ -670,34 +748,37 @@ def _exec_sql(sql: str, *, db: str = DEFAULT_DB_NAME) -> str:
         "-U",
         DEFAULT_DB_USER,
         "-d",
-        db,
+        safe_db,
         "-q",
         "-X",
-        "-c",
-        sql,
+        "-v",
+        "ON_ERROR_STOP=1",
     ]
+    if tuples_only:
+        cmd.extend(["-t", "-A"])
+    cmd.extend(["-c", final_sql])
     res = _run(cmd, check=True)
     return res.stdout
 
 
-def _exec_sql_json(sql: str, *, db: str = DEFAULT_DB_NAME) -> list[dict[str, object]]:
+def _exec_sql_json(
+    sql: str, *, db: str = DEFAULT_DB_NAME, readonly: bool = False
+) -> list[dict[str, object]]:
     """Execute SQL query returning rows as a JSON list of dictionaries."""
-    wrapped = f"SELECT json_agg(t) FROM ({sql}) t;"  # noqa: S608 - internal JSON aggregation wrapper
-    raw = _exec_sql(wrapped, db=db).strip()
-    match = re.search(r"(\[.*\])", raw, re.DOTALL)
-    if match:
-        try:
-            parsed: object = cast("object", json.loads(match.group(1)))
-            if isinstance(parsed, list):
-                items = cast("list[object]", parsed)
-                return [
-                    cast("dict[str, object]", item)
-                    for item in items
-                    if isinstance(item, dict)
-                ]
-        except (json.JSONDecodeError, ValueError):
-            pass
-    return []
+    clean_subquery = sql.strip().removesuffix(";").rstrip()
+    wrapped = f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({clean_subquery}) t;"  # noqa: S608 - internal JSON aggregation wrapper
+    raw = _exec_sql(wrapped, db=db, readonly=readonly, tuples_only=True).strip()
+    try:
+        parsed: object = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CliError(
+            "Database query returned invalid JSON; no audit result is available."
+        ) from exc
+    if not isinstance(parsed, list) or any(
+        not isinstance(item, dict) for item in parsed
+    ):
+        raise CliError("Database query did not return an array of records.")
+    return cast("list[dict[str, object]]", parsed)
 
 
 # ==============================================================================
@@ -783,7 +864,7 @@ def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> Non
                 "--name",
                 DEFAULT_POD_NAME,
                 "-p",
-                f"{DEFAULT_HTTP_PORT}:8069",
+                f"127.0.0.1:{DEFAULT_HTTP_PORT}:8069",
                 "-p",
                 f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
             ]
@@ -1528,15 +1609,18 @@ def cmd_route_list(args: argparse.Namespace) -> int:
     json_mode = _require_bool(args, "json")
     routes: list[ControllerInfo] = []
 
-    target_dirs = (
-        [ctx.root / module]
-        if module
-        else [
+    if module:
+        mod_dir = ctx.root / module
+        if not mod_dir.is_dir():
+            msg = f"Module not found: {mod_dir}"
+            raise CliError(msg)
+        target_dirs = [mod_dir]
+    else:
+        target_dirs = [
             d
             for d in ctx.root.iterdir()
             if d.is_dir() and d.name not in IGNORED_ADDON_DIRS
         ]
-    )
 
     for mdir in target_dirs:
         visitor = _OdooASTVisitor(mdir.name, str(mdir))
@@ -1562,7 +1646,7 @@ def cmd_route_list(args: argparse.Namespace) -> int:
 def cmd_db_summary(args: argparse.Namespace) -> int:
     """Show PostgreSQL database summary statistics and installed module count."""
     ctx = _resolve_workspace()
-    db = _optional_str(args, "db") or ctx.effective_db_name
+    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
     json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
 
@@ -1590,8 +1674,8 @@ def cmd_db_summary(args: argparse.Namespace) -> int:
 def cmd_db_tables(args: argparse.Namespace) -> int:
     """List largest database tables by total relation size."""
     ctx = _resolve_workspace()
-    db = _optional_str(args, "db") or ctx.effective_db_name
-    limit = _require_int(args, "limit", 20)
+    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
+    limit = max(1, _require_int(args, "limit", 20))
     json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
 
@@ -1620,50 +1704,59 @@ def cmd_db_tables(args: argparse.Namespace) -> int:
 
 
 def cmd_db_query(args: argparse.Namespace) -> int:
-    """Execute arbitrary SQL query with write-safety check."""
-    ctx = _resolve_workspace()
-    db = _optional_str(args, "db") or ctx.effective_db_name
-    _ensure_runtime_pod(ctx)
-
+    """Execute arbitrary SQL query with read-only transaction safety check."""
     raw_sql = _require_str(args, "sql").strip()
+    if not raw_sql:
+        msg = "SQL query string cannot be empty."
+        raise CliError(msg)
+
     unsafe = _require_bool(args, "unsafe")
     json_mode = _require_bool(args, "json")
 
-    # Simple write safety check
-    first_word = raw_sql.split()[0].upper() if raw_sql else ""
-    if not unsafe and first_word not in ("SELECT", "EXPLAIN", "SHOW", "WITH"):
-        msg = (
-            f"Write query blocked by safety policy ({first_word}). "
-            "Pass --unsafe to override."
-        )
-        raise CliError(msg)
+    if not unsafe:
+        clean_sql = raw_sql.rstrip(";").strip()
+        if ";" in clean_sql:
+            msg = (
+                "Multi-statement queries are blocked without --unsafe. "
+                "Pass --unsafe to execute multi-statement SQL on local replica."
+            )
+            raise CliError(msg)
+
+    ctx = _resolve_workspace()
+    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
+    _ensure_runtime_pod(ctx)
 
     if json_mode:
-        rows = _exec_sql_json(raw_sql, db=db)
+        rows = _exec_sql_json(raw_sql, db=db, readonly=not unsafe)
         print(json.dumps(rows, indent=2))
     else:
-        out = _exec_sql(raw_sql, db=db)
+        out = _exec_sql(raw_sql, db=db, readonly=not unsafe)
         print(out)
     return 0
 
 
 def cmd_db_clone(args: argparse.Namespace) -> int:
     """Clone a PostgreSQL database template to a new target database."""
-    ctx = _resolve_workspace()
-    _ensure_runtime_pod(ctx)
+    source = _validate_db_name(_require_str(args, "source"))
+    target = _validate_db_name(_require_str(args, "target"))
+    if source == target:
+        msg = f"Source and target database names cannot be identical ({source!r})."
+        raise CliError(msg)
 
-    source = _require_str(args, "source")
-    target = _require_str(args, "target")
+    owner = _validate_db_name(DEFAULT_DB_USER)
     force = _require_bool(args, "force")
     json_mode = _require_bool(args, "json")
+
+    ctx = _resolve_workspace()
+    _ensure_runtime_pod(ctx)
 
     print(f"Cloning database {source!r} -> {target!r}...")
 
     # 1. Terminate existing connections to source and target
-    term_sql = f"""
-        SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-        WHERE datname IN ('{source}', '{target}') AND pid <> pg_backend_pid();
-    """  # noqa: S608 - maintenance connection termination
+    term_sql = (
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated database identifiers
+        f"WHERE datname IN ('{source}', '{target}') AND pid <> pg_backend_pid();"
+    )
     _ = _exec_sql(term_sql, db="postgres")
 
     # 2. Drop target if requested
@@ -1672,11 +1765,8 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
         _ = _exec_sql(drop_sql, db="postgres")
 
     # 3. Create database as template copy
-    create_sql = (
-        f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER {DEFAULT_DB_USER};'
-    )
+    create_sql = f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'  # noqa: S608 - create database with validated identifiers
     _ = _exec_sql(create_sql, db="postgres")
-
     if json_mode:
         print(json.dumps({"status": "cloned", "source": source, "target": target}))
     else:
