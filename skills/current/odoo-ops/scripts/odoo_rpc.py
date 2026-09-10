@@ -5,18 +5,27 @@
 """Odoo JSON-RPC Client.
 
 Queries and manages Odoo models directly via JSON-RPC.
+Requires explicit per-invocation authorization (--allow-rpc / allow_rpc=True)
+before initiating any network connection, authentication, or config loading.
 Enforces strict allowlisting for safe read-only/introspection queries by default,
-and requires explicit authorization (--write) for state-modifying operations.
+and requires independent explicit authorization (--write / allow_write=True)
+for state-modifying operations.
+
+Note: Client-side method allowlists do not guarantee server-side read-only transactions,
+as custom server-side method implementations or hooks could perform mutations.
+Consent flags record explicit user authorization.
 """
 
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +43,7 @@ from typing import (
 if TYPE_CHECKING:
     import http.client
     from collections.abc import Callable
+    from typing import IO
 
 JsonValue: TypeAlias = Union[  # pyright: ignore[reportDeprecated] - see note above
     bool, int, float, str, "list[JsonValue]", "dict[str, JsonValue]", None
@@ -55,18 +65,16 @@ READONLY_ALLOWLIST: frozenset[str] = frozenset(
         "get_views",
         "name_search",
         "name_get",
-        "export_data",
         "get_metadata",
         "get_external_id",
         "default_get",
         "check_access_rights",
         "check_field_access_rights",
         "user_has_groups",
-        "onchange",
     }
 )
 
-# Methods that mutate state / write to the database (require --write)
+# Methods that mutate state (require --write / allow_write=True)
 MUTATION_ALLOWLIST: frozenset[str] = frozenset(
     {
         "create",
@@ -78,6 +86,97 @@ MUTATION_ALLOWLIST: frozenset[str] = frozenset(
         "toggle_active",
     }
 )
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Prevent automatic HTTP redirection to safeguard credentials from leaking."""
+
+    def redirect_request(  # noqa: PLR0913, PLR0917 - stdlib override signature
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: http.client.HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        """Reject automated redirects across all 3xx status codes."""
+        del req, fp, code, msg, headers, newurl
+        return None
+
+
+def _is_loopback_host(hostname: str) -> bool:
+    """Check if a hostname or IP address is loopback."""
+    norm = hostname.strip().lower()
+    if norm in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        ip = ipaddress.ip_address(norm)
+    except ValueError:
+        return False
+    else:
+        return ip.is_loopback
+
+
+def _validate_url(raw_url: str, *, verify_ssl: bool = True) -> str:
+    """Validate URL structure, schemes, credentials, query/fragments, and transport safety."""
+    if not isinstance(raw_url, str) or not raw_url.strip():
+        message = "Odoo RPC URL must be a non-empty string."
+        raise ValueError(message)
+
+    parsed = urllib.parse.urlsplit(raw_url)
+    if parsed.scheme not in ("http", "https"):
+        message = "Invalid Odoo RPC URL. Scheme must be http or https."
+        raise ValueError(message)
+    if not parsed.netloc or not parsed.hostname:
+        message = "Invalid Odoo RPC URL. URL must contain a valid host."
+        raise ValueError(message)
+    if parsed.username or parsed.password:
+        message = "Odoo RPC URL must not contain embedded user credentials/userinfo."
+        raise ValueError(message)
+    if parsed.query:
+        message = "Odoo RPC URL must not contain query parameters."
+        raise ValueError(message)
+    if parsed.fragment:
+        message = "Odoo RPC URL must not contain URL fragments."
+        raise ValueError(message)
+
+    is_loopback = _is_loopback_host(parsed.hostname)
+    if parsed.scheme == "http" and not is_loopback:
+        message = (
+            "Plaintext HTTP is only permitted for loopback endpoints (127.0.0.1, localhost, ::1); "
+            + "remote connections must use HTTPS."
+        )
+        raise ValueError(message)
+    if not verify_ssl and not is_loopback:
+        message = (
+            "Disabling SSL verification (--insecure / verify_ssl=False) is only permitted for loopback endpoints "
+            + "(127.0.0.1, localhost, ::1); remote connections must verify TLS certificates."
+        )
+        raise ValueError(message)
+
+    norm_url = raw_url.rstrip("/")
+    if not norm_url.endswith("/jsonrpc"):
+        norm_url = f"{norm_url}/jsonrpc"
+    return norm_url
+
+
+def _check_positive_id(val: object, label: str) -> int:
+    """Validate that a value is a strictly positive non-boolean integer."""
+    if isinstance(val, bool) or not isinstance(val, int) or val <= 0:
+        message = f"Invalid {label}: ID must be a positive non-boolean integer (> 0), got {val!r}."
+        raise ValueError(message)
+    return val
+
+
+def _validate_id_list(ids: list[int], label: str = "IDs") -> list[int]:
+    """Ensure list of IDs is non-empty and contains only positive non-bool ints."""
+    if not isinstance(ids, list) or not ids:
+        message = (
+            f"Invalid {label}: ID list must be a non-empty list of positive integers."
+        )
+        raise ValueError(message)
+    return [_check_positive_id(item, f"{label} item") for item in ids]
 
 
 def parse_env_file(path: Path) -> bool:
@@ -100,7 +199,7 @@ def parse_env_file(path: Path) -> bool:
         key, value = text.split("=", 1)
         key = key.strip()
         value = value.strip()
-        if not key:
+        if not key or not key.isidentifier():
             continue
         if (
             len(value) >= _MIN_QUOTED_LENGTH
@@ -113,25 +212,18 @@ def parse_env_file(path: Path) -> bool:
 
 
 def load_env(env_file: Path | str | None = None) -> None:
-    """Auto-discover and load .env configuration."""
-    candidates: list[Path] = []
-    if env_file:
-        candidates.append(Path(env_file).expanduser())
-    if os.environ.get("ODOO_ENV_FILE"):
-        candidates.append(Path(os.environ["ODOO_ENV_FILE"]).expanduser())
+    """Load explicit .env configuration file with strict fail-closed semantics."""
+    target_path_str = env_file or os.environ.get("ODOO_ENV_FILE")
+    if not target_path_str:
+        return
 
-    skill_root = Path(__file__).resolve().parents[1]
-    candidates.append(skill_root / ".env")
-
-    # Upward search for nearest ancestor skills/odoo-ops/.env
-    here = Path.cwd().resolve()
-    for directory in (here, *here.parents):
-        candidate = directory / "skills" / "odoo-ops" / ".env"
-        candidates.append(candidate)
-
-    for candidate in candidates:
-        if candidate.is_file() and parse_env_file(candidate):
-            break
+    path = Path(target_path_str).expanduser()
+    if not path.is_file():
+        message = f"Explicit .env file not found or unreadable: {path}"
+        raise FileNotFoundError(message)
+    if not parse_env_file(path):
+        message = f"Failed to parse explicit .env file: {path}"
+        raise ValueError(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,17 +248,17 @@ class OdooRpcConfig:
         verify_ssl: bool | None = None,
     ) -> OdooRpcConfig:
         """Resolve and validate configuration from CLI arguments and environment."""
-        resolved_url = _require_field("Odoo RPC URL", url, "ODOO_RPC_URL", "--url")
-        if not resolved_url.endswith("/jsonrpc"):
-            resolved_url = f"{resolved_url.rstrip('/')}/jsonrpc"
+        raw_url = _require_field("Odoo RPC URL", url, "ODOO_RPC_URL", "--url")
+        resolved_ssl = _resolve_verify_ssl(verify_ssl)
+        validated_url = _validate_url(raw_url, verify_ssl=resolved_ssl)
         return cls(
-            url=resolved_url,
+            url=validated_url,
             database=_require_field(
                 "Odoo RPC database", database, "ODOO_RPC_DB", "--db"
             ),
             user=_require_field("Odoo RPC user", user, "ODOO_RPC_USER", "--user"),
             token=_resolve_token(token, token_path),
-            verify_ssl=_resolve_verify_ssl(verify_ssl),
+            verify_ssl=resolved_ssl,
         )
 
 
@@ -183,32 +275,33 @@ def _require_field(label: str, flag: str | None, env_name: str, cli: str) -> str
 
 
 def _resolve_token(token: str | None, token_path: Path | str | None) -> str:
-    """Resolve the API token from a flag, environment, or token files."""
-    resolved = token or os.environ.get("ODOO_RPC_TOKEN")
-    if not resolved:
-        candidate_token_paths: list[Path] = []
-        if token_path:
-            candidate_token_paths.append(Path(token_path).expanduser())
-        if os.environ.get("ODOO_RPC_TOKEN_PATH"):
-            candidate_token_paths.append(
-                Path(os.environ["ODOO_RPC_TOKEN_PATH"]).expanduser()
-            )
-        candidate_token_paths.append(Path("~/.erp-token").expanduser())
-        for path in candidate_token_paths:
-            if path.is_file():
-                try:
-                    resolved = path.read_text(encoding="utf-8").strip()
-                    if resolved:
-                        break
-                except OSError:
-                    continue
-    if not resolved:
-        message = (
-            "Missing Odoo RPC token. Specify ODOO_RPC_TOKEN, "
-            + "provide ODOO_RPC_TOKEN_PATH, or pass --token / --token-path."
-        )
-        raise ValueError(message)
-    return resolved
+    """Resolve the API token from a flag, environment, or explicit token file."""
+    if token:
+        return token
+    if os.environ.get("ODOO_RPC_TOKEN"):
+        return os.environ["ODOO_RPC_TOKEN"]
+
+    target_token_path = token_path or os.environ.get("ODOO_RPC_TOKEN_PATH")
+    if target_token_path:
+        path = Path(target_token_path).expanduser()
+        if not path.is_file():
+            message = f"Explicit token file not found or unreadable: {path}"
+            raise FileNotFoundError(message)
+        try:
+            resolved = path.read_text(encoding="utf-8").strip()
+        except OSError as e:
+            message = f"Cannot read token file: {path}"
+            raise OSError(message) from e
+        else:
+            if not resolved:
+                message = f"Token file is empty: {path}"
+                raise ValueError(message)
+            return resolved
+    message = (
+        "Missing Odoo RPC token. Specify ODOO_RPC_TOKEN, "
+        + "provide ODOO_RPC_TOKEN_PATH, or pass --token / --token-path."
+    )
+    raise ValueError(message)
 
 
 def _resolve_verify_ssl(verify_ssl: bool | None) -> bool:
@@ -224,10 +317,66 @@ def json_rpc(
     service: str,
     method: str,
     *args: JsonValue,
+    allow_rpc: bool = False,
+    allow_write: bool = False,
     verify_ssl: bool = True,
     timeout: float = 30.0,
 ) -> JsonValue:
-    """Execute a single JSON-RPC 2.0 call against Odoo."""
+    """Execute a single JSON-RPC 2.0 call against Odoo.
+
+    Requires explicit per-invocation consent via allow_rpc=True.
+    Enforces service allowlists and method permissions at the transport boundary.
+    """
+    if not allow_rpc:
+        message = (
+            "RPC BLOCKED: Network JSON-RPC calls require explicit authorization. "
+            + "Pass allow_rpc=True (or --allow-rpc on the CLI) to proceed."
+        )
+        raise PermissionError(message)
+
+    validated_url = _validate_url(url, verify_ssl=verify_ssl)
+
+    if service == "common":
+        if method != "authenticate":
+            message = (
+                f"METHOD FORBIDDEN: common method '{method}' is forbidden; "
+                + "only common.authenticate is permitted."
+            )
+            raise PermissionError(message)
+    elif service == "object":
+        if method != "execute_kw":
+            message = (
+                f"METHOD FORBIDDEN: object method '{method}' is forbidden; "
+                + "only object.execute_kw is permitted."
+            )
+            raise PermissionError(message)
+        # Check inner method: args are (db, uid, password, model, inner_method, inner_args, inner_kwargs)
+        if len(args) < 5 or not isinstance(args[4], str):
+            message = (
+                "Malformed execute_kw payload: inner method name missing or invalid."
+            )
+            raise PermissionError(message)
+        inner_method = args[4]
+        if inner_method in READONLY_ALLOWLIST:
+            pass
+        elif inner_method in MUTATION_ALLOWLIST:
+            if not allow_write:
+                message = (
+                    f"MUTATION BLOCKED: Method '{inner_method}' modifies data "
+                    + "but allow_write=False was specified."
+                )
+                raise PermissionError(message)
+        else:
+            message = (
+                f"METHOD FORBIDDEN: Method '{inner_method}' is neither in the safe "
+                + "allowlist nor the mutation allowlist: "
+                + f"{sorted(READONLY_ALLOWLIST | MUTATION_ALLOWLIST)}"
+            )
+            raise PermissionError(message)
+    else:
+        message = f"SERVICE FORBIDDEN: JSON-RPC service '{service}' is forbidden."
+        raise PermissionError(message)
+
     payload = {
         "jsonrpc": "2.0",
         "method": "call",
@@ -257,8 +406,8 @@ def json_rpc(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
-    req = urllib.request.Request(  # noqa: S310 - the skill is an Odoo RPC client; the URL comes from validated OdooRpcConfig
-        url,
+    req = urllib.request.Request(  # noqa: S310 - validated_url is strictly checked by _validate_url
+        validated_url,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
@@ -266,46 +415,67 @@ def json_rpc(
         },
     )
 
+    opener = urllib.request.build_opener(
+        _NoRedirectHandler(),
+        urllib.request.HTTPSHandler(context=ctx),
+        urllib.request.HTTPHandler(),
+    )
+
     try:
-        with urllib.request.urlopen(  # noqa: S310 - the skill is an Odoo RPC client; the URL comes from validated OdooRpcConfig
-            req, context=ctx, timeout=timeout
-        ) as raw_resp:  # pyright: ignore[reportAny] - typeshed types urlopen() as Any; narrowed to HTTPResponse on the next line
+        with opener.open(  # noqa: S310 - validated_url is strictly checked by _validate_url
+            req, timeout=timeout
+        ) as raw_resp:  # pyright: ignore[reportAny] - typeshed types open() as Any; narrowed to HTTPResponse on the next line
             resp = cast("http.client.HTTPResponse", raw_resp)
             raw = resp.read().decode("utf-8")
             decoded = cast("object", json.loads(raw))
             if not isinstance(decoded, dict):
-                message = f"Unexpected JSON-RPC response: {raw!r}"
+                message = "Unexpected JSON-RPC response format from server."
                 raise TypeError(message)
             res = cast("dict[object, object]", decoded)
             if "error" in res:
-                failure = f"Odoo RPC Error: {res['error']}"
+                err_dict = res["error"] if isinstance(res["error"], dict) else {}
+                raw_code = err_dict.get("code")
+                err_code = (
+                    raw_code
+                    if isinstance(raw_code, int) and not isinstance(raw_code, bool)
+                    else "unknown"
+                )
+                failure = f"Odoo RPC server error (code {err_code})"
                 raise RuntimeError(failure)
             return cast("JsonValue", res.get("result"))
     except urllib.error.HTTPError as e:
-        error_body = ""
-        try:
-            error_body = e.read().decode("utf-8", errors="replace")
-        except (OSError, UnicodeDecodeError):
-            error_body = "<unreadable>"
-        http_failure = f"HTTP {e.code}: {e.reason} ({error_body})"
-        raise RuntimeError(http_failure) from e
-    except urllib.error.URLError as e:
-        connection_failure = f"Failed to connect to {url}: {e.reason}"
-        raise ConnectionError(connection_failure) from e
+        http_failure = f"HTTP {e.code} error from server"
+        raise RuntimeError(http_failure) from None
+    except urllib.error.URLError:
+        connection_failure = "Failed to connect to RPC endpoint"
+        raise ConnectionError(connection_failure) from None
 
 
 class OdooRpcClient:
-    """Client providing safe querying and guarded mutations on Odoo via JSON-RPC."""
+    """Client providing safe querying and guarded mutations on Odoo via JSON-RPC.
+
+    Note: Client-side method allowlists do not guarantee server-side read-only transactions,
+    as custom server-side method implementations or hooks could perform mutations.
+    Explicit authorization (--allow-rpc and --write) attests user permission.
+    """
 
     def __init__(
         self,
         config: OdooRpcConfig | None = None,
         *,
+        allow_rpc: bool = False,
         allow_write: bool = False,
     ) -> None:
-        """Build a client with an explicit config or environment defaults."""
-        self.config: OdooRpcConfig = config or OdooRpcConfig.from_env()
+        """Build a client with explicit RPC consent and optional mutation permissions."""
+        if not allow_rpc:
+            message = (
+                "RPC BLOCKED: OdooRpcClient requires explicit authorization. "
+                + "Pass allow_rpc=True (or --allow-rpc on the CLI) to proceed."
+            )
+            raise PermissionError(message)
+        self.allow_rpc: bool = allow_rpc
         self.allow_write: bool = allow_write
+        self.config: OdooRpcConfig = config or OdooRpcConfig.from_env()
         self._uid: int | None = None
 
     @property
@@ -320,9 +490,11 @@ class OdooRpcClient:
                 self.config.user,
                 self.config.token,
                 {},
+                allow_rpc=self.allow_rpc,
+                allow_write=self.allow_write,
                 verify_ssl=self.config.verify_ssl,
             )
-            if not res or not isinstance(res, int):
+            if not res or not isinstance(res, int) or isinstance(res, bool):
                 auth_failure = (
                     f"Authentication failed at {self.config.url} "
                     + f"for user {self.config.user}"
@@ -339,8 +511,15 @@ class OdooRpcClient:
         kwargs: JsonObject | None = None,
     ) -> JsonValue:
         """Execute a model method after checking method permission policies."""
+        if not isinstance(model, str) or not model.strip():
+            message = "Model name must be a non-empty string."
+            raise ValueError(message)
+        if not all(c.isalnum() or c in "._" for c in model):
+            message = f"Invalid model name: {model!r}"
+            raise ValueError(message)
+
         if method in READONLY_ALLOWLIST:
-            # Safe read-only / introspection methods are always allowed
+            # Safe read-only / introspection methods are allowed without --write
             pass
         elif method in MUTATION_ALLOWLIST:
             if not self.allow_write:
@@ -369,6 +548,8 @@ class OdooRpcClient:
             method,
             args or [],
             kwargs or {},
+            allow_rpc=self.allow_rpc,
+            allow_write=self.allow_write,
             verify_ssl=self.config.verify_ssl,
         )
 
@@ -407,10 +588,11 @@ class OdooRpcClient:
         fields: list[str] | None = None,
     ) -> list[JsonRecord]:
         """Read field values for record ids."""
+        valid_ids = _validate_id_list(ids, "ids")
         kwargs: JsonObject = {"fields": cast("JsonValue", fields)} if fields else {}
         return cast(
             "list[JsonRecord]",
-            self.execute(model, "read", [cast("JsonValue", ids)], kwargs),
+            self.execute(model, "read", [cast("JsonValue", valid_ids)], kwargs),
         )
 
     def fields_get(
@@ -435,7 +617,7 @@ class OdooRpcClient:
         """Inspect a rendered view architecture."""
         kwargs: JsonObject = {"view_type": view_type}
         if view_id is not None:
-            kwargs["view_id"] = view_id
+            kwargs["view_id"] = _check_positive_id(view_id, "view_id")
         return cast("JsonObject", self.execute(model, "get_view", [], kwargs))
 
     def get_views(
@@ -463,9 +645,10 @@ class OdooRpcClient:
         ids: list[int],
     ) -> list[JsonRecord]:
         """Fetch record metadata for ids."""
+        valid_ids = _validate_id_list(ids, "ids")
         return cast(
             "list[JsonRecord]",
-            self.execute(model, "get_metadata", [cast("JsonValue", ids)]),
+            self.execute(model, "get_metadata", [cast("JsonValue", valid_ids)]),
         )
 
     def get_external_id(
@@ -474,9 +657,10 @@ class OdooRpcClient:
         ids: list[int],
     ) -> dict[int, str]:
         """Fetch XML external ids for record ids."""
+        valid_ids = _validate_id_list(ids, "ids")
         return cast(
             "dict[int, str]",
-            self.execute(model, "get_external_id", [cast("JsonValue", ids)]),
+            self.execute(model, "get_external_id", [cast("JsonValue", valid_ids)]),
         )
 
     def default_get(
@@ -514,25 +698,7 @@ class OdooRpcClient:
         """Check whether the current user has a group."""
         return cast("bool", self.execute("res.users", "user_has_groups", [groups]))
 
-    def onchange(
-        self,
-        model: str,
-        ids: list[int],
-        values: JsonObject,
-        field_name: str,
-        field_onchange: JsonObject,
-    ) -> JsonObject:
-        """Simulate an onchange for a field."""
-        return cast(
-            "JsonObject",
-            self.execute(
-                model,
-                "onchange",
-                [cast("JsonValue", ids), values, field_name, field_onchange],
-            ),
-        )
-
-    # --- State Mutation Operations (Guarded by --write) ---
+    # --- State Mutation Operations (Guarded by --write / allow_write=True) ---
 
     def create(
         self,
@@ -551,9 +717,13 @@ class OdooRpcClient:
         vals: JsonObject,
     ) -> bool:
         """Update records with field values."""
+        valid_ids = _validate_id_list(ids, "ids")
+        if not isinstance(vals, dict) or not vals:
+            message = "vals must be a non-empty dictionary of field updates."
+            raise ValueError(message)
         return cast(
             "bool",
-            self.execute(model, "write", [cast("JsonValue", ids), vals]),
+            self.execute(model, "write", [cast("JsonValue", valid_ids), vals]),
         )
 
     def unlink(
@@ -562,7 +732,10 @@ class OdooRpcClient:
         ids: list[int],
     ) -> bool:
         """Delete records by id."""
-        return cast("bool", self.execute(model, "unlink", [cast("JsonValue", ids)]))
+        valid_ids = _validate_id_list(ids, "ids")
+        return cast(
+            "bool", self.execute(model, "unlink", [cast("JsonValue", valid_ids)])
+        )
 
     def copy(
         self,
@@ -571,8 +744,9 @@ class OdooRpcClient:
         default: JsonObject | None = None,
     ) -> int:
         """Duplicate a record with optional default overrides."""
+        valid_id = _check_positive_id(record_id, "record_id")
         kwargs: JsonObject = {"default": default} if default else {}
-        return cast("int", self.execute(model, "copy", [record_id], kwargs))
+        return cast("int", self.execute(model, "copy", [valid_id], kwargs))
 
     def action_archive(
         self,
@@ -580,8 +754,10 @@ class OdooRpcClient:
         ids: list[int],
     ) -> bool:
         """Archive records by id."""
+        valid_ids = _validate_id_list(ids, "ids")
         return cast(
-            "bool", self.execute(model, "action_archive", [cast("JsonValue", ids)])
+            "bool",
+            self.execute(model, "action_archive", [cast("JsonValue", valid_ids)]),
         )
 
     def action_unarchive(
@@ -590,8 +766,10 @@ class OdooRpcClient:
         ids: list[int],
     ) -> bool:
         """Unarchive records by id."""
+        valid_ids = _validate_id_list(ids, "ids")
         return cast(
-            "bool", self.execute(model, "action_unarchive", [cast("JsonValue", ids)])
+            "bool",
+            self.execute(model, "action_unarchive", [cast("JsonValue", valid_ids)]),
         )
 
     def toggle_active(
@@ -600,13 +778,11 @@ class OdooRpcClient:
         ids: list[int],
     ) -> bool:
         """Toggle the active flag on records."""
+        valid_ids = _validate_id_list(ids, "ids")
         return cast(
-            "bool", self.execute(model, "toggle_active", [cast("JsonValue", ids)])
+            "bool",
+            self.execute(model, "toggle_active", [cast("JsonValue", valid_ids)]),
         )
-
-
-# Backward-compatible alias
-OdooReadOnlyClient = OdooRpcClient
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -615,14 +791,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="Odoo JSON-RPC Client (Safe Querying & Guarded Mutations)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    # Global connection & execution overrides
+    # Global consent & connection overrides
+    _ = parser.add_argument(
+        "--allow-rpc",
+        action="store_true",
+        help="Acknowledge and authorize live network JSON-RPC calls (required)",
+    )
     _ = parser.add_argument("--url", help="Odoo JSON-RPC endpoint URL")
     _ = parser.add_argument("--db", help="Odoo database name")
     _ = parser.add_argument("--user", help="Odoo user login")
     _ = parser.add_argument("--token", help="Odoo API token or password")
     _ = parser.add_argument("--token-path", help="Path to token file")
     _ = parser.add_argument(
-        "--insecure", action="store_true", help="Disable SSL certificate verification"
+        "--insecure",
+        action="store_true",
+        help="Disable SSL certificate verification (loopback only)",
     )
     _ = parser.add_argument(
         "--env-file", help="Path to specific .env configuration file"
@@ -667,19 +850,27 @@ def _add_query_parsers(
     count_parser = add_parser("count", help="Count matching records")
     _ = count_parser.add_argument("model", help="Model name")
     _ = count_parser.add_argument(
-        "domain", nargs="?", default="[]", help="Domain as JSON array"
+        "domain",
+        nargs="?",
+        default="[]",
+        help="Domain as JSON array",
     )
 
     read_parser = add_parser("read", help="Read records by ID")
     _ = read_parser.add_argument("model", help="Model name")
     _ = read_parser.add_argument(
-        "ids", help="Record IDs as JSON array (e.g. '[1, 2, 3]')"
+        "ids", help='Record IDs as JSON array (e.g. "[1, 2, 3]")'
     )
     _ = read_parser.add_argument(
         "--fields", nargs="*", default=None, help="Field names to retrieve"
     )
 
-    fg_parser = add_parser("fields_get", help="Inspect model fields definition")
+
+def _add_introspection_parsers(
+    add_parser: Callable[..., argparse.ArgumentParser],
+) -> None:
+    """Register safe-introspection subcommands."""
+    fg_parser = add_parser("fields_get", help="Inspect Model fields definition")
     _ = fg_parser.add_argument("model", help="Model name")
     _ = fg_parser.add_argument(
         "--fields", nargs="*", default=None, help="Specific fields to inspect"
@@ -691,24 +882,24 @@ def _add_query_parsers(
         "--view-id", type=int, default=None, help="Specific view ID"
     )
     _ = gv_parser.add_argument(
-        "--view-type", default="form", help="View type (form, list/tree, search)"
+        "--view-type",
+        default="form",
+        help="View type (form, list/tree, search)",
     )
 
-
-def _add_introspection_parsers(
-    add_parser: Callable[..., argparse.ArgumentParser],
-) -> None:
-    """Register safe-introspection subcommands."""
-    # --- Safe Introspection Commands ---
     meta_parser = add_parser(
         "metadata", help="Get record metadata (create_date, write_date, XML IDs)"
     )
     _ = meta_parser.add_argument("model", help="Model name")
-    _ = meta_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
+    _ = meta_parser.add_argument(
+        "ids", help='Record IDs as JSON array (e.g. "[1, 2, 3]")'
+    )
 
     ext_parser = add_parser("external_id", help="Retrieve XML External IDs for records")
     _ = ext_parser.add_argument("model", help="Model name")
-    _ = ext_parser.add_argument("ids", help="Record IDs as JSON array (e.g. '[1, 2]')")
+    _ = ext_parser.add_argument(
+        "ids", help='Record IDs as JSON array (e.g. "[1, 2, 3]")'
+    )
 
     def_parser = add_parser("default_get", help="Retrieve default values for fields")
     _ = def_parser.add_argument("model", help="Model name")
@@ -716,10 +907,12 @@ def _add_introspection_parsers(
         "fields", nargs="+", help="Field names to inspect default values for"
     )
 
-    access_parser = add_parser("check_access", help="Check model access rights")
+    access_parser = add_parser("check_access", help="Check Model access rights")
     _ = access_parser.add_argument("model", help="Model name")
     _ = access_parser.add_argument(
-        "--operation", default="read", choices=["read", "write", "create", "unlink"]
+        "operation",
+        default="read",
+        choices=["read", "write", "create", "unlink"],
     )
 
     group_parser = add_parser("user_has_groups", help="Check if current user has group")
@@ -732,7 +925,6 @@ def _add_mutation_parsers(
     add_parser: Callable[..., argparse.ArgumentParser],
 ) -> None:
     """Register guarded state-mutation subcommands."""
-    # --- State Mutation Commands (Require --write) ---
     create_parser = add_parser("create", help="Create new record(s) (requires --write)")
     _ = create_parser.add_argument("model", help="Model name")
     _ = create_parser.add_argument(
@@ -744,7 +936,7 @@ def _add_mutation_parsers(
     )
     _ = update_parser.add_argument("model", help="Model name")
     _ = update_parser.add_argument(
-        "ids", help="Record IDs as JSON array (e.g. '[1, 2]')"
+        "ids", help='Record IDs as JSON array (e.g. "[1, 2, 3]")'
     )
     _ = update_parser.add_argument(
         "values", help="Field values to update as JSON object"
@@ -755,7 +947,7 @@ def _add_mutation_parsers(
     )
     _ = unlink_parser.add_argument("model", help="Model name")
     _ = unlink_parser.add_argument(
-        "ids", help="Record IDs as JSON array (e.g. '[1, 2]')"
+        "ids", help='Record IDs as JSON array (e.g. "[1, 2, 3]")'
     )
 
     copy_parser = add_parser("copy", help="Duplicate a record (requires --write)")
@@ -769,18 +961,18 @@ def _add_mutation_parsers(
         "archive", help="Archive records by setting active=False (requires --write)"
     )
     _ = archive_parser.add_argument("model", help="Model name")
-    _ = archive_parser.add_argument("ids", help="Record IDs as JSON array")
+    _ = archive_parser.add_argument("ids", help="Record IDs as JSON array)")
 
     unarchive_parser = add_parser(
         "unarchive", help="Unarchive records by setting active=True (requires --write)"
     )
     _ = unarchive_parser.add_argument("model", help="Model name")
-    _ = unarchive_parser.add_argument("ids", help="Record IDs as JSON array")
+    _ = unarchive_parser.add_argument("ids", help="Record IDs as JSON array)")
 
 
 def _optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Narrow an optional string flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = cast("object", getattr(args, field, None))
     return value if isinstance(value, str) else None
 
 
@@ -850,36 +1042,66 @@ def _json_object_arg(text: str, label: str) -> JsonObject:
 
 
 def _json_vals(text: str, label: str) -> JsonObject | list[JsonRecord]:
-    """Parse a CLI JSON argument that may be an object or an array of objects."""
+    """Parse a CLI JSON argument that may be an object or a non-empty array of objects."""
     try:
         value = cast("object", json.loads(text))
     except json.JSONDecodeError as exc:
         message = f"Invalid {label} JSON: {exc}."
         raise ValueError(message) from exc
     if isinstance(value, dict):
+        if not all(isinstance(k, str) for k in value):
+            message = f"Invalid {label} JSON: keys must be strings."
+            raise TypeError(message)
         return cast("JsonObject", value)
-    if isinstance(value, list):
-        items = cast("list[object]", value)
-        return [cast("JsonRecord", item) for item in items]
-    message = f"Invalid {label} JSON: expected an object or an array."
+    if isinstance(value, list) and value:
+        for idx, item in enumerate(value):
+            if not isinstance(item, dict) or not all(isinstance(k, str) for k in item):
+                message = (
+                    f"Invalid {label} JSON item at index {idx}: "
+                    + "expected an object with string keys."
+                )
+                raise TypeError(message)
+        return cast("list[JsonRecord]", value)
+    message = (
+        f"Invalid {label} JSON: expected an object or a non-empty array of objects."
+    )
     raise TypeError(message)
 
 
 def _id_list(text: str, label: str) -> list[int]:
-    """Parse a CLI JSON-array-of-ids argument."""
-    return [cast("int", item) for item in _json_list(text, label)]
+    """Parse a CLI JSON-array-of-ids argument with strict positive integer checks."""
+    raw_list = _json_list(text, label)
+    if not raw_list:
+        message = f"Invalid {label}: ID list must not be empty."
+        raise ValueError(message)
+    return [_check_positive_id(item, f"{label} item") for item in raw_list]
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the Odoo RPC command-line interface."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    load_env(_optional_str(args, "env_file"))
+    if not _optional_flag(args, "allow_rpc"):
+        _ = sys.stderr.write(
+            "RPC BLOCKED: Network RPC access requires explicit authorization. "
+            + "Pass --allow-rpc to proceed.\n"
+        )
+        return 1
+
     command = _required_str(args, "command")
     if command not in _ALL_COMMANDS:
         _ = sys.stderr.write(f"Error: Unknown command: {command}.\n")
         return 1
+
+    if command in _MUTATION_COMMANDS and not _optional_flag(args, "write"):
+        _ = sys.stderr.write(
+            f"MUTATION BLOCKED: Command '{command}' modifies data "
+            + "but --write was not specified. Pass --write to authorize state mutations.\n"
+        )
+        return 1
+
     try:
+        load_env(_optional_str(args, "env_file"))
         config = OdooRpcConfig.from_env(
             url=_optional_str(args, "url"),
             database=_optional_str(args, "db"),
@@ -888,7 +1110,11 @@ def main(argv: list[str] | None = None) -> int:
             token_path=_optional_str(args, "token_path"),
             verify_ssl=False if _optional_flag(args, "insecure") else None,
         )
-        client = OdooRpcClient(config, allow_write=_optional_flag(args, "write"))
+        client = OdooRpcClient(
+            config,
+            allow_rpc=True,
+            allow_write=_optional_flag(args, "write"),
+        )
         if command in _READ_COMMANDS:
             _run_read_commands(client, args, command)
         elif command in _INSPECTION_COMMANDS:
@@ -901,6 +1127,8 @@ def main(argv: list[str] | None = None) -> int:
         RuntimeError,
         PermissionError,
         ConnectionError,
+        FileNotFoundError,
+        OSError,
         json.JSONDecodeError,
     ) as exc:
         _ = sys.stderr.write(f"Error: {exc}\n")
