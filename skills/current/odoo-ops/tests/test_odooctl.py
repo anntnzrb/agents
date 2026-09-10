@@ -253,6 +253,161 @@ class TestCmdTestLifecycle:
             assert json_payload["exit_code"] == 0
 
 
+class TestCmdLint:
+    """Tests for cmd_lint integrating Ruff and XML view linter."""
+
+    def test_cmd_lint_success_on_clean_module(self) -> None:
+        """Verify cmd_lint returns 0 when both Ruff and XML view linter pass."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mod_dir = tmp_path / "mock_mod"
+            views_dir = mod_dir / "views"
+            views_dir.mkdir(parents=True)
+            xml_file = views_dir / "clean_view.xml"
+            xml_file.write_text(
+                """<odoo>
+                    <record id="clean_view" model="ir.ui.view">
+                        <field name="arch" type="xml">
+                            <tree string="Clean">
+                                <field name="name"/>
+                            </tree>
+                        </field>
+                    </record>
+                </odoo>""",
+                encoding="utf-8",
+            )
+            ctx = make_workspace_context(tmp_path)
+            args = argparse.Namespace(
+                target="mock_mod",
+                profile="etech",
+                fix=False,
+                json=False,
+                strict=False,
+                skip_views=False,
+            )
+            mock_proc = MagicMock(returncode=0)
+            with (
+                patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+                patch.object(odooctl, "_resolve_target_paths", return_value=[mod_dir]),
+                patch("subprocess.run", return_value=mock_proc),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                code = odooctl.cmd_lint(args)
+
+            assert code == 0
+            assert "XML View Linter" in stdout.getvalue()
+
+    def test_cmd_lint_fails_on_xml_critical_violation(self) -> None:
+        """Verify cmd_lint returns 1 when XML view has critical violations even if Ruff returns 0."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mod_dir = tmp_path / "mock_mod"
+            views_dir = mod_dir / "views"
+            views_dir.mkdir(parents=True)
+            xml_file = views_dir / "bad_view.xml"
+            xml_file.write_text(
+                """<odoo>
+                    <record id="bad_view" model="ir.ui.view">
+                        <field name="arch" type="xml">
+                            <form string="Legacy">
+                                <field name="name" attrs="{'invisible': [('state', '=', 'draft')]}"/>
+                            </form>
+                        </field>
+                    </record>
+                </odoo>""",
+                encoding="utf-8",
+            )
+            ctx = make_workspace_context(tmp_path)
+            args = argparse.Namespace(
+                target="mock_mod",
+                profile="etech",
+                fix=False,
+                json=False,
+                strict=False,
+                skip_views=False,
+            )
+            mock_proc = MagicMock(returncode=0)
+            with (
+                patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+                patch.object(odooctl, "_resolve_target_paths", return_value=[mod_dir]),
+                patch("subprocess.run", return_value=mock_proc),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                code = odooctl.cmd_lint(args)
+
+            assert code == 1
+            assert "ODOO_XML_001" in stdout.getvalue()
+
+    def test_cmd_lint_skip_views(self) -> None:
+        """Verify cmd_lint with --skip-views only runs Ruff and ignores XML files."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mod_dir = tmp_path / "mock_mod"
+            mod_dir.mkdir(parents=True)
+            args = argparse.Namespace(
+                target="mock_mod",
+                profile="etech",
+                fix=False,
+                json=False,
+                strict=False,
+                skip_views=True,
+            )
+            mock_proc = MagicMock(returncode=0)
+            with (
+                patch.object(odooctl, "_resolve_target_paths", return_value=[mod_dir]),
+                patch("subprocess.run", return_value=mock_proc),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                code = odooctl.cmd_lint(args)
+
+            assert code == 0
+            assert "XML View Linter" not in stdout.getvalue()
+
+    def test_cmd_lint_json_mode(self) -> None:
+        """Verify cmd_lint with --json outputs combined python and view violations."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mod_dir = tmp_path / "mock_mod"
+            views_dir = mod_dir / "views"
+            views_dir.mkdir(parents=True)
+            xml_file = views_dir / "clean_view.xml"
+            xml_file.write_text(
+                """<odoo>
+                    <record id="clean_view" model="ir.ui.view">
+                        <field name="arch" type="xml">
+                            <tree string="Clean">
+                                <field name="name"/>
+                            </tree>
+                        </field>
+                    </record>
+                </odoo>""",
+                encoding="utf-8",
+            )
+            ctx = make_workspace_context(tmp_path)
+            args = argparse.Namespace(
+                target="mock_mod",
+                profile="etech",
+                fix=False,
+                json=True,
+                strict=False,
+                skip_views=False,
+            )
+            mock_proc = MagicMock(returncode=0, stdout="[]")
+            with (
+                patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+                patch.object(odooctl, "_resolve_target_paths", return_value=[mod_dir]),
+                patch("subprocess.run", return_value=mock_proc),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                code = odooctl.cmd_lint(args)
+
+            assert code == 0
+            payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+            assert payload["success"] is True
+            assert payload["total_view_violations"] == 0
+            assert payload["total_python_violations"] == 0
+
+
 class TestStopAndDevLifecycle:
     """Tests for stack teardown and dev server lifecycle."""
 

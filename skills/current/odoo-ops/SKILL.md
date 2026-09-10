@@ -35,6 +35,7 @@ In examples below, `odoo-ops` means this exact command. Use `--help` for current
 | Local paths and database identity | [Runtime discovery](references/runtime-discovery.md) | Before local runtime or database operations |
 | Local SQL and cloning | [Database recipes](references/db-recipes.md) | Querying or rebuilding a replica |
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
+| XML view rules and AST linting | [XML view rules](references/xml-view-rules.md) | Auditing or fixing XML views and QWeb templates |
 | Command results | [Output contracts](references/output-contracts.md) | Interpreting inspection output |
 | Action selection | [Server Action capabilities](references/server-action-capabilities.md) | Choosing UI actions, automation, or addons |
 | Production action workflow | [Server Action playbook](references/server-action-playbook.md) | Preparing or executing production actions |

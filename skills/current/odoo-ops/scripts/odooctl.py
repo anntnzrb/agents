@@ -1394,11 +1394,13 @@ def cmd_test(args: argparse.Namespace) -> int:
 
 
 def cmd_lint(args: argparse.Namespace) -> int:
-    """Run Ruff linter on profile lint_modules or target."""
+    """Run Ruff Python and XML view linters on profile lint_modules or target."""
     target = _require_str(args, "target", "crm")
     profile = _require_str(args, "profile", "etech")
     fix = _require_bool(args, "fix")
     json_mode = _require_bool(args, "json")
+    strict = _require_bool(args, "strict")
+    skip_views = _require_bool(args, "skip_views")
     target_paths = _resolve_target_paths(target, profile, for_lint=True)
 
     cmd = ["uvx", "ruff", "check"]
@@ -1413,10 +1415,65 @@ def cmd_lint(args: argparse.Namespace) -> int:
 
     cmd.extend([str(p) for p in target_paths])
 
+    if skip_views:
+        proc = subprocess.run(  # noqa: S603 - controlled ruff execution
+            cmd, check=False
+        )
+        return proc.returncode
+
+    ctx = _resolve_workspace()
+    linter = xml_view_linter.OdooXmlViewLinter(root_path=ctx.root)
+    violations: list[xml_view_linter.ViewViolation] = []
+    for p in target_paths:
+        if p.is_file() and p.suffix.lower() == ".xml":
+            violations.extend(linter.lint_file(p))
+        elif p.is_dir():
+            violations.extend(linter.lint_module(p))
+
+    has_critical = any(
+        v["severity"] == xml_view_linter.Severity.CRITICAL.value for v in violations
+    )
+    has_warning = any(
+        v["severity"] == xml_view_linter.Severity.WARNING.value for v in violations
+    )
+    views_failed = has_critical or (strict and has_warning)
+
+    if json_mode:
+        proc = subprocess.run(  # noqa: S603 - controlled ruff execution
+            cmd, capture_output=True, text=True, check=False
+        )
+        try:
+            ruff_json = json.loads(proc.stdout) if proc.stdout.strip() else []
+        except Exception:
+            ruff_json = proc.stdout.strip()
+
+        combined_success = proc.returncode == 0 and not views_failed
+        combined_payload = {
+            "success": combined_success,
+            "ruff_exit_code": proc.returncode,
+            "python_violations": ruff_json,
+            "view_violations": violations,
+            "total_python_violations": len(ruff_json)
+            if isinstance(ruff_json, list)
+            else (1 if proc.returncode != 0 else 0),
+            "total_view_violations": len(violations),
+        }
+        print(json.dumps(combined_payload, indent=2))
+        return (
+            0 if combined_success else (proc.returncode if proc.returncode != 0 else 1)
+        )
+
     proc = subprocess.run(  # noqa: S603 - controlled ruff execution
         cmd, check=False
     )
-    return proc.returncode
+    print("\n--- Odoo 17 XML View Linter ---")
+    print(xml_view_linter.format_violations_human(violations))
+
+    if proc.returncode != 0:
+        return proc.returncode
+    if views_failed:
+        return 1
+    return 0
 
 
 def cmd_fmt(args: argparse.Namespace) -> int:
@@ -1846,7 +1903,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Lint Command
     p_lint = subparsers.add_parser(
-        "lint", parents=[parent_parser], help="Run Ruff linter on profile lint_modules"
+        "lint",
+        parents=[parent_parser],
+        help="Run Python (Ruff) and XML view linters on profile lint_modules",
     )
     _ = p_lint.add_argument(
         "target",
@@ -1855,9 +1914,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Module name or workflow profile key (default: crm)",
     )
     _ = p_lint.add_argument(
-        "--fix", action="store_true", help="Auto-fix safe lint violations"
+        "--fix", action="store_true", help="Auto-fix safe Python lint violations"
     )
-
+    _ = p_lint.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat XML view warnings as errors (exit code 1 on warnings)",
+    )
+    _ = p_lint.add_argument(
+        "--skip-views",
+        action="store_true",
+        help="Skip XML view linting and only run Ruff Python checks",
+    )
     # Fmt Command
     p_fmt = subparsers.add_parser(
         "fmt",
