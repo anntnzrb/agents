@@ -213,6 +213,31 @@ class TestXmlViewLinterRules:
         assert json_dict["success"] is True
         assert json_dict["total_violations"] == 0
 
+    def test_xxe_entities_disabled(
+        self, linter: OdooXmlViewLinter, tmp_path: Path
+    ) -> None:
+        """Verify external entities are not resolved or expanded."""
+        xml_file = tmp_path / "xxe.xml"
+        xml_file.write_text(
+            """<?xml version="1.0"?>
+            <!DOCTYPE foo [
+            <!ELEMENT foo ANY >
+            <!ENTITY xxe SYSTEM "file:///etc/passwd" >]>
+            <odoo>
+                <record id="test_xxe" model="ir.ui.view">
+                    <field name="arch" type="xml">
+                        <form string="&xxe;">
+                            <field name="name"/>
+                        </form>
+                    </field>
+                </record>
+            </odoo>""",
+            encoding="utf-8",
+        )
+        violations = linter.lint_file(xml_file)
+        # Either syntax error / entity resolution refusal or parsed without expanding entity
+        assert not any("root:x:0:0" in v.get("snippet", "") for v in violations)
+
 
 class TestLintViewsCli:
     """Test CLI dispatch of lint-views subcommand in odooctl."""

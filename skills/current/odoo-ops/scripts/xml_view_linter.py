@@ -146,7 +146,12 @@ class OdooXmlViewLinter:
 
         # 2. AST-based checks with lxml
         try:
-            parser = etree.XMLParser(recover=False, remove_blank_text=False)
+            parser = etree.XMLParser(
+                recover=False,
+                remove_blank_text=False,
+                resolve_entities=False,
+                no_network=True,
+            )
             tree = etree.fromstring(content_bytes, parser=parser)
         except etree.XMLSyntaxError as err:
             violations.append(
@@ -360,6 +365,7 @@ class OdooXmlViewLinter:
                         )
                 else:
                     seen_fields[field_name] = (line, field_node)
+
     def _check_unnamed_groups_and_pages(
         self, path: Path, tree: etree._Element, violations: list[ViewViolation]
     ) -> None:
