@@ -44,7 +44,7 @@ retry:
 
 advisor:
   enabled: true
-  syncBacklog: "off"
+  syncBacklog: "1"
   immuneTurns: 3
 
 prewalk:
