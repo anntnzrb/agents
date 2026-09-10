@@ -1,0 +1,16 @@
+{
+  "hosts": {
+    "oulu": {
+      "host": "oulu.trex-gamut.ts.net",
+      "username": "annt",
+      "port": 22,
+      "keyPath": "~/.ssh/beirut"
+    },
+    "munich": {
+      "host": "munich.trex-gamut.ts.net",
+      "username": "annt",
+      "port": 22,
+      "keyPath": "~/.ssh/beirut"
+    }
+  }
+}
