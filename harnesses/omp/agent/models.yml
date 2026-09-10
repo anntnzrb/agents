@@ -37,6 +37,16 @@ providers:
             - low
             - max
           defaultLevel: low
+      swe-2:
+        contextWindow: 262000 # 262K * 85% = 222.7K trigger, server-advertised window
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+            - high
+            - max
+          defaultLevel: max
+          requiresEffort: true
   cmd:
     baseUrl: https://api.commandcode.ai/provider/v1
     api: openai-completions
