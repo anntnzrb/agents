@@ -4,10 +4,12 @@
 
 Model = env['{{ model_name }}']
 DOMAIN = {{ domain_literal }}
-TO_UPDATE_DOMAIN = DOMAIN + [{{ extra_predicates }}]
 EXPECTED_TO_UPDATE = {{ expected_to_update }}
 MAX_RECORDS = {{ max_records }}
+TARGET_IDS = {{ target_ids_literal }}
+EXCLUDED_IDS = {{ excluded_ids_literal }}
 VALS = {{ vals_literal }}
+WRITE_APPROVED = False  # literal False; change to True only after human approval
 
 
 def esc(value):
@@ -19,19 +21,111 @@ def esc(value):
         return 'true'
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join([esc(v) for v in value]) + ']'
+    if isinstance(value, set):
+        return '[' + ','.join([esc(v) for v in sorted(value)]) + ']'
+    if isinstance(value, dict):
+        return '{' + ','.join([esc(str(k)) + ':' + esc(v) for k, v in value.items()]) + '}'
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(str(key)) + ':' + esc(value)
+
+
+def raw_pair(key, raw_json):
+    return esc(str(key)) + ':' + str(raw_json)
 
 
 def obj(items):
     return '{' + ','.join(items) + '}'
 
+
+if WRITE_APPROVED is not True:
+    payload = obj([
+        pair('error', 'write_not_approved'),
+        pair('message', 'WRITE_APPROVED must be explicitly set to True after human approval'),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+# Strict target ID validation before any querying:
+# require non-empty, unique, positive, non-bool integers matching expected count.
+if (
+    not isinstance(TARGET_IDS, (list, tuple, set))
+    or not TARGET_IDS
+    or any(isinstance(x, bool) or not isinstance(x, int) or x <= 0 for x in TARGET_IDS)
+):
+    payload = obj([
+        pair('error', 'invalid_target_ids'),
+        pair('message', 'TARGET_IDS must be a non-empty sequence of positive integers'),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+target_id_list = list(TARGET_IDS)
+target_id_set = set(target_id_list)
+if len(target_id_set) != len(target_id_list):
+    payload = obj([
+        pair('error', 'duplicate_target_ids'),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+if len(target_id_list) != EXPECTED_TO_UPDATE:
+    payload = obj([
+        pair('error', 'target_ids_count_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', len(target_id_list)),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+if EXPECTED_TO_UPDATE > MAX_RECORDS:
+    payload = obj([
+        pair('error', 'expected_count_exceeds_max_records'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('max_records', MAX_RECORDS),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+if EXCLUDED_IDS:
+    excluded_set = set(EXCLUDED_IDS)
+    if not target_id_set.isdisjoint(excluded_set):
+        payload = obj([
+            pair('error', 'target_and_excluded_ids_overlap'),
+            pair('overlap_ids', sorted(list(target_id_set & excluded_set))),
+            pair('write_executed', False),
+        ])
+        raise UserError(payload)
+
+TO_UPDATE_DOMAIN = list(DOMAIN) + [('id', 'in', target_id_list)] + [{{ extra_predicates }}]
+if EXCLUDED_IDS:
+    TO_UPDATE_DOMAIN.append(('id', 'not in', list(EXCLUDED_IDS)))
 
 pre_count = Model.search_count(TO_UPDATE_DOMAIN)
 if pre_count != EXPECTED_TO_UPDATE:
@@ -43,32 +137,48 @@ if pre_count != EXPECTED_TO_UPDATE:
     ])
     raise UserError(payload)
 
-records_to_update = Model.search(TO_UPDATE_DOMAIN, order='id asc', limit={{ max_records }})
+records_to_update = Model.search(TO_UPDATE_DOMAIN, order='id asc', limit=MAX_RECORDS + 1)
 if len(records_to_update) != EXPECTED_TO_UPDATE:
     payload = obj([
         pair('error', 'limit_or_search_mismatch'),
         pair('expected', EXPECTED_TO_UPDATE),
         pair('actual', len(records_to_update)),
+        pair('max_records', MAX_RECORDS),
         pair('write_executed', False),
     ])
     raise UserError(payload)
 
-records_to_update.write({{ vals_literal }})
-env.invalidate_all()
-remaining = Model.search_count(TO_UPDATE_DOMAIN)
-if remaining != 0:
+frozen_ids = records_to_update.ids
+if set(frozen_ids) != target_id_set:
     payload = obj([
-        pair('error', 'postcheck_remaining_rows'),
+        pair('error', 'target_ids_mismatch'),
+        pair('expected_ids', target_id_list),
+        pair('actual_ids', frozen_ids),
+        pair('write_executed', False),
+    ])
+    raise UserError(payload)
+
+records_to_update.write(VALS)
+env.invalidate_all()
+
+# Postcheck frozen candidate records rather than volatile live domain
+remaining_frozen = Model.search_count([('id', 'in', frozen_ids)] + TO_UPDATE_DOMAIN)
+if remaining_frozen != 0:
+    payload = obj([
+        pair('error', 'postcheck_remaining_frozen_rows'),
         pair('expected', 0),
-        pair('actual', remaining),
+        pair('actual', remaining_frozen),
         pair('write_executed', True),
     ])
     raise UserError(payload)
 
+live_remaining = Model.search_count(list(DOMAIN) + [{{ extra_predicates }}])
+
 payload = obj([
     pair('status', 'ok'),
-    pair('updated', EXPECTED_TO_UPDATE),
-    pair('remaining', remaining),
+    pair('updated', len(frozen_ids)),
+    pair('remaining_frozen', remaining_frozen),
+    pair('live_remaining', live_remaining),
     pair('write_executed', True),
 ])
 action = {

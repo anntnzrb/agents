@@ -1,5 +1,7 @@
 # Odoo Server Action safe_eval reference
 
+Read [Safety model](safety-model.md) before production interaction. `safe_eval` restricts Python operations; it is not a read-only or authorization boundary. A read-only snippet does not authorize creating or running a production Server Action.
+
 Sources:
 - Odoo docs `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
 - Odoo docs `https://www.odoo.com/documentation/17.0/applications/studio/automated_actions.html`
@@ -77,5 +79,6 @@ Odoo captures result through `action`: local `_run_action_code_multi` calls `saf
 ## Success/failure semantics
 
 - Read-only audit can `raise UserError(payload_json)`; no writes should commit.
+- Rollback covers the current database transaction, not external effects or separately committed work. Custom read overrides may still cause such effects.
 - Write success MUST set `action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'type': 'success', 'title': '...', 'message': payload, 'sticky': True}}`.
 - Write failure MUST `raise UserError(payload_json)` to abort and rollback.

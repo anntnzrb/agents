@@ -2,6 +2,16 @@
 
 Templates are starting points: copy to `<temp-dir>/<task>.py`, edit there, then use the platform clipboard command.
 
+Read [Safety model](safety-model.md) before production use. Render every placeholder and review the full result locally. Preparing or copying code is not permission to save or run it in production. Do not use templates to bypass JSON-RPC consent.
+
+Both write templates default to `WRITE_APPROVED = False`. Set it to `True` only after explicit approval of the rendered action, exact target IDs, values, and expected effects. Never substitute a matching count for target identity. Rehearse on the disposable replica with outbound integrations disabled.
+
+`target_ids_literal` contains the exact approved records, excluding `excluded_ids_literal`; write templates reject empty, duplicate, invalid, or overlapping targets. `expected_to_update` must match that ID set. A discovery dry-run may use empty targets to inspect a domain, but that result cannot authorize a write until exact IDs are captured and approved.
+
+The ORM template verifies that frozen targets no longer match the correction predicate. Supply predicates that express the defect, not just a broad selection. It does not replace task-specific value invariants or concurrency control.
+
+The final audit's `expected_distribution_literal` uses `{field_name: {group_key: count}}`, with native Python keys such as integer many-to-one IDs. The mapping must cover the configured grouping fields and all expected buckets. Use `{}` only when no distribution invariant is required.
+
 ## Templates
 
 Shared required placeholders; `model name`, `domain`, `expected counts`, `target ids`, `excluded ids`, `fields to update`, `final invariant checks`; apply to:

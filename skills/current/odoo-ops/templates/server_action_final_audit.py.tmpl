@@ -23,14 +23,43 @@ def esc(value):
         return 'true'
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join([esc(v) for v in value]) + ']'
+    if isinstance(value, set):
+        return '[' + ','.join([esc(v) for v in sorted(value)]) + ']'
+    if isinstance(value, dict):
+        return '{' + ','.join([esc(str(k)) + ':' + esc(v) for k, v in value.items()]) + '}'
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(str(key)) + ':' + esc(value)
+
+
+def raw_pair(key, raw_json):
+    return esc(str(key)) + ':' + str(raw_json)
 
 
 def obj(items):
@@ -44,21 +73,31 @@ def arr(values):
 def group_obj(row, group_field):
     group_value = row.get(group_field)
     return obj([
-        pair('key', group_value and group_value[0] or False),
-        pair('label', group_value and group_value[1] or False),
+        pair('key', group_value and (group_value[0] if isinstance(group_value, (list, tuple)) else group_value) or False),
+        pair('label', group_value and (group_value[1] if isinstance(group_value, (list, tuple)) else group_value) or False),
         pair('count', row.get(group_field + '_count') or row.get('__count') or 0),
     ])
 
 
-def groups_payload(domain):
+def groups_data(domain):
+    data = []
     chunks = []
     for group_field in GROUP_FIELDS[:3]:
         rows = Model.read_group(domain, ['id:count'], [group_field], lazy=False)
+        group_rows = []
+        field_data = {'field': group_field, 'counts': {}}
+        for row in rows:
+            group_value = row.get(group_field)
+            key = group_value and (group_value[0] if isinstance(group_value, (list, tuple)) else group_value) or False
+            count = row.get(group_field + '_count') or row.get('__count') or 0
+            field_data['counts'][key] = count
+            group_rows.append(group_obj(row, group_field))
+        data.append(field_data)
         chunks.append(obj([
             pair('field', group_field),
-            'rows:' + '[' + ','.join([group_obj(row, group_field) for row in rows]) + ']',
+            raw_pair('rows', '[' + ','.join(group_rows) + ']'),
         ]))
-    return '[' + ','.join(chunks) + ']'
+    return data, '[' + ','.join(chunks) + ']'
 
 
 total = Model.search_count(INDEPENDENT_DOMAIN)
@@ -71,8 +110,46 @@ if total != EXPECTED_TOTAL:
 if wrong_remaining != EXPECTED_WRONG_REMAINING:
     failures.append(obj([pair('check', 'wrong_remaining_rows'), pair('expected', 0), pair('actual', wrong_remaining)]))
 
-# Distribution/invariant placeholder: compare EXPECTED_DISTRIBUTION with groups_payload(INDEPENDENT_DOMAIN).
-distribution = groups_payload(INDEPENDENT_DOMAIN)
+actual_dist_data, distribution_json = groups_data(INDEPENDENT_DOMAIN)
+
+# Distribution validation: explicit schema {field: {key: count}}, compare full mappings
+if EXPECTED_DISTRIBUTION != {}:
+    if not isinstance(EXPECTED_DISTRIBUTION, dict):
+        failures.append(obj([
+            pair('check', 'expected_distribution_invalid_schema'),
+            pair('message', 'EXPECTED_DISTRIBUTION must be a dict of {field: {key: count}}'),
+        ]))
+    else:
+        actual_map = {d['field']: d['counts'] for d in actual_dist_data}
+        for exp_field, exp_buckets in EXPECTED_DISTRIBUTION.items():
+            if not isinstance(exp_buckets, dict):
+                failures.append(obj([
+                    pair('check', 'expected_distribution_invalid_buckets'),
+                    pair('field', exp_field),
+                    pair('message', 'buckets must be a dict of {key: count}'),
+                ]))
+                continue
+            if exp_field not in actual_map:
+                failures.append(obj([
+                    pair('check', 'expected_distribution_missing_field'),
+                    pair('field', exp_field),
+                ]))
+                continue
+            act_buckets = actual_map[exp_field]
+            if act_buckets != exp_buckets:
+                failures.append(obj([
+                    pair('check', 'distribution_mapping_mismatch'),
+                    pair('field', exp_field),
+                    pair('expected', exp_buckets),
+                    pair('actual', act_buckets),
+                ]))
+        for act_field in actual_map:
+            if act_field not in EXPECTED_DISTRIBUTION:
+                failures.append(obj([
+                    pair('check', 'unexpected_actual_distribution_field'),
+                    pair('field', act_field),
+                    pair('actual', actual_map[act_field]),
+                ]))
 
 # Persistent leftovers check: pg_temp_* is intentionally excluded.
 env.cr.execute("""
@@ -88,7 +165,7 @@ if leftovers:
 status = failures and 'failed' or 'ok'
 payload = obj([
     pair('status', status),
-    'failures:' + '[' + ','.join(failures) + ']',
+    raw_pair('failures', '[' + ','.join(failures) + ']'),
     pair('total', total),
     pair('expected_total', EXPECTED_TOTAL),
     pair('wrong_remaining', wrong_remaining),
@@ -97,6 +174,6 @@ payload = obj([
     pair('live_domain_delta', live_domain_delta),
     pair('live_domain_delta_is_failure', False),
     pair('persistent_leftovers', len(leftovers)),
-    'distribution:' + distribution,
+    raw_pair('distribution', distribution_json),
 ])
 raise UserError(payload)

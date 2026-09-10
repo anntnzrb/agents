@@ -17,14 +17,43 @@ def esc(value):
         return 'true'
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join([esc(v) for v in value]) + ']'
+    if isinstance(value, set):
+        return '[' + ','.join([esc(v) for v in sorted(value)]) + ']'
+    if isinstance(value, dict):
+        return '{' + ','.join([esc(str(k)) + ':' + esc(v) for k, v in value.items()]) + '}'
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(str(key)) + ':' + esc(value)
+
+
+def raw_pair(key, raw_json):
+    return esc(str(key)) + ':' + str(raw_json)
 
 
 def obj(items):
@@ -44,8 +73,8 @@ def m2o(value):
 def group_obj(row, group_field):
     group_value = row.get(group_field)
     return obj([
-        pair('key', group_value and group_value[0] or False),
-        pair('label', group_value and group_value[1] or False),
+        pair('key', group_value and (group_value[0] if isinstance(group_value, (list, tuple)) else group_value) or False),
+        pair('label', group_value and (group_value[1] if isinstance(group_value, (list, tuple)) else group_value) or False),
         pair('count', row.get(group_field + '_count') or row.get('__count') or 0),
     ])
 
@@ -56,7 +85,7 @@ def groups_payload():
         rows = Model.read_group(DOMAIN, ['id:count'], [group_field], lazy=False)
         chunks.append(obj([
             pair('field', group_field),
-            'rows:' + '[' + ','.join([group_obj(row, group_field) for row in rows]) + ']',
+            raw_pair('rows', '[' + ','.join([group_obj(row, group_field) for row in rows]) + ']'),
         ]))
     return '[' + ','.join(chunks) + ']'
 
@@ -73,7 +102,7 @@ payload = obj([
     pair('count_matches', total == EXPECTED_TOTAL),
     pair('first_id', first and first.id or False),
     pair('last_id', last and last.id or False),
-    'groups:' + groups_payload(),
+    raw_pair('groups', groups_payload()),
     pair('write_executed', False),
 ])
 raise UserError(payload)

@@ -41,14 +41,43 @@ def esc(value):
         return 'true'
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join([esc(v) for v in value]) + ']'
+    if isinstance(value, set):
+        return '[' + ','.join([esc(v) for v in sorted(value)]) + ']'
+    if isinstance(value, dict):
+        return '{' + ','.join([esc(str(k)) + ':' + esc(v) for k, v in value.items()]) + '}'
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(str(key)) + ':' + esc(value)
+
+
+def raw_pair(key, raw_json):
+    return esc(str(key)) + ':' + str(raw_json)
 
 
 def obj(items):
@@ -60,17 +89,14 @@ def json_rows(rows):
 
 
 def json_values(values):
-    encoded = []
-    for value in values:
-        encoded.append(esc(value))
-    return '[' + ','.join(encoded) + ']'
+    return '[' + ','.join([esc(value) for value in values]) + ']'
 
 
 # Group output is deliberately compact: technical key, visible label, count.
 def group_row_json(row, group_field):
     value = row.get(group_field)
-    key = value and isinstance(value, (list, tuple)) and value[0] or value or False
-    label = value and isinstance(value, (list, tuple)) and value[1] or value or False
+    key = value and (value[0] if isinstance(value, (list, tuple)) else value) or False
+    label = value and (value[1] if isinstance(value, (list, tuple)) else value) or False
     count = row.get(group_field + '_count') or row.get('__count') or 0
     return obj([pair('key', key), pair('label', label), pair('count', count)])
 
@@ -178,7 +204,7 @@ if not error:
             group_rows.append(group_row_json(row, group_field))
         group_chunks.append(obj([
             pair('field', group_field),
-            'rows:' + json_rows(group_rows),
+            raw_pair('rows', json_rows(group_rows)),
         ]))
 
 payload = obj([
@@ -190,12 +216,12 @@ payload = obj([
     pair('audited_count', len(audited)),
     pair('first_id', audited and audited[0].id or False),
     pair('last_id', audited and audited[-1].id or False),
-    'missing_ids:' + json_values(missing_ids),
-    'duplicate_ids:' + json_values(duplicate_ids),
-    'invalid_fields:' + json_values(invalid_fields),
-    'invalid_group_fields:' + json_values(invalid_group_fields),
-    'sample:' + json_rows(sample_rows),
-    'groups:' + json_rows(group_chunks),
+    raw_pair('missing_ids', json_values(missing_ids)),
+    raw_pair('duplicate_ids', json_values(duplicate_ids)),
+    raw_pair('invalid_fields', json_values(invalid_fields)),
+    raw_pair('invalid_group_fields', json_values(invalid_group_fields)),
+    raw_pair('sample', json_rows(sample_rows)),
+    raw_pair('groups', json_rows(group_chunks)),
     pair('write_executed', False),
 ])
 raise UserError(payload)

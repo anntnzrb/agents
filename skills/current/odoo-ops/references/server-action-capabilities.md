@@ -2,6 +2,8 @@
 
 Use when choosing Server Actions, contextual/automated actions, UI Python, automation, cron, webhooks, JSON-RPC, or a custom module.
 
+Read [Safety model](safety-model.md) first. Available credentials never authorize JSON-RPC. Ask before any RPC contact, including reads. Creating, editing, or executing production actions also requires scoped permission; UI actions are not an alternative way around denied RPC.
+
 Sources:
 - Odoo actions: `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
 - Studio automation: `https://www.odoo.com/documentation/17.0/applications/studio/automated_actions.html`
@@ -55,7 +57,7 @@ Triggers include stage/user/tag/state/priority changes, archive/unarchive, save,
 
 ## Safe patterns
 
-- Preview/apply: read-only contextual action reports selected IDs/counts; separate write action requires approved count.
+- Preview/apply: read-only contextual action reports selected IDs/counts; separate write action requires approval of exact IDs, values, and effects, not just a matching count.
 - Filtered window: after audit, assign an `ir.actions.act_window` dictionary so users inspect the exact recordset instead of exporting it.
 - Small chains: use `multi` for independently understandable steps; NEVER hide a large workflow in opaque snippets.
 - Queue by flag: Server Action marks a bounded recordset; scheduled/module method performs heavy work. Prefer an addon when permanent.

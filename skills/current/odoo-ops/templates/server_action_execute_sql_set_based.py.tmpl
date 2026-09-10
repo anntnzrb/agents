@@ -6,8 +6,10 @@ Model = env['{{ model_name }}']
 DOMAIN = {{ domain_literal }}
 EXPECTED_TO_UPDATE = {{ expected_to_update }}
 APPROVED_DRY_RUN_COUNT = {{ approved_dry_run_count }}
+TARGET_IDS = {{ target_ids_literal }}
+EXCLUDED_IDS = {{ excluded_ids_literal }}
+WRITE_APPROVED = False  # literal False; change to True only after human approval
 SLUG = '{{ slug }}'
-TMP_TABLE = 'tmp_{{ slug }}_candidates'
 
 
 def esc(value):
@@ -19,14 +21,43 @@ def esc(value):
         return 'true'
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join([esc(v) for v in value]) + ']'
+    if isinstance(value, set):
+        return '[' + ','.join([esc(v) for v in sorted(value)]) + ']'
+    if isinstance(value, dict):
+        return '{' + ','.join([esc(str(k)) + ':' + esc(v) for k, v in value.items()]) + '}'
     text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def pair(key, value):
-    return esc(key) + ':' + esc(value)
+    return esc(str(key)) + ':' + esc(value)
+
+
+def raw_pair(key, raw_json):
+    return esc(str(key)) + ':' + str(raw_json)
 
 
 def obj(items):
@@ -36,6 +67,51 @@ def obj(items):
 def fail(items):
     raise UserError(obj(items))
 
+
+if WRITE_APPROVED is not True:
+    fail([
+        pair('error', 'write_not_approved'),
+        pair('message', 'WRITE_APPROVED must be explicitly set to True after human approval'),
+        pair('write_executed', False),
+    ])
+
+# Strict target ID validation before any querying:
+# require non-empty, unique, positive, non-bool integers matching expected count.
+if (
+    not isinstance(TARGET_IDS, (list, tuple, set))
+    or not TARGET_IDS
+    or any(isinstance(x, bool) or not isinstance(x, int) or x <= 0 for x in TARGET_IDS)
+):
+    fail([
+        pair('error', 'invalid_target_ids'),
+        pair('message', 'TARGET_IDS must be a non-empty sequence of positive integers'),
+        pair('write_executed', False),
+    ])
+
+target_id_list = list(TARGET_IDS)
+target_id_set = set(target_id_list)
+if len(target_id_set) != len(target_id_list):
+    fail([
+        pair('error', 'duplicate_target_ids'),
+        pair('write_executed', False),
+    ])
+
+if len(target_id_list) != EXPECTED_TO_UPDATE:
+    fail([
+        pair('error', 'target_ids_count_mismatch'),
+        pair('expected', EXPECTED_TO_UPDATE),
+        pair('actual', len(target_id_list)),
+        pair('write_executed', False),
+    ])
+
+if EXCLUDED_IDS:
+    excluded_set = set(EXCLUDED_IDS)
+    if not target_id_set.isdisjoint(excluded_set):
+        fail([
+            pair('error', 'target_and_excluded_ids_overlap'),
+            pair('overlap_ids', sorted(list(target_id_set & excluded_set))),
+            pair('write_executed', False),
+        ])
 
 current_count = Model.search_count(DOMAIN)
 if current_count != APPROVED_DRY_RUN_COUNT:
@@ -57,13 +133,13 @@ if current_count != EXPECTED_TO_UPDATE:
 
 env.cr.execute("SET LOCAL lock_timeout = '5s'")
 env.cr.execute("SET LOCAL statement_timeout = '60s'")
-env.cr.execute("DROP TABLE IF EXISTS tmp_{{ slug }}_candidates")
 
 # Candidate SQL must translate the ORM domain fully:
 # - include active IS TRUE for UI/ORM active_test
 # - translate M2M fields with EXISTS
 # - use IS DISTINCT FROM for nullable comparisons
 # - include exact excluded ids and target ids
+# - lock candidate rows FOR UPDATE OF target to guard concurrent drift
 # - use env.cr.execute(sql, params); hardcode/whitelist identifiers only
 candidate_sql = """
 CREATE TEMP TABLE tmp_{{ slug }}_candidates ON COMMIT DROP AS
@@ -80,10 +156,11 @@ WHERE target.active IS TRUE
         AND rel.{{ right_id }} = ANY(%s)
   )
   AND {{ additional_sql_predicates }}
+FOR UPDATE OF target
 """
-env.cr.execute(candidate_sql, [{{ target_ids_literal }}, {{ excluded_ids_literal }}, {{ comparison_value }}, {{ m2m_target_ids_literal }}])
+env.cr.execute(candidate_sql, [target_id_list, list(EXCLUDED_IDS or []), {{ comparison_value }}, {{ m2m_target_ids_literal }}])
 
-env.cr.execute("SELECT count(*) AS total, count(DISTINCT id) AS distinct_total FROM tmp_{{ slug }}_candidates")
+env.cr.execute("SELECT count(*) AS total, count(DISTINCT id) AS distinct_total FROM pg_temp.tmp_{{ slug }}_candidates")
 row = env.cr.dictfetchone()
 if row['total'] != row['distinct_total']:
     fail([
@@ -100,11 +177,11 @@ if row['total'] != EXPECTED_TO_UPDATE:
         pair('write_executed', False),
     ])
 
-env.cr.execute("CREATE UNIQUE INDEX tmp_{{ slug }}_candidates_id_idx ON tmp_{{ slug }}_candidates(id)")
+env.cr.execute("CREATE UNIQUE INDEX tmp_{{ slug }}_candidates_id_idx ON pg_temp.tmp_{{ slug }}_candidates(id)")
 update_sql = """
 UPDATE {{ table_name }} AS target
 SET {{ sql_set_clause }}
-FROM tmp_{{ slug }}_candidates AS c
+FROM pg_temp.tmp_{{ slug }}_candidates AS c
 WHERE target.id = c.id
 """
 env.cr.execute(update_sql, [{{ update_params_literal }}])
@@ -121,7 +198,7 @@ if updated != EXPECTED_TO_UPDATE:
 postcheck_sql = """
 SELECT count(*) AS wrong_remaining
 FROM {{ table_name }} AS target
-JOIN tmp_{{ slug }}_candidates AS c ON c.id = target.id
+JOIN pg_temp.tmp_{{ slug }}_candidates AS c ON c.id = target.id
 WHERE {{ final_invariant_failure_sql }}
 """
 env.cr.execute(postcheck_sql, [{{ postcheck_params_literal }}])

@@ -1,4 +1,4 @@
-# Odoo 17 / Python 3.10 — read-only modern Python capability gauntlet
+# Odoo 17 / Python 3.10: read-only modern Python capability gauntlet
 # Model: crm.lead
 #
 # Run this as an Execute Python Code Server Action on crm.lead. It may be
@@ -22,10 +22,28 @@
 
 def json_string(value: str, /) -> str:
     """Encode one JSON string without importing json."""
-    text = str(value)
-    text = text.replace('\\', '\\\\').replace('"', '\\"')
-    text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    return '"' + text + '"'
+    out = []
+    for ch in str(value):
+        code = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == '\b':
+            out.append('\\b')
+        elif ch == '\f':
+            out.append('\\f')
+        elif ch == '\n':
+            out.append('\\n')
+        elif ch == '\r':
+            out.append('\\r')
+        elif ch == '\t':
+            out.append('\\t')
+        elif code < 0x20:
+            out.append('\\u%04x' % code)
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
 
 
 def json_value(value) -> str:
@@ -40,7 +58,7 @@ def json_value(value) -> str:
         return str(value)
     if isinstance(value, dict):
         items = [
-            json_string(key) + ':' + json_value(item)
+            json_string(str(key)) + ':' + json_value(item)
             for key, item in value.items()
         ]
         return '{' + ','.join(items) + '}'
@@ -201,7 +219,7 @@ checks.append(check('timezone_helper', bool(timezone('UTC'))))
 active_model = env.context.get('active_model')
 active_ids = env.context.get('active_ids') or []
 max_selection = 1000
-context_model_ok = active_model in (None, 'crm.lead')
+context_model_ok = (active_model == 'crm.lead') if active_ids else (active_model in (None, 'crm.lead'))
 checks.append(check('active_model_boundary', context_model_ok, active_model or 'none'))
 selection_within_limit = len(active_ids) <= max_selection
 checks.append(check('selection_limit', selection_within_limit, len(active_ids)))
@@ -265,4 +283,3 @@ payload = {
     'write_executed': False,
 }
 raise UserError(json_value(payload))
-
