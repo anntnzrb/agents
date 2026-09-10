@@ -1,22 +1,28 @@
-# Runtime Discovery
+# Runtime discovery
 
-Dynamic resolution rules for Odoo workspaces.
+Read before local development or database operations. Discovery finds paths; it does not certify a disposable database.
 
-## Discovery Precedence
+## Local paths
 
-1. **Addons Directory**:
-   - Explicit flag `--root <path>`
-   - Environment variable `$ODOO_ADDONS_DIR`
-   - Current working directory (if containing Odoo modules or Git root)
-   - Default: `~/repos/etech/odoo`
+- Runtime: existing `ODOO_RUNTIME_PATH`, then `/opt/odoo17`, then `~/.local/share/odoo17`. If none exists, the resolver returns `/opt/odoo17` as its fallback path.
+- Custom addons: existing `ODOO_ADDONS_PATH`, then `~/repos/etech/odoo/addons`, then `./addons`, then the current directory.
+- Config: `<runtime>/config/odoo.conf`.
+- Source addons: matching directories under `<runtime>/source`.
 
-2. **Runtime Directory**:
-   - Explicit flag `--runtime-dir <path>`
-   - Environment variable `$ODOO_RUNTIME_DIR`
-   - Discovered: `/opt/odoo17` or `~/.local/share/odoo17`
+Use absolute environment paths. The CLI does not provide `--root` or `--runtime-dir` overrides.
 
-3. **Database**:
-   - Explicit flag `--db <name>`
-   - Active workflow profile database
-   - Config file `db_name`
-   - Fallback: `$ODOO17_DEFAULT_DB` or `erptech_0817-crm`
+## Database selection
+
+Database inspection commands use `--db` when supplied, otherwise the resolved config's `options.db_name`, falling back to `ODOO_DB_NAME` or the controller's default. Development and test commands select their database through the requested workflow or module resolution. Workflow settings live in `profiles/<profile>.json`.
+
+```text
+uv run --script <skill-dir>/scripts/cli.py env --json
+```
+
+Inspect `runtime_path`, `config_path`, `custom_addons_path`, `effective_database`, and the requested workflow before destructive work. `env` reports configuration, not a proof that the database is connected or disposable.
+
+## Isolation
+
+Keep Podman pointed at the local host or local Podman machine. Never use production container connections for replica commands. Loopback connections can still be tunnels; verify their purpose locally.
+
+Disable copied production cron jobs and outbound integrations before running application code. Missing local data never authorizes JSON-RPC discovery; follow [Safety model](safety-model.md).

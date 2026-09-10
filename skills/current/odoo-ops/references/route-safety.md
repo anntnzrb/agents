@@ -1,98 +1,24 @@
-# Route Safety
+# Route safety
 
-Scope: route inspection = read-only static analysis of local addon/controller source; keep it separate from DB inspection. Purpose: risk visibility, not route execution.
+Use for static inspection of local addon controllers. Listing a route never authorizes invoking it.
 
 ## Commands
 
-List all discovered routes:
-
 ```text
-uv run --script <skill-dir>/scripts/cli.py route list --json
+uv run --script <skill-dir>/scripts/cli.py routes --json
+uv run --script <skill-dir>/scripts/cli.py routes <module> --json
 ```
 
-List routes with heuristic write signals:
+The CLI scans Python files under the resolved custom addons directory. It does not provide `route list` or `route scan-writes` commands.
 
-```text
-uv run --script <skill-dir>/scripts/cli.py route scan-writes --json
-```
+## Output
 
-Use `--json` by default.
+JSON is an array of route objects with `module`, `class_name`, `method`, `route`, `auth`, `methods`, `file`, and `line`.
 
-## Discovery
+The scanner does not return a write-risk classification or parse-error inventory. Unreadable or invalid Python files can be skipped. An empty result does not establish absence of routes or risks.
 
-Scan resolved addon paths for the current runtime backend. Compose paths usually include:
+## Review
 
-- `<odoo-runtime>/source/<odoo-version>/odoo/addons`
-- `<custom-addons>/addons`
+Read handler source and its callees before assessing effects. Look for ORM mutations, direct SQL, transaction control, external calls, and business methods such as `action_*`. Names and static signals are heuristics, not proof of read-only behavior.
 
-For host runtimes, derive addon paths from `odoo.conf`. Inspect Python files under addon directories and collect controller methods decorated with `@route`.
-
-## Heuristic write signals
-
-Mark a route likely mutating when its handler name or AST body suggests state changes.
-
-Function names:
-
-- `create`, `write`, `unlink`, `copy`, `action_*`, `button_*`
-- `save`, `submit`, `confirm`, `approve`, `assign`, `sync`
-
-Body signals:
-
-- ORM writes: `.create(...)`, `.write(...)`, `.unlink(...)`, `.copy(...)`
-- direct SQL: `cr.execute(...)`
-- transaction control: `commit` / `rollback`
-- helper calls with obviously mutating names
-
-Signals are not proof: suspicious routes may be harmless, and apparently harmless routes may trigger indirect writes.
-
-## Output contract
-
-Each discovered route includes enough review context:
-
-- `module`
-- `controller`
-- `function`
-- `paths`
-- `methods`
-- `auth`
-- `route_type`
-- `source`
-- `line`
-- `write_signals`
-
-`route list` returns all routes. `route scan-writes` returns only routes with non-empty `write_signals`.
-
-Surface `parse_errors` for files that could not be parsed; this warns about skipped analysis, not proof that no routes exist there.
-
-## Review flow
-
-1. `uv run --script <skill-dir>/scripts/cli.py env inspect --json`
-2. `uv run --script <skill-dir>/scripts/cli.py route list --json`
-3. `uv run --script <skill-dir>/scripts/cli.py route scan-writes --json`
-4. Read flagged handler source before considering any invocation.
-
-Do not infer production safety directly from route discovery.
-
-## DB boundary
-
-Keep these distinct:
-
-- DB inspection: current data
-- route inspection: likely code paths
-- route invocation: out of scope unless a future version explicitly adds it
-
-Write signals do not justify database mutation during investigation.
-
-## Failure behavior
-
-Report:
-
-- parser could not read `controllers/foo.py` because of syntax error
-- no routes found under resolved addon paths
-- addon paths resolved but contained no controller modules
-
-Never:
-
-- silently ignore parse errors
-- claim no risky routes exist when files were skipped
-- present heuristics as certainty
+Keep source inspection, database inspection, and route invocation separate. Do not invoke a controller to test whether it writes. For production or RPC interaction, follow [Safety model](safety-model.md); local inspection does not grant that permission.
