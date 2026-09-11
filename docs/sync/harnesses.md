@@ -31,9 +31,9 @@ Adapters can declare these hooks:
 
 ## CLIProxyAPI integration
 
-A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials. OpenCode uses the `keyless` placeholder because its SDK requires a non-empty value; Grok's provider block declares no client key. Other committed harness sources do not declare a CLIProxyAPI provider. Sync probes the gateway without authorization.
+A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores.
 
 Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers
@@ -60,7 +60,7 @@ The cache keeps the current and previous known-good package versions. Newly inst
 
 - If `.env` is absent, `sync` continues with an empty default environment map.
 - Variables are decoded at the `SyncEnv` boundary with variable expansion disabled, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.
-- Decoded variables are forwarded to child processes for all supported harnesses (`codex`, `deepseek`, `grok`, `opencode`, `pi`, and `omp`).
+- Decoded variables are forwarded to child processes of every enabled harness.
 - Precedence:
   1. Explicit adapter overrides (`launcher.env`).
   2. Parent-process environment variables inherited from the invoking environment.

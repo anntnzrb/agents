@@ -182,9 +182,9 @@ class SyncPlan:
 
 CLIPROXY_ENDPOINT_TEMPLATE_PATHS: dict[str, tuple[str, ...]] = {
     "codex": ("config.toml",),
-    "grok": ("config.toml",),
     "opencode": ("opencode.jsonc",),
     "omp": ("models.yml",),
+    "pi": ("extensions/cliproxy/index.ts",),
 }
 
 

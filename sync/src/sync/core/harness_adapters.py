@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 type HostPlatform = Literal["darwin", "linux"]
 
-type HarnessId = Literal["codex", "deepseek", "grok", "opencode", "pi", "omp"]
+type HarnessId = Literal["codex", "deepseek", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
@@ -85,15 +85,6 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         launcher=HarnessLauncherSpec(
             package="@deepseek-ai/dsh",
             bin="dsh",
-        ),
-    ),
-    HarnessAdapter(
-        id="grok",
-        home_segments=(".grok",),
-        platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
-            package="@xai-official/grok",
-            bin="grok",
         ),
     ),
     HarnessAdapter(

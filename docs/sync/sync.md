@@ -18,7 +18,7 @@ Unknown commands and invalid arguments exit with status `2`. A manual sync exits
 
 A manual sync runs these stages in order:
 
-1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. The `~/.omp/python-env` bootstrap runs only when the `omp` adapter is enabled.
+1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. Adapter-declared bootstraps run only when their adapter is enabled.
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
