@@ -117,6 +117,6 @@ When searching for specific services, query the highest-priority marketplaces fi
 
 To add a new marketplace (for example, `eneba` or `gamivo`):
 
-1. Create `lib/adapters/<name>.ts` implementing the `MarketplaceAdapter` interface.
-2. Register the adapter in `lib/adapters/index.ts` using `registerAdapter(new NewAdapter())`.
+1. Create `lib/adapters/<name>.py` implementing the `MarketplaceAdapter` protocol.
+2. Register the adapter in `lib/adapters/__init__.py` using `register_adapter(NewAdapter())`.
 3. The core engine will automatically include the new marketplace in multi-market scans without requiring any changes to CLI or scoring logic.
