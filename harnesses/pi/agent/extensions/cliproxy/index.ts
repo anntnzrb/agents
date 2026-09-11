@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
 // Sync replaces this placeholder with the deployment endpoint.
@@ -19,13 +20,21 @@ const FALLBACK_MAX_TOKENS = 16384;
 // Gateway ids may carry a thinking-level qualifier the catalog does not use.
 const QUALIFIER_PATTERN = /-(minimal|low|medium|high|max|thinking)$/i;
 
+const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
 interface GatewayModelsResponse {
 	data?: Array<{ id?: unknown }>;
+}
+
+interface ReasoningOption {
+	type?: string;
+	values?: string[];
 }
 
 interface CatalogModel {
 	name?: string;
 	reasoning?: boolean;
+	reasoning_options?: ReasoningOption[];
 	limit?: { context?: number; output?: number };
 	modalities?: { input?: string[] };
 	cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number } | null;
@@ -41,6 +50,74 @@ interface CatalogCache {
 
 let memoryCatalog: CatalogCache | undefined;
 let lastKnown: ProviderModelConfig[] = [];
+let builtinIndex: Map<string, BuiltinMetadata[]> | undefined;
+
+type ModelMetadata = Pick<ProviderModelConfig, "compat" | "thinkingLevelMap">;
+
+interface BuiltinMetadata {
+	provider: string;
+	metadata: ModelMetadata;
+}
+
+/**
+ * Index pi's shipped catalog by model id. The gateway serves the same upstream models under
+ * prefixed ids, so the provider that authored a model also authors its request dialect and
+ * thinking-level map; reading that catalog avoids hardcoding request shapes per gateway model.
+ * Only `openai-completions` models qualify: this provider speaks that protocol to the gateway, so
+ * metadata authored for another protocol describes a request shape this provider never sends.
+ */
+function builtinMetadataIndex(): Map<string, BuiltinMetadata[]> {
+	if (builtinIndex) return builtinIndex;
+	const index = new Map<string, BuiltinMetadata[]>();
+	const add = (key: string, entry: BuiltinMetadata): void => {
+		const entries = index.get(key);
+		if (entries) entries.push(entry);
+		else index.set(key, [entry]);
+	};
+	for (const provider of getBuiltinProviders()) {
+		for (const model of getBuiltinModels(provider)) {
+			if (model.api !== "openai-completions") continue;
+			if (!model.compat && !model.thinkingLevelMap) continue;
+			const entry = {
+				provider,
+				metadata: { compat: model.compat, thinkingLevelMap: model.thinkingLevelMap },
+			};
+			add(model.id, entry);
+			add(`${provider}/${model.id}`, entry);
+		}
+	}
+	builtinIndex = index;
+	return index;
+}
+
+/**
+ * Resolve metadata for a gateway id, preferring the provider named in the id itself:
+ * `opencode-go/deepseek-v4-pro` keeps the `opencode-go` dialect over any other provider
+ * that ships the same model id.
+ */
+function builtinMetadata(id: string): ModelMetadata | undefined {
+	const index = builtinMetadataIndex();
+	const candidates = index.get(id) ?? index.get(segment(id));
+	if (!candidates || candidates.length === 0) return undefined;
+	const segments = new Set(id.split("/"));
+	const match = candidates.find((candidate) => segments.has(candidate.provider)) ?? candidates[0];
+	return match.metadata;
+}
+
+/**
+ * Derive thinking-level support from the models.dev effort list, the only effort data available
+ * for models pi's shipped catalog does not know yet. Levels a model cannot select stay null so
+ * pi clamps to a supported level instead of sending an unsupported one.
+ */
+function effortLevelMap(options: ReasoningOption[] | undefined): ModelMetadata["thinkingLevelMap"] {
+	const values = options?.find((option) => option.type === "effort")?.values;
+	if (!values || values.length === 0) return undefined;
+	const map: NonNullable<ModelMetadata["thinkingLevelMap"]> = {
+		off: values.includes("none") ? "none" : null,
+	};
+	for (const level of THINKING_LEVELS) map[level] = values.includes(level) ? level : null;
+	return map;
+}
 
 function catalogPath(): string {
 	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
@@ -122,10 +199,13 @@ function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogMod
 function toModel(id: string, catalog: CatalogCache | undefined): ProviderModelConfig {
 	const entry = catalogModel(catalog, id);
 	const inputs = entry?.modalities?.input ?? ["text"];
+	const metadata = builtinMetadata(id);
 	return {
 		id,
 		name: entry?.name ?? id,
 		reasoning: entry?.reasoning ?? true,
+		thinkingLevelMap: metadata?.thinkingLevelMap ?? effortLevelMap(entry?.reasoning_options),
+		compat: metadata?.compat,
 		input: inputs.includes("image") ? ["text", "image"] : ["text"],
 		cost: {
 			input: entry?.cost?.input ?? 0,
