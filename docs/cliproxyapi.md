@@ -105,26 +105,13 @@ sh tools/cliproxyapi/panel.rebuild.sh
 
 The script runs from any directory and requires `git` and `bun` on `PATH`. It writes `tools/cliproxyapi/panel.html`.
 
-## Scope models by origin
+## Model IDs
 
-The template enables `force-model-prefix`. Accounts with a prefix expose model IDs in `<prefix>/<alias>` form. See the [model prefix table](#model-prefixes).
+The template exposes upstream model names as-is. Aliases, forked model variants, and forced payload mappings are not used.
 
-OAuth accounts get prefixes from the top-level `prefix` field in their auth files under `~/.cli-proxy-api/`. Reauthentication recreates an auth file and drops its prefix.
+`force-model-prefix` remains `true`: a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential. Only the xAI Grok account currently sets a prefix (`grok`); Antigravity, Codex, and the API-key compatibility profiles are unprefixed, so all accounts of a provider share one pool and models are addressed by their upstream names.
 
-To restore the ChatGPT prefix after reauthentication:
-
-```bash
-set -eu
-for f in ~/.cli-proxy-api/codex-*.json; do
-	[ -f "$f" ] || continue
-	tmp="$f.tmp"
-	jq '.prefix = "chatgpt"' "$f" > "$tmp"
-	chmod 600 "$tmp"
-	mv "$tmp" "$f"
-done
-```
-
-Restart the running gateway process after you edit the auth files.
+Reauthentication recreates an auth file without its `prefix` field. Add one back only when you deliberately want to scope a credential to a separate model namespace.
 
 ## Verify model access
 
@@ -213,20 +200,17 @@ Sync writes the generated configuration with mode `0600`.
 
 The generated configuration includes the `remote-management.secret-key` value from the template. The control panel uses that value for management requests. Keep the listener on a trusted private interface.
 
-No harness reads `secrets.local.json`. The gateway accepts requests without a client key. OpenCode and OMP send a static placeholder key because their SDKs require a non-empty value. Codex does not configure a client key.
+No harness reads `secrets.local.json`. The gateway accepts requests without a client key. OpenCode sends the static `keyless` placeholder because its SDK requires a non-empty value; other committed harness sources send no client key.
 
 ## Model prefixes
 
-The template sets `force-model-prefix: true`.
+The template sets `force-model-prefix: true`, so a prefixed credential or compatibility profile namespaces its models.
 
 | Prefix | Origin | Prefix source |
 | --- | --- | --- |
-| `go` | OpenCode Go custom compatibility profile | Profile prefix in `config.yaml.tmpl` |
-| `cline-pass` | ClinePass custom compatibility profile | Profile prefix in `config.yaml.tmpl` |
-| `cmd` | Command Code custom compatibility profile | Profile prefix in `config.yaml.tmpl` |
-| `chatgpt` | ChatGPT OAuth accounts | `prefix` field in `~/.cli-proxy-api/codex-*.json` |
-| `antigravity` | Google Antigravity OAuth accounts | `prefix` field in `~/.cli-proxy-api/antigravity-*.json` |
 | `grok` | XAI Grok OAuth accounts | `prefix` field in `~/.cli-proxy-api/xai-*.json` |
+
+The `openai-compatibility` profiles no longer declare provider prefixes, and the OAuth accounts no longer carry `chatgpt` or `antigravity` prefixes, so those models are exposed under their upstream names.
 
 ## Routing settings
 
