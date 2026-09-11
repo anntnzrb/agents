@@ -17,3 +17,14 @@ secrets.local.json
 .ruff_cache/
 .hypothesis/
 .firecrawl/
+.mypy_cache/
+.pytype/
+.nox/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
+*.pyo
+*.egg-info/
