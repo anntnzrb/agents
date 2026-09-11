@@ -1,4 +1,17 @@
 providers:
+  cliproxy:
+    baseUrl: "${CLIPROXY_CLIENT_BASE_URL}"
+    apiKey: keyless
+    api: openai-completions
+    discovery:
+      type: openai-models-list
+    modelOverrides:
+      gemini-3.7-flash-high:
+        contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits; matches the google-antigravity profile
+      gemini-3.8-flash-high:
+        contextWindow: 500000 # 500K * 85% = 425K trigger; matches the google-antigravity profile
+      gpt-6-astra:
+        contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
   google-antigravity:
     modelOverrides:
       gemini-3.7-flash:
