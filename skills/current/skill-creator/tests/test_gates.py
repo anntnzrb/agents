@@ -87,6 +87,33 @@ def test_main_appends_pytest_with_tests_flag(tmp_path: Path) -> None:
     assert "PyYAML>=6.0" in pytest_step
 
 
+def test_basedpyright_step_includes_pytest_when_tests_exist(
+    tmp_path: Path,
+) -> None:
+    """Tests may import pytest; basedpyright needs it on its env path."""
+    skill = _skill_dir(tmp_path)
+    (skill / "tests").mkdir()
+    seen: list[tuple[Sequence[str], Path]] = []
+    assert main([str(skill)], _fake_runner(seen)) == 0
+    pyright_step = list(seen[2][0])
+    assert pyright_step[-1] == "basedpyright"
+    assert "pytest" in pyright_step
+    assert "PyYAML>=6.0" in pyright_step
+
+
+def test_basedpyright_step_omits_pytest_without_tests_dir(
+    tmp_path: Path,
+) -> None:
+    """Without tests/ the basedpyright env carries only runtime deps."""
+    skill = _skill_dir(tmp_path)
+    seen: list[tuple[Sequence[str], Path]] = []
+    assert main([str(skill)], _fake_runner(seen)) == 0
+    pyright_step = list(seen[2][0])
+    assert pyright_step[-1] == "basedpyright"
+    assert "pytest" not in pyright_step
+    assert "PyYAML>=6.0" in pyright_step
+
+
 def test_main_skips_pytest_without_tests_dir(tmp_path: Path) -> None:
     """The tests flag without a tests/ directory runs static gates only."""
     skill = _skill_dir(tmp_path)

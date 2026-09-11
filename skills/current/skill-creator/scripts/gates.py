@@ -90,13 +90,15 @@ def _with_prefix(deps: Sequence[str]) -> tuple[str, ...]:
     return tuple(prefix)
 
 
-def _static_steps(deps: Sequence[str]) -> list[tuple[str, ...]]:
+def _static_steps(deps: Sequence[str], *, has_tests: bool) -> list[tuple[str, ...]]:
     """Return the static gate steps; only basedpyright needs the skill env."""
-    prefix = _with_prefix(deps)
+    # Tests legitimately import pytest; it must be resolvable when the
+    # basedpyright step type-checks a tests/ directory.
+    pyright_deps = ["pytest", *deps] if has_tests else list(deps)
     return [
         ("uvx", "ruff", "format", "--check", "."),
         ("uvx", "ruff", "check", "."),
-        (*prefix, "basedpyright"),
+        (*_with_prefix(pyright_deps), "basedpyright"),
     ]
 
 
@@ -130,12 +132,13 @@ def main(argv: list[str] | None = None, runner: GateRunner = _run_step) -> int:
         print(f"gates: {exc}", file=sys.stderr)
         return EXIT_USAGE
     steps: list[tuple[str, ...]] = []
+    has_tests = (skill_dir / "tests").is_dir()
     if _has_python(skill_dir):
-        steps.extend(_static_steps(deps))
+        steps.extend(_static_steps(deps, has_tests=has_tests))
     else:
         print("(no Python files, skipping static gates)")
     if with_tests:
-        if (skill_dir / "tests").is_dir():
+        if has_tests:
             steps.append(_pytest_step(deps))
         else:
             print("(no tests/ directory, skipping pytest)")
