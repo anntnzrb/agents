@@ -40,167 +40,33 @@ codex:
   disable-codex-cloaking: false
   optimize-multi-agent-v2: false
 
-oauth-model-alias:
-  antigravity:
-    - name: "gemini-3.7-flash-high"
-      alias: "nnn-gemini-3.7-flash-medium"
-      display-name: "[nnn] Gemini 3.7 Flash (Medium)"
-      fork: true
-      force-mapping: true
-  codex:
-    - name: "gpt-5.6-sol"
-      alias: "nnn-gpt-5.6-sol-high"
-      display-name: "[nnn] GPT-5.6 Sol (High)"
-      fork: true
-      force-mapping: true
-    - name: "gpt-5.6-luna"
-      alias: "nnn-gpt-5.6-luna-max"
-      display-name: "[nnn] GPT-5.6 Luna (Max)"
-      fork: true
-      force-mapping: true
-    - name: "gpt-5.6-luna"
-      alias: "nnn-gpt-5.6-luna-max-fast"
-      display-name: "[nnn] GPT-5.6 Luna (Max) (Fast)"
-      fork: true
-      force-mapping: true
-    - name: "gpt-5.6-terra"
-      alias: "nnn-gpt-5.6-terra-max"
-      display-name: "[nnn] GPT-5.6 Terra (Max)"
-      fork: true
-      force-mapping: true
-    - name: "gpt-5.6-terra"
-      alias: "nnn-gpt-5.6-terra-max-fast"
-      display-name: "[nnn] GPT-5.6 Terra (Max) (Fast)"
-      fork: true
-      force-mapping: true
-
 openai-compatibility:
   - name: "opencode-go-custom"
-    prefix: "go"
     base-url: "https://opencode.ai/zen/go/v1"
     x-credential-pool: "opencode-go"
     models:
       - name: "deepseek-v4-flash"
-        alias: "nnn-deepseek-v4-flash-max"
-        display-name: "[nnn] DeepSeek V4 Flash (Max)"
-        force-mapping: true
       - name: "deepseek-v4-pro"
-        alias: "nnn-deepseek-v4-pro-max"
-        display-name: "[nnn] DeepSeek V4 Pro (Max)"
-        force-mapping: true
   - name: "opencode-zen-custom"
-    prefix: "zen"
     base-url: "https://opencode.ai/zen/v1"
     x-credential-pool: "opencode-zen"
   - name: "cline-pass-custom"
-    prefix: "cline-pass"
     base-url: "https://api.cline.bot/api/v1"
     x-credential-pool: "cline-pass"
     models:
       - name: "cline-pass/deepseek-v4-flash"
-        alias: "nnn-deepseek-v4-flash-max"
-        display-name: "[nnn] DeepSeek V4 Flash (Max)"
-        force-mapping: true
       - name: "cline-pass/deepseek-v4-pro"
-        alias: "nnn-deepseek-v4-pro-max"
-        display-name: "[nnn] DeepSeek V4 Pro (Max)"
-        force-mapping: true
       - name: "cline-pass/glm-5.3"
-        alias: "nnn-glm-5.3-max"
-        display-name: "[nnn] GLM 5.3 (Max)"
-        force-mapping: true
       - name: "cline-pass/kimi-k3"
-        alias: "nnn-kimi-k3-max"
-        display-name: "[nnn] Kimi K3 (Max)"
-        force-mapping: true
       - name: "cline-pass/qwen3.8-max"
-        alias: "nnn-qwen3.8-max-xhigh"
-        display-name: "[nnn] Qwen 3.8 Max (XHigh)"
-        force-mapping: true
   - name: "command-code-custom"
-    prefix: "cmd"
     base-url: "https://api.commandcode.ai/provider/v1"
     x-credential-pool: "command-code"
     models:
       - name: "deepseek/deepseek-v4-flash"
-        alias: "nnn-deepseek-v4-flash-max"
-        display-name: "[nnn] DeepSeek V4 Flash (Max)"
-        force-mapping: true
       - name: "deepseek/deepseek-v4-pro"
-        alias: "nnn-deepseek-v4-pro-max"
-        display-name: "[nnn] DeepSeek V4 Pro (Max)"
-        force-mapping: true
       - name: "zai-org/GLM-5.3"
-        alias: "nnn-glm-5.3-max"
-        display-name: "[nnn] GLM 5.3 (Max)"
-        force-mapping: true
       - name: "moonshotai/Kimi-K3"
-        alias: "nnn-kimi-k3-max"
-        display-name: "[nnn] Kimi K3 (Max)"
-        force-mapping: true
-
-payload:
-  override:
-    - models:
-        - name: "gemini-3.7-flash-high"
-          protocol: "antigravity"
-      params:
-        "generationConfig.thinkingConfig.thinkingLevel": "medium"
-    - models:
-        - name: "gpt-5.6-sol"
-          protocol: "codex"
-      params:
-        "reasoning.effort": "high"
-    - models:
-        - name: "gpt-5.6-luna"
-          protocol: "codex"
-      params:
-        "reasoning.effort": "max"
-    - models:
-        - name: "nnn-gpt-5.6-luna-max-fast"
-          protocol: "codex"
-      params:
-        service_tier: "fast"
-    - models:
-        - name: "gpt-5.6-terra"
-          protocol: "codex"
-      params:
-        "reasoning.effort": "max"
-    - models:
-        - name: "nnn-gpt-5.6-terra-max-fast"
-          protocol: "codex"
-      params:
-        service_tier: "fast"
-    - models:
-        - name: "deepseek-v4-flash"
-        - name: "cline-pass/deepseek-v4-flash"
-        - name: "deepseek/deepseek-v4-flash"
-      params:
-        reasoning_effort: "high"
-    - models:
-        - name: "deepseek-v4-pro"
-        - name: "cline-pass/deepseek-v4-pro"
-        - name: "deepseek/deepseek-v4-pro"
-      params:
-        reasoning_effort: "high"
-    - models:
-        - name: "deepseek-v4-flash-free"
-      params:
-        reasoning_effort: "high"
-    - models:
-        - name: "cline-pass/glm-5.3"
-        - name: "zai-org/GLM-5.3"
-      params:
-        reasoning_effort: "max"
-    - models:
-        - name: "cline-pass/kimi-k3"
-        - name: "moonshotai/Kimi-K3"
-      params:
-        reasoning_effort: "max"
-    - models:
-        - name: "cline-pass/qwen3.8-max"
-      params:
-        reasoning_effort: "xhigh"
 
 oauth-excluded-models:
   antigravity:
