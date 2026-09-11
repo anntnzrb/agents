@@ -12,6 +12,19 @@ providers:
         contextWindow: 500000 # 500K * 85% = 425K trigger; matches the google-antigravity profile
       gpt-6-astra:
         contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
+      command-code/deepseek/deepseek-v4.1-flash:
+        reasoning: true
+        contextWindow: 1000000 # 1M * 85% = 850K trigger, server-advertised 1M window / 384K max output
+        thinking:
+          mode: effort
+          efforts:
+            - low
+            - high
+            - max
+          defaultLevel: max
+        input:
+          - text
+          - image
   google-antigravity:
     modelOverrides:
       gemini-3.7-flash:
