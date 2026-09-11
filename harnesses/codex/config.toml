@@ -12,12 +12,22 @@ web_search = "live"
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
+model_provider = "cliproxy"
 review_model = "gpt-5.6-luna"
-model_reasoning_effort = "max"
+model_reasoning_effort = "low"
 model_verbosity = "low"
 model_reasoning_summary = "detailed"
 personality = "pragmatic"
+
+# -----------------------------------------------------------------------------
+# PROVIDERS
+# -----------------------------------------------------------------------------
+
+[model_providers.cliproxy]
+name = "CLIProxyAPI"
+base_url = "${CLIPROXY_CLIENT_BASE_URL}"
+wire_api = "responses"
 
 # -----------------------------------------------------------------------------
 # PERMISSIONS
