@@ -513,48 +513,19 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
             assert _is_obj_dict(model)
             assert set(model.keys()) == {"name"}
 
-    # Only the shared OpenCode pools are namespaced; every other provider keeps
-    # upstream model names so a model id maps to exactly one owner.
-    assert prefixed == {"opencode-go-custom", "opencode-zen-custom"}
+    # Shared pools are namespaced so every model id maps to exactly one owner.
+    assert prefixed == {
+        "opencode-go-custom",
+        "opencode-zen-custom",
+        "cline-pass-custom",
+        "command-code-custom",
+    }
 
-    cline = next(
-        (
-            p
-            for p in profiles
-            if _is_obj_dict(p) and p.get("name") == "cline-pass-custom"
-        ),
-        None,
-    )
-    assert _is_obj_dict(cline)
-    cline_models_raw = cline.get("models")
-    assert _is_obj_list(cline_models_raw)
-    cline_models = [m.get("name") for m in cline_models_raw if _is_obj_dict(m)]
-    assert cline_models == [
-        "cline-pass/deepseek-v4-flash",
-        "cline-pass/deepseek-v4-pro",
-        "cline-pass/glm-5.3",
-        "cline-pass/kimi-k3",
-        "cline-pass/qwen3.8-max",
-    ]
-
-    command_code = next(
-        (
-            p
-            for p in profiles
-            if _is_obj_dict(p) and p.get("name") == "command-code-custom"
-        ),
-        None,
-    )
-    assert _is_obj_dict(command_code)
-    cmd_models_raw = command_code.get("models")
-    assert _is_obj_list(cmd_models_raw)
-    cmd_models = [m.get("name") for m in cmd_models_raw if _is_obj_dict(m)]
-    assert cmd_models == [
-        "deepseek/deepseek-v4-flash",
-        "deepseek/deepseek-v4-pro",
-        "zai-org/GLM-5.3",
-        "moonshotai/Kimi-K3",
-    ]
+    # Every compatibility profile derives its model list from its upstream.
+    for profile in profiles:
+        assert _is_obj_dict(profile)
+        assert profile.get("x-model-discovery") is True
+        assert "models" not in profile
 
 
 def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
