@@ -471,16 +471,29 @@ def test_append_preserved_sections_handles_various_newline_layouts() -> None:
     assert append_preserved_sections("", "[table]\nk = 1\n") == "[table]\nk = 1\n"
 
 
-def test_cliproxy_custom_aliases_use_provider_native_model_and_payload_shapes() -> None:
-    """Test committed cliproxy config template contains expected provider profiles."""
+def test_cliproxy_config_template_uses_upstream_model_names() -> None:
+    """Test the committed cliproxy template exposes upstream model names only."""
     source = (REPOSITORY_ROOT / "tools" / "cliproxyapi" / "config.yaml.tmpl").read_text(
         encoding="utf-8"
     )
     config: object = yaml.safe_load(source)  # pyright: ignore[reportAny]
     assert _is_obj_dict(config)
 
+    # The alias/fork layer and per-model payload overrides are intentionally absent.
+    assert "oauth-model-alias" not in config
+    assert "payload" not in config
+
     profiles = config.get("openai-compatibility")
     assert _is_obj_list(profiles)
+    for profile in profiles:
+        assert _is_obj_dict(profile)
+        assert "prefix" not in profile
+        models = profile.get("models")
+        if not _is_obj_list(models):
+            continue
+        for model in models:
+            assert _is_obj_dict(model)
+            assert set(model.keys()) == {"name"}
 
     cline = next(
         (
@@ -520,28 +533,6 @@ def test_cliproxy_custom_aliases_use_provider_native_model_and_payload_shapes() 
         "zai-org/GLM-5.3",
         "moonshotai/Kimi-K3",
     ]
-
-    payload_val = config.get("payload")
-    assert _is_obj_dict(payload_val)
-    override_val = payload_val.get("override")
-    assert _is_obj_list(override_val)
-    antigravity = next(
-        (
-            r
-            for r in override_val
-            if _is_obj_dict(r)
-            and (models := r.get("models")) is not None
-            and _is_obj_list(models)
-            and any(
-                _is_obj_dict(m) and m.get("protocol") == "antigravity" for m in models
-            )
-        ),
-        None,
-    )
-    assert _is_obj_dict(antigravity)
-    assert antigravity.get("params") == {
-        "generationConfig.thinkingConfig.thinkingLevel": "medium",
-    }
 
 
 def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
