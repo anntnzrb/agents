@@ -27,6 +27,9 @@ max-retry-interval: 30
 disable-cooling: false
 save-cooldown-status: true
 
+# Transient upstream failures rely on the retry rounds instead of a flat 60s cooldown.
+transient-error-cooldown-seconds: -1
+
 streaming:
   bootstrap-retries: 1
 
