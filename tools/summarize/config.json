@@ -18,7 +18,7 @@
     "embeddedVideo": "both",
     "videoMode": "auto"
   },
-  "model": "openai/antigravity/nnn-gemini-3.7-flash-medium",
+  "model": "openai/gemini-3.8-flash-high",
   "output": {
     "language": "auto",
     "length": "xxl"
