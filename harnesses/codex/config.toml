@@ -21,6 +21,15 @@ model_reasoning_summary = "detailed"
 personality = "pragmatic"
 
 # -----------------------------------------------------------------------------
+# PERMISSIONS
+# -----------------------------------------------------------------------------
+# These MUST stay above the first table header below; TOML keys after a table
+# header belong to that table, which silently disabled both settings.
+
+approval_policy = "never"
+default_permissions = ":danger-full-access"
+
+# -----------------------------------------------------------------------------
 # PROVIDERS
 # -----------------------------------------------------------------------------
 
@@ -28,13 +37,6 @@ personality = "pragmatic"
 name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
-
-# -----------------------------------------------------------------------------
-# PERMISSIONS
-# -----------------------------------------------------------------------------
-
-approval_policy = "never"
-default_permissions = ":danger-full-access"
 
 # light theme
 [desktop.appearanceLightChromeTheme]
