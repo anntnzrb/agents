@@ -82,6 +82,8 @@ hooks = false
 memories = false
 plugins = true
 prevent_idle_sleep = true
+recommended_plugins = true
+worktrees = true
 
 [memories]
 generate_memories = false
