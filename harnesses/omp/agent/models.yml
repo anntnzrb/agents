@@ -27,6 +27,18 @@ providers:
             - low
             - max
           defaultLevel: low
+      deepseek-v4.1-flash:
+        contextWindow: 1000000 # 1M * 85% = 850K trigger, server-advertised 1M window / 384K max output
+        thinking:
+          mode: effort
+          efforts:
+            - low
+            - high
+            - max
+          defaultLevel: max
+        input:
+          - text
+          - image
   devin:
     modelOverrides:
       glm-5-3-flash-1m:
@@ -61,6 +73,18 @@ providers:
             - low
             - max
           defaultLevel: low
+      deepseek/deepseek-v4.1-flash:
+        contextWindow: 1000000 # 1M * 85% = 850K trigger, server-advertised 1M window; catalog max-out 66K
+        thinking:
+          mode: effort
+          efforts:
+            - low
+            - high
+            - max
+          defaultLevel: max
+        input:
+          - text
+          - image
   cline-pass:
     baseUrl: https://api.cline.bot/api/v1
     apiKey: CLINE_API_KEY
@@ -118,3 +142,6 @@ providers:
 # - GPT-6 Astra:
 #   - OpenAI Responses API & Compaction Architecture (https://developers.openai.com/api/docs/guides/compaction)
 #   - RULER COLM 2024 (https://arxiv.org/abs/2404.06654)
+# - DeepSeek V4.1 Flash:
+#   - DeepSeek V4.1-Flash announcement, `deepseek-flash` model ID (https://api-docs.deepseek.com/news/news260910/)
+#   - 1M context / 384K max output, low/high/max thinking per
