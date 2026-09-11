@@ -32,32 +32,32 @@ Scan, verify, and score software subscriptions, developer accounts, and digital 
 
 ## Public CLI Entrypoint
 
-Run via Bun runner:
+Run via uv:
 
 ```text
-bun skills/current/market-hunter/scripts/cli.ts "<query>" [options]
+uv run --script skills/current/market-hunter/scripts/cli.py "<query>" [options]
 ```
 
 ## Common Command Recipes
 
 Search for ChatGPT Plus deals with a budget ceiling:
 ```bash
-bun skills/current/market-hunter/scripts/cli.ts "ChatGPT Plus" --budget 15
+uv run --script skills/current/market-hunter/scripts/cli.py "ChatGPT Plus" --budget 15
 ```
 
 Search specifically for dedicated personal accounts:
 ```bash
-bun skills/current/market-hunter/scripts/cli.ts "Claude Pro" --type account
+uv run --script skills/current/market-hunter/scripts/cli.py "Claude Pro" --type account
 ```
 
 Search across specific marketplaces and output JSON:
 ```bash
-bun skills/current/market-hunter/scripts/cli.ts "Gemini Pro 6 Months" --markets g2a,kinguin,plati --json
+uv run --script skills/current/market-hunter/scripts/cli.py "Gemini Pro 6 Months" --markets g2a,kinguin,plati --json
 ```
 
 Include all listings (including filtered low-trust offers) for debugging:
 ```bash
-bun skills/current/market-hunter/scripts/cli.ts "GitHub Copilot 1 Year" --full
+uv run --script skills/current/market-hunter/scripts/cli.py "GitHub Copilot 1 Year" --full
 ```
 
 ## Output Contract
@@ -104,8 +104,8 @@ The CLI outputs clean, human-readable terminal reports by default and structured
 ## Exit Codes
 
 - `0`: Successful scan and report emission.
-- `2`: Invalid command arguments or configuration error.
-- `124`: Scan execution timeout fired.
+- `1`: Unexpected runtime failure (stack trace on stderr).
+- `2`: Invalid command arguments.
 
 ## Required Follow-Up Reads
 

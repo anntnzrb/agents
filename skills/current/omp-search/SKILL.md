@@ -16,7 +16,7 @@ Use this skill when an agent needs live web search through the installed OMP CLI
 Run the cross-platform wrapper; do not invoke a shell, source an environment file, or scrape OMP's terminal panel yourself:
 
 ```text
-bun <skill-dir>/scripts/cli.ts "<query>"
+uv run --script <skill-dir>/scripts/cli.py "<query>"
 ```
 
 The wrapper locates `omp` on `PATH` or uses `OMP_BIN`, preserves the caller's working directory and OMP profile, and emits one JSON object to stdout.
@@ -57,9 +57,9 @@ Failure returns the same query context with `ok: false`, an `error` object, and 
 ## Examples
 
 ```text
-bun <skill-dir>/scripts/cli.ts "latest Bun JavaScript runtime release" --recency week --limit 3
-bun <skill-dir>/scripts/cli.ts "ancient history of the Antikythera mechanism" --providers exa,parallel
-bun <skill-dir>/scripts/cli.ts "current TypeScript release" --provider brave --full
+uv run --script <skill-dir>/scripts/cli.py "latest Bun JavaScript runtime release" --recency week --limit 3
+uv run --script <skill-dir>/scripts/cli.py "ancient history of the Antikythera mechanism" --providers exa,parallel
+uv run --script <skill-dir>/scripts/cli.py "current TypeScript release" --provider brave --full
 ```
 
 ## Runtime notes
@@ -72,7 +72,7 @@ bun <skill-dir>/scripts/cli.ts "current TypeScript release" --provider brave --f
 ## Validation
 
 ```text
-bun <skill-dir>/scripts/cli.ts --help
-bun test <skill-dir>/test/
+uv run --script <skill-dir>/scripts/cli.py --help
+uv run --script <skill-creator-dir>/scripts/cli.py gates <skill-dir> --tests
 uv run --script <skill-creator-dir>/scripts/cli.py quick-validate <skill-dir>
 ```

@@ -1,0 +1,56 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "A002",
+    "ANN401",
+    "BLE001",
+    "COM812",
+    "CPY001",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D203",
+    "D213",
+    "E501",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "FBT001",
+    "FBT002",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "C901",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TC003",
+    "TRY003",
+    "TRY301",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201", "INP001"]
+"tests/**/*.py" = ["S101", "PT009", "ANN", "ARG", "E402", "INP001", "FBT001", "PLR2004"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["scripts", "lib", "tests"]
+extraPaths = ["lib"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+
+[tool.pytest.ini_options]
+pythonpath = ["lib", "."]
+testpaths = ["tests"]
