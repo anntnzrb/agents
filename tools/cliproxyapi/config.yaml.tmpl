@@ -68,6 +68,59 @@ openai-compatibility:
       - name: "zai-org/GLM-5.3"
       - name: "moonshotai/Kimi-K3"
 
+payload:
+  override:
+    - models:
+        - name: "gemini-3.7-flash-high"
+          protocol: "antigravity"
+      params:
+        "generationConfig.thinkingConfig.thinkingLevel": "medium"
+    - models:
+        - name: "gpt-5.6-sol"
+          protocol: "codex"
+      params:
+        "reasoning.effort": "high"
+    - models:
+        - name: "gpt-5.6-luna"
+          protocol: "codex"
+      params:
+        "reasoning.effort": "max"
+    - models:
+        - name: "gpt-5.6-terra"
+          protocol: "codex"
+      params:
+        "reasoning.effort": "max"
+    - models:
+        - name: "deepseek-v4-flash"
+        - name: "cline-pass/deepseek-v4-flash"
+        - name: "deepseek/deepseek-v4-flash"
+      params:
+        reasoning_effort: "high"
+    - models:
+        - name: "deepseek-v4-pro"
+        - name: "cline-pass/deepseek-v4-pro"
+        - name: "deepseek/deepseek-v4-pro"
+      params:
+        reasoning_effort: "high"
+    - models:
+        - name: "deepseek-v4-flash-free"
+      params:
+        reasoning_effort: "high"
+    - models:
+        - name: "cline-pass/glm-5.3"
+        - name: "zai-org/GLM-5.3"
+      params:
+        reasoning_effort: "max"
+    - models:
+        - name: "cline-pass/kimi-k3"
+        - name: "moonshotai/Kimi-K3"
+      params:
+        reasoning_effort: "max"
+    - models:
+        - name: "cline-pass/qwen3.8-max"
+      params:
+        reasoning_effort: "xhigh"
+
 oauth-excluded-models:
   antigravity:
     - "claude-*"
