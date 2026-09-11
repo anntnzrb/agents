@@ -1,0 +1,1 @@
+"""omp-search core library."""
