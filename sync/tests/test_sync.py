@@ -846,7 +846,7 @@ def test_run_sync_happy_path(seeded_home: Path) -> None:
     )
     _write_file(
         seeded_home / ".config" / "agents" / "tools" / "summarize" / "config.json",
-        '{"model":"fast"}',
+        '{"env":{"OPENAI_BASE_URL":"${CLIPROXY_CLIENT_BASE_URL}"}}',
     )
     _write_file(
         seeded_home / ".config" / "agents" / "skills" / "current" / "skill.txt",

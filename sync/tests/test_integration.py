@@ -195,7 +195,10 @@ def write_fixture_files(home: Path) -> None:
     ).write_text('{"x":1}', encoding="utf-8")
     _ = (
         home / ".config" / "agents" / "tools" / "summarize" / "config.json"
-    ).write_text('{"x":1}', encoding="utf-8")
+    ).write_text(
+        f'{{"env": {{"OPENAI_BASE_URL": "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"}}}}',
+        encoding="utf-8",
+    )
     template_content = (
         "host: ${CLIPROXY_LISTEN_HOST}\n"
         "port: ${CLIPROXY_LISTEN_PORT}\n"
@@ -539,7 +542,9 @@ def test_integration_happy_path_matches_expected_outputs(
     assert (home / ".omp" / "agent" / "skills" / "skill.txt").is_file()
     assert not (home / ".omp" / "agent" / "skills" / "legacy").exists()
     assert (home / ".mcporter" / "mcporter.json").is_file()
-    assert (home / ".summarize" / "config.json").is_file()
+    summarize_config = (home / ".summarize" / "config.json").read_text(encoding="utf-8")
+    assert "127.0.0.1:1" in summarize_config
+    assert CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER not in summarize_config
 
     config_text = (home / ".cli-proxy-api" / "config.yaml").read_text(encoding="utf-8")
     raw_config: object = yaml.safe_load(config_text)  # pyright: ignore[reportAny]

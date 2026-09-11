@@ -25,6 +25,7 @@ from sync.core.cliproxy_deployment import (
     CliProxyEndpointSyncOptions,
     is_cliproxy_target_ready,
     publish_cliproxy_endpoint_templates,
+    sync_cliproxy_endpoint_template,
 )
 from sync.core.plan import (
     CliProxyConfigJob,
@@ -125,6 +126,12 @@ def _run_file_job(job: FileJob) -> bool:
     try:
         if not Path(job.src).exists() and not is_symlink(job.src):
             err(f"missing source: {job.src}")
+            return True
+        if job.endpoint_template:
+            if job.deployment is None:
+                err(f"missing deployment for endpoint template: {job.src}")
+                return False
+            sync_cliproxy_endpoint_template(job.src, job.dst, job.deployment)
             return True
         try:
             src_stat = Path(job.src).stat()

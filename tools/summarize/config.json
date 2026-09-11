@@ -12,7 +12,7 @@
   },
   "env": {
     "OPENAI_API_KEY": "keyless",
-    "OPENAI_BASE_URL": "http://munich.trex-gamut.ts.net:8317/v1"
+    "OPENAI_BASE_URL": "${CLIPROXY_CLIENT_BASE_URL}"
   },
   "media": {
     "embeddedVideo": "both",

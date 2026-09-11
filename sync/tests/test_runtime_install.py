@@ -41,7 +41,10 @@ def make_home(tmp_path: Path, *, gateway_host: bool = True) -> str:
         f"{json.dumps(deployment)}\n", encoding="utf-8"
     )
     _ = (tools / "mcporter" / "mcporter.jsonc").write_text("{}\n", encoding="utf-8")
-    _ = (tools / "summarize" / "config.json").write_text("{}\n", encoding="utf-8")
+    _ = (tools / "summarize" / "config.json").write_text(
+        '{"env":{"OPENAI_BASE_URL":"${CLIPROXY_CLIENT_BASE_URL}"}}\n',
+        encoding="utf-8",
+    )
 
     return home
 

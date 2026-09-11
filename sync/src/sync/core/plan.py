@@ -61,6 +61,8 @@ class FileJob:
 
     src: str
     dst: str
+    endpoint_template: bool = False
+    deployment: CliProxyDeployment | None = None
     kind: Literal["File"] = "File"
 
 
@@ -358,6 +360,8 @@ def _config_jobs(
         FileJob(
             src=str(Path(sync_env.ssot_home) / "tools" / "summarize" / "config.json"),
             dst=str(Path(sync_env.summarize_home) / "config.json"),
+            endpoint_template=True,
+            deployment=deployment,
         ),
         CliProxyConfigJob(
             src=str(
