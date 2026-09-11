@@ -135,6 +135,7 @@ interrupt_message = true
 [features.multi_agent_v2]
 hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
+max_concurrent_threads_per_session = 8
 
 [agents.explorer]
 description = "Codebase explorer with full local tool access that returns structured evidence."
