@@ -31,7 +31,7 @@ Adapters can declare these hooks:
 
 ## CLIProxyAPI integration
 
-A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials. OpenCode, OMP, and Pi use the `keyless` placeholder in their CLIProxyAPI entries. Codex does not configure a client key. Sync probes the gateway without authorization.
+A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials. OpenCode uses the `keyless` placeholder because its SDK requires a non-empty value; Grok's provider block declares no client key. Other committed harness sources do not declare a CLIProxyAPI provider. Sync probes the gateway without authorization.
 
 Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. Harness providers use a static placeholder key because their SDKs require a non-empty value. The gateway ignores that key.
 
