@@ -75,7 +75,7 @@ Run sync from the repository root:
 uv run --project sync sync
 ```
 
-The first gateway-host run may download the pinned CLIProxyAPI archive. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
+The first gateway-host run may download the managed CLIProxyAPI release for this platform. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
 
 Confirm that sync created the main artifacts:
 

@@ -89,7 +89,7 @@ Extension dependency hooks compute a content fingerprint (`fingerprintTree`) of 
 - Ignored entries: skips `node_modules`, `.git`, hidden entries (names starting with `.`), and Python bytecode/caches (`__pycache__`, `*.pyc`, `*.pyo`).
 ## Managed CLIProxyAPI release
 
-`tools/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. Sync downloads an archive only when the cached executable or its receipt does not match the manifest.
+`tools/cliproxyapi/release.json` selects the GitHub repository, version, platform archive, binary, and checksum. A `version` of `latest` resolves through the GitHub release redirect. Sync downloads an archive only when the cached executable or its receipt does not match the resolved release.
 
 The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`:
 
@@ -97,7 +97,7 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 <cache-home>/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
 ```
 
-Sync verifies the SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest contains macOS ARM64 and Linux x86_64 assets.
+Sync verifies the release's SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest lists macOS ARM64 and Linux x86_64 assets.
 
 Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on the next sync.
 

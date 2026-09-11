@@ -326,3 +326,190 @@ def test_managed_tool_recovers_from_corrupted_receipt(tmp_path: Path) -> None:
     tools = prepare_managed_tools(sync_env, runtime)
     assert len(tools) == 1
     assert downloads == EXPECTED_REINSTALL_DOWNLOADS
+
+
+LATEST_VERSION = "7.3.0"
+LATEST_ARCHIVE_NAME = "CLIProxyAPI_7.3.0_darwin_aarch64.tar.gz"
+LATEST_CHECKSUMS_URL = (
+    "https://github.com/router-for-me/CLIProxyAPI/releases/download/"
+    f"v{LATEST_VERSION}/checksums.txt"
+)
+
+
+def write_latest_manifest(home: Path) -> None:
+    """Write a latest-tracking manifest with version-name templates."""
+    manifest_dir = home / ".config" / "agents" / "tools" / "cliproxyapi"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_payload = {
+        "repository": "router-for-me/CLIProxyAPI",
+        "version": "latest",
+        "binary": "cli-proxy-api",
+        "assets": {
+            "darwin-arm64": {
+                "name": "CLIProxyAPI_{version}_darwin_aarch64.tar.gz",
+            },
+        },
+    }
+    manifest_path = manifest_dir / "release.json"
+    _ = manifest_path.write_text(f"{json.dumps(manifest_payload)}\n", encoding="utf-8")
+
+
+def test_managed_tool_tracks_latest_release(tmp_path: Path) -> None:
+    """Latest manifests resolve the tag and verify the download via checksums."""
+    write_latest_manifest(tmp_path)
+    sync_env = SyncEnv.from_home(
+        str(tmp_path),
+        INSTALL_TIMEOUT_MS,
+        platform="darwin",
+    )
+    downloads: list[str] = []
+    checksum_fetches: list[str] = []
+
+    def mock_resolve(repository: str, timeout_ms: int) -> str:
+        _ = timeout_ms
+        assert repository == "router-for-me/CLIProxyAPI"
+        return LATEST_VERSION
+
+    def mock_fetch_checksums(url: str, timeout_ms: int) -> dict[str, str]:
+        _ = timeout_ms
+        checksum_fetches.append(url)
+        return {LATEST_ARCHIVE_NAME: EXPECTED_CHECKSUM}
+
+    def mock_download(url: str, destination: str, timeout_ms: int) -> None:
+        _ = timeout_ms
+        downloads.append(url)
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
+
+    def mock_extract(
+        _archive: str,
+        destination: str,
+        entry_name: str,
+        _timeout_ms: int,
+    ) -> None:
+        executable = Path(destination) / entry_name
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(EXECUTABLE_MODE)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        resolve_version=mock_resolve,
+        fetch_checksums=mock_fetch_checksums,
+        download=mock_download,
+        extract=mock_extract,
+    )
+
+    first = prepare_managed_tools(sync_env, runtime)[0]
+    assert first.version == LATEST_VERSION
+    assert f"/releases/download/v{LATEST_VERSION}/{LATEST_ARCHIVE_NAME}" in downloads[0]
+    assert LATEST_VERSION in first.executable
+    assert checksum_fetches == [LATEST_CHECKSUMS_URL]
+
+    second = prepare_managed_tools(sync_env, runtime)[0]
+    assert second.executable == first.executable
+    assert len(downloads) == 1
+    assert len(checksum_fetches) == 1
+
+
+def test_managed_tool_latest_falls_back_to_cached_install(tmp_path: Path) -> None:
+    """A failed latest lookup reuses the newest verified cached install."""
+    write_latest_manifest(tmp_path)
+    sync_env = SyncEnv.from_home(
+        str(tmp_path),
+        INSTALL_TIMEOUT_MS,
+        platform="darwin",
+    )
+    downloads = 0
+
+    def mock_download(_url: str, destination: str, _timeout_ms: int) -> None:
+        nonlocal downloads
+        downloads += 1
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
+
+    def mock_extract(
+        _archive: str,
+        destination: str,
+        entry_name: str,
+        _timeout_ms: int,
+    ) -> None:
+        executable = Path(destination) / entry_name
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(EXECUTABLE_MODE)
+
+    def mock_fetch_checksums(_url: str, _timeout_ms: int) -> dict[str, str]:
+        return {LATEST_ARCHIVE_NAME: EXPECTED_CHECKSUM}
+
+    online = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        resolve_version=lambda _repository, _timeout_ms: LATEST_VERSION,
+        fetch_checksums=mock_fetch_checksums,
+        download=mock_download,
+        extract=mock_extract,
+    )
+    first = prepare_managed_tools(sync_env, online)[0]
+    assert first.version == LATEST_VERSION
+    assert downloads == 1
+
+    def offline_resolve(_repository: str, _timeout_ms: int) -> str:
+        message = "network down"
+        raise RuntimeError(message)
+
+    offline = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        resolve_version=offline_resolve,
+    )
+    cached = prepare_managed_tools(sync_env, offline)[0]
+    assert cached.version == LATEST_VERSION
+    assert cached.executable == first.executable
+    assert downloads == 1
+
+
+def test_managed_tool_latest_without_cache_raises(tmp_path: Path) -> None:
+    """Latest lookup failure without a cached install surfaces the error."""
+    write_latest_manifest(tmp_path)
+    sync_env = SyncEnv.from_home(
+        str(tmp_path),
+        INSTALL_TIMEOUT_MS,
+        platform="darwin",
+    )
+
+    def offline_resolve(_repository: str, _timeout_ms: int) -> str:
+        message = "network down"
+        raise RuntimeError(message)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        resolve_version=offline_resolve,
+    )
+    with pytest.raises(RuntimeError, match=r"network down"):
+        _ = prepare_managed_tools(sync_env, runtime)
+
+
+def test_managed_tool_latest_requires_checksums_entry(tmp_path: Path) -> None:
+    """A checksums file without the target asset aborts the install."""
+    write_latest_manifest(tmp_path)
+    sync_env = SyncEnv.from_home(
+        str(tmp_path),
+        INSTALL_TIMEOUT_MS,
+        platform="darwin",
+    )
+    downloads = 0
+
+    def mock_download(_url: str, destination: str, _timeout_ms: int) -> None:
+        nonlocal downloads
+        downloads += 1
+        _ = Path(destination).write_bytes(ARCHIVE_CONTENT)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        resolve_version=lambda _repository, _timeout_ms: LATEST_VERSION,
+        fetch_checksums=lambda _url, _timeout_ms: {},
+        download=mock_download,
+    )
+    with pytest.raises(RuntimeError, match=r"checksums missing"):
+        _ = prepare_managed_tools(sync_env, runtime)
+    assert downloads == 0
