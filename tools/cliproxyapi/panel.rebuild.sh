@@ -5,7 +5,7 @@
 set -eu
 
 REPO="https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
-HEAD="5d6ff13de6fd10e7cb20f0e6de1977cd4697bdae"
+HEAD="ed5f1c48e11ba7335f1e8f676f228c280196af85"
 OUT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
