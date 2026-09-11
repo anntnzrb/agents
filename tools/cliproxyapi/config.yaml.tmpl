@@ -41,18 +41,35 @@ routing:
 codex:
   identity-confuse: false
   disable-codex-cloaking: false
-  optimize-multi-agent-v2: false
+  # Codex Desktop/TUI/CLI multi-agent v2 request normalization.
+  optimize-multi-agent-v2: true
+  # Hold handshake events so overload rejections can fail over on another credential.
+  stream-bootstrap-buffering: true
+  # Scope usage_limit_reached cooldowns to the requested model instead of the whole credential.
+  model-level-cooling: true
+
+antigravity:
+  connection-pool:
+    enabled: true
 
 openai-compatibility:
   - name: "opencode-go-custom"
     base-url: "https://opencode.ai/zen/go/v1"
+    prefix: "opencode-go"
     x-credential-pool: "opencode-go"
-    models:
-      - name: "deepseek-v4-flash"
-      - name: "deepseek-v4-pro"
+    # The Go API rejects requests without a session key; the gateway's own affinity
+    # still chooses the credential, so a fixed routing key is sufficient.
+    headers:
+      x-opencode-session: "cliproxy"
+    # Sync derives the model list from {base-url}/models.
+    x-model-discovery: true
   - name: "opencode-zen-custom"
     base-url: "https://opencode.ai/zen/v1"
+    prefix: "opencode-zen"
     x-credential-pool: "opencode-zen"
+    headers:
+      x-opencode-session: "cliproxy"
+    x-model-discovery: true
   - name: "cline-pass-custom"
     base-url: "https://api.cline.bot/api/v1"
     x-credential-pool: "cline-pass"

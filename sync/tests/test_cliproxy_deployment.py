@@ -485,15 +485,21 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
 
     profiles = config.get("openai-compatibility")
     assert _is_obj_list(profiles)
+    prefixed: set[object] = set()
     for profile in profiles:
         assert _is_obj_dict(profile)
-        assert "prefix" not in profile
+        if "prefix" in profile:
+            prefixed.add(profile.get("name"))
         models = profile.get("models")
         if not _is_obj_list(models):
             continue
         for model in models:
             assert _is_obj_dict(model)
             assert set(model.keys()) == {"name"}
+
+    # Only the shared OpenCode pools are namespaced; every other provider keeps
+    # upstream model names so a model id maps to exactly one owner.
+    assert prefixed == {"opencode-go-custom", "opencode-zen-custom"}
 
     cline = next(
         (
