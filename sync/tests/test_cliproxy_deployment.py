@@ -479,25 +479,11 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
     config: object = yaml.safe_load(source)  # pyright: ignore[reportAny]
     assert _is_obj_dict(config)
 
-    # Model aliases stay absent; payload overrides are limited to reasoning-effort
-    # and thinking-level pins for models that need them.
+    # Model aliases, payload overrides, and OAuth model exclusions stay absent;
+    # model policy lives in the clients and in upstream discovery.
     assert "oauth-model-alias" not in config
-    payload = config.get("payload")
-    assert _is_obj_dict(payload)
-    overrides = payload.get("override")
-    assert _is_obj_list(overrides)
-    declared_names: set[object] = set()
-    for entry in overrides:
-        assert _is_obj_dict(entry)
-        models = entry.get("models")
-        assert _is_obj_list(models)
-        for model in models:
-            assert _is_obj_dict(model)
-            declared_names.add(model.get("name"))
-    assert all(isinstance(name, str) and name for name in declared_names)
-    # OpenCode pool models carry a namespace prefix; payload rules must use it.
-    bare_pool_names = {"deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-free"}
-    assert not (declared_names & bare_pool_names)
+    assert "payload" not in config
+    assert "oauth-excluded-models" not in config
 
     profiles = config.get("openai-compatibility")
     assert _is_obj_list(profiles)
