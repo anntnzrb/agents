@@ -5,9 +5,11 @@
   "followUpMode": "all",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.84.2",
+  "defaultModel": "cliproxy/gemini-3.8-flash-high",
   "enabledModels": [
-    "opencode-go/muse-spark-1.3-contributor:max",
-    "opencode-go/deepseek-flash:max"
+    "cliproxy/gemini-3.8-flash-high",
+    "cliproxy/gpt-6-astra",
+    "opencode-go/muse-spark-1.3-contributor:max"
   ],
   "quietStartup": true,
   "showHardwareCursor": true,
