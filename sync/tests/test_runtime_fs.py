@@ -299,6 +299,8 @@ def test_is_identical_file(tmp_path: Path) -> None:
     _ = f1.write_text("hello", encoding="utf-8")
     _ = f2.write_text("hello", encoding="utf-8")
     _ = f3.write_text("world", encoding="utf-8")
+    for path in (f1, f2, f3):
+        path.chmod(0o644)
 
     stat1 = f1.stat()
     assert is_identical_file(f1, stat1, f2) is True
