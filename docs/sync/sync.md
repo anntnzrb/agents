@@ -62,7 +62,7 @@ The gateway host also receives `tools/cliproxyapi/panel.html` at `~/.cli-proxy-a
 
 Endpoint publication replaces every configured `${CLIPROXY_CLIENT_BASE_URL}` harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
 
-The renderer parses and serializes YAML with PyYAML. It expands credential pools into native and compatibility profiles. The job writes generated files through a temporary file and an atomic rename.
+The renderer parses and serializes YAML with PyYAML. It expands credential pools into native and compatibility profiles. Compatibility profiles marked `x-model-discovery: true` take their model list from the profile's `{base-url}/models` endpoint at render time, authenticated with the pool's first credential; the marker does not appear in the rendered file. A failed lookup reuses the model list from the previously generated configuration. The job writes generated files through a temporary file and an atomic rename.
 ## Installed runtime
 
 Sync copies `sync/src/`, `sync/pyproject.toml`, and `sync/uv.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `uv sync --frozen --no-dev` there so the installed copy resolves its runtime dependencies. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.

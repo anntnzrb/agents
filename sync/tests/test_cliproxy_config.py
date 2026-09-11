@@ -265,3 +265,109 @@ port: ${{CLIPROXY_LISTEN_PORT}}
 
     with pytest.raises(ValueError, match=expected_match):
         _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
+
+
+def test_cliproxy_render_config_discovers_compatibility_models() -> None:
+    """Discovery replaces the profile model list with ids fetched from the upstream."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    calls: list[tuple[str, str]] = []
+
+    def fake_fetch(base_url: str, api_key: str) -> list[str] | None:
+        calls.append((base_url, api_key))
+        return ["model-a", "model-b"]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discover=fake_fetch,
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [{"name": "model-a"}, {"name": "model-b"}],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+    assert calls == [("https://upstream.example.test/v1", "key-1")]
+
+
+def _unavailable_fetch(_base_url: str, _api_key: str) -> None:
+    return None
+
+
+def test_cliproxy_render_config_reuses_previous_models_when_discovery_fails() -> None:
+    """A failed discovery fetch keeps the previously rendered model list."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discover=_unavailable_fetch,
+        previous_models={"discovered": [{"name": "stale-model"}]},
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [{"name": "stale-model"}],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_cliproxy_render_config_rejects_discovery_without_pool() -> None:
+    """Discovery requires the credential pool marker that supplies the API key."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-model-discovery: true
+"""
+    secrets = {"CLIPROXY_CREDENTIAL_POOLS": {"other": [{"apiKey": "key-1"}]}}
+    with pytest.raises(ValueError, match="requires x-credential-pool"):
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
+
+
+def test_cliproxy_render_config_rejects_non_boolean_discovery_marker() -> None:
+    """The discovery marker accepts only true."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery:
+      include: ["*"]
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    with pytest.raises(ValueError, match="expected true"):
+        _ = render_cliproxy_config(template, secrets, DEPLOYMENT)

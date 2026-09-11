@@ -5,22 +5,24 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final, TypeGuard
 
+import httpx
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-
     from sync.core.cliproxy_deployment import CliProxyDeployment
-from sync.runtime.errors import panic_message
+from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import sync_private_text_file
 from sync.runtime.jsonc import strip_jsonc
 
 POOL_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9-]*$")
 POOL_MARKER: Final[str] = "x-credential-pool"
+DISCOVERY_MARKER: Final[str] = "x-model-discovery"
+DISCOVERY_TIMEOUT_SECONDS: Final[float] = 5.0
 MIN_CREDENTIAL_WEIGHT: Final[int] = 1
 MAX_CREDENTIAL_WEIGHT: Final[int] = 1_000_000
 
@@ -35,6 +37,9 @@ NATIVE_CREDENTIAL_SECTIONS: Final[tuple[str, ...]] = (
 
 OWNED_NATIVE_FIELDS: Final[tuple[str, ...]] = ("api-key", "weight", "proxy-url")
 OWNED_COMPATIBILITY_FIELDS: Final[tuple[str, ...]] = ("api-key-entries",)
+
+
+type ModelListFetcher = Callable[[str, str], list[str] | None]
 
 
 class Credential(BaseModel):
@@ -102,6 +107,89 @@ def credential_config(credential: Credential) -> dict[str, object]:
     if credential.proxy_url is not None:
         result["proxy-url"] = credential.proxy_url
     return result
+
+
+def fetch_upstream_model_ids(base_url: str, api_key: str) -> list[str] | None:
+    """Return upstream model ids, or None when the endpoint is unavailable."""
+    url = f"{base_url.rstrip('/')}/models"
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {api_key}"}
+    try:
+        response = httpx.get(url, headers=headers, timeout=DISCOVERY_TIMEOUT_SECONDS)
+        if not response.is_success:
+            return None
+        payload: object = response.json()  # pyright: ignore[reportAny]
+    except (httpx.HTTPError, OSError, ValueError, TypeError):
+        return None
+    if not _is_obj_dict(payload):
+        return None
+    data = payload.get("data")
+    if not _is_obj_list(data):
+        return None
+    ids: list[str] = []
+    for item in data:
+        if _is_obj_dict(item):
+            identifier = item.get("id")
+            if isinstance(identifier, str) and identifier:
+                ids.append(identifier)
+    return ids
+
+
+def _validate_discovery(value: object, label: str) -> None:
+    if value is not True:
+        msg = f"invalid {label}.{DISCOVERY_MARKER}: expected true"
+        raise ValueError(msg)
+
+
+def _read_previous_models(path: Path) -> dict[str, list[object]]:
+    """Collect the previous rendered model lists keyed by compatibility profile name."""
+    try:
+        parsed: object = yaml.safe_load(path.read_text(encoding="utf-8"))  # pyright: ignore[reportAny]
+    except (OSError, yaml.YAMLError):
+        return {}
+    if not _is_obj_dict(parsed):
+        return {}
+    profiles = parsed.get("openai-compatibility")
+    if not _is_obj_list(profiles):
+        return {}
+    previous: dict[str, list[object]] = {}
+    for profile in profiles:
+        if not _is_obj_dict(profile):
+            continue
+        name = profile.get("name")
+        models = profile.get("models")
+        if isinstance(name, str) and _is_obj_list(models):
+            previous[name] = list(models)
+    return previous
+
+
+def _discover_profile_models(
+    label: str,
+    profile: dict[str, object],
+    credential: Credential,
+    discover: ModelListFetcher | None,
+    previous_models: Mapping[str, Sequence[object]] | None,
+) -> list[dict[str, object]]:
+    base_url = profile.get("base-url")
+    if not isinstance(base_url, str) or not base_url:
+        msg = f"invalid {label}: {DISCOVERY_MARKER} requires base-url"
+        raise ValueError(msg)
+    ids: list[str] | None = None
+    if discover is not None:
+        try:
+            ids = discover(base_url, credential.api_key)
+        except (httpx.HTTPError, OSError, RuntimeError, ValueError, TypeError):
+            ids = None
+    if ids is not None:
+        return [{"name": model_id} for model_id in ids]
+    name = profile.get("name")
+    previous = None
+    if isinstance(name, str) and previous_models:
+        previous = previous_models.get(name)
+    if previous:
+        warn(f"model discovery unavailable for {name}; reusing previous models")
+        return [dict(item) for item in previous if _is_obj_dict(item)]
+    warn(f"model discovery unavailable for {name}; no models declared")
+    return []
 
 
 def _validate_pool_marker(value: object, label: str) -> str:
@@ -174,6 +262,8 @@ def _expand_compatibility_section(
     value: object,
     pools: dict[str, list[Credential]],
     referenced_pools: set[str],
+    discover: ModelListFetcher | None,
+    previous_models: Mapping[str, Sequence[object]] | None,
 ) -> list[dict[str, object]]:
     if not _is_obj_list(value):
         msg = "invalid openai-compatibility: expected array"
@@ -186,6 +276,9 @@ def _expand_compatibility_section(
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
         if POOL_MARKER not in profile:
+            if DISCOVERY_MARKER in profile:
+                msg = f"invalid {label}: {DISCOVERY_MARKER} requires {POOL_MARKER}"
+                raise ValueError(msg)
             result.append(profile)
             continue
         pool_marker_val = profile[POOL_MARKER]
@@ -194,6 +287,15 @@ def _expand_compatibility_section(
         credentials = _require_pool(pool_name, pools)
         referenced_pools.add(pool_name)
         shared_profile = {k: v for k, v in profile.items() if k != POOL_MARKER}
+        if DISCOVERY_MARKER in shared_profile:
+            _validate_discovery(shared_profile.pop(DISCOVERY_MARKER), label)
+            shared_profile["models"] = _discover_profile_models(
+                label,
+                shared_profile,
+                credentials[0],
+                discover,
+                previous_models,
+            )
         result.append(
             shared_profile
             | {
@@ -207,6 +309,8 @@ def render_cliproxy_config(
     template: str,
     secrets: CliProxySecrets | Mapping[str, object],
     deployment: CliProxyDeployment,
+    discover: ModelListFetcher | None = None,
+    previous_models: Mapping[str, Sequence[object]] | None = None,
 ) -> str:
     """Render CLIProxyAPI configuration YAML from template, secrets, and deployment."""
     try:
@@ -248,6 +352,8 @@ def render_cliproxy_config(
             config["openai-compatibility"],
             pools,
             referenced_pools,
+            discover,
+            previous_models,
         )
 
     unreferenced_pools = [name for name in pools if name not in referenced_pools]
@@ -302,7 +408,13 @@ def sync_cliproxy_config(
         raise RuntimeError(msg) from error
 
     secrets = read_cliproxy_secrets(secrets_p)
-    content = render_cliproxy_config(template, secrets, deployment)
+    content = render_cliproxy_config(
+        template,
+        secrets,
+        deployment,
+        discover=fetch_upstream_model_ids,
+        previous_models=_read_previous_models(dst_p),
+    )
     try:
         sync_private_text_file(dst_p, content)
     except (OSError, ValueError, RuntimeError) as error:
