@@ -1,15 +1,15 @@
 {
   "repository": "router-for-me/CLIProxyAPI",
-  "version": "7.2.132",
+  "version": "7.2.157",
   "binary": "cli-proxy-api",
   "assets": {
     "darwin-arm64": {
-      "name": "CLIProxyAPI_7.2.132_darwin_aarch64.tar.gz",
-      "sha256": "360f410c7a30df1dc197949bfd2f272930a9420ce9357889c27b40d8ad9f17f9"
+      "name": "CLIProxyAPI_7.2.157_darwin_aarch64.tar.gz",
+      "sha256": "f8adffd1b9d6aaa69df5f99a2a32f61f86835872fee709f52af6c58072d7936c"
     },
     "linux-x64": {
-      "name": "CLIProxyAPI_7.2.132_linux_amd64.tar.gz",
-      "sha256": "3813ec363ee53bd2ec6c876f8a6adf794a82247ca41a0994de8514a408888639"
+      "name": "CLIProxyAPI_7.2.157_linux_amd64.tar.gz",
+      "sha256": "e0df9f570b6e910a14f081425cee2527a503311f617d7727cd428009fab14c77"
     }
   }
 }
