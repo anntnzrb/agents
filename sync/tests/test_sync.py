@@ -446,6 +446,30 @@ def test_run_jobs_with_preserve_invalidates_cache_after_source_rewrite(
     ) == "new\n"
 
 
+def test_run_jobs_dir_tree_scope_replaces_file_destination(
+    tmp_path: Path,
+) -> None:
+    """Verify a Tree-scope dir job replaces an existing file at the destination."""
+    _write_file(tmp_path / "src" / "nested" / "file.txt", "content\n")
+    _write_file(tmp_path / "dst", "not a directory\n")
+
+    result = asyncio.run(
+        run_jobs_with_preserve(
+            [
+                DirJob(
+                    src=str(tmp_path / "src"),
+                    dst=str(tmp_path / "dst"),
+                    scope="Tree",
+                )
+            ]
+        )
+    )
+    assert result is True
+    assert (tmp_path / "dst" / "nested" / "file.txt").read_text(
+        encoding="utf-8"
+    ) == "content\n"
+
+
 def test_iter_extension_packages_skips_node_modules(
     tmp_path: Path,
 ) -> None:

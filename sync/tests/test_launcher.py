@@ -29,7 +29,12 @@ from sync.core.launcher import (
 )
 from sync.core.release_manifest import StaticReleaseAsset, StaticReleaseManifest
 from sync.core.tool_launchers import tool_launcher
-from sync.runtime.process import ProcessResult, RunProcessOptions, run_process
+from sync.runtime.process import (
+    MAX_DETAIL_CHARS,
+    ProcessResult,
+    RunProcessOptions,
+    run_process,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -281,6 +286,43 @@ def test_npm_launcher_first_ever_resolution_failure_still_errors(
 
     with pytest.raises(RuntimeError, match="network unavailable"):
         _ = asyncio.run(prepare_npm_package(spec, options))
+
+
+def test_npm_launcher_truncates_oversized_install_failure_detail(
+    tmp_path: Path,
+) -> None:
+    """Verify oversized npm install failure output is truncated in the error."""
+    home = str(tmp_path)
+
+    async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
+        return "1.0.0"
+
+    async def mock_run(
+        _cmd: Sequence[str],
+        _options: RunProcessOptions,
+    ) -> ProcessResult:
+        return ProcessResult(
+            exit_code=1,
+            stdout="",
+            stderr="x" * (MAX_DETAIL_CHARS + 1),
+            timed_out=False,
+        )
+
+    runtime = LauncherRuntime(resolve_version=mock_resolve, run=mock_run)
+    options = PreparePackageOptions(
+        home=home,
+        cache_home=str(tmp_path / "cache"),
+        runtime=runtime,
+        timeout_ms=DEFAULT_PREPARE_TIMEOUT_MS,
+    )
+    spec = NpmPackageSpec(tool="demo", package="demo-package", bin="demo")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        _ = asyncio.run(prepare_npm_package(spec, options))
+    message = str(exc_info.value)
+    assert "npm install failed" in message
+    assert message.endswith("…[truncated]")
+    assert len(message) < MAX_DETAIL_CHARS + 100
 
 
 def test_npm_launcher_separates_cache_versions_when_a_harness_changes_package(

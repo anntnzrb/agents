@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from typing import TYPE_CHECKING, Final, TypeGuard
 
@@ -16,6 +17,7 @@ from sync.core.harness import HarnessSpec, build_harness
 from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.hook_state import (
     clear_extension_hook_state,
+    find_generated_extension_entries,
     fingerprint_tree,
     load_extension_hook_state,
     prepare_extension_hook_state,
@@ -415,6 +417,33 @@ def test_prepare_extension_hook_state_records_and_preserves_nested_package_entri
     assert "skill-a/node_modules" in updated_state.preserve_paths
     assert "skill-a/bun.lock" in updated_state.preserve_paths
     assert "skill-a/package.json" in updated_state.preserve_paths
+
+
+def test_find_generated_extension_entries_tolerates_child_stat_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify a scandir child stat failure aborts the scan without raising."""
+    _ = (tmp_path / "package.json").write_text("{}\n", encoding="utf-8")
+
+    class _BrokenEntry:
+        name: str = "broken"
+        path: str = str(tmp_path / "broken")
+
+        def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+            _ = follow_symlinks
+            message = "denied"
+            raise PermissionError(message)
+
+    real_scandir = os.scandir
+
+    def fake_scandir(path: str | os.PathLike[str]) -> object:
+        if str(path) == str(tmp_path):
+            return iter([_BrokenEntry()])
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", fake_scandir)
+    assert find_generated_extension_entries(tmp_path) == ["package.json"]
 
 
 def test_clear_extension_hook_state(tmp_path: Path) -> None:
