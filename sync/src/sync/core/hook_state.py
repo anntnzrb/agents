@@ -211,13 +211,16 @@ def find_generated_extension_entries(
     ]
 
     try:
-        for child in os.scandir(root_path):
-            if not child.is_dir(follow_symlinks=False) or should_skip_entry(child.name):
-                continue
-            for entry_name in GENERATED_EXTENSION_ENTRY_NAMES:
-                relative_path = f"{child.name}/{entry_name}"
-                if _exists(str(root_path / relative_path)):
-                    results.append(relative_path)
+        with os.scandir(root_path) as entries:
+            for child in entries:
+                if not child.is_dir(follow_symlinks=False) or should_skip_entry(
+                    child.name
+                ):
+                    continue
+                for entry_name in GENERATED_EXTENSION_ENTRY_NAMES:
+                    relative_path = f"{child.name}/{entry_name}"
+                    if _exists(str(root_path / relative_path)):
+                        results.append(relative_path)
     except OSError:
         pass
 

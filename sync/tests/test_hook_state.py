@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Final, TypeGuard
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+    from typing import Self
 from sync.core.harness import HarnessSpec, build_harness
 from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.hook_state import (
@@ -435,11 +437,24 @@ def test_find_generated_extension_entries_tolerates_child_stat_errors(
             message = "denied"
             raise PermissionError(message)
 
+    class _FakeScandir:
+        def __init__(self, entries: list[object]) -> None:
+            self._entries: list[object] = entries
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def __iter__(self) -> Iterator[object]:
+            return iter(self._entries)
+
     real_scandir = os.scandir
 
     def fake_scandir(path: str | os.PathLike[str]) -> object:
         if str(path) == str(tmp_path):
-            return iter([_BrokenEntry()])
+            return _FakeScandir([_BrokenEntry()])
         return real_scandir(path)
 
     monkeypatch.setattr(os, "scandir", fake_scandir)
