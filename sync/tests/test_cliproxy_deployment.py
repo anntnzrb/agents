@@ -536,6 +536,16 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
     assert streaming.get("keepalive-seconds") == keepalive_seconds
     assert config.get("nonstream-keepalive-interval") == keepalive_seconds
 
+    # Antigravity WAF false-flags the literal harness system-conventions block as
+    # a bogus 429 (upstream issue #5751); sensitive-words obfuscation breaks the
+    # literal match before the request leaves the proxy.
+    antigravity = config.get("antigravity")
+    assert _is_obj_dict(antigravity)
+    sensitive_words = antigravity.get("sensitive-words")
+    assert _is_obj_list(sensitive_words)
+    assert "system-conventions" in sensitive_words
+    assert "system-directive" in sensitive_words
+
 
 def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
     tmp_path: Path,
