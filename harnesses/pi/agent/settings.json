@@ -5,9 +5,9 @@
   "followUpMode": "all",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.84.2",
-  "defaultModel": "command-code/deepseek/deepseek-v4.1-flash:max",
+  "defaultModel": "cliproxy/command-code/deepseek/deepseek-v4.1-flash:max",
   "enabledModels": [
-    "command-code/deepseek/deepseek-v4.1-flash:max"
+    "cliproxy/command-code/deepseek/deepseek-v4.1-flash:max"
   ],
   "quietStartup": true,
   "showHardwareCursor": true,
