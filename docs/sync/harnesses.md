@@ -13,6 +13,7 @@ Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports
 | `platforms` | Host platforms on which sync enables the adapter |
 | `launcher` | npm or static release launcher specification |
 | `launcher.defaultArgs` | Arguments that sync places in the wrapper before caller arguments |
+| `launcher.env` | Environment variables baked into the wrapper as `export` lines and applied to every launch; they override both the parent environment and `.env` |
 | `instructionFile` | Harness instruction filename when it differs from `AGENTS.md` |
 | `runtimeSubdir` | Subdirectory appended to the source and generated roots |
 | `compatManagedEntries` | Obsolete generated entries that sync can remove |
