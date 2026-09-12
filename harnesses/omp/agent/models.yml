@@ -25,6 +25,17 @@ providers:
         input:
           - text
           - image
+      opencode-go/muse-spark-1.3-contributor:
+        contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Muse 1.3's 98.5% MRCR recall zone
+        thinking:
+          mode: effort
+          efforts:
+            - low
+            - max
+          defaultLevel: max
+        input:
+          - text
+          - image
   google-antigravity:
     modelOverrides:
       gemini-3.7-flash:
