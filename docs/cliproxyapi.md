@@ -2,6 +2,8 @@
 
 CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider. `tools/cliproxyapi/deployment.json` is the only deployment-specific resource. It selects the gateway host, listener, and client endpoint.
 
+T3 Code sessions on the gateway host also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
+
 Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. Use the reference sections for field definitions and routing settings.
 
 ## Set the deployment
@@ -76,6 +78,28 @@ chmod 600 ~/.cli-proxy-api/codex-*.json
 ```
 
 Do not run two gateways with the same active refresh token. Stop the old gateway before you move OAuth state. Reauthenticate on the new host instead of copying an active token.
+
+## Authenticate Antigravity
+
+Use the control panel or the CLI. Both flows end at `http://localhost:51121/oauth-callback`, so the browser that completes Google OAuth must resolve `localhost:51121` to the gateway host. When operating the gateway remotely, forward the port first:
+
+```bash
+ssh -L 51121:localhost:51121 <gateway-host>
+```
+
+Panel flow: open the control panel and start Antigravity login. The gateway runs a temporary callback forwarder on port `51121`, exchanges the authorization code, writes the credential file under `~/.cli-proxy-api/`, and loads it without a restart.
+
+CLI flow on the gateway host:
+
+```bash
+cli-proxy-api --antigravity-login --no-browser
+```
+
+Open the printed URL in the browser. Restrict the generated file:
+
+```bash
+chmod 600 ~/.cli-proxy-api/antigravity-*.json
+```
 
 ## Start the gateway
 
@@ -246,15 +270,26 @@ The committed template sets these CLIProxyAPI values:
 | `routing.strategy` | `weighted-round-robin` |
 | `routing.session-affinity` | `true` |
 | `routing.session-affinity-ttl` | `1h` |
+| `routing.session-affinity-subagents` | `true` |
 | `request-retry` | `3` |
 | `max-retry-credentials` | `0` |
 | `max-retry-interval` | `30` |
 | `disable-cooling` | `false` |
 | `save-cooldown-status` | `true` |
+| `transient-error-cooldown-seconds` | `-1` |
+| `quota-exceeded.switch-project` | `true` |
+| `quota-exceeded.switch-preview-model` | `true` |
+| `quota-exceeded.antigravity-credits` | `true` |
+| `streaming.keepalive-seconds` | `15` |
 | `streaming.bootstrap-retries` | `1` |
+| `nonstream-keepalive-interval` | `15` |
 | `ws-auth` | `false` |
 
 Sync passes these values through to CLIProxyAPI. It does not derive or override them at runtime.
+
+## Upstream truth
+
+When a setting's semantics look wrong or a flag seems off, read the pinned release source — not this page. `config.example.yaml` in the upstream repository documents every accepted key, and `internal/` is authoritative for behavior. `tools/cliproxyapi/release.json` records which release is deployed.
 
 ## Control panel
 

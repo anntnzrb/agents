@@ -30,13 +30,27 @@ save-cooldown-status: true
 # Transient upstream failures rely on the retry rounds instead of a flat 60s cooldown.
 transient-error-cooldown-seconds: -1
 
+# Quota exhaustion falls back across projects, preview variants, and paid credits
+# before a request fails; a dead or exhausted credential never sinks the pool.
+quota-exceeded:
+  switch-project: true
+  switch-preview-model: true
+  antigravity-credits: true
+
+# Non-streaming responses emit blank lines so slow upstreams never look dead.
+nonstream-keepalive-interval: 15
+
 streaming:
+  # SSE keep-alives during long silent generations so clients never see dead air.
+  keepalive-seconds: 15
   bootstrap-retries: 1
 
 routing:
   strategy: "weighted-round-robin"
   session-affinity: true
   session-affinity-ttl: "1h"
+  # Subagent sessions inherit the parent's credential binding.
+  session-affinity-subagents: true
 
 codex:
   identity-confuse: false

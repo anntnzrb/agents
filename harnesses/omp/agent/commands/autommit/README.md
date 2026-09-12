@@ -67,3 +67,9 @@ Re-evaluate the role before changing its model; provider catalogs, free tiers, q
 8. Smoke-test the candidate on representative clean, mixed, split, and malformed diffs before making it the default.
 
 The durable configuration is `harnesses/omp/agent/config.yml`. Run the repository sync entrypoint after changing it so the generated OMP home receives the update.
+
+## Provider failures
+
+If the commit model fails after OMP finishes its provider retries, `/autommit` reports the provider error without requiring `--debug`. Provider failures stop planning or critique; they do not consume proposal-correction attempts. No commits are published without a valid proposal and any required critic verdict.
+
+For a rate limit or exhausted quota, wait for the provider's reset or configure another available `commit` model. A provider error is not evidence that the staged changes need a different commit plan.

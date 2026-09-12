@@ -513,6 +513,29 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
         assert profile.get("x-model-discovery") is True
         assert "models" not in profile
 
+    # Quota exhaustion falls back across projects, preview variants, and credits
+    # before a request fails; a dead or exhausted credential never sinks a pool.
+    quota = config.get("quota-exceeded")
+    assert quota == {
+        "switch-project": True,
+        "switch-preview-model": True,
+        "antigravity-credits": True,
+    }
+
+    # Subagent sessions inherit the parent's credential binding; failover stays
+    # automatic when the bound auth becomes unavailable.
+    routing = config.get("routing")
+    assert _is_obj_dict(routing)
+    assert routing.get("session-affinity") is True
+    assert routing.get("session-affinity-subagents") is True
+
+    # Long silent generations emit SSE keep-alives so clients never see dead air.
+    keepalive_seconds: Final = 15
+    streaming = config.get("streaming")
+    assert _is_obj_dict(streaming)
+    assert streaming.get("keepalive-seconds") == keepalive_seconds
+    assert config.get("nonstream-keepalive-interval") == keepalive_seconds
+
 
 def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
     tmp_path: Path,
