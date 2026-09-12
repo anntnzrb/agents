@@ -6,7 +6,7 @@ modelRoles:
   default: devin/swe-2:max
   smol: devin/swe-2:max
   vision: cliproxy/gemini-3.8-flash-high:high
-  commit: command-code/deepseek/deepseek-v4.1-flash:max
+  commit: cliproxy/gemini-3.8-flash-high:high
   tiny: cliproxy/gemini-3.7-flash-high:medium
   task: devin/swe-2:max
   advisor: cliproxy/gemini-3.8-flash-high:high
