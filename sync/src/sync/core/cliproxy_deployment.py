@@ -40,7 +40,6 @@ CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER: Final[str] = (
 ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
 MIN_PORT: Final[int] = 1
 MAX_PORT: Final[int] = 65535
-DEFAULT_FILE_MODE: Final[int] = 0o644
 
 
 def _is_unspecified_host(host: str) -> bool:
