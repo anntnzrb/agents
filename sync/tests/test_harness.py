@@ -10,9 +10,11 @@ import pytest
 from sync.cli import EXIT_USAGE, main
 from sync.core.harness import (
     RootEnvReadError,
+    StaticReleaseLauncher,
     SyncEnv,
     assert_path_component,
     load_root_env,
+    supported_harness,
 )
 
 if TYPE_CHECKING:
@@ -89,6 +91,35 @@ def test_load_root_env_returns_tagged_error_when_reading_fails(
 
     assert exc_info.value.path == str(bad_env_path)
     assert "failed to read root environment file" in str(exc_info.value)
+
+
+def test_supported_harness_resolves_devin_static_release(tmp_path: Path) -> None:
+    """Verify the devin adapter resolves a static release launcher and merge file."""
+    devin = supported_harness(str(tmp_path), "devin", "linux")
+    assert devin is not None
+    assert devin.home == str(tmp_path / ".config" / "devin")
+    assert devin.merge_json_files == ("config.json",)
+    assert isinstance(devin.launcher, StaticReleaseLauncher)
+    assert devin.launcher.bin == "devin"
+    assert devin.launcher.release.manifest_url == (
+        "https://static.devin.ai/cli/current/manifest.json"
+    )
+    assert devin.launcher.release.install_segments == (
+        ".local",
+        "share",
+        "devin",
+        "cli",
+    )
+    assert devin.launcher.release.executable_segments == ("bin", "devin")
+    assert devin.launcher.release.targets["linux-x64"] == "x86_64-unknown-linux"
+    assert devin.launcher.release.targets["darwin-arm64"] == "aarch64-apple-darwin"
+    assert devin.launcher.release.man_segments == ("share", "man", "man1")
+    assert devin.launcher.release.man_dest_segments == (
+        ".local",
+        "share",
+        "man",
+        "man1",
+    )
 
 
 def test_assert_path_component_rejects_trailing_newline() -> None:

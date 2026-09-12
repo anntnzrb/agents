@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import errno
 import fcntl
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from sync.runtime.errors import panic_message
 
 __all__ = [
     "SyncLock",
+    "acquire_cache_lock",
     "release_sync_lock",
     "try_acquire_sync_lock",
 ]
@@ -22,6 +25,8 @@ LOCK_FILE_MODE: int = 0o644
 FILE_START_OFFSET: int = 0
 TRUNCATE_SIZE: int = 0
 WOULD_BLOCK_ERRNOS: frozenset[int] = frozenset({errno.EAGAIN, errno.EWOULDBLOCK})
+RETRY_SLEEP_SECONDS: float = 0.025
+MILLISECONDS_PER_SECOND: float = 1000.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,3 +103,21 @@ def release_sync_lock(lock: SyncLock) -> None:
     """Release an acquired sync lock by closing its file descriptor."""
     with contextlib.suppress(OSError):
         os.close(lock.fd)
+
+
+async def acquire_cache_lock(
+    lock_root: str,
+    lock_file: str,
+    timeout_ms: int,
+) -> SyncLock:
+    """Acquire an exclusive cache lock, retrying until the timeout elapses."""
+    started_at = time.monotonic()
+    timeout_seconds = timeout_ms / MILLISECONDS_PER_SECOND
+    while True:
+        lock = try_acquire_sync_lock(lock_root, lock_file)
+        if lock is not None:
+            return lock
+        if time.monotonic() - started_at >= timeout_seconds:
+            message = f"timed out waiting for cache lock: {lock_file}"
+            raise TimeoutError(message)
+        await asyncio.sleep(RETRY_SLEEP_SECONDS)

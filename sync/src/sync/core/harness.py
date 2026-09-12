@@ -23,11 +23,13 @@ from sync.core.harness_adapters import (
     HarnessId,
     HarnessLauncherSpec,
     HostPlatform,
+    LauncherEnv,
     PackageBootstrapHook,
+    StaticReleaseLauncherSpec,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 SOURCE_AGENT_FILE: str = "HARNESS.md"
 INSTALL_TIMEOUT_SECONDS: int = 120
@@ -41,8 +43,20 @@ type HarnessHook = PackageBootstrapHook | ExtensionDepsHook
 
 
 @dataclass(frozen=True, slots=True)
-class HarnessLauncher:
-    """Resolved harness launcher configuration."""
+class StaticRelease:
+    """Resolved static CDN release source for a harness launcher."""
+
+    manifest_url: str
+    install_segments: tuple[str, ...]
+    executable_segments: tuple[str, ...]
+    targets: Mapping[str, str]
+    man_segments: tuple[str, ...] | None = None
+    man_dest_segments: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NpmLauncher:
+    """Resolved npm package launcher configuration."""
 
     package: str
     bin: str
@@ -50,6 +64,20 @@ class HarnessLauncher:
     smoke_check: str = "--version"
     default_args: tuple[str, ...] = ()
     env: dict[str, str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StaticReleaseLauncher:
+    """Resolved static release launcher configuration."""
+
+    bin: str
+    release: StaticRelease
+    smoke_check: str = "--version"
+    default_args: tuple[str, ...] = ()
+    env: dict[str, str] | None = None
+
+
+type HarnessLauncher = NpmLauncher | StaticReleaseLauncher
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,36 +227,53 @@ def load_root_env(env_path: str) -> dict[str, str]:
     return decode_root_env(content)
 
 
+def _resolve_launcher_env(
+    env: LauncherEnv | None,
+    home: str,
+) -> dict[str, str] | None:
+    if callable(env):
+        return env(home)
+    return env
+
+
+def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
+    launcher_env = _resolve_launcher_env(spec.env, home)
+    smoke_check = spec.smoke_check if spec.smoke_check is not None else "--version"
+    default_args = spec.default_args if spec.default_args is not None else ()
+
+    if isinstance(spec, StaticReleaseLauncherSpec):
+        return StaticReleaseLauncher(
+            bin=spec.bin,
+            release=StaticRelease(
+                manifest_url=spec.release.manifest_url,
+                install_segments=spec.release.install_segments,
+                executable_segments=spec.release.executable_segments,
+                targets=spec.release.targets,
+                man_segments=spec.release.man_segments,
+                man_dest_segments=spec.release.man_dest_segments,
+            ),
+            smoke_check=smoke_check,
+            default_args=default_args,
+            env=launcher_env,
+        )
+    return NpmLauncher(
+        package=spec.package,
+        bin=spec.bin,
+        dist_tag=spec.dist_tag if spec.dist_tag is not None else "latest",
+        smoke_check=smoke_check,
+        default_args=default_args,
+        env=launcher_env,
+    )
+
+
 def build_harness(spec: HarnessSpec) -> Harness:
     """Build a resolved Harness instance from a specification."""
     assert_path_component(spec.source_name, "harness id")
-    launcher_env: dict[str, str] | None = None
-    if callable(spec.launcher.env):
-        launcher_env = spec.launcher.env(spec.home)
-    elif spec.launcher.env is not None:
-        launcher_env = spec.launcher.env
-
-    launcher = HarnessLauncher(
-        package=spec.launcher.package,
-        bin=spec.launcher.bin,
-        dist_tag=(
-            spec.launcher.dist_tag if spec.launcher.dist_tag is not None else "latest"
-        ),
-        smoke_check=(
-            spec.launcher.smoke_check
-            if spec.launcher.smoke_check is not None
-            else "--version"
-        ),
-        default_args=(
-            spec.launcher.default_args if spec.launcher.default_args is not None else ()
-        ),
-        env=launcher_env,
-    )
     return Harness(
         id=spec.id,
         source_name=spec.source_name,
         home=spec.home,
-        launcher=launcher,
+        launcher=_build_launcher(spec.launcher, spec.home),
         instruction_file=(
             spec.instruction_file
             if spec.instruction_file is not None
@@ -412,8 +457,11 @@ __all__ = [
     "HarnessLauncherSpec",
     "HarnessSpec",
     "HostPlatform",
+    "NpmLauncher",
     "PackageBootstrapHook",
     "RootEnvReadError",
+    "StaticRelease",
+    "StaticReleaseLauncher",
     "SyncEnv",
     "assert_path_component",
     "build_harness",

@@ -202,22 +202,22 @@ def download_release(url: str, destination: str | Path, timeout_ms: int) -> None
 def _do_extract_tar(
     archive_path: Path,
     dest_path: Path,
-    entry_name: str,
+    entry_name: str | None,
 ) -> None:
     with tarfile.open(archive_path, mode="r:*") as tar:
-        member = tar.getmember(entry_name)
-        tar.extract(member, path=dest_path, filter="data")
+        if entry_name is None:
+            tar.extractall(path=dest_path, filter="data")
+        else:
+            member = tar.getmember(entry_name)
+            tar.extract(member, path=dest_path, filter="data")
 
 
-def extract_release(
-    archive: str | Path,
-    destination: str | Path,
-    entry_name: str,
+def _extract_with_timeout(
+    archive_path: Path,
+    dest_path: Path,
+    entry_name: str | None,
     timeout_ms: int,
 ) -> None:
-    """Extract a single entry from a tarball archive to destination directory."""
-    archive_path = Path(archive)
-    dest_path = Path(destination)
     timeout_sec = max(0.0, timeout_ms / MS_PER_SECOND)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
@@ -239,6 +239,25 @@ def extract_release(
         raise RuntimeError(message) from exc
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
+
+
+def extract_release(
+    archive: str | Path,
+    destination: str | Path,
+    entry_name: str,
+    timeout_ms: int,
+) -> None:
+    """Extract a single entry from a tarball archive to destination directory."""
+    _extract_with_timeout(Path(archive), Path(destination), entry_name, timeout_ms)
+
+
+def extract_archive(
+    archive: str | Path,
+    destination: str | Path,
+    timeout_ms: int,
+) -> None:
+    """Extract every entry from a tarball archive into a destination directory."""
+    _extract_with_timeout(Path(archive), Path(destination), None, timeout_ms)
 
 
 def verify_checksum(archive: str | Path, expected: str) -> None:

@@ -4,35 +4,87 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
+import shutil
 import sys
+import tarfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 import pytest
 
-from sync.core.harness import SyncEnv
+from sync.core.harness import StaticRelease, StaticReleaseLauncher, SyncEnv
 from sync.core.launcher import (
     LauncherRuntime,
     NpmPackageSpec,
     PreparePackageOptions,
+    ReleaseRuntime,
     launch_harness,
     launch_npm_package,
     npm_cache_layout,
     prepare_npm_package,
+    prepare_static_release,
 )
+from sync.core.release_manifest import StaticReleaseAsset, StaticReleaseManifest
 from sync.core.tool_launchers import tool_launcher
 from sync.runtime.process import ProcessResult, RunProcessOptions, run_process
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 EXPECTED_INSTALLS: Final[int] = 2
 EXPECTED_LAUNCH_EXIT_CODE: Final[int] = 7
 EXPECTED_TOOL_EXIT_CODE: Final[int] = 3
 DEFAULT_PREPARE_TIMEOUT_MS: Final[int] = 1000
 MODE_EXECUTABLE: Final[int] = 0o755
+RELEASE_VERSION: Final[str] = "9.9.9"
+RELEASE_TARGET: Final[str] = "x86_64-unknown-linux"
+
+
+def _make_release_bundle(bundle: Path, stage: Path) -> str:
+    """Create a fake release tar.gz and return its SHA-256 hex digest."""
+    binary = stage / "bin" / "devin"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    _ = binary.write_text("#!/bin/sh\necho devin\n", encoding="utf-8")
+    binary.chmod(MODE_EXECUTABLE)
+    docs = stage / "share" / "devin" / "docs" / "index.mdx"
+    docs.parent.mkdir(parents=True, exist_ok=True)
+    _ = docs.write_text("docs\n", encoding="utf-8")
+    man = stage / "share" / "man" / "man1" / "devin.1"
+    man.parent.mkdir(parents=True, exist_ok=True)
+    _ = man.write_text(".TH devin 1\n", encoding="utf-8")
+    with tarfile.open(bundle, "w:gz") as archive:
+        archive.add(binary, arcname="bin/devin")
+        archive.add(docs, arcname="share/devin/docs/index.mdx")
+        archive.add(man, arcname="share/man/man1/devin.1")
+    return hashlib.sha256(bundle.read_bytes()).hexdigest()
+
+
+def _release_spec() -> StaticRelease:
+    """Return the static release source used by the launch tests."""
+    return StaticRelease(
+        manifest_url="https://example.test/manifest.json",
+        install_segments=(".local", "share", "devin", "cli"),
+        executable_segments=("bin", "devin"),
+        targets={"linux-x64": RELEASE_TARGET},
+        man_segments=("share", "man", "man1"),
+        man_dest_segments=(".local", "share", "man", "man1"),
+    )
+
+
+def _release_manifest(sha256: str) -> StaticReleaseManifest:
+    """Return a manifest pointing at a single Linux x64 platform asset."""
+    return StaticReleaseManifest(
+        version=RELEASE_VERSION,
+        platforms={
+            RELEASE_TARGET: StaticReleaseAsset(
+                url="https://example.test/bundle.tar.gz",
+                sha256=sha256,
+            )
+        },
+    )
 
 
 def _success(stdout: str = "") -> ProcessResult:
@@ -436,6 +488,329 @@ asyncio.run(main())
         )
     )
     assert proc.exit_code == 0, f"Subprocess failed:\n{proc.stderr}"
+
+
+def test_static_release_prepares_verifies_and_reuses_cache(tmp_path: Path) -> None:
+    """Verify a static release is downloaded, verified, linked, and cached."""
+    bundle = tmp_path / "bundle.tar.gz"
+    sha256 = _make_release_bundle(bundle, tmp_path / "stage")
+    downloads: list[str] = []
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return _release_manifest(sha256)
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        downloads.append(destination)
+        _ = shutil.copyfile(bundle, destination)
+
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+    )
+
+    first = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+    assert first.version == RELEASE_VERSION
+    executable = Path(first.executable)
+    assert executable.is_file()
+    assert executable.parent.name == "bin"
+    install_root = tmp_path / ".local" / "share" / "devin" / "cli"
+    version_dir = install_root / "_versions" / RELEASE_VERSION
+    assert (install_root / "_versions" / "current").is_symlink()
+    assert (install_root / "_versions" / "current").resolve() == version_dir.resolve()
+    assert (version_dir / "distribution").read_text(encoding="utf-8") == "curl-bash\n"
+    assert (version_dir / "share" / "devin" / "docs" / "index.mdx").is_file()
+    man_link = tmp_path / ".local" / "share" / "man" / "man1" / "devin.1"
+    assert man_link.is_symlink()
+    assert (
+        man_link.resolve()
+        == (version_dir / "share" / "man" / "man1" / "devin.1").resolve()
+    )
+    assert len(downloads) == 1
+
+    second = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+    assert second.executable == first.executable
+    assert len(downloads) == 1
+
+
+def test_static_release_prunes_stale_owned_man_links(tmp_path: Path) -> None:
+    """Verify stale owned man links are removed while unrelated links survive."""
+    bundle = tmp_path / "bundle.tar.gz"
+    sha256 = _make_release_bundle(bundle, tmp_path / "stage")
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return _release_manifest(sha256)
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(bundle, destination)
+
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+    )
+    _ = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+
+    man_dir = tmp_path / ".local" / "share" / "man" / "man1"
+    install_root = tmp_path / ".local" / "share" / "devin" / "cli"
+    stale = man_dir / "devin-stale.1"
+    stale.symlink_to(
+        install_root / "_versions" / "current" / "share" / "man" / "man1" / stale.name
+    )
+    unrelated_target = tmp_path / "other.1"
+    _ = unrelated_target.write_text(".TH other 1\n", encoding="utf-8")
+    unrelated = man_dir / "other.1"
+    unrelated.symlink_to(unrelated_target)
+
+    _ = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+
+    assert not stale.exists()
+    assert unrelated.is_symlink()
+    assert unrelated.resolve() == unrelated_target.resolve()
+
+
+def test_static_release_falls_back_to_cached_install(tmp_path: Path) -> None:
+    """Verify a failed manifest lookup reuses the current cached install."""
+    bundle = tmp_path / "bundle.tar.gz"
+    sha256 = _make_release_bundle(bundle, tmp_path / "stage")
+
+    def ok_fetch(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return _release_manifest(sha256)
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(bundle, destination)
+
+    install_runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=ok_fetch,
+        download=download,
+    )
+    first = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, install_runtime
+        )
+    )
+
+    def fail_fetch(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        message = "network down"
+        raise RuntimeError(message)
+
+    offline_runtime = ReleaseRuntime(
+        arch="x86_64", platform="linux", fetch_manifest=fail_fetch
+    )
+    cached = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, offline_runtime
+        )
+    )
+    assert cached.version == first.version
+    assert cached.executable == first.executable
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["../../../../outside/9.9.9", "nested/9.9.9", ".stage-incomplete", "9.9.9\n"],
+)
+def test_static_release_rejects_unmanaged_fallback(tmp_path: Path, target: str) -> None:
+    """Reject executable caches outside a direct, valid version directory."""
+    release = _release_spec()
+    versions = tmp_path.joinpath(*release.install_segments, "_versions")
+    binary = (versions / target).joinpath(*release.executable_segments)
+    binary.parent.mkdir(parents=True)
+    _ = binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(MODE_EXECUTABLE)
+    (versions / "current").symlink_to(target)
+
+    def fail_fetch(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        message = "network down"
+        raise RuntimeError(message)
+
+    with pytest.raises(RuntimeError, match="network down"):
+        _ = asyncio.run(
+            prepare_static_release(
+                release,
+                str(tmp_path),
+                DEFAULT_PREPARE_TIMEOUT_MS,
+                ReleaseRuntime(fetch_manifest=fail_fetch),
+            )
+        )
+
+
+@pytest.mark.parametrize("entry", ["current", "9.9.9", "9.9.9/bin/devin"])
+@pytest.mark.parametrize("destination", ["outside", "missing", "loop"])
+def test_static_release_rejects_escaping_or_broken_links(
+    tmp_path: Path, entry: str, destination: str
+) -> None:
+    """Reject symlink escapes and preserve lookup errors for broken caches."""
+    release = _release_spec()
+    versions = tmp_path.joinpath(*release.install_segments, "_versions")
+    versions.mkdir(parents=True)
+    if entry != "current":
+        (versions / "current").symlink_to(RELEASE_VERSION)
+    link = versions / entry
+    link.parent.mkdir(parents=True, exist_ok=True)
+    outside = tmp_path / "outside" / RELEASE_VERSION
+    binary = outside if entry.endswith("devin") else outside / "bin" / "devin"
+    binary.parent.mkdir(parents=True)
+    _ = binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(MODE_EXECUTABLE)
+    target = outside if destination == "outside" else link
+    link.symlink_to(tmp_path / "missing" if destination == "missing" else target)
+
+    def fail_fetch(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        message = "network down"
+        raise RuntimeError(message)
+
+    with pytest.raises(RuntimeError, match="network down"):
+        _ = asyncio.run(
+            prepare_static_release(
+                release,
+                str(tmp_path),
+                DEFAULT_PREPARE_TIMEOUT_MS,
+                ReleaseRuntime(fetch_manifest=fail_fetch),
+            )
+        )
+
+
+def test_static_release_rotates_previous_link(tmp_path: Path) -> None:
+    """Verify a version change rotates current to previous."""
+    first_hash = _make_release_bundle(tmp_path / "first.tar.gz", tmp_path / "stage-one")
+    second_hash = _make_release_bundle(
+        tmp_path / "second.tar.gz", tmp_path / "stage-two"
+    )
+    state: dict[str, str] = {
+        "version": RELEASE_VERSION,
+        "hash": first_hash,
+        "bundle": str(tmp_path / "first.tar.gz"),
+    }
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return StaticReleaseManifest(
+            version=state["version"],
+            platforms={
+                RELEASE_TARGET: StaticReleaseAsset(
+                    url="https://example.test/bundle.tar.gz",
+                    sha256=state["hash"],
+                )
+            },
+        )
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(state["bundle"], destination)
+
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+    )
+    _ = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+
+    state["version"] = "10.0.0"
+    state["hash"] = second_hash
+    state["bundle"] = str(tmp_path / "second.tar.gz")
+    updated = asyncio.run(
+        prepare_static_release(
+            _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+    assert updated.version == "10.0.0"
+    versions_dir = tmp_path / ".local" / "share" / "devin" / "cli" / "_versions"
+    previous = (versions_dir / "previous").resolve()
+    current = (versions_dir / "current").resolve()
+    assert previous == (versions_dir / RELEASE_VERSION).resolve()
+    assert current == (versions_dir / "10.0.0").resolve()
+
+
+def test_static_release_missing_platform_asset_raises(tmp_path: Path) -> None:
+    """Verify a manifest missing the host platform fails with context."""
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return StaticReleaseManifest(version=RELEASE_VERSION, platforms={})
+
+    runtime = ReleaseRuntime(
+        arch="x86_64", platform="linux", fetch_manifest=fetch_manifest
+    )
+
+    with pytest.raises(RuntimeError, match="missing platform"):
+        _ = asyncio.run(
+            prepare_static_release(
+                _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+            )
+        )
+
+
+def test_static_release_harness_launch_dispatches_prepared_binary(
+    tmp_path: Path,
+) -> None:
+    """Verify launch_harness prepares and forwards arguments to the release binary."""
+    bundle = tmp_path / "bundle.tar.gz"
+    sha256 = _make_release_bundle(bundle, tmp_path / "stage")
+    calls: list[tuple[list[str], Mapping[str, str | None] | None]] = []
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return _release_manifest(sha256)
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(bundle, destination)
+
+    async def run(
+        cmd: Sequence[str],
+        options: RunProcessOptions,
+    ) -> ProcessResult:
+        calls.append((list(cmd), options.env))
+        return ProcessResult(
+            exit_code=EXPECTED_LAUNCH_EXIT_CODE,
+            stdout="",
+            stderr="",
+            timed_out=False,
+        )
+
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+        run=run,
+    )
+
+    home = str(tmp_path)
+    (tmp_path / ".config" / "agents" / "harnesses" / "devin").mkdir(
+        parents=True, exist_ok=True
+    )
+    sync_env = SyncEnv.from_home(home, DEFAULT_PREPARE_TIMEOUT_MS, platform="linux")
+    harness = next(c for c in sync_env.harnesses if c.source_name == "devin")
+    assert isinstance(harness.launcher, StaticReleaseLauncher)
+
+    exit_code = asyncio.run(
+        launch_harness(sync_env, harness, ["--help"], release_runtime=runtime)
+    )
+    assert exit_code == EXPECTED_LAUNCH_EXIT_CODE
+    assert calls[-1][0][-1] == "--help"
+    assert calls[-1][0][0].endswith("bin/devin")
 
 
 def test_tool_launcher_launch_uses_the_registered_npm_spec(

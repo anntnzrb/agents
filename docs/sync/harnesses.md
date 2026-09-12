@@ -11,11 +11,12 @@ Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports
 | `id` | Adapter ID, source directory name, package-cache name, and launch argument |
 | `homeSegments` | Path components from the user home to the generated harness home |
 | `platforms` | Host platforms on which sync enables the adapter |
-| `launcher` | npm package, executable name, dist-tag, and smoke command |
+| `launcher` | npm or static release launcher specification |
 | `launcher.defaultArgs` | Arguments that sync places in the wrapper before caller arguments |
 | `instructionFile` | Harness instruction filename when it differs from `AGENTS.md` |
 | `runtimeSubdir` | Subdirectory appended to the source and generated roots |
 | `compatManagedEntries` | Obsolete generated entries that sync can remove |
+| `mergeJsonFiles` | Source JSON files sync deep-merges over the generated file instead of copying |
 | `hooks` | Package-bootstrap and extension-dependency jobs |
 
 Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated root comes from `homeSegments`. With `runtimeSubdir`, sync appends that value to both roots.
@@ -23,6 +24,19 @@ Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated 
 ## Published configuration
 
 Sync publishes the repository's `HARNESS.md` as the harness instruction file (`AGENTS.md` unless the adapter sets `instructionFile`) and `skills/current/` as `skills/` to every enabled harness. Tool sources under `tools/` are repository-only and never published.
+
+## Launchers
+
+Sync supports two launcher kinds, discriminated by the adapter's `launcher` value.
+
+- `NpmLauncherSpec` installs a versioned npm package. `package`, `bin`, `distTag`, and `smokeCheck` describe it.
+- `StaticReleaseLauncherSpec` installs a versioned archive from a static JSON manifest. `manifestUrl` points at the manifest, `targets` maps `<platform>-<arch>` keys to the manifest's platform keys, `installSegments` is the home-relative install root, and `executableSegments` is the path to the binary inside the extracted version directory.
+
+A static release manifest has the shape `{"version": "1.2.3", "platforms": {"<platform-key>": {"url": "...", "sha256": "..."}}}`. Sync resolves the manifest, verifies the archive SHA-256, extracts it into `<install root>/_versions/<version>/`, writes the distribution marker, and rotates the `current` and `previous` symlinks. An already installed version is reused without re-downloading, and a failed manifest lookup or installation falls back to the current cached install.
+
+When `manSegments` and `manDestSegments` are set, sync also publishes versioned man page symlinks into the destination directory and removes owned stale links whose target points into the install root. It never removes unrelated entries in the shared man directory.
+
+Devin uses a static release launcher. Sync installs the current release into `~/.local/share/devin/cli/_versions/` and publishes the `devin` wrapper. The merged user config sets `auto_update: false` so Devin's background updater never replaces the sync-managed install.
 
 Adapters can declare these hooks:
 
@@ -40,7 +54,7 @@ Harnesses use their native model discovery or configured model definitions again
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli` with `launch`, prepares the cached npm package, forwards all arguments, and returns the harness exit status.
+Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli` with `launch`, prepares the harness launcher, forwards all arguments, and returns the harness exit status.
 
 When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127`.
 
@@ -48,11 +62,17 @@ The wrapper command is `launcher.bin`. The wrapper passes the adapter `id` to th
 
 Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync removes stale wrappers only when they contain its ownership marker and remain in an allowed wrapper directory. Sync preserves unmanaged conflicts and reports them.
 
+## Merged JSON configuration
+
+`mergeJsonFiles` lists source JSON files that must not overwrite machine-owned keys. Sync deep-merges the source object over the existing destination: nested objects merge by key, managed scalar and array values win, and destination-only keys survive. This keeps live fields such as Devin's org identifier while the SSOT owns preferences such as `auto_update`.
+
 ## Package cache
 
-Each harness has a versioned npm cache under `<cache-home>/npm-tools/`. `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`.
+Each npm harness has a versioned cache under `<cache-home>/npm-tools/`. `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`.
 
 The cache keeps the current and previous known-good package versions. Newly installed packages pass the adapter smoke command before promotion. Cached packages are checked for package identity and an executable before promotion.
+
+Static release harnesses install one directory per resolved manifest version under the adapter `installSegments` root instead of the npm cache. Those installs also keep the current and previous versions.
 
 ## Shared harness environment
 

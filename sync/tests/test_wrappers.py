@@ -13,11 +13,12 @@ import pytest
 
 from sync.core.harness import (
     HarnessSpec,
+    NpmLauncher,
     SyncEnv,
     build_harness,
     supported_harness,
 )
-from sync.core.harness_adapters import HarnessLauncherSpec
+from sync.core.harness_adapters import NpmLauncherSpec
 from sync.core.managed_tools import PreparedManagedTool
 from sync.core.wrappers import (
     WRAPPER_MARKER,
@@ -80,7 +81,7 @@ def test_harness_ownership_ids_cannot_escape_the_wrapper_directory() -> None:
                 id="codex",
                 source_name="../codex",
                 home="/var/agents/codex",
-                launcher=HarnessLauncherSpec(
+                launcher=NpmLauncherSpec(
                     package="@openai/codex",
                     bin="codex",
                 ),
@@ -97,6 +98,7 @@ def test_installed_runtime_resolves_known_harness_without_ssot(
     deepseek = supported_harness(home, "deepseek", "linux")
     assert deepseek is not None
     assert deepseek.home == str(tmp_path / ".dsh")
+    assert isinstance(deepseek.launcher, NpmLauncher)
     assert deepseek.launcher.package == "@deepseek-ai/dsh"
     assert deepseek.launcher.bin == "dsh"
 
@@ -168,6 +170,19 @@ def test_wrapper_destinations_render_unix_launchers(tmp_path: Path) -> None:
     )
     assert summarize_args in summarize_unix.content
     assert WRAPPER_MARKER in summarize_unix.content
+
+
+def test_devin_wrapper_uses_the_release_launcher(tmp_path: Path) -> None:
+    """Verify the devin adapter renders a wrapper for its static release binary."""
+    home = str(tmp_path)
+    _add_harness_sources(home, ["devin"])
+    sync_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
+    destinations = wrapper_destinations(sync_env)
+    devin = next((e for e in destinations if e.path.endswith("/devin")), None)
+    assert devin is not None
+    assert devin.path == str(tmp_path / ".local" / "bin" / "devin")
+    assert "launch 'devin'" in devin.content
+    assert WRAPPER_MARKER in devin.content
 
 
 def test_generated_wrappers_do_not_embed_root_env_values(

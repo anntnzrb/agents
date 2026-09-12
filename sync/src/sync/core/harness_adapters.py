@@ -11,26 +11,54 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 type HostPlatform = Literal["darwin", "linux"]
 
-type HarnessId = Literal["codex", "deepseek", "opencode", "pi", "omp"]
+type HarnessId = Literal["codex", "deepseek", "devin", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
 
+type LauncherEnv = dict[str, str] | Callable[[str], dict[str, str]]
+
 
 @dataclass(frozen=True, slots=True)
-class HarnessLauncherSpec:
-    """Launcher configuration specification for a harness."""
+class StaticReleaseSpec:
+    """Static CDN release specification resolved from a versioned manifest."""
+
+    manifest_url: str
+    install_segments: tuple[str, ...]
+    executable_segments: tuple[str, ...]
+    targets: Mapping[str, str]
+    man_segments: tuple[str, ...] | None = None
+    man_dest_segments: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NpmLauncherSpec:
+    """Launcher configuration for an npm-distributed harness."""
 
     package: str
     bin: str
     dist_tag: str | None = None
     smoke_check: str | None = None
     default_args: tuple[str, ...] | None = None
-    env: dict[str, str] | Callable[[str], dict[str, str]] | None = None
+    env: LauncherEnv | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StaticReleaseLauncherSpec:
+    """Launcher configuration for a static-manifest harness."""
+
+    bin: str
+    release: StaticReleaseSpec
+    smoke_check: str | None = None
+    default_args: tuple[str, ...] | None = None
+    env: LauncherEnv | None = None
+
+
+type HarnessLauncherSpec = NpmLauncherSpec | StaticReleaseLauncherSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +102,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         id="codex",
         home_segments=(".codex",),
         platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
+        launcher=NpmLauncherSpec(
             package="@openai/codex",
             bin="codex",
         ),
@@ -83,16 +111,38 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         id="deepseek",
         home_segments=(".dsh",),
         platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
+        launcher=NpmLauncherSpec(
             package="@deepseek-ai/dsh",
             bin="dsh",
         ),
     ),
     HarnessAdapter(
+        id="devin",
+        home_segments=(".config", "devin"),
+        platforms=("darwin", "linux"),
+        launcher=StaticReleaseLauncherSpec(
+            bin="devin",
+            release=StaticReleaseSpec(
+                manifest_url="https://static.devin.ai/cli/current/manifest.json",
+                install_segments=(".local", "share", "devin", "cli"),
+                executable_segments=("bin", "devin"),
+                targets={
+                    "darwin-arm64": "aarch64-apple-darwin",
+                    "darwin-x64": "x86_64-apple-darwin",
+                    "linux-arm64": "aarch64-unknown-linux",
+                    "linux-x64": "x86_64-unknown-linux",
+                },
+                man_segments=("share", "man", "man1"),
+                man_dest_segments=(".local", "share", "man", "man1"),
+            ),
+        ),
+        merge_json_files=("config.json",),
+    ),
+    HarnessAdapter(
         id="opencode",
         home_segments=(".config", "opencode"),
         platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
+        launcher=NpmLauncherSpec(
             package="opencode-ai",
             bin="opencode",
         ),
@@ -102,7 +152,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         id="pi",
         home_segments=(".pi",),
         platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
+        launcher=NpmLauncherSpec(
             package="@earendil-works/pi-coding-agent",
             bin="pi",
         ),
@@ -120,7 +170,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         id="omp",
         home_segments=(".omp",),
         platforms=("darwin", "linux"),
-        launcher=HarnessLauncherSpec(
+        launcher=NpmLauncherSpec(
             package="@oh-my-pi/pi-coding-agent",
             bin="omp",
         ),
@@ -139,5 +189,9 @@ __all__ = [
     "HarnessId",
     "HarnessLauncherSpec",
     "HostPlatform",
+    "LauncherEnv",
+    "NpmLauncherSpec",
     "PackageBootstrapHook",
+    "StaticReleaseLauncherSpec",
+    "StaticReleaseSpec",
 ]

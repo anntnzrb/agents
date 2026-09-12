@@ -8,25 +8,37 @@ import contextlib
 import hashlib
 import json
 import os
+import platform
 import re
 import secrets
 import shutil
 import stat
-import time
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter, ValidationError
 
-from sync.runtime.errors import err, warn
-from sync.runtime.lock import SyncLock, release_sync_lock, try_acquire_sync_lock
+from sync.core.harness import StaticReleaseLauncher
+from sync.core.managed_tools import (
+    download_release,
+    extract_archive,
+    supported_arch,
+    sys_platform,
+    verify_checksum,
+)
+from sync.core.release_manifest import fetch_static_release_manifest
+from sync.runtime.errors import err, panic_message, warn
+from sync.runtime.fs import rm_entry
+from sync.runtime.lock import acquire_cache_lock, release_sync_lock
 from sync.runtime.process import ProcessResult, RunProcessOptions, run_process
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
 
-    from sync.core.harness import Harness, SyncEnv
+    from sync.core.harness import Harness, StaticRelease, SyncEnv
+    from sync.core.release_manifest import FetchManifestFn, StaticReleaseAsset
 
 __all__ = [
     "DEFAULT_LAUNCH_TIMEOUT_MS",
@@ -35,10 +47,14 @@ __all__ = [
     "NpmPackageSpec",
     "PreparePackageOptions",
     "PreparedNpmPackage",
+    "PreparedStaticRelease",
+    "ReleaseRuntime",
     "launch_harness",
     "launch_npm_package",
+    "launch_static_release",
     "npm_cache_layout",
     "prepare_npm_package",
+    "prepare_static_release",
 ]
 
 DEFAULT_LAUNCH_TIMEOUT_MS: int = 120_000
@@ -47,11 +63,17 @@ PACKAGE_PATTERN: re.Pattern[str] = re.compile(
     r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$"
 )
 SEMVER_PATTERN: re.Pattern[str] = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$")
-RETRY_SLEEP_SECONDS: float = 0.025
+RELEASE_VERSION_PATTERN: re.Pattern[str] = re.compile(r"^\d+(?:\.\d+)*$")
 PACKAGE_KEY_LENGTH: int = 16
-MILLISECONDS_PER_SECOND: float = 1000.0
 EXEC_PERM_MASK: int = 0o111
 EXIT_TIMED_OUT: int = 124
+RELEASE_VERSIONS_SUBDIR: str = "_versions"
+RELEASE_CURRENT_LINK: str = "current"
+RELEASE_PREVIOUS_LINK: str = "previous"
+RELEASE_LOCK_FILE: str = "lock"
+RELEASE_DISTRIBUTION: str = "curl-bash"
+RELEASE_DISTRIBUTION_FILE: str = "distribution"
+RELEASE_STAGE_PREFIX: str = ".stage-"
 MAX_DETAIL_CHARS: int = 2000
 _PACKAGE_MANIFEST = TypeAdapter(dict[str, object])
 
@@ -288,7 +310,7 @@ async def prepare_npm_package(
         Path(layout.versions_dir).mkdir, parents=True, exist_ok=True
     )
 
-    lock = await acquire_cache_lock(layout, timeout_ms)
+    lock = await acquire_cache_lock(layout.tool_cache, layout.lock_file, timeout_ms)
     try:
         return await _prepare_locked_package(layout, spec, options, timeout_ms)
     finally:
@@ -329,24 +351,304 @@ async def launch_npm_package(
     return result.exit_code
 
 
+@dataclass(frozen=True, slots=True)
+class ReleaseRuntime:
+    """Optional pluggable callbacks for static release resolution and execution."""
+
+    arch: str | None = None
+    platform: str | None = None
+    fetch_manifest: FetchManifestFn | None = None
+    download: Callable[[str, str, int], None] | None = None
+    extract: Callable[[str, str, int], None] | None = None
+    run: (
+        Callable[[Sequence[str], RunProcessOptions], Awaitable[ProcessResult]] | None
+    ) = None
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedStaticRelease:
+    """Result of preparing a static release executable."""
+
+    version: str
+    executable: str
+
+
+def _release_platform_key(runtime: ReleaseRuntime | None) -> str:
+    platform_name = (
+        runtime.platform if runtime is not None and runtime.platform else sys_platform()
+    )
+    arch_source = (
+        runtime.arch if runtime is not None and runtime.arch else platform.machine()
+    )
+    return f"{platform_name}-{supported_arch(arch_source)}"
+
+
+def _promote_release_stage(
+    stage_dir: Path,
+    version_dir: Path,
+    archive_path: Path,
+) -> None:
+    archive_path.unlink(missing_ok=True)
+    _ = (stage_dir / RELEASE_DISTRIBUTION_FILE).write_text(
+        f"{RELEASE_DISTRIBUTION}\n", encoding="utf-8"
+    )
+    if version_dir.exists() or version_dir.is_symlink():
+        rm_entry(str(version_dir))
+    _ = stage_dir.replace(version_dir)
+
+
+async def _install_static_release(
+    version: str,
+    asset: StaticReleaseAsset,
+    version_dir: Path,
+    timeout_ms: int,
+    runtime: ReleaseRuntime | None,
+) -> None:
+    versions_dir = version_dir.parent
+    stage_dir = Path(
+        await asyncio.to_thread(
+            tempfile.mkdtemp, prefix=RELEASE_STAGE_PREFIX, dir=str(versions_dir)
+        )
+    )
+    try:
+        archive_path = stage_dir / f"release-{version}.tar.gz"
+        download = (
+            runtime.download
+            if runtime is not None and runtime.download is not None
+            else download_release
+        )
+        await asyncio.to_thread(download, asset.url, str(archive_path), timeout_ms)
+        await asyncio.to_thread(verify_checksum, str(archive_path), asset.sha256)
+        extract = (
+            runtime.extract
+            if runtime is not None and runtime.extract is not None
+            else extract_archive
+        )
+        await asyncio.to_thread(extract, str(archive_path), str(stage_dir), timeout_ms)
+        await asyncio.to_thread(
+            _promote_release_stage, stage_dir, version_dir, archive_path
+        )
+    finally:
+        shutil.rmtree(stage_dir, ignore_errors=True)
+
+
+def _update_release_links(versions_dir: Path, version_dir: Path) -> None:
+    current_link = str(versions_dir / RELEASE_CURRENT_LINK)
+    previous_link = str(versions_dir / RELEASE_PREVIOUS_LINK)
+    expected_target = os.path.relpath(str(version_dir), str(versions_dir))
+    current_target = read_link_target(current_link)
+    if current_target == expected_target:
+        return
+    if current_target is not None:
+        replace_link(previous_link, current_target)
+    replace_link(current_link, expected_target)
+
+
+def _prune_release_versions(versions_dir: Path) -> None:
+    keep: set[str] = set()
+    for link_path in (
+        str(versions_dir / RELEASE_CURRENT_LINK),
+        str(versions_dir / RELEASE_PREVIOUS_LINK),
+    ):
+        target = read_link_target(link_path)
+        if target:
+            keep.add(Path(target).name)
+    try:
+        entries = list(versions_dir.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if entry.name in keep or entry.is_symlink():
+            continue
+        if not entry.is_dir() or not RELEASE_VERSION_PATTERN.match(entry.name):
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
+
+
+def _sync_release_man_pages(
+    release: StaticRelease,
+    home: str,
+    version_dir: Path,
+    install_root: Path,
+) -> None:
+    if release.man_segments is None or release.man_dest_segments is None:
+        return
+    source_dir = version_dir.joinpath(*release.man_segments)
+    if not source_dir.is_dir():
+        return
+    dest_dir = Path(home).joinpath(*release.man_dest_segments)
+    names = {entry.name for entry in source_dir.iterdir() if entry.is_file()}
+    managed_prefix = str(install_root / RELEASE_VERSIONS_SUBDIR) + os.sep
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for entry in list(dest_dir.iterdir()):
+        if entry.name in names or not entry.is_symlink():
+            continue
+        try:
+            target = str(entry.readlink())
+        except OSError:
+            continue
+        if target.startswith(managed_prefix):
+            entry.unlink(missing_ok=True)
+
+    current_dir = install_root / RELEASE_VERSIONS_SUBDIR / RELEASE_CURRENT_LINK
+    for name in sorted(names):
+        link_target = str(current_dir.joinpath(*release.man_segments) / name)
+        link_path = dest_dir / name
+        if link_path.is_symlink() and str(link_path.readlink()) == link_target:
+            continue
+        try:
+            replace_link(str(link_path), link_target)
+        except (OSError, RuntimeError) as error:
+            warn(f"man page conflict at {link_path}: {panic_message(error)}")
+
+
+def _current_prepared_release(
+    release: StaticRelease,
+    home: str,
+) -> PreparedStaticRelease | None:
+    versions_dir = Path(home).joinpath(
+        *release.install_segments, RELEASE_VERSIONS_SUBDIR
+    )
+    try:
+        if not (versions_dir / RELEASE_CURRENT_LINK).is_symlink():
+            return None
+        version_dir = (versions_dir / RELEASE_CURRENT_LINK).resolve(strict=True)
+        executable = version_dir.joinpath(*release.executable_segments).resolve(
+            strict=True
+        )
+        if (
+            version_dir.parent == versions_dir.resolve()
+            and RELEASE_VERSION_PATTERN.fullmatch(version_dir.name)
+            and executable.is_relative_to(version_dir)
+            and is_executable(str(executable))
+        ):
+            return PreparedStaticRelease(version_dir.name, str(executable))
+    except (OSError, RuntimeError):
+        return None
+    return None
+
+
+async def prepare_static_release(
+    release: StaticRelease,
+    home: str,
+    timeout_ms: int,
+    runtime: ReleaseRuntime | None = None,
+) -> PreparedStaticRelease:
+    """Resolve, verify, cache, and link a static release executable."""
+    try:
+        return await _prepare_static_release_locked(release, home, timeout_ms, runtime)
+    except (OSError, RuntimeError, ValueError, TypeError) as error:
+        cached = await asyncio.to_thread(_current_prepared_release, release, home)
+        if cached is None:
+            raise
+        detail = panic_message(error)
+        warn(f"static release lookup failed ({detail}); using cached {cached.version}")
+        return cached
+
+
+async def _prepare_static_release_locked(
+    release: StaticRelease,
+    home: str,
+    timeout_ms: int,
+    runtime: ReleaseRuntime | None,
+) -> PreparedStaticRelease:
+    fetch = runtime.fetch_manifest if runtime is not None else None
+    manifest = await asyncio.to_thread(
+        fetch_static_release_manifest, release.manifest_url, timeout_ms, fetch
+    )
+
+    platform_key = _release_platform_key(runtime)
+    target = release.targets.get(platform_key)
+    if target is None:
+        message = f"static release has no target for {platform_key}"
+        raise RuntimeError(message)
+    asset = manifest.platforms.get(target)
+    if asset is None:
+        message = f"static release {manifest.version} missing platform {target}"
+        raise RuntimeError(message)
+
+    install_root = Path(home).joinpath(*release.install_segments)
+    versions_dir = install_root / RELEASE_VERSIONS_SUBDIR
+    version_dir = versions_dir / manifest.version
+    executable = version_dir.joinpath(*release.executable_segments)
+    await asyncio.to_thread(versions_dir.mkdir, parents=True, exist_ok=True)
+
+    lock = await acquire_cache_lock(
+        str(install_root), str(install_root / RELEASE_LOCK_FILE), timeout_ms
+    )
+    try:
+        if not is_executable(str(executable)):
+            await _install_static_release(
+                manifest.version, asset, version_dir, timeout_ms, runtime
+            )
+        _update_release_links(versions_dir, version_dir)
+        _prune_release_versions(versions_dir)
+        await asyncio.to_thread(
+            _sync_release_man_pages, release, home, version_dir, install_root
+        )
+        if not is_executable(str(executable)):
+            message = (
+                f"static release {manifest.version} has no executable {executable}"
+            )
+            raise RuntimeError(message)
+    finally:
+        release_sync_lock(lock)
+
+    return PreparedStaticRelease(version=manifest.version, executable=str(executable))
+
+
+async def launch_static_release(
+    sync_env: SyncEnv,
+    launcher: StaticReleaseLauncher,
+    args: Sequence[str],
+    env: dict[str, str] | None,
+    runtime: ReleaseRuntime | None = None,
+) -> int:
+    """Prepare and execute a static release harness with forwarded arguments."""
+    prepared = await prepare_static_release(
+        launcher.release, sync_env.home, sync_env.install_timeout_ms, runtime
+    )
+    runner = (
+        runtime.run if runtime is not None and runtime.run is not None else run_process
+    )
+    result = await runner(
+        [prepared.executable, *args],
+        RunProcessOptions(
+            stdio="inherit",
+            env=env,
+        ),
+    )
+    if result.timed_out or result.output_limited:
+        err(f"{launcher.bin} launch timed out")
+        return EXIT_TIMED_OUT
+    return result.exit_code
+
+
 async def launch_harness(
     sync_env: SyncEnv,
     harness: Harness,
     args: Sequence[str],
     runtime: LauncherRuntime | None = None,
+    release_runtime: ReleaseRuntime | None = None,
 ) -> int:
     """Launch a harness executable, resolving environment variables and cache."""
     # Parent environment beats .env defaults; explicit adapter values win over both.
     merged = {k: v for k, v in sync_env.root_env.items() if k not in os.environ}
-    if harness.launcher.env is not None:
-        merged.update(harness.launcher.env)
+    launcher = harness.launcher
+    if launcher.env is not None:
+        merged.update(launcher.env)
+
+    if isinstance(launcher, StaticReleaseLauncher):
+        return await launch_static_release(
+            sync_env, launcher, args, merged or None, release_runtime
+        )
 
     spec = NpmPackageSpec(
         tool=harness.source_name,
-        package=harness.launcher.package,
-        bin=harness.launcher.bin,
-        dist_tag=harness.launcher.dist_tag,
-        smoke_check=harness.launcher.smoke_check,
+        package=launcher.package,
+        bin=launcher.bin,
+        dist_tag=launcher.dist_tag,
+        smoke_check=launcher.smoke_check,
         env=merged or None,
     )
     return await launch_npm_package(sync_env, spec, args, runtime)
@@ -369,23 +671,6 @@ async def resolve_version(
         message = f"could not resolve {package_name}@{dist_tag}"
         raise RuntimeError(message)
     return result.stdout.replace("\r", "").replace("\n", "").strip()
-
-
-async def acquire_cache_lock(
-    layout: NpmCacheLayout,
-    timeout_ms: int,
-) -> SyncLock:
-    """Acquire the exclusive lock for the npm tool cache directory."""
-    started_at = time.monotonic()
-    timeout_seconds = timeout_ms / MILLISECONDS_PER_SECOND
-    while True:
-        lock = try_acquire_sync_lock(layout.tool_cache, layout.lock_file)
-        if lock is not None:
-            return lock
-        if time.monotonic() - started_at >= timeout_seconds:
-            message = f"timed out waiting for npm cache lock: {layout.lock_file}"
-            raise TimeoutError(message)
-        await asyncio.sleep(RETRY_SLEEP_SECONDS)
 
 
 def update_current_and_previous(layout: NpmCacheLayout, version: str) -> None:
