@@ -464,8 +464,15 @@ def fetch_json(url: str, timeout: float = 5.0) -> Json | None:
         conn.close()
 
 
-def cliproxy_model_ids() -> list[str]:
-    """Live model ids served by the repo-declared CLIProxyAPI gateway."""
+def cliproxy_custom_models() -> list[Json]:
+    """Live picker entries served by the repo-declared CLIProxyAPI gateway.
+
+    Multi-segment ids stay bare slugs (the pool segment already names the
+    upstream); single-segment OAuth-pool ids get a display name carrying the
+    gateway-reported owner so the picker shows which pool serves them.
+    Entries are ordered singles-first because the web picker caps custom
+    models per instance — OAuth pools win the visible window.
+    """
     deployment = load_json_object(CLIPROXY_DEPLOYMENT_PATH)
     client = deployment.get("client") if deployment else None
     base = cast(JsonObject, client).get("baseUrl") if isinstance(client, dict) else None
@@ -475,13 +482,71 @@ def cliproxy_model_ids() -> list[str]:
     models = data.get("data") if isinstance(data, dict) else None
     if not isinstance(models, list):
         return []
-    ids: list[str] = []
+    singles: list[Json] = []
+    pooled: list[str] = []
     for entry in cast(list[object], models):
-        if isinstance(entry, dict):
-            model_id = cast(JsonObject, entry).get("id")
-            if isinstance(model_id, str) and model_id:
-                ids.append(model_id)
-    return sorted(ids)
+        if not isinstance(entry, dict):
+            continue
+        model_id = cast(JsonObject, entry).get("id")
+        if not isinstance(model_id, str) or not model_id:
+            continue
+        owner = cast(JsonObject, entry).get("owned_by")
+        if "/" in model_id or not isinstance(owner, str) or not owner:
+            pooled.append(model_id)
+        else:
+            singles.append({"slug": model_id, "name": f"{model_id} ({owner})"})
+    # The web picker renders at most 32 custom models per instance, first
+    # settings order wins — OAuth-pool ids go first so they win the window;
+    # pooled ids fill the rest and remain visible on mobile, which reads the
+    # uncapped server snapshot.
+    singles.sort(key=lambda e: str(cast(JsonObject, e).get("slug", "")))
+    return [*singles, *sorted(pooled)]
+
+
+def resolve_opencode_binary() -> str | None:
+    """Resolve the real opencode binary inside the sync npm cache.
+
+    `~/.local/bin/opencode` is a sync wrapper that routes every spawn through
+    `sync launch`, adding ~3s of Python startup — enough to overrun T3's 4s
+    OpenCode version probe. Pointing the driver at the cached binary directly
+    keeps probes under a second. Prefers the non-baseline build.
+    """
+    candidates = sorted(
+        Path.home().glob(
+            ".cache/npm-tools/opencode/packages/*/current/node_modules/opencode-*/bin/opencode"
+        )
+    )
+    for preferred in candidates:
+        if "-baseline" not in preferred.parent.parent.name and os.access(preferred, os.X_OK):
+            return str(preferred)
+    for fallback in candidates:
+        if os.access(fallback, os.X_OK):
+            return str(fallback)
+    return None
+
+
+def sync_opencode_binary_path(live: JsonObject) -> None:
+    """Point the OpenCode driver's binaryPath at the resolved cached binary.
+
+    The launcher wrapper still owns user-facing launches; this only affects
+    the binary T3 spawns for probes and sessions.
+    """
+    binary = resolve_opencode_binary()
+    if binary is None:
+        return
+    instances = live.get("providerInstances")
+    if not isinstance(instances, dict):
+        return
+    opencode = instances.get("opencode")
+    if not isinstance(opencode, dict):
+        return
+    config = opencode.get("config")
+    if not isinstance(config, dict):
+        config = cast(JsonObject, {})
+        cast(JsonObject, opencode)["config"] = config
+    if config.get("binaryPath") != binary:
+        cast(JsonObject, config)["binaryPath"] = binary
+        print(f"opencode binaryPath -> {binary}")
 
 
 def sync_codex_custom_models(live: JsonObject) -> None:
@@ -498,8 +563,8 @@ def sync_codex_custom_models(live: JsonObject) -> None:
     if not isinstance(codex, dict):
         return
     _ = codex.pop("customModels", None)
-    ids = cliproxy_model_ids()
-    if not ids:
+    entries = cliproxy_custom_models()
+    if not entries:
         print(
             "t3ctl: warning — cliproxy catalog unreachable; keeping existing customModels",
             file=sys.stderr,
@@ -509,8 +574,8 @@ def sync_codex_custom_models(live: JsonObject) -> None:
     if not isinstance(config, dict):
         config = cast(JsonObject, {})
         cast(JsonObject, codex)["config"] = config
-    cast(JsonObject, config)["customModels"] = cast(Json, ids)
-    print(f"synced {len(ids)} cliproxy model ids into codex config.customModels")
+    cast(JsonObject, config)["customModels"] = entries
+    print(f"synced {len(entries)} cliproxy model ids into codex config.customModels")
 
 
 def deep_merge(base: JsonObject, overlay: JsonObject) -> None:
@@ -538,6 +603,7 @@ def apply_settings() -> None:
     if desired is None or live is None:
         die("settings files must contain a JSON object")
     deep_merge(live, desired)
+    sync_opencode_binary_path(live)
     sync_codex_custom_models(live)
     write_settings(live)
     print(f"applied {SETTINGS_PATH} -> {SETTINGS_TARGET}")
@@ -563,6 +629,7 @@ def cmd_sync_models(_args: argparse.Namespace) -> int:
     live = load_json_object(SETTINGS_TARGET)
     if live is None:
         die(f"{SETTINGS_TARGET} missing or unreadable; is the service installed?")
+    sync_opencode_binary_path(live)
     sync_codex_custom_models(live)
     write_settings(live)
     return 0
