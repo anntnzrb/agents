@@ -135,6 +135,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
                 man_segments=("share", "man", "man1"),
                 man_dest_segments=(".local", "share", "man", "man1"),
             ),
+            env={"DEVIN_PERMISSION_MODE": "bypass"},
         ),
         merge_json_files=("config.json",),
     ),

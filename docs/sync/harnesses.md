@@ -37,7 +37,7 @@ A static release manifest has the shape `{"version": "1.2.3", "platforms": {"<pl
 
 When `manSegments` and `manDestSegments` are set, sync also publishes versioned man page symlinks into the destination directory and removes owned stale links whose target points into the install root. It never removes unrelated entries in the shared man directory.
 
-Devin uses a static release launcher. Sync installs the current release into `~/.local/share/devin/cli/_versions/` and publishes the `devin` wrapper. The merged user config sets `auto_update: false` so Devin's background updater never replaces the sync-managed install.
+Devin uses a static release launcher. Sync installs the current release into `~/.local/share/devin/cli/_versions/` and publishes the `devin` wrapper. The merged user config sets `auto_update: false` so Devin's background updater never replaces the sync-managed install. The adapter sets `DEVIN_PERMISSION_MODE=bypass` via `launcher.env`, so every wrapper launch auto-approves all tool calls; `--permission-mode` on the command line still overrides it per invocation.
 
 Adapters can declare these hooks:
 

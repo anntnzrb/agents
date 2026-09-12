@@ -183,6 +183,7 @@ def test_devin_wrapper_uses_the_release_launcher(tmp_path: Path) -> None:
     assert devin.path == str(tmp_path / ".local" / "bin" / "devin")
     assert "launch 'devin'" in devin.content
     assert WRAPPER_MARKER in devin.content
+    assert "export DEVIN_PERMISSION_MODE='bypass'" in devin.content
 
 
 def test_generated_wrappers_do_not_embed_root_env_values(
