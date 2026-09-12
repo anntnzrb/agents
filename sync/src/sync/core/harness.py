@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 SOURCE_AGENT_FILE: str = "HARNESS.md"
-INSTALL_TIMEOUT_SECONDS: int = 120
 INSTALL_TIMEOUT_MS: int = 120_000
 MANAGED_STATE_SUBDIR: str = ".local/share/agents/sync-managed"
 SKILLS_DST_DIR: str = "skills"
