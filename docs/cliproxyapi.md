@@ -270,15 +270,26 @@ The committed template sets these CLIProxyAPI values:
 | `routing.strategy` | `weighted-round-robin` |
 | `routing.session-affinity` | `true` |
 | `routing.session-affinity-ttl` | `1h` |
+| `routing.session-affinity-subagents` | `true` |
 | `request-retry` | `3` |
 | `max-retry-credentials` | `0` |
 | `max-retry-interval` | `30` |
 | `disable-cooling` | `false` |
 | `save-cooldown-status` | `true` |
+| `transient-error-cooldown-seconds` | `-1` |
+| `quota-exceeded.switch-project` | `true` |
+| `quota-exceeded.switch-preview-model` | `true` |
+| `quota-exceeded.antigravity-credits` | `true` |
+| `streaming.keepalive-seconds` | `15` |
 | `streaming.bootstrap-retries` | `1` |
+| `nonstream-keepalive-interval` | `15` |
 | `ws-auth` | `false` |
 
 Sync passes these values through to CLIProxyAPI. It does not derive or override them at runtime.
+
+## Upstream truth
+
+When a setting's semantics look wrong or a flag seems off, read the pinned release source — not this page. `config.example.yaml` in the upstream repository documents every accepted key, and `internal/` is authoritative for behavior. `tools/cliproxyapi/release.json` records which release is deployed.
 
 ## Control panel
 
