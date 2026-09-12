@@ -139,8 +139,12 @@ function inputModalities(entry: CatalogModel | undefined): InputModality[] {
 function toModelConfig(id: string, catalog: CatalogCache | undefined): ProviderModel {
 	const entry = catalogModel(catalog, id);
 	const input = inputModalities(entry);
+	// Multi-segment gateway ids are <pool>/<vendor>/<model>; the pool
+	// distinguishes upstreams that vend the same model.
+	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : undefined;
+	const name = entry?.name ?? id;
 	return {
-		name: entry?.name ?? id,
+		name: pool ? `${name} (${pool})` : name,
 		release_date: entry?.release_date ?? "",
 		reasoning: entry?.reasoning ?? true,
 		attachment: entry?.attachment ?? input.includes("image"),
