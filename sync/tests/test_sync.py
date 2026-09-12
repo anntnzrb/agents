@@ -829,7 +829,11 @@ def test_sync_plan_preserves_declared_devin_config_keys(home: Path) -> None:
     assert preserve_job is not None
     assert preserve_job.src == str(devin_source / "config.json")
     assert preserve_job.dst == str(home / ".config" / "devin" / "config.json")
-    assert preserve_job.preserve_paths == ("devin",)
+    assert preserve_job.preserve_paths == (
+        "devin",
+        "shell.setup_complete",
+        "shell.startup_messages_remaining",
+    )
 
     dir_job = next(
         (

@@ -98,7 +98,13 @@ def test_supported_harness_resolves_devin_static_release(tmp_path: Path) -> None
     devin = supported_harness(str(tmp_path), "devin", "linux")
     assert devin is not None
     assert devin.home == str(tmp_path / ".config" / "devin")
-    assert devin.preserve_json_keys == {"config.json": ("devin",)}
+    assert devin.preserve_json_keys == {
+        "config.json": (
+            "devin",
+            "shell.setup_complete",
+            "shell.startup_messages_remaining",
+        )
+    }
     assert isinstance(devin.launcher, StaticReleaseLauncher)
     assert devin.launcher.bin == "devin"
     assert devin.launcher.release.manifest_url == (

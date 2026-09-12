@@ -137,7 +137,13 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             ),
             env={"DEVIN_PERMISSION_MODE": "bypass"},
         ),
-        preserve_json_keys={"config.json": ("devin",)},
+        preserve_json_keys={
+            "config.json": (
+                "devin",
+                "shell.setup_complete",
+                "shell.startup_messages_remaining",
+            )
+        },
     ),
     HarnessAdapter(
         id="opencode",

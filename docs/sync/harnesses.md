@@ -67,7 +67,7 @@ Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync 
 
 `preserveJsonKeys` maps each source JSON filename to the dot-paths allowed to survive from the previous generated file. Sync copies the source file verbatim over the destination, then re-injects each declared path's previous value only where the source leaves it undefined: the source wins collisions, paths absent from the destination are skipped, and undeclared destination keys are removed. An empty path list is a pure copy, and a missing source file is a sync error.
 
-Devin declares only `devin` for `config.json` so the CLI's cached org identifier survives reconciliation while the SSOT owns everything else, including `auto_update`; other CLI write-back values are re-derivable and intentionally not preserved.
+Devin declares `devin`, `shell.setup_complete`, and `shell.startup_messages_remaining` for `config.json` so the CLI's org identifier and startup state survive reconciliation while the SSOT owns everything else, including `auto_update`; other write-back values are re-derivable and intentionally not preserved.
 
 ## Package cache
 
