@@ -285,7 +285,17 @@ The committed template sets these CLIProxyAPI values:
 | `streaming.keepalive-seconds` | `15` |
 | `streaming.bootstrap-retries` | `1` |
 | `nonstream-keepalive-interval` | `15` |
+| `antigravity.sensitive-words` | harness system-convention tags + RFC 2119 line |
 | `ws-auth` | `false` |
+
+`antigravity.sensitive-words` exists because Google's Cloud Code Assist WAF
+rejects requests whose `systemInstruction` carries the literal
+`<system-conventions>` / `<system-directive>` blocks that harness system
+prompts ship (OMP, and anything embedding the same conventions text), with a
+misleading `429 RESOURCE_EXHAUSTED` that is not quota exhaustion (upstream
+issue #5751). The proxy zero-width-obfuscates the listed tokens before the
+request leaves, which breaks the WAF's literal match while staying invisible
+to the model.
 
 Sync passes these values through to CLIProxyAPI. It does not derive or override them at runtime.
 
