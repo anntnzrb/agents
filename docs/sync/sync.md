@@ -20,7 +20,7 @@ A manual sync runs these stages in order:
 
 1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. Adapter-declared bootstraps run only when their adapter is enabled.
 2. Remove stale top-level harness entries that earlier sync runs owned.
-3. Install the sync runtime and reconcile source files, shared assets, skills, and generated configuration.
+3. Install the sync runtime and reconcile source files, merged JSON configuration, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
 5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts.
 6. Record managed harness entries.
@@ -36,6 +36,8 @@ Directory jobs use one of two scopes:
 
 - A tree job makes the destination tree match its source.
 - A children job reconciles managed top-level entries inside an existing harness home, preserving unrelated top-level entries while making each managed subdirectory match its source.
+
+Merged JSON configuration jobs deep-merge a source object over the generated file, preserving destination-only keys. See the [Harness adapter reference](harnesses.md#merged-json-configuration).
 
 Recorded ownership limits cleanup to safe top-level names. Sync preserves unmanaged wrapper conflicts and reports each conflict.
 

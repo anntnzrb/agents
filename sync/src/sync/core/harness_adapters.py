@@ -65,6 +65,7 @@ class HarnessAdapter:
     instruction_file: str | None = None
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] | None = None
+    merge_json_files: tuple[str, ...] | None = None
     hooks: tuple[HarnessHookSpec, ...] | None = None
 
 

@@ -36,6 +36,7 @@ from sync.runtime.errors import assert_never, panic_message
 type JobKind = Literal[
     "Dir",
     "File",
+    "MergeJsonConfig",
     "SecretTemplate",
     "CliProxyReadiness",
     "CliProxyEndpointTemplates",
@@ -64,6 +65,15 @@ class FileJob:
     endpoint_template: bool = False
     deployment: CliProxyDeployment | None = None
     kind: Literal["File"] = "File"
+
+
+@dataclass(frozen=True, slots=True)
+class MergeJsonConfigJob:
+    """Merged JSON configuration synchronization job."""
+
+    src: str
+    dst: str
+    kind: Literal["MergeJsonConfig"] = "MergeJsonConfig"
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +130,7 @@ class SyncRuntimeInstallJob:
 type Job = (
     DirJob
     | FileJob
+    | MergeJsonConfigJob
     | SecretTemplateJob
     | CliProxyReadinessJob
     | CliProxyEndpointTemplatesJob
@@ -424,9 +435,20 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
                 src=plan.source_root,
                 dst=plan.root,
                 scope="Children",
-                preserve_paths=template_paths_by_id.get(plan.harness.id, ()),
+                preserve_paths=(
+                    *template_paths_by_id.get(plan.harness.id, ()),
+                    *plan.harness.merge_json_files,
+                ),
             )
             for plan in harnesses
+        ),
+        *(
+            MergeJsonConfigJob(
+                src=str(Path(plan.source_root) / rel_path),
+                dst=str(Path(plan.root) / rel_path),
+            )
+            for plan in harnesses
+            for rel_path in plan.harness.merge_json_files
         ),
         *(
             DirJob(
@@ -474,6 +496,7 @@ __all__ = [
     "HarnessPlan",
     "Job",
     "JobKind",
+    "MergeJsonConfigJob",
     "PackageBootstrapHookPlan",
     "SecretTemplateJob",
     "SyncHookPlan",

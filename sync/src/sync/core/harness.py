@@ -63,6 +63,7 @@ class HarnessSpec:
     instruction_file: str | None = None
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] | None = None
+    merge_json_files: tuple[str, ...] | None = None
     hooks: tuple[HarnessHookSpec, ...] | None = None
 
 
@@ -77,6 +78,7 @@ class Harness:
     instruction_file: str = DEFAULT_INSTRUCTION_FILE
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] = ()
+    merge_json_files: tuple[str, ...] = ()
     hooks: tuple[HarnessHook, ...] = ()
 
 
@@ -238,6 +240,9 @@ def build_harness(spec: HarnessSpec) -> Harness:
             if spec.compat_managed_entries is not None
             else ()
         ),
+        merge_json_files=(
+            spec.merge_json_files if spec.merge_json_files is not None else ()
+        ),
         hooks=normalize_hooks(spec.hooks if spec.hooks is not None else ()),
     )
 
@@ -262,6 +267,7 @@ def _adapter_to_harness(
         instruction_file=adapter.instruction_file,
         runtime_subdir=adapter.runtime_subdir,
         compat_managed_entries=adapter.compat_managed_entries,
+        merge_json_files=adapter.merge_json_files,
         hooks=adapter.hooks,
     )
     return build_harness(spec)

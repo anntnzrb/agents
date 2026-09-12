@@ -51,6 +51,7 @@ from sync.core.plan import (
     ExtensionDepsHookPlan,
     FileJob,
     Job,
+    MergeJsonConfigJob,
     PackageBootstrapHookPlan,
     SecretTemplateJob,
     build_sync_plan,
@@ -787,6 +788,42 @@ def test_sync_plan_resolves_hook_targets_from_harness_specs(
         ("pi", str(home / ".pi" / "agent" / "extensions")),
         ("omp", str(home / ".omp" / "agent")),
     ]
+
+
+def test_sync_plan_merges_devin_config_over_local_keys(home: Path) -> None:
+    """Verify devin config is merge-managed and its local keys survive sync."""
+    _ = _make_sync_env(home)
+    devin_source = home / ".config" / "agents" / "harnesses" / "devin"
+    _write_file(devin_source / "config.json", '{"version": 1, "auto_update": false}\n')
+    sync_env = SyncEnv.from_home(str(home), 10_000, platform="linux")
+
+    sync_plan = build_sync_plan(sync_env)
+    merge_job = next(
+        (j for j in sync_plan.jobs if isinstance(j, MergeJsonConfigJob)),
+        None,
+    )
+    assert merge_job is not None
+    assert merge_job.src == str(devin_source / "config.json")
+    assert merge_job.dst == str(home / ".config" / "devin" / "config.json")
+
+    dir_job = next(
+        (
+            j
+            for j in sync_plan.jobs
+            if isinstance(j, DirJob) and j.dst == str(home / ".config" / "devin")
+        ),
+        None,
+    )
+    assert dir_job is not None
+    assert "config.json" in dir_job.preserve_paths
+
+    dst = home / ".config" / "devin" / "config.json"
+    _write_file(dst, '{"version": 1, "devin": {"org_id": "org-1"}}\n')
+    assert asyncio.run(run_jobs_with_preserve([merge_job])) is True
+    merged: object = json.loads(dst.read_text(encoding="utf-8"))  # pyright: ignore[reportAny]
+    assert _is_dict(merged)
+    assert merged.get("devin") == {"org_id": "org-1"}
+    assert merged.get("auto_update") is False
 
 
 def test_sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host(

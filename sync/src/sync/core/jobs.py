@@ -27,6 +27,7 @@ from sync.core.cliproxy_deployment import (
     publish_cliproxy_endpoint_templates,
     sync_cliproxy_endpoint_template,
 )
+from sync.core.json_config import sync_merged_json_config
 from sync.core.plan import (
     CliProxyConfigJob,
     CliProxyEndpointTemplatesJob,
@@ -34,6 +35,7 @@ from sync.core.plan import (
     DirJob,
     FileJob,
     Job,
+    MergeJsonConfigJob,
     SecretTemplateJob,
     SyncRuntimeInstallJob,
 )
@@ -148,6 +150,18 @@ def _run_file_job(job: FileJob) -> bool:
     return True
 
 
+def _run_merge_json_config_job(job: MergeJsonConfigJob) -> bool:
+    try:
+        if not Path(job.src).exists():
+            err(f"missing source: {job.src}")
+            return True
+        sync_merged_json_config(job.src, job.dst)
+    except (OSError, RuntimeError, ValueError) as error:
+        err(f"merge failed: {job.src} -> {job.dst} ({panic_message(error)})")
+        return False
+    return True
+
+
 def _run_secret_template_job(job: SecretTemplateJob) -> bool:
     if not Path(job.src).exists():
         err(f"missing source: {job.src}")
@@ -199,7 +213,7 @@ def _run_cliproxy_config_job(job: CliProxyConfigJob, state: JobRunState) -> bool
     return True
 
 
-async def _run_job(
+async def _run_job(  # noqa: C901
     job: Job,
     preserve_paths_by_dst: Mapping[str, Sequence[str]],
     source_content_cache: SourceContentCache,
@@ -211,6 +225,8 @@ async def _run_job(
                 success = _run_dir_job(job, preserve_paths_by_dst, source_content_cache)
             case FileJob():
                 success = _run_file_job(job)
+            case MergeJsonConfigJob():
+                success = _run_merge_json_config_job(job)
             case SecretTemplateJob():
                 success = _run_secret_template_job(job)
             case CliProxyReadinessJob():
