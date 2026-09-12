@@ -9,6 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import dotenv
@@ -90,7 +91,7 @@ class HarnessSpec:
     instruction_file: str | None = None
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] | None = None
-    merge_json_files: tuple[str, ...] | None = None
+    preserve_json_keys: Mapping[str, tuple[str, ...]] | None = None
     hooks: tuple[HarnessHookSpec, ...] | None = None
 
 
@@ -105,7 +106,7 @@ class Harness:
     instruction_file: str = DEFAULT_INSTRUCTION_FILE
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] = ()
-    merge_json_files: tuple[str, ...] = ()
+    preserve_json_keys: Mapping[str, tuple[str, ...]] = MappingProxyType({})
     hooks: tuple[HarnessHook, ...] = ()
 
 
@@ -276,7 +277,7 @@ def build_harness(spec: HarnessSpec) -> Harness:
         instruction_file=spec.instruction_file or DEFAULT_INSTRUCTION_FILE,
         runtime_subdir=spec.runtime_subdir,
         compat_managed_entries=spec.compat_managed_entries or (),
-        merge_json_files=spec.merge_json_files or (),
+        preserve_json_keys=spec.preserve_json_keys or {},
         hooks=normalize_hooks(spec.hooks or ()),
     )
 
@@ -301,7 +302,7 @@ def _adapter_to_harness(
         instruction_file=adapter.instruction_file,
         runtime_subdir=adapter.runtime_subdir,
         compat_managed_entries=adapter.compat_managed_entries,
-        merge_json_files=adapter.merge_json_files,
+        preserve_json_keys=adapter.preserve_json_keys,
         hooks=adapter.hooks,
     )
     return build_harness(spec)

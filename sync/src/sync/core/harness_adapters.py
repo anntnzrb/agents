@@ -93,7 +93,7 @@ class HarnessAdapter:
     instruction_file: str | None = None
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] | None = None
-    merge_json_files: tuple[str, ...] | None = None
+    preserve_json_keys: Mapping[str, tuple[str, ...]] | None = None
     hooks: tuple[HarnessHookSpec, ...] | None = None
 
 
@@ -137,7 +137,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             ),
             env={"DEVIN_PERMISSION_MODE": "bypass"},
         ),
-        merge_json_files=("config.json",),
+        preserve_json_keys={"config.json": ("devin",)},
     ),
     HarnessAdapter(
         id="opencode",

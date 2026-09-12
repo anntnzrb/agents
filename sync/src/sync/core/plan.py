@@ -36,7 +36,7 @@ from sync.runtime.errors import assert_never, panic_message
 type JobKind = Literal[
     "Dir",
     "File",
-    "MergeJsonConfig",
+    "PreserveJsonKeys",
     "SecretTemplate",
     "CliProxyReadiness",
     "CliProxyEndpointTemplates",
@@ -68,12 +68,13 @@ class FileJob:
 
 
 @dataclass(frozen=True, slots=True)
-class MergeJsonConfigJob:
-    """Merged JSON configuration synchronization job."""
+class PreserveJsonKeysJob:
+    """JSON configuration copy job preserving declared destination keys."""
 
     src: str
     dst: str
-    kind: Literal["MergeJsonConfig"] = "MergeJsonConfig"
+    preserve_paths: tuple[str, ...] = ()
+    kind: Literal["PreserveJsonKeys"] = "PreserveJsonKeys"
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +131,7 @@ class SyncRuntimeInstallJob:
 type Job = (
     DirJob
     | FileJob
-    | MergeJsonConfigJob
+    | PreserveJsonKeysJob
     | SecretTemplateJob
     | CliProxyReadinessJob
     | CliProxyEndpointTemplatesJob
@@ -432,18 +433,19 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
                 scope="Children",
                 preserve_paths=(
                     *template_paths_by_id.get(plan.harness.id, ()),
-                    *plan.harness.merge_json_files,
+                    *plan.harness.preserve_json_keys,
                 ),
             )
             for plan in harnesses
         ),
         *(
-            MergeJsonConfigJob(
+            PreserveJsonKeysJob(
                 src=str(Path(plan.source_root) / rel_path),
                 dst=str(Path(plan.root) / rel_path),
+                preserve_paths=preserve_paths,
             )
             for plan in harnesses
-            for rel_path in plan.harness.merge_json_files
+            for rel_path, preserve_paths in plan.harness.preserve_json_keys.items()
         ),
         *(
             DirJob(
@@ -488,8 +490,8 @@ __all__ = [
     "ExtensionDepsHookPlan",
     "FileJob",
     "Job",
-    "MergeJsonConfigJob",
     "PackageBootstrapHookPlan",
+    "PreserveJsonKeysJob",
     "SecretTemplateJob",
     "SyncRuntimeInstallJob",
     "build_sync_plan",

@@ -27,7 +27,7 @@ from sync.core.cliproxy_deployment import (
     publish_cliproxy_endpoint_templates,
     sync_cliproxy_endpoint_template,
 )
-from sync.core.json_config import sync_merged_json_config
+from sync.core.json_config import sync_json_config
 from sync.core.plan import (
     CliProxyConfigJob,
     CliProxyEndpointTemplatesJob,
@@ -35,7 +35,7 @@ from sync.core.plan import (
     DirJob,
     FileJob,
     Job,
-    MergeJsonConfigJob,
+    PreserveJsonKeysJob,
     SecretTemplateJob,
     SyncRuntimeInstallJob,
 )
@@ -147,14 +147,14 @@ def _run_file_job(job: FileJob) -> bool:
     return True
 
 
-def _run_merge_json_config_job(job: MergeJsonConfigJob) -> bool:
+def _run_preserve_json_keys_job(job: PreserveJsonKeysJob) -> bool:
     try:
         if not Path(job.src).exists():
             err(f"missing source: {job.src}")
             return True
-        sync_merged_json_config(job.src, job.dst)
+        sync_json_config(job.src, job.dst, job.preserve_paths)
     except (OSError, RuntimeError, ValueError) as error:
-        err(f"merge failed: {job.src} -> {job.dst} ({panic_message(error)})")
+        err(f"copy failed: {job.src} -> {job.dst} ({panic_message(error)})")
         return False
     return True
 
@@ -222,8 +222,8 @@ async def _run_job(  # noqa: C901
                 success = _run_dir_job(job, preserve_paths_by_dst, source_content_cache)
             case FileJob():
                 success = _run_file_job(job)
-            case MergeJsonConfigJob():
-                success = _run_merge_json_config_job(job)
+            case PreserveJsonKeysJob():
+                success = _run_preserve_json_keys_job(job)
             case SecretTemplateJob():
                 success = _run_secret_template_job(job)
             case CliProxyReadinessJob():
