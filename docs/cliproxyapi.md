@@ -79,6 +79,28 @@ chmod 600 ~/.cli-proxy-api/codex-*.json
 
 Do not run two gateways with the same active refresh token. Stop the old gateway before you move OAuth state. Reauthenticate on the new host instead of copying an active token.
 
+## Authenticate Antigravity
+
+Use the control panel or the CLI. Both flows end at `http://localhost:51121/oauth-callback`, so the browser that completes Google OAuth must resolve `localhost:51121` to the gateway host. When operating the gateway remotely, forward the port first:
+
+```bash
+ssh -L 51121:localhost:51121 <gateway-host>
+```
+
+Panel flow: open the control panel and start Antigravity login. The gateway runs a temporary callback forwarder on port `51121`, exchanges the authorization code, writes the credential file under `~/.cli-proxy-api/`, and loads it without a restart.
+
+CLI flow on the gateway host:
+
+```bash
+cli-proxy-api --antigravity-login --no-browser
+```
+
+Open the printed URL in the browser. Restrict the generated file:
+
+```bash
+chmod 600 ~/.cli-proxy-api/antigravity-*.json
+```
+
 ## Start the gateway
 
 On the configured gateway host, start CLIProxyAPI in the foreground:

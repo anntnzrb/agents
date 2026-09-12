@@ -8,7 +8,8 @@ Choose a page by the task you need to complete. Sync application documentation l
 
 ## Operate
 
-- [CLIProxyAPI](cliproxyapi.md) changes credentials, authenticates ChatGPT, runs the gateway, and lists artifacts, configuration fields, discovery rules, and routing settings.
+- [CLIProxyAPI](cliproxyapi.md) changes credentials, authenticates OAuth accounts, runs the gateway, and lists artifacts, configuration fields, discovery rules, and routing settings.
+- [T3 Code server](t3.md) installs, repairs, exposes, and moves the T3 background service declared by `tools/t3/`.
 
 ## Develop
 
