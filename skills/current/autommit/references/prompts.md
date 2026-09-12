@@ -30,6 +30,8 @@ Planning evidence, in order:
 
 When validation fails, preserve the original evidence and add only the exact rejection as correction context. Generate a complete replacement plan; never patch a rejected plan mentally and skip validation.
 
+Provider failures are not plan rejections. After the host finishes its provider retries, report any terminal provider error and stop. Use correction attempts only when the model returned a plan that failed validation.
+
 ## Atomicity Critic
 
 Use a fresh focused pass only when `validate-plan` returns `requires_atomicity_review:true`.
