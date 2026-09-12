@@ -18,15 +18,6 @@ __all__ = [
 _OS_ERROR_CODE_MAP: dict[type[OSError], tuple[str, ...]] = {
     FileNotFoundError: ("ENOENT",),
     FileExistsError: ("EEXIST",),
-    PermissionError: ("EACCES", "EPERM"),
-    IsADirectoryError: ("EISDIR",),
-    NotADirectoryError: ("ENOTDIR",),
-    ProcessLookupError: ("ESRCH",),
-    BlockingIOError: ("EAGAIN", "EWOULDBLOCK"),
-    InterruptedError: ("EINTR",),
-    ConnectionRefusedError: ("ECONNREFUSED",),
-    ConnectionResetError: ("ECONNRESET",),
-    TimeoutError: ("ETIMEDOUT",),
 }
 
 

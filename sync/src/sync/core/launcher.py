@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter, ValidationError
 
-from sync.core.harness import StaticReleaseLauncher
+from sync.core.harness import StaticReleaseLauncher, assert_path_component
 from sync.core.managed_tools import (
     download_release,
     extract_archive,
@@ -32,7 +32,12 @@ from sync.core.release_manifest import fetch_static_release_manifest
 from sync.runtime.errors import err, panic_message, warn
 from sync.runtime.fs import rm_entry
 from sync.runtime.lock import acquire_cache_lock, release_sync_lock
-from sync.runtime.process import ProcessResult, RunProcessOptions, run_process
+from sync.runtime.process import (
+    MAX_DETAIL_CHARS,
+    ProcessResult,
+    RunProcessOptions,
+    run_process,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -41,24 +46,18 @@ if TYPE_CHECKING:
     from sync.core.release_manifest import FetchManifestFn, StaticReleaseAsset
 
 __all__ = [
-    "DEFAULT_LAUNCH_TIMEOUT_MS",
     "LauncherRuntime",
-    "NpmCacheLayout",
     "NpmPackageSpec",
     "PreparePackageOptions",
-    "PreparedNpmPackage",
-    "PreparedStaticRelease",
     "ReleaseRuntime",
     "launch_harness",
     "launch_npm_package",
-    "launch_static_release",
     "npm_cache_layout",
     "prepare_npm_package",
     "prepare_static_release",
 ]
 
 DEFAULT_LAUNCH_TIMEOUT_MS: int = 120_000
-COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9._-]+$")
 PACKAGE_PATTERN: re.Pattern[str] = re.compile(
     r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$"
 )
@@ -74,7 +73,6 @@ RELEASE_LOCK_FILE: str = "lock"
 RELEASE_DISTRIBUTION: str = "curl-bash"
 RELEASE_DISTRIBUTION_FILE: str = "distribution"
 RELEASE_STAGE_PREFIX: str = ".stage-"
-MAX_DETAIL_CHARS: int = 2000
 _PACKAGE_MANIFEST = TypeAdapter(dict[str, object])
 
 
@@ -136,7 +134,7 @@ def npm_cache_layout(
     cache_home: str | None = None,
 ) -> NpmCacheLayout:
     """Compute the cache directories, symlinks, and lockfile for an npm tool."""
-    require_component(spec.tool, "tool")
+    assert_path_component(spec.tool, "tool")
     resolved_cache = (
         cache_home or os.environ.get("XDG_CACHE_HOME") or str(Path(home) / ".cache")
     )
@@ -229,11 +227,7 @@ async def _ensure_version_installed(
         raise RuntimeError(message)
 
     runtime = options.runtime
-    runner = (
-        runtime.run
-        if (runtime is not None and runtime.run is not None)
-        else run_process
-    )
+    runner = runtime.run if runtime and runtime.run else run_process
     stage_name = f".stage-{os.getpid()}-{secrets.token_hex(4)}"
     stage_dir = str(Path(layout.versions_dir) / stage_name)
     try:
@@ -260,10 +254,10 @@ async def _prepare_locked_package(
     runtime = options.runtime
     resolver = (
         runtime.resolve_version
-        if runtime is not None and runtime.resolve_version is not None
+        if runtime and runtime.resolve_version
         else resolve_version
     )
-    dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
+    dist_tag = spec.dist_tag or "latest"
     try:
         resolved_version = validate_resolved_version(
             await resolver(spec.package, dist_tag, timeout_ms)
@@ -286,11 +280,17 @@ async def _prepare_locked_package(
         fallback = current_cached_package(layout, spec)
         if fallback is None:
             raise
-        warn_using_cached_package(spec, fallback[0], error)
+        version, current_bin = fallback
+        detail = str(error) or error.__class__.__name__
+        message = (
+            f"latest {spec.package}@{dist_tag} unavailable ({detail}); "
+            f"using cached {spec.tool}@{version}"
+        )
+        warn(message)
         return PreparedNpmPackage(
             layout=layout,
-            resolved_version=fallback[0],
-            current_bin=fallback[1],
+            resolved_version=version,
+            current_bin=current_bin,
         )
 
 
@@ -332,11 +332,7 @@ async def launch_npm_package(
             runtime=runtime,
         ),
     )
-    runner = (
-        runtime.run
-        if (runtime is not None and runtime.run is not None)
-        else run_process
-    )
+    runner = runtime.run if runtime and runtime.run else run_process
     cmd = [prepared.current_bin, *args]
     result = await runner(
         cmd,
@@ -374,12 +370,8 @@ class PreparedStaticRelease:
 
 
 def _release_platform_key(runtime: ReleaseRuntime | None) -> str:
-    platform_name = (
-        runtime.platform if runtime is not None and runtime.platform else sys_platform()
-    )
-    arch_source = (
-        runtime.arch if runtime is not None and runtime.arch else platform.machine()
-    )
+    platform_name = runtime.platform if runtime and runtime.platform else sys_platform()
+    arch_source = runtime.arch if runtime and runtime.arch else platform.machine()
     return f"{platform_name}-{supported_arch(arch_source)}"
 
 
@@ -410,20 +402,12 @@ async def _install_static_release(
             tempfile.mkdtemp, prefix=RELEASE_STAGE_PREFIX, dir=str(versions_dir)
         )
     )
+    download = runtime.download if runtime and runtime.download else download_release
+    extract = runtime.extract if runtime and runtime.extract else extract_archive
     try:
         archive_path = stage_dir / f"release-{version}.tar.gz"
-        download = (
-            runtime.download
-            if runtime is not None and runtime.download is not None
-            else download_release
-        )
         await asyncio.to_thread(download, asset.url, str(archive_path), timeout_ms)
         await asyncio.to_thread(verify_checksum, str(archive_path), asset.sha256)
-        extract = (
-            runtime.extract
-            if runtime is not None and runtime.extract is not None
-            else extract_archive
-        )
         await asyncio.to_thread(extract, str(archive_path), str(stage_dir), timeout_ms)
         await asyncio.to_thread(
             _promote_release_stage, stage_dir, version_dir, archive_path
@@ -432,16 +416,21 @@ async def _install_static_release(
         shutil.rmtree(stage_dir, ignore_errors=True)
 
 
-def _update_release_links(versions_dir: Path, version_dir: Path) -> None:
-    current_link = str(versions_dir / RELEASE_CURRENT_LINK)
-    previous_link = str(versions_dir / RELEASE_PREVIOUS_LINK)
-    expected_target = os.path.relpath(str(version_dir), str(versions_dir))
+def _rotate_links(current_link: str, previous_link: str, expected_target: str) -> None:
     current_target = read_link_target(current_link)
     if current_target == expected_target:
         return
     if current_target is not None:
         replace_link(previous_link, current_target)
     replace_link(current_link, expected_target)
+
+
+def _update_release_links(versions_dir: Path, version_dir: Path) -> None:
+    _rotate_links(
+        str(versions_dir / RELEASE_CURRENT_LINK),
+        str(versions_dir / RELEASE_PREVIOUS_LINK),
+        os.path.relpath(str(version_dir), str(versions_dir)),
+    )
 
 
 def _prune_release_versions(versions_dir: Path) -> None:
@@ -608,9 +597,7 @@ async def launch_static_release(
     prepared = await prepare_static_release(
         launcher.release, sync_env.home, sync_env.install_timeout_ms, runtime
     )
-    runner = (
-        runtime.run if runtime is not None and runtime.run is not None else run_process
-    )
+    runner = runtime.run if runtime and runtime.run else run_process
     result = await runner(
         [prepared.executable, *args],
         RunProcessOptions(
@@ -679,12 +666,7 @@ def update_current_and_previous(layout: NpmCacheLayout, version: str) -> None:
     expected_target = os.path.relpath(
         version_dir, str(Path(layout.current_link).parent)
     )
-    current_target = read_link_target(layout.current_link)
-    if current_target == expected_target:
-        return
-    if current_target is not None:
-        replace_link(layout.previous_link, current_target)
-    replace_link(layout.current_link, expected_target)
+    _rotate_links(layout.current_link, layout.previous_link, expected_target)
 
 
 def replace_link(link_path: str, target: str) -> None:
@@ -761,10 +743,10 @@ def package_bin_path(root: str, bin_name: str) -> str:
 
 def validate_spec(spec: NpmPackageSpec) -> None:
     """Validate that spec components adhere to safe identifier patterns."""
-    require_component(spec.tool, "tool")
-    require_component(spec.bin, "bin")
-    dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
-    require_component(dist_tag, "dist-tag")
+    assert_path_component(spec.tool, "tool")
+    assert_path_component(spec.bin, "bin")
+    dist_tag = spec.dist_tag or "latest"
+    assert_path_component(dist_tag, "dist-tag")
     if not PACKAGE_PATTERN.match(spec.package):
         message = f"invalid package: {spec.package}"
         raise ValueError(message)
@@ -805,28 +787,6 @@ def current_cached_package(
     return version, current_bin
 
 
-def warn_using_cached_package(
-    spec: NpmPackageSpec,
-    version: str,
-    error: object,
-) -> None:
-    """Log a warning that latest package is unavailable and cache is being used."""
-    dist_tag = spec.dist_tag if spec.dist_tag is not None else "latest"
-    detail = _detail_from_error(error)
-    message = (
-        f"latest {spec.package}@{dist_tag} unavailable ({detail}); "
-        f"using cached {spec.tool}@{version}"
-    )
-    warn(message)
-
-
-def _detail_from_error(error: object) -> str:
-    if isinstance(error, BaseException):
-        msg = str(error)
-        return msg or error.__class__.__name__
-    return str(error)
-
-
 def installed_package_matches(
     root: str,
     spec: NpmPackageSpec,
@@ -848,13 +808,6 @@ def installed_package_matches(
         )
     except (OSError, json.JSONDecodeError, ValidationError, TypeError, ValueError):
         return False
-
-
-def require_component(value: str, label: str) -> None:
-    """Ensure a name component contains only safe characters and is not '.' or '..'."""
-    if not value or not COMPONENT_PATTERN.match(value) or value in (".", ".."):
-        message = f"invalid {label}: {value}"
-        raise ValueError(message)
 
 
 def is_executable(target_path: str) -> bool:

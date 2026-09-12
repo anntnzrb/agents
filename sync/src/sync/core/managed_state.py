@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,18 +26,20 @@ from sync.core.harness import (
 from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.plan import build_sync_plan, top_level_entry_names
 from sync.runtime.errors import err, panic_message, warn
-from sync.runtime.fs import is_safe_managed_entry_name, rm_entry, sync_text_file
+from sync.runtime.fs import (
+    existing_file_mode,
+    is_safe_managed_entry_name,
+    rm_entry,
+    sync_text_file,
+)
 
 __all__ = [
-    "ManagedHarnessPlan",
-    "ManagedSyncPlan",
     "clean_managed_entries",
     "load_recorded_entry_names",
     "plan_managed_entries",
     "plan_managed_entries_for_sync_plan",
     "record_managed_entries",
     "top_level_entry_names",
-    "unique_sorted",
     "write_recorded_entry_names",
 ]
 
@@ -112,12 +113,7 @@ def write_recorded_entry_names(
     """Write sorted unique managed entry names to JSON file atomically."""
     path_str = str(path)
     payload = f"{json.dumps(unique_sorted(entry_names), indent=2)}\n"
-    try:
-        existing = Path(path_str).lstat()
-        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o600
-    except OSError:
-        mode = 0o600
-    sync_text_file(path_str, payload, mode)
+    sync_text_file(path_str, payload, existing_file_mode(path_str))
 
 
 def plan_managed_entries_for_sync_plan(
@@ -140,11 +136,11 @@ def plan_managed_entries_for_sync_plan(
             )
             if entry_name not in current_entry_set
         ]
-        cleanup_paths: list[str] = []
-        for entry in stale_entry_names:
-            resolved = _cleanup_path(harness_plan.root, entry)
-            if resolved is not None:
-                cleanup_paths.append(resolved)
+        cleanup_paths = [
+            resolved
+            for entry in stale_entry_names
+            if (resolved := _cleanup_path(harness_plan.root, entry)) is not None
+        ]
         harnesses.append(
             ManagedHarnessPlan(
                 state_path=harness_plan.state_path,

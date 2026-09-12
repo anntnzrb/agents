@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sync.runtime.fs import rm_entry
+from sync.runtime.fs import rm_entry as _rm_entry
 from sync.runtime.process import command_exists, run_command
 
 if TYPE_CHECKING:
@@ -23,7 +23,6 @@ __all__ = [
     "fnv1a64",
     "package_cache_dir",
     "replace_dir_atomically",
-    "rm_entry",
     "source_slug",
     "staging_dir_for",
 ]
@@ -55,8 +54,8 @@ def _replace_dir_atomically_sync(src: str, dst: str) -> None:
     legacy_backup = _with_extension(dst, "backup")
 
     if _exists(legacy_backup):
-        rm_entry(legacy_backup)
-    rm_entry(backup)
+        _rm_entry(legacy_backup)
+    _rm_entry(backup)
 
     moved_to_backup = False
     if _exists(dst):
@@ -66,7 +65,7 @@ def _replace_dir_atomically_sync(src: str, dst: str) -> None:
     try:
         _ = Path(src).replace(dst)
         if moved_to_backup:
-            rm_entry(backup)
+            _rm_entry(backup)
     except Exception:
         if moved_to_backup and _exists(backup):
             with contextlib.suppress(OSError):
@@ -101,8 +100,8 @@ def source_slug(source: str) -> str:
     """Generate a clean alphanumeric slug from a package source URL or path."""
     trimmed = _TRAILING_PATH_SEPARATOR_PATTERN.sub("", source.strip())
     normalized = trimmed.removesuffix(".git")
-    if _is_local_path_source(normalized):
-        source_parts = [_local_path_basename(normalized)]
+    if Path(normalized).is_absolute():
+        source_parts = [Path(normalized).name]
     else:
         parts = [p for p in _SOURCE_SEPARATOR_PATTERN.split(normalized) if p]
         source_parts = parts[-2:]
@@ -124,14 +123,6 @@ def fnv1a64(input_str: str) -> str:
     return f"{hash_val:016x}"
 
 
-def _local_path_basename(source: str) -> str:
-    return Path(source).name
-
-
-def _is_local_path_source(source: str) -> bool:
-    return Path(source).is_absolute()
-
-
 def _with_extension(target: str, extension: str) -> str:
     target_path = Path(target)
     return str(target_path.parent / f"{target_path.stem}.{extension}")
@@ -148,10 +139,10 @@ async def clone_package_with_runner(
     commands = _clone_commands(source, target_dir, gh_available=gh_available)
     for index, command in enumerate(commands):
         if index > 0:
-            rm_entry(target_dir)
+            _rm_entry(target_dir)
         if await runner(command):
             return True
-        rm_entry(target_dir)
+        _rm_entry(target_dir)
     return False
 
 

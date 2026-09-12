@@ -238,8 +238,8 @@ def _resolve_launcher_env(
 
 def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
     launcher_env = _resolve_launcher_env(spec.env, home)
-    smoke_check = spec.smoke_check if spec.smoke_check is not None else "--version"
-    default_args = spec.default_args if spec.default_args is not None else ()
+    smoke_check = spec.smoke_check or "--version"
+    default_args = spec.default_args or ()
 
     if isinstance(spec, StaticReleaseLauncherSpec):
         return StaticReleaseLauncher(
@@ -259,7 +259,7 @@ def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
     return NpmLauncher(
         package=spec.package,
         bin=spec.bin,
-        dist_tag=spec.dist_tag if spec.dist_tag is not None else "latest",
+        dist_tag=spec.dist_tag or "latest",
         smoke_check=smoke_check,
         default_args=default_args,
         env=launcher_env,
@@ -274,21 +274,11 @@ def build_harness(spec: HarnessSpec) -> Harness:
         source_name=spec.source_name,
         home=spec.home,
         launcher=_build_launcher(spec.launcher, spec.home),
-        instruction_file=(
-            spec.instruction_file
-            if spec.instruction_file is not None
-            else DEFAULT_INSTRUCTION_FILE
-        ),
+        instruction_file=spec.instruction_file or DEFAULT_INSTRUCTION_FILE,
         runtime_subdir=spec.runtime_subdir,
-        compat_managed_entries=(
-            spec.compat_managed_entries
-            if spec.compat_managed_entries is not None
-            else ()
-        ),
-        merge_json_files=(
-            spec.merge_json_files if spec.merge_json_files is not None else ()
-        ),
-        hooks=normalize_hooks(spec.hooks if spec.hooks is not None else ()),
+        compat_managed_entries=spec.compat_managed_entries or (),
+        merge_json_files=spec.merge_json_files or (),
+        hooks=normalize_hooks(spec.hooks or ()),
     )
 
 
@@ -414,21 +404,9 @@ def normalize_hooks(
         if isinstance(hook, PackageBootstrapHook):
             result.append(
                 PackageBootstrapHook(
-                    manifest_file=(
-                        hook.manifest_file
-                        if hook.manifest_file is not None
-                        else "packages.json"
-                    ),
-                    settings_file=(
-                        hook.settings_file
-                        if hook.settings_file is not None
-                        else "settings.json"
-                    ),
-                    cache_subdir=(
-                        hook.cache_subdir
-                        if hook.cache_subdir is not None
-                        else DEFAULT_PACKAGE_CACHE_SUBDIR
-                    ),
+                    manifest_file=hook.manifest_file or "packages.json",
+                    settings_file=hook.settings_file or "settings.json",
+                    cache_subdir=hook.cache_subdir or DEFAULT_PACKAGE_CACHE_SUBDIR,
                 )
             )
         else:
@@ -441,7 +419,6 @@ __all__ = [
     "DEFAULT_PACKAGE_CACHE_SUBDIR",
     "HARNESS_ADAPTERS",
     "INSTALL_TIMEOUT_MS",
-    "INSTALL_TIMEOUT_SECONDS",
     "MANAGED_STATE_SUBDIR",
     "PATH_COMPONENT_PATTERN",
     "SKILLS_DST_DIR",
@@ -450,10 +427,8 @@ __all__ = [
     "ExtensionDepsHook",
     "Harness",
     "HarnessAdapter",
-    "HarnessHook",
     "HarnessHookSpec",
     "HarnessId",
-    "HarnessLauncher",
     "HarnessLauncherSpec",
     "HarnessSpec",
     "HostPlatform",
@@ -465,9 +440,7 @@ __all__ = [
     "SyncEnv",
     "assert_path_component",
     "build_harness",
-    "decode_root_env",
     "discover_harnesses",
-    "harness_instruction_file_name",
     "harness_instruction_target",
     "harness_managed_state_path",
     "harness_root",
@@ -475,6 +448,5 @@ __all__ = [
     "is_directory",
     "load_root_env",
     "platform_from_process",
-    "read_root_env_content",
     "supported_harness",
 ]

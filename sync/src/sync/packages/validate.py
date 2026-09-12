@@ -7,9 +7,8 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import TypeGuard
 
-from sync.runtime.jsonc import strip_jsonc
+from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 
 RESOURCE_KEYS: tuple[str, ...] = ("extensions", "skills", "prompts", "themes")
 
@@ -109,14 +108,6 @@ _SOURCE_EXTENSIONS: tuple[str, ...] = (
 _MIN_SCOPED_PARTS = 2
 
 
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
-
-
 def package_is_healthy(target_dir: str) -> bool:
     """Return True if package dir contains valid resources and no missing imports."""
     if not _is_directory(target_dir):
@@ -127,9 +118,9 @@ def package_is_healthy(target_dir: str) -> bool:
     package_json_path = str(Path(target_dir) / "package.json")
     if _is_file(package_json_path):
         package_json = _read_json_file(package_json_path)
-        if _is_obj_dict(package_json):
+        if is_obj_dict(package_json):
             pi = package_json.get("pi")
-            if _is_obj_dict(pi):
+            if is_obj_dict(pi):
                 validated = _validate_pi_manifest(target_dir, pi)
                 if validated is not None:
                     return validated
@@ -145,7 +136,7 @@ def package_has_build_script(target_dir: str) -> bool:
 
     package_json = _read_json_file(package_json_path)
 
-    if not _is_obj_dict(package_json):
+    if not is_obj_dict(package_json):
         return False
     scripts = package_json.get("scripts")
     return isinstance(scripts, dict) and "build" in scripts
@@ -505,7 +496,7 @@ def _validate_pi_manifest(target_dir: str, pi: dict[str, object]) -> bool | None
     has_entries = False
     for key in RESOURCE_KEYS:
         entries = pi.get(key)
-        if not _is_obj_list(entries):
+        if not is_obj_list(entries):
             continue
         for entry in entries:
             if not isinstance(entry, str):

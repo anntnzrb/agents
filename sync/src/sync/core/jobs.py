@@ -110,14 +110,11 @@ def _run_dir_job(
         if not Path(job.src).is_dir():
             err(f"missing directory: {job.src}")
             return True
-        if job.scope == "Children":
-            Path(job.dst).mkdir(parents=True, exist_ok=True)
-            sync_managed_children(
-                job.src, job.dst, preserve_paths, source_content_cache
-            )
-        else:
-            Path(job.dst).parent.mkdir(parents=True, exist_ok=True)
-            sync_managed_tree(job.src, job.dst, preserve_paths, source_content_cache)
+        sync_children = job.scope == "Children"
+        sync_fn = sync_managed_children if sync_children else sync_managed_tree
+        mkdir_target = Path(job.dst) if sync_children else Path(job.dst).parent
+        mkdir_target.mkdir(parents=True, exist_ok=True)
+        sync_fn(job.src, job.dst, preserve_paths, source_content_cache)
     except (OSError, RuntimeError) as error:
         err(f"copy failed: {job.src} -> {job.dst} ({panic_message(error)})")
         return False
@@ -568,12 +565,7 @@ def remove_legacy_runtime_install(runtime_home: str) -> bool:
 
 
 __all__ = [
-    "DEFAULT_PRUNE_TIMEOUT_MS",
-    "MIN_INSTALL_TIMEOUT_MS",
-    "JobRunState",
-    "RequiredPaths",
     "prune_unreferenced_releases",
-    "publish_current_link",
     "remove_legacy_runtime_install",
     "run_jobs_with_preserve",
 ]

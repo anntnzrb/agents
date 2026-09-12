@@ -160,30 +160,6 @@ async def command_exists(
     return resolved is not None
 
 
-def _parse_run_options(
-    options: RunProcessOptions | None,
-    cwd: str | Path | None,
-    env: Mapping[str, str | None] | None,
-    timeout_ms: float | None,
-    stdio: Literal["pipe", "inherit"],
-) -> tuple[
-    str | Path | None,
-    Mapping[str, str | None] | None,
-    float | None,
-    Literal["pipe", "inherit"],
-]:
-    if isinstance(options, RunProcessOptions):
-        eff_cwd = options.cwd if options.cwd is not None else cwd
-        eff_env = options.env if options.env is not None else env
-        eff_timeout = (
-            options.timeout_ms if options.timeout_ms is not None else timeout_ms
-        )
-        eff_stdio = options.stdio if options.stdio != "pipe" else stdio
-        return eff_cwd, eff_env, eff_timeout, eff_stdio
-
-    return cwd, env, timeout_ms, stdio
-
-
 def _build_process_env(
     effective_env: Mapping[str, str | None] | None,
 ) -> dict[str, str]:
@@ -223,7 +199,7 @@ class _StreamDrainState:
     overflow: bool = False
 
 
-async def _drain_one_stream(
+async def _drain(
     stream: asyncio.StreamReader,
     chunks: list[bytes],
     state: _StreamDrainState,
@@ -278,24 +254,6 @@ async def _discard_and_reap_pipes(proc: asyncio.subprocess.Process) -> None:
             _ = tg.create_task(_reap_process(proc))
 
 
-async def _drain_pipes(
-    proc: asyncio.subprocess.Process,
-    stdout_chunks: list[bytes],
-    stderr_chunks: list[bytes],
-    shared: _StreamDrainState,
-) -> None:
-    """Drain both pipes and wait for exit; callers handle timeouts."""
-    stdout = proc.stdout
-    stderr = proc.stderr
-    if stdout is None or stderr is None:
-        _ = await proc.wait()
-        return
-    async with asyncio.TaskGroup() as tg:
-        _ = tg.create_task(_drain_one_stream(stdout, stdout_chunks, shared, proc))
-        _ = tg.create_task(_drain_one_stream(stderr, stderr_chunks, shared, proc))
-        _ = tg.create_task(proc.wait())
-
-
 async def _communicate_subprocess(
     proc: asyncio.subprocess.Process,
     timeout_ms: float | None,
@@ -328,7 +286,10 @@ async def _communicate_subprocess(
     )
     try:
         async with asyncio.timeout(timeout_sec):
-            await _drain_pipes(proc, stdout_chunks, stderr_chunks, shared)
+            async with asyncio.TaskGroup() as tg:
+                _ = tg.create_task(_drain(proc.stdout, stdout_chunks, shared, proc))
+                _ = tg.create_task(_drain(proc.stderr, stderr_chunks, shared, proc))
+                _ = tg.create_task(proc.wait())
     except TimeoutError:
         _kill_process_group(proc)
         await _discard_and_reap_pipes(proc)
@@ -360,8 +321,15 @@ async def run_process(  # noqa: PLR0913
             timed_out=False,
         )
 
-    eff_cwd, eff_env, eff_timeout, eff_stdio = _parse_run_options(
-        options, cwd, env, timeout_ms, stdio
+    eff_cwd = options.cwd if options is not None and options.cwd is not None else cwd
+    eff_env = options.env if options is not None and options.env is not None else env
+    eff_timeout = (
+        options.timeout_ms
+        if options is not None and options.timeout_ms is not None
+        else timeout_ms
+    )
+    eff_stdio = (
+        options.stdio if options is not None and options.stdio != "pipe" else stdio
     )
     resolved_env = _build_process_env(eff_env)
     executable = await asyncio.to_thread(

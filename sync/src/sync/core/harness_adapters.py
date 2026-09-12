@@ -193,5 +193,4 @@ __all__ = [
     "NpmLauncherSpec",
     "PackageBootstrapHook",
     "StaticReleaseLauncherSpec",
-    "StaticReleaseSpec",
 ]

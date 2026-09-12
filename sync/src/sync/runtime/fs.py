@@ -263,18 +263,19 @@ def _prune_managed_tree(dst: str, preserve_paths: Sequence[str]) -> None:
     for dst_entry in _safe_scandir(dst):
         if dst_entry.name in preserve_paths:
             continue
-        child_dst = str(Path(dst) / dst_entry.name)
-        if (
-            _preserves_entry(preserve_paths, dst_entry.name)
-            and dst_entry.is_dir(follow_symlinks=False)
-            and not dst_entry.is_symlink()
-        ):
-            _prune_managed_tree(
-                child_dst,
-                _child_preserve(preserve_paths, dst_entry.name),
-            )
-            continue
-        rm_entry(child_dst)
+        _prune_one(dst_entry, preserve_paths)
+
+
+def _prune_one(dst_entry: os.DirEntry[str], preserve_paths: Sequence[str]) -> None:
+    child_dst = str(Path(dst_entry.path))
+    if (
+        _preserves_entry(preserve_paths, dst_entry.name)
+        and dst_entry.is_dir(follow_symlinks=False)
+        and not dst_entry.is_symlink()
+    ):
+        _prune_managed_tree(child_dst, _child_preserve(preserve_paths, dst_entry.name))
+        return
+    rm_entry(child_dst)
 
 
 def _sync_managed_entry(
@@ -301,18 +302,7 @@ def _sync_managed_entry(
         for dst_entry in _safe_scandir(dst):
             if dst_entry.name in src_names or dst_entry.name in preserve_paths:
                 continue
-            child_dst = str(Path(dst) / dst_entry.name)
-            if (
-                _preserves_entry(preserve_paths, dst_entry.name)
-                and dst_entry.is_dir(follow_symlinks=False)
-                and not dst_entry.is_symlink()
-            ):
-                _prune_managed_tree(
-                    child_dst,
-                    _child_preserve(preserve_paths, dst_entry.name),
-                )
-                continue
-            rm_entry(child_dst)
+            _prune_one(dst_entry, preserve_paths)
 
     for src_entry in src_entries:
         if src_entry.name in preserve_paths:
@@ -411,6 +401,17 @@ def _raise_zero_write(temp_path: str) -> NoReturn:
     raise OSError(message)
 
 
+def existing_file_mode(path: str | os.PathLike[str]) -> int:
+    """Return the existing regular-file mode, or 0600 when absent or special."""
+    try:
+        metadata = Path(path).lstat()
+    except OSError:
+        return OUTPUT_MODE
+    if stat.S_ISREG(metadata.st_mode):
+        return metadata.st_mode & 0o777
+    return OUTPUT_MODE
+
+
 def sync_text_file(
     dst: str | os.PathLike[str],
     content: str,
@@ -447,11 +448,3 @@ def sync_text_file(
         with contextlib.suppress(OSError):
             Path(temp_path).unlink()
         raise
-
-
-def sync_private_text_file(
-    dst: str | os.PathLike[str],
-    content: str,
-) -> None:
-    """Write text file atomically with 0600 mode."""
-    sync_text_file(dst, content, OUTPUT_MODE)

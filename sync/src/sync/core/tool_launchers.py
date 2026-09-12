@@ -69,8 +69,7 @@ def tool_launcher_default_args(
     tool: ToolLauncherSpec,
 ) -> list[str]:
     """Compute default launcher CLI arguments including config path if configured."""
-    config_args: list[str] = []
     if tool.config_home_segments:
         config_path = str(Path(sync_env.home).joinpath(*tool.config_home_segments))
-        config_args = ["--config", config_path]
-    return [*config_args, *tool.default_args]
+        return ["--config", config_path, *tool.default_args]
+    return list(tool.default_args)

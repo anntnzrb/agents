@@ -22,29 +22,20 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from typing import NoReturn
 
-    from sync.core.harness import Harness, SyncEnv
+    from sync.core.harness import SyncEnv
     from sync.core.managed_tools import PreparedManagedTool
 
 __all__ = [
-    "UNIX_WRAPPER_DIR",
     "WRAPPER_MARKER",
     "WRAPPER_STATE_FILE",
-    "HarnessWrapperDestination",
-    "WrapperDestination",
-    "WrapperReconcileResult",
-    "WrapperRuntime",
     "WrapperState",
     "is_managed_wrapper",
     "managed_tool_wrapper_destination",
     "read_wrapper_state",
     "reconcile_wrapper_files",
     "reconcile_wrappers",
-    "render_launch_wrapper",
-    "render_managed_tool_wrapper",
-    "shell_quote",
     "wrapper_destinations",
-    "wrapper_directory",
-    "wrapper_path",
+    "write_managed_wrapper",
 ]
 
 UNIX_WRAPPER_DIR: tuple[str, str] = (".local", "bin")
@@ -70,13 +61,6 @@ class WrapperDestination:
 
 
 @dataclass(frozen=True, slots=True)
-class HarnessWrapperDestination(WrapperDestination):
-    """Destination wrapper specifically generated for a harness."""
-
-    harness: Harness
-
-
-@dataclass(frozen=True, slots=True)
 class WrapperReconcileResult:
     """Result summary of wrapper reconciliation."""
 
@@ -97,17 +81,11 @@ def wrapper_directory(sync_env: SyncEnv) -> str:
     return str(Path(sync_env.home).joinpath(*UNIX_WRAPPER_DIR))
 
 
-def wrapper_path(sync_env: SyncEnv, harness: Harness) -> str:
-    """Compute the wrapper script path for a given harness."""
-    return str(Path(wrapper_directory(sync_env)) / harness.launcher.bin)
-
-
 def wrapper_destinations(sync_env: SyncEnv) -> list[WrapperDestination]:
     """Compute all desired wrapper destinations for harnesses and tools."""
     harness_wrappers: list[WrapperDestination] = [
-        HarnessWrapperDestination(
-            harness=harness,
-            path=wrapper_path(sync_env, harness),
+        WrapperDestination(
+            path=str(Path(wrapper_directory(sync_env)) / harness.launcher.bin),
             content=render_launch_wrapper(
                 sync_env.runtime_home,
                 harness.source_name,
@@ -234,26 +212,20 @@ def reconcile_wrapper_files(
             continue
         if str(Path(old_path).parent.resolve()) not in allowed_directories:
             conflicts.append(old_path)
-            continue
-        if is_managed_wrapper(old_path):
+        elif is_managed_wrapper(old_path):
             remove_wrapper(old_path)
             removed.append(old_path)
         else:
             conflicts.append(old_path)
 
     for entry in desired:
-        status = write_managed_wrapper(entry.path, entry.content)
-        if status == "owned":
+        if write_managed_wrapper(entry.path, entry.content) == "owned":
             owned.append(entry.path)
         else:
             conflicts.append(entry.path)
 
     Path(state_path).parent.mkdir(parents=True, exist_ok=True)
-    unique_owned = sorted(set(owned))
-    write_wrapper_state(
-        state_path,
-        WrapperState(version=1, entries=unique_owned),
-    )
+    write_wrapper_state(state_path, WrapperState(version=1, entries=sorted(set(owned))))
 
     return WrapperReconcileResult(
         owned=owned,

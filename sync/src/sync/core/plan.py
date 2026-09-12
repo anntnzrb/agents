@@ -345,6 +345,8 @@ def _config_jobs(
     *,
     gateway_host: bool,
 ) -> list[Job]:
+    ssot = Path(sync_env.ssot_home)
+    home = Path(sync_env.home)
     endpoint_targets: list[CliProxyEndpointTarget] = [
         CliProxyEndpointTarget(
             src=str(Path(plan.source_root) / rel_path),
@@ -365,23 +367,19 @@ def _config_jobs(
             gateway_host=gateway_host,
         ),
         FileJob(
-            src=str(Path(sync_env.ssot_home) / "tools" / "mcporter" / "mcporter.jsonc"),
+            src=str(ssot / "tools" / "mcporter" / "mcporter.jsonc"),
             dst=str(Path(sync_env.mcporter_home) / "mcporter.json"),
         ),
         FileJob(
-            src=str(Path(sync_env.ssot_home) / "tools" / "summarize" / "config.json"),
+            src=str(ssot / "tools" / "summarize" / "config.json"),
             dst=str(Path(sync_env.summarize_home) / "config.json"),
             endpoint_template=True,
             deployment=deployment,
         ),
         CliProxyConfigJob(
-            src=str(
-                Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / "config.yaml.tmpl"
-            ),
-            dst=str(Path(sync_env.home) / ".cli-proxy-api" / "config.yaml"),
-            secrets_path=str(
-                Path(sync_env.home) / ".config" / "agents" / "secrets.local.json"
-            ),
+            src=str(ssot / CLI_PROXY_SOURCE_DIR / "config.yaml.tmpl"),
+            dst=str(home / ".cli-proxy-api" / "config.yaml"),
+            secrets_path=str(home / ".config" / "agents" / "secrets.local.json"),
             deployment=deployment,
             gateway_host=gateway_host,
         ),
@@ -390,13 +388,8 @@ def _config_jobs(
     if gateway_host:
         jobs.append(
             FileJob(
-                src=str(Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / "panel.html"),
-                dst=str(
-                    Path(sync_env.home)
-                    / ".cli-proxy-api"
-                    / "static"
-                    / "management.html"
-                ),
+                src=str(ssot / CLI_PROXY_SOURCE_DIR / "panel.html"),
+                dst=str(home / ".cli-proxy-api" / "static" / "management.html"),
             )
         )
     jobs.append(
@@ -414,8 +407,10 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
     harnesses = tuple(
         _build_harness_plan(sync_env, harness) for harness in sync_env.harnesses
     )
+    ssot = Path(sync_env.ssot_home)
+    runtime_home = Path(sync_env.runtime_home)
     cli_proxy_deployment = read_cliproxy_deployment(
-        str(Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / "deployment.json")
+        str(ssot / CLI_PROXY_SOURCE_DIR / "deployment.json")
     )
     gateway_host = is_cliproxy_gateway_host(cli_proxy_deployment)
     template_paths_by_id = {
@@ -425,9 +420,9 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
 
     jobs: list[Job] = [
         SyncRuntimeInstallJob(
-            source_root=str(Path(sync_env.ssot_home) / "sync"),
-            releases_root=str(Path(sync_env.runtime_home) / "sync-releases"),
-            current_link=str(Path(sync_env.runtime_home) / "sync-current"),
+            source_root=str(ssot / "sync"),
+            releases_root=str(runtime_home / "sync-releases"),
+            current_link=str(runtime_home / "sync-current"),
             timeout_ms=sync_env.install_timeout_ms,
         ),
         *(
@@ -486,21 +481,16 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
 
 
 __all__ = [
-    "CLIPROXY_ENDPOINT_TEMPLATE_PATHS",
     "CliProxyConfigJob",
     "CliProxyEndpointTemplatesJob",
     "CliProxyReadinessJob",
     "DirJob",
     "ExtensionDepsHookPlan",
     "FileJob",
-    "HarnessPlan",
     "Job",
-    "JobKind",
     "MergeJsonConfigJob",
     "PackageBootstrapHookPlan",
     "SecretTemplateJob",
-    "SyncHookPlan",
-    "SyncPlan",
     "SyncRuntimeInstallJob",
     "build_sync_plan",
     "top_level_entry_names",

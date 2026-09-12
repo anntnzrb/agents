@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Protocol, TypedDict
 from pydantic import TypeAdapter, ValidationError
 
 from sync.runtime.errors import warn
-from sync.runtime.fs import is_ignored_sync_entry, sync_text_file
+from sync.runtime.fs import existing_file_mode, is_ignored_sync_entry, sync_text_file
 from sync.runtime.jsonc import strip_jsonc
 
 if TYPE_CHECKING:
@@ -25,14 +25,11 @@ if TYPE_CHECKING:
     from sync.core.plan import ExtensionDepsHookPlan
 
 __all__ = [
-    "GENERATED_EXTENSION_ENTRY_NAMES",
     "PreparedExtensionHookState",
     "clear_extension_hook_state",
-    "find_generated_extension_entries",
     "fingerprint_tree",
     "prepare_extension_hook_state",
     "record_extension_hook_state",
-    "should_skip_entry",
 ]
 
 GENERATED_EXTENSION_ENTRY_NAMES: tuple[str, ...] = (
@@ -40,9 +37,6 @@ GENERATED_EXTENSION_ENTRY_NAMES: tuple[str, ...] = (
     "node_modules",
     "bun.lock",
     "bun.lockb",
-)
-_GENERATED_EXTENSION_ENTRY_SET: frozenset[str] = frozenset(
-    GENERATED_EXTENSION_ENTRY_NAMES
 )
 
 
@@ -218,13 +212,12 @@ def find_generated_extension_entries(
 
     try:
         for child in os.scandir(root_path):
-            if child.is_dir(follow_symlinks=False) and not should_skip_entry(
-                child.name
-            ):
-                for entry_name in GENERATED_EXTENSION_ENTRY_NAMES:
-                    relative_path = f"{child.name}/{entry_name}"
-                    if _exists(str(root_path / relative_path)):
-                        results.append(relative_path)
+            if not child.is_dir(follow_symlinks=False) or should_skip_entry(child.name):
+                continue
+            for entry_name in GENERATED_EXTENSION_ENTRY_NAMES:
+                relative_path = f"{child.name}/{entry_name}"
+                if _exists(str(root_path / relative_path)):
+                    results.append(relative_path)
     except OSError:
         pass
 
@@ -241,8 +234,8 @@ def should_skip_entry(entry_name: str) -> bool:
 
 
 def _is_generated_extension_entry_name(entry_name: str) -> bool:
-    base_name = entry_name.rsplit("/", 1)[-1] if "/" in entry_name else entry_name
-    return base_name in _GENERATED_EXTENSION_ENTRY_SET
+    base_name = entry_name.rsplit("/", 1)[-1]
+    return base_name in GENERATED_EXTENSION_ENTRY_NAMES
 
 
 def _exists(target_path: str) -> bool:
@@ -295,9 +288,4 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
 
 def _write_hook_state_file(path: str, state: Mapping[str, object]) -> None:
     payload = f"{json.dumps(state, indent=2)}\n"
-    try:
-        existing = Path(path).lstat()
-        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o600
-    except OSError:
-        mode = 0o600
-    sync_text_file(path, payload, mode)
+    sync_text_file(path, payload, existing_file_mode(path))

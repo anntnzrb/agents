@@ -19,29 +19,17 @@ from sync.runtime.process import (
 __all__ = [
     "install_inferred_import_packages",
     "install_package_deps",
-    "pick_bun_runner",
-    "run_command",
-    "run_package_build",
 ]
 
 _EMPTY_PACKAGE_JSON: str = '{\n  "name": "pi-extension-deps",\n  "private": true\n}\n'
 
 
-async def pick_bun_runner() -> str | None:
-    """Resolve path to bun binary on system PATH or local environment."""
-    return await resolve_executable("bun")
-
-
-def _has_package_json(target_dir: str) -> bool:
-    return (Path(target_dir) / "package.json").is_file()
-
-
 async def install_package_deps(target_dir: str, timeout_ms: int) -> bool:
     """Install package dependencies via bun install or inferred imports."""
-    if not await asyncio.to_thread(_has_package_json, target_dir):
+    if not await asyncio.to_thread(Path(target_dir, "package.json").is_file):
         return await install_inferred_import_packages(target_dir, timeout_ms)
 
-    tool = await pick_bun_runner()
+    tool = await resolve_executable("bun")
     if not tool:
         err(f"bun is required for dependency install in {target_dir}")
         return False
@@ -73,7 +61,7 @@ async def install_inferred_import_packages(
     if not await _ensure_install_project(target_dir):
         return False
 
-    tool = await pick_bun_runner()
+    tool = await resolve_executable("bun")
     if not tool:
         err(f"bun is required for inferred imports in {target_dir}")
         return False
@@ -89,7 +77,7 @@ async def install_inferred_import_packages(
 
 async def run_package_build(target_dir: str, timeout_ms: int) -> bool:
     """Execute bun run build in the specified package directory."""
-    tool = await pick_bun_runner()
+    tool = await resolve_executable("bun")
     if not tool:
         err(f"bun is required for build in {target_dir}")
         return False

@@ -15,14 +15,14 @@ import urllib.parse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Final, Literal, TypeGuard
+from typing import ClassVar, Final, Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from sync.runtime.errors import is_errno, panic_message
 from sync.runtime.fs import sync_text_file
-from sync.runtime.jsonc import strip_jsonc
+from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 
 INVALID_LISTEN_HOST_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@]")
 INVALID_SERVER_HOSTNAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@:]")
@@ -41,14 +41,6 @@ ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
 MIN_PORT: Final[int] = 1
 MAX_PORT: Final[int] = 65535
 DEFAULT_FILE_MODE: Final[int] = 0o644
-
-
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
 
 
 def _is_unspecified_host(host: str) -> bool:
@@ -168,7 +160,7 @@ class CliProxyDeployment(BaseModel):
 
 def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:
     """Parse and validate CLIProxyAPI deployment dictionary."""
-    if not _is_obj_dict(value):
+    if not is_obj_dict(value):
         msg = "invalid CLIProxyAPI deployment: expected object"
         raise ValueError(msg)
     try:
@@ -242,10 +234,10 @@ def is_cliproxy_target_ready(
         if not resp.is_success:
             return False
         payload: object = resp.json()  # pyright: ignore[reportAny]
-        if not _is_obj_dict(payload):
+        if not is_obj_dict(payload):
             return False
         data = payload.get("data")
-        return _is_obj_list(data) and len(data) > 0
+        return is_obj_list(data) and len(data) > 0
     except (httpx.HTTPError, OSError, ValueError, TypeError, KeyError):
         return False
 
@@ -275,12 +267,22 @@ def parse_toml_key_path(raw: str) -> list[str] | None:
         data: object = tomllib.loads(f"[{raw}]\n")
     except tomllib.TOMLDecodeError:
         return None
+    return _toml_single_path(data)
+
+
+def _toml_single_path(data: object) -> list[str] | None:
+    """Walk nested single-key TOML tables/arrays into a key segment list."""
     keys: list[str] = []
     curr: object = data
-    while _is_obj_dict(curr) and curr:
-        k = next(iter(curr.keys()))
-        keys.append(k)
-        curr = curr.get(k)
+    while True:
+        if is_obj_dict(curr) and curr:
+            k = next(iter(curr.keys()))
+            keys.append(k)
+            curr = curr.get(k)
+        elif is_obj_list(curr) and curr:
+            curr = curr[0]
+        else:
+            break
     return keys or None
 
 
@@ -293,18 +295,7 @@ def parse_toml_table_header(line: str) -> list[str] | None:
         data: object = tomllib.loads(trimmed + "\n")
     except tomllib.TOMLDecodeError:
         return None
-    keys: list[str] = []
-    curr: object = data
-    while True:
-        if _is_obj_dict(curr) and curr:
-            k = next(iter(curr.keys()))
-            keys.append(k)
-            curr = curr.get(k)
-        elif _is_obj_list(curr) and curr:
-            curr = curr[0]
-        else:
-            break
-    return keys or None
+    return _toml_single_path(data)
 
 
 def extract_preserved_top_levels(

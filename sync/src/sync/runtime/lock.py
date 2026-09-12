@@ -21,12 +21,8 @@ __all__ = [
     "try_acquire_sync_lock",
 ]
 
-LOCK_FILE_MODE: int = 0o644
-FILE_START_OFFSET: int = 0
-TRUNCATE_SIZE: int = 0
-WOULD_BLOCK_ERRNOS: frozenset[int] = frozenset({errno.EAGAIN, errno.EWOULDBLOCK})
-RETRY_SLEEP_SECONDS: float = 0.025
-MILLISECONDS_PER_SECOND: float = 1000.0
+_LOCK_FILE_MODE: int = 0o644
+_WOULD_BLOCK_ERRNOS: frozenset[int] = frozenset({errno.EAGAIN, errno.EWOULDBLOCK})
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,53 +43,32 @@ def try_acquire_sync_lock(
     Returns SyncLock on success, or None if the lock is held by another process.
     """
     state_dir_path = Path(state_dir)
-    lock_path_path = Path(lock_path)
-    state_dir_str = str(state_dir_path)
-    lock_path_str = str(lock_path_path)
+    lock_path_str = str(Path(lock_path))
 
     try:
         state_dir_path.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        message = f"create sync state dir {state_dir_str} ({panic_message(error)})"
+        message = f"create sync state dir {state_dir} ({panic_message(error)})"
         raise RuntimeError(message) from error
 
     try:
-        fd = os.open(
-            lock_path_str,
-            os.O_CREAT | os.O_RDWR,
-            LOCK_FILE_MODE,
-        )
+        fd = os.open(lock_path_str, os.O_CREAT | os.O_RDWR, _LOCK_FILE_MODE)
     except OSError as error:
         message = f"open sync lock {lock_path_str} ({panic_message(error)})"
         raise RuntimeError(message) from error
 
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.ftruncate(fd, 0)
+        _ = os.lseek(fd, 0, os.SEEK_SET)
+        _ = os.write(fd, f"pid={os.getpid()}\n".encode())
+        os.fsync(fd)
     except (BlockingIOError, OSError) as error:
         with contextlib.suppress(OSError):
             os.close(fd)
-        if isinstance(error, BlockingIOError) or error.errno in WOULD_BLOCK_ERRNOS:
+        if isinstance(error, BlockingIOError) or error.errno in _WOULD_BLOCK_ERRNOS:
             return None
         message = f"lock sync {lock_path_str} ({panic_message(error)})"
-        raise RuntimeError(message) from error
-
-    try:
-        os.ftruncate(fd, TRUNCATE_SIZE)
-        _ = os.lseek(fd, FILE_START_OFFSET, os.SEEK_SET)
-    except OSError as error:
-        with contextlib.suppress(OSError):
-            os.close(fd)
-        message = f"clear sync lock {lock_path_str} ({panic_message(error)})"
-        raise RuntimeError(message) from error
-
-    try:
-        pid_payload = f"pid={os.getpid()}\n".encode()
-        _ = os.write(fd, pid_payload)
-        os.fsync(fd)
-    except OSError as error:
-        with contextlib.suppress(OSError):
-            os.close(fd)
-        message = f"write sync lock {lock_path_str} ({panic_message(error)})"
         raise RuntimeError(message) from error
 
     return SyncLock(fd=fd)
@@ -112,7 +87,7 @@ async def acquire_cache_lock(
 ) -> SyncLock:
     """Acquire an exclusive cache lock, retrying until the timeout elapses."""
     started_at = time.monotonic()
-    timeout_seconds = timeout_ms / MILLISECONDS_PER_SECOND
+    timeout_seconds = timeout_ms / 1000.0
     while True:
         lock = try_acquire_sync_lock(lock_root, lock_file)
         if lock is not None:
@@ -120,4 +95,4 @@ async def acquire_cache_lock(
         if time.monotonic() - started_at >= timeout_seconds:
             message = f"timed out waiting for cache lock: {lock_file}"
             raise TimeoutError(message)
-        await asyncio.sleep(RETRY_SLEEP_SECONDS)
+        await asyncio.sleep(0.025)

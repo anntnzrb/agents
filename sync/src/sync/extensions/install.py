@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 __all__ = [
     "install_extension_deps",
     "iter_extension_packages",
-    "log_install_failure",
     "run_install",
 ]
 
@@ -67,24 +66,16 @@ async def run_install(
     return False
 
 
-async def _choose_installer() -> list[str] | None:
-    return ["bun", "install"] if await command_exists("bun") else None
-
-
-def _has_package_json(package_dir: Path) -> bool:
-    return (package_dir / "package.json").is_file()
-
-
 async def install_extension_deps(
     root: str,
     source_root: str,
     timeout_ms: int,
 ) -> bool:
     """Install dependencies for each extension and infer root imports."""
-    command = await _choose_installer()
-    if not command:
+    if not await command_exists("bun"):
         err("bun is required for extension dependency install")
         return False
+    command = ["bun", "install"]
 
     results: list[bool] = []
     root_path = Path(root)
@@ -92,7 +83,7 @@ async def install_extension_deps(
     for source_package_dir in await iter_extension_packages(source_root):
         rel = Path(source_package_dir).relative_to(source_root_path)
         package_dir = root_path / rel
-        has_pkg = await asyncio.to_thread(_has_package_json, package_dir)
+        has_pkg = await asyncio.to_thread((package_dir / "package.json").is_file)
         if not has_pkg:
             results.append(True)
             continue

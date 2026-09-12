@@ -57,7 +57,6 @@ from sync.packages.index import (
     bootstrap_package_target,
 )
 from sync.runtime.errors import err, panic_message, warn
-from sync.runtime.fs import copy_tree, is_symlink, rm_entry
 from sync.runtime.lock import (
     SyncLock,
     release_sync_lock,
@@ -72,25 +71,9 @@ from sync.runtime.process import (
 )
 
 __all__ = [
-    "DEFAULT_SYNC_TIMEOUT_SECONDS",
-    "SYNC_LOCK_FILE",
-    "ExtensionHookRuntimeState",
-    "SyncLock",
-    "copy_tree",
-    "ensure_python_env",
-    "err",
-    "is_symlink",
     "launch_main",
     "main",
-    "panic_message",
-    "parse_timeout_seconds",
-    "rm_entry",
     "run_sync",
-    "start_sync_watchdog",
-    "sync_lock_path",
-    "sync_timeout",
-    "try_acquire_sync_lock",
-    "warn",
 ]
 
 DEFAULT_SYNC_TIMEOUT_SECONDS: int = 15 * 60
@@ -120,28 +103,20 @@ async def ensure_python_env(home: str, timeout_ms: int) -> None:
         warn("uv not found; skipping python-env bootstrap.")
         return
 
-    install = await run_process(
-        ["uv", "python", "install"],
-        RunProcessOptions(timeout_ms=timeout_ms),
-    )
+    opts = RunProcessOptions(timeout_ms=timeout_ms)
+    install = await run_process(["uv", "python", "install"], opts)
     if install.timed_out or install.output_limited or install.exit_code != 0:
         warn("uv python install failed; skipping.")
         return
 
-    find = await run_process(
-        ["uv", "python", "find"],
-        RunProcessOptions(timeout_ms=timeout_ms, stdio="pipe"),
-    )
+    find = await run_process(["uv", "python", "find"], opts)
     latest = find.stdout.strip()
     if find.output_limited or not latest:
         warn("uv python find returned empty; skipping.")
         return
 
     venv_target = str(Path(home) / ".omp" / "python-env")
-    venv = await run_process(
-        ["uv", "venv", "--python", latest, venv_target],
-        RunProcessOptions(timeout_ms=timeout_ms),
-    )
+    venv = await run_process(["uv", "venv", "--python", latest, venv_target], opts)
     if venv.timed_out or venv.output_limited or venv.exit_code != 0:
         warn("failed to create python-env")
 
@@ -310,9 +285,7 @@ async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
         except TimeoutError:
             pass
         except asyncio.CancelledError:
-            if sync_task.done():
-                pass
-            else:
+            if not sync_task.done():
                 _ = sync_task.cancel()
                 raise
         if not sync_task.done():
@@ -328,8 +301,7 @@ async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
         _ = sync_task.cancel()
         raise
     finally:
-        if stop_backstop is not None:
-            stop_backstop()
+        stop_backstop()
 
 
 async def _async_main() -> int:
@@ -360,27 +332,25 @@ def launch_main(source_name: str, args: Sequence[str]) -> int:
 
 
 async def _sync_before_launch(sync_env: SyncEnv) -> None:
-    lock = None
     try:
         lock = try_acquire_sync_lock(sync_env)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
-        message = panic_message(error)
-        warn(f"sync before launch unavailable: {message}")
-
-    if lock is not None:
-        try:
-            try:
-                async with asyncio.timeout(sync_timeout()):
-                    success = await run_sync(sync_env)
-            except TimeoutError:
-                warn("sync before launch timed out; continuing launch")
-                return
-            if not success:
-                warn("continuing launch without completed sync")
-        finally:
-            release_sync_lock(lock)
-    else:
+        warn(f"sync before launch unavailable: {panic_message(error)}")
+        return
+    if lock is None:
         warn("another sync is already running; continuing launch")
+        return
+    try:
+        try:
+            async with asyncio.timeout(sync_timeout()):
+                success = await run_sync(sync_env)
+        except TimeoutError:
+            warn("sync before launch timed out; continuing launch")
+            return
+        if not success:
+            warn("continuing launch without completed sync")
+    finally:
+        release_sync_lock(lock)
 
 
 def _resolve_launch_target(
@@ -440,8 +410,7 @@ async def _async_launch_main(
         if harness is not None:
             return await launch_harness(sync_env, harness, args)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
-        message = panic_message(error)
-        err(f"launch failed: {message}")
+        err(f"launch failed: {panic_message(error)}")
         return EXIT_ERROR
 
     err(f"unsupported launch target: {source_name}")
@@ -453,16 +422,16 @@ async def run_sync_hooks(
     extension_hook_states: Mapping[str, ExtensionHookRuntimeState],
 ) -> bool:
     """Run all sync hook plans, returning True if all succeeded."""
-    success = True
-    for hook in hooks:
-        hook_state: PreparedExtensionHookState | None = None
-        if hook.kind == "ExtensionDeps":
-            runtime_state = extension_hook_states.get(hook.state_path)
-            if runtime_state is not None:
-                hook_state = runtime_state.state
-        if not await run_sync_hook(hook, hook_state):
-            success = False
-    return success
+    results = [
+        await run_sync_hook(
+            hook,
+            extension_hook_states[hook.state_path].state
+            if hook.kind == "ExtensionDeps" and hook.state_path in extension_hook_states
+            else None,
+        )
+        for hook in hooks
+    ]
+    return all(results)
 
 
 async def run_sync_hook(
@@ -529,11 +498,11 @@ def preserve_paths_by_dst(
     """Index preserved paths by job root destination directory."""
     preserve_by_dst: dict[str, list[str]] = {}
     for runtime_state in states.values():
-        hook = runtime_state.hook
         state = runtime_state.state
         if not state.should_skip or not state.preserve_paths:
             continue
-        existing = preserve_by_dst.setdefault(hook.job_root, [])
-        existing.extend(state.preserve_paths)
-        preserve_by_dst[hook.job_root] = sorted(set(existing))
+        job_root = runtime_state.hook.job_root
+        preserve_by_dst[job_root] = sorted(
+            {*preserve_by_dst.get(job_root, []), *state.preserve_paths}
+        )
     return preserve_by_dst

@@ -6,11 +6,9 @@ from __future__ import annotations
 import asyncio
 import json
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, TypeGuard
-
-from pydantic import BaseModel, ConfigDict, field_validator
+from typing import TYPE_CHECKING
 
 from sync.packages.process import (
     install_inferred_import_packages as install_inferred_import_packages_impl,
@@ -23,7 +21,6 @@ from sync.packages.source import (
     clone_package,
     package_cache_dir,
     replace_dir_atomically,
-    rm_entry,
     staging_dir_for,
 )
 from sync.packages.validate import (
@@ -33,15 +30,14 @@ from sync.packages.validate import (
     package_is_healthy,
 )
 from sync.runtime.errors import err, is_errno, panic_message
-from sync.runtime.fs import sync_text_file
-from sync.runtime.jsonc import strip_jsonc
+from sync.runtime.fs import rm_entry, sync_text_file
+from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 __all__ = [
     "PackageBootstrapTarget",
-    "PackageManifest",
     "bootstrap_package_target",
     "extract_import_specifiers",
     "missing_package_roots",
@@ -55,41 +51,32 @@ __all__ = [
 _DEFAULT_FILE_MODE = 0o600
 
 
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
-
-
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-class PackageManifest(BaseModel):
+@dataclass(frozen=True, slots=True)
+class PackageManifest:
     """Manifest describing package bootstrap sources."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
+    packages: list[str] = field(default_factory=list)
 
-    packages: list[str]
 
-    @field_validator("packages", mode="before")
-    @classmethod
-    def _normalize_packages(cls, value: object) -> list[str]:
-        if not _is_obj_list(value):
-            message = "packages must be a list"
+def _normalize_packages(value: object) -> PackageManifest:
+    """Validate and dedupe a raw packages list, raising ValueError on misuse."""
+    if not is_obj_list(value):
+        message = "packages must be a list"
+        raise TypeError(message)
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            message = "package source must be a string"
             raise TypeError(message)
-        result: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            if not isinstance(item, str):
-                message = "package source must be a string"
-                raise TypeError(message)
-            trimmed = item.strip()
-            if not trimmed:
-                message = "package source must not be empty"
-                raise ValueError(message)
-            if trimmed not in seen:
-                seen.add(trimmed)
-                result.append(trimmed)
-        return result
+        trimmed = item.strip()
+        if not trimmed:
+            message = "package source must not be empty"
+            raise ValueError(message)
+        if trimmed not in seen:
+            seen.add(trimmed)
+            result.append(trimmed)
+    return PackageManifest(packages=result)
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +95,7 @@ def read_package_manifest(file_path: str) -> PackageManifest:
         content = Path(file_path).read_text(encoding="utf-8")
     except OSError as error:
         if is_errno(error, "ENOENT"):
-            return PackageManifest(packages=[])
+            return PackageManifest()
         message = f"{file_path} ({error})"
         raise ValueError(message) from error
 
@@ -118,8 +105,11 @@ def read_package_manifest(file_path: str) -> PackageManifest:
         message = f"invalid JSON in {file_path}: {error}"
         raise ValueError(message) from error
 
+    if not is_obj_dict(data):
+        message = f"{file_path} (expected object)"
+        raise ValueError(message)
     try:
-        return PackageManifest.model_validate(data)
+        return _normalize_packages(data.get("packages"))
     except (ValueError, TypeError) as error:
         message = f"{file_path} ({panic_message(error)})"
         raise ValueError(message) from error
@@ -141,7 +131,7 @@ def patch_runtime_settings(file_path: str, package_paths: Sequence[str]) -> None
         message = f"parse {file_path} ({error})"
         raise ValueError(message) from error
 
-    raw_dict: dict[str, object] = dict(value) if _is_obj_dict(value) else {}
+    raw_dict: dict[str, object] = dict(value) if is_obj_dict(value) else {}
     settings: dict[str, object] = {str(k): v for k, v in raw_dict.items()}
     settings["packages"] = list(package_paths)
 

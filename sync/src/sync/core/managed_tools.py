@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import hashlib
-import inspect
 import json
 import os
 import platform
@@ -49,12 +48,10 @@ CHECKSUM_FIELD_COUNT = 2
 SHA256_HEX_LENGTH = 64
 
 DEFAULT_HEALTH_TIMEOUT_MS = 500
-DEFAULT_INSTALL_TIMEOUT_MS = 120_000
 EXECUTABLE_MODE = 0o755
 RECEIPT_INDENT = 2
 HTTP_OK = 200
 MS_PER_SECOND = 1000.0
-_TIMEOUT_POSITIONAL_ARITY = 2
 
 
 class ReleaseAsset(BaseModel):
@@ -434,7 +431,7 @@ def _resolve_cache_home(
     env_cache = os.environ.get("XDG_CACHE_HOME")
     if env_cache:
         return env_cache
-    home = getattr(sync_env, "home", str(Path.home()))
+    home = sync_env.home
     return str(Path(home) / ".cache")
 
 
@@ -593,7 +590,7 @@ def prepare_cli_proxy(
     manifest = read_manifest(manifest_path)
     arch_candidate = runtime.arch if runtime and runtime.arch else None
     arch = supported_arch(arch_candidate) if arch_candidate else _current_arch()
-    platform_name = getattr(sync_env, "platform", sys_platform())
+    platform_name = sync_env.platform
     platform_key = f"{platform_name}-{arch}"
     asset = manifest.assets.get(platform_key)
     if asset is None:
@@ -602,13 +599,9 @@ def prepare_cli_proxy(
 
     executable_name = manifest.binary
     cache_home = _resolve_cache_home(sync_env, runtime)
-    home = getattr(sync_env, "home", str(Path.home()))
+    home = sync_env.home
     config_path = str(Path(home) / ".cli-proxy-api" / "config.yaml")
-    timeout_ms = getattr(
-        sync_env,
-        "install_timeout_ms",
-        getattr(sync_env, "installTimeoutMs", DEFAULT_INSTALL_TIMEOUT_MS),
-    )
+    timeout_ms = sync_env.install_timeout_ms
 
     context = ManagedToolInstallContext(
         manifest=manifest,
@@ -682,11 +675,7 @@ def prepare_managed_tools(
     runtime: ManagedToolRuntime | None = None,
 ) -> list[PreparedManagedTool]:
     """Prepare all managed tools defined in SSOT environment."""
-    ssot_home = getattr(
-        sync_env,
-        "ssot_home",
-        getattr(sync_env, "ssotHome", str(Path.home())),
-    )
+    ssot_home = sync_env.ssot_home
     manifest_path = Path(ssot_home) / CLI_PROXY_SOURCE_DIR / RELEASE_FILE
     if not manifest_path.exists():
         return []
@@ -697,29 +686,12 @@ def _invoke_fetch(
     fetch_impl: FetchImpl,
     url: str,
     timeout_sec: float,
-    timeout_ms: int,
 ) -> object:
-    """Invoke fetch implementation with timeout according to its signature."""
+    """Invoke fetch implementation, passing a timeout when it accepts one."""
     try:
-        sig = inspect.signature(fetch_impl)
-        params = list(sig.parameters.values())
-        param_names = {p.name for p in params}
-        has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
-        if "timeout_ms" in param_names:
-            return fetch_impl(url, timeout_ms=timeout_ms)
-        if "timeout" in param_names or has_var_kw:
-            return fetch_impl(url, timeout=timeout_sec)
-        if len(params) >= _TIMEOUT_POSITIONAL_ARITY and params[1].kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        ):
-            return fetch_impl(url, timeout_sec)
+        return fetch_impl(url, timeout=timeout_sec)
+    except TypeError:
         return fetch_impl(url)
-    except (ValueError, TypeError):
-        try:
-            return fetch_impl(url, timeout=timeout_sec)
-        except TypeError:
-            return fetch_impl(url)
 
 
 def is_cli_proxy_running(
@@ -732,7 +704,7 @@ def is_cli_proxy_running(
         url = cliproxy_models_url(deployment)
         timeout_sec = timeout_ms / MS_PER_SECOND
         if fetch_impl is not None:
-            _ = _invoke_fetch(fetch_impl, url, timeout_sec, timeout_ms)
+            _ = _invoke_fetch(fetch_impl, url, timeout_sec)
         else:
             _ = httpx.get(url, timeout=timeout_sec)
     except Exception:

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 from sync.runtime.errors import panic_message
-from sync.runtime.fs import sync_private_text_file
+from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import strip_jsonc
 
 _PLACEHOLDER_PATTERN = re.compile(r"\$\{([^{}]+)\}")
@@ -57,7 +57,7 @@ def sync_secret_template(
     content = render_secret_template(template, secrets)
 
     try:
-        sync_private_text_file(dst_str, content)
+        sync_text_file(dst_str, content)
     except (OSError, ValueError, RuntimeError) as error:
         message = (
             f"render secret template {src_str} -> {dst_str} ({panic_message(error)})"

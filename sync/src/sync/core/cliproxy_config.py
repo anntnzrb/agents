@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Final, TypeGuard
+from typing import TYPE_CHECKING, ClassVar, Final
 
 import httpx
 import yaml
@@ -16,8 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 if TYPE_CHECKING:
     from sync.core.cliproxy_deployment import CliProxyDeployment
 from sync.runtime.errors import panic_message, warn
-from sync.runtime.fs import sync_private_text_file
-from sync.runtime.jsonc import strip_jsonc
+from sync.runtime.fs import sync_text_file
+from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 
 POOL_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9-]*$")
 POOL_MARKER: Final[str] = "x-credential-pool"
@@ -120,14 +120,14 @@ def fetch_upstream_model_ids(base_url: str, api_key: str) -> list[str] | None:
         payload: object = response.json()  # pyright: ignore[reportAny]
     except (httpx.HTTPError, OSError, ValueError, TypeError):
         return None
-    if not _is_obj_dict(payload):
+    if not is_obj_dict(payload):
         return None
     data = payload.get("data")
-    if not _is_obj_list(data):
+    if not is_obj_list(data):
         return None
     ids: list[str] = []
     for item in data:
-        if _is_obj_dict(item):
+        if is_obj_dict(item):
             identifier = item.get("id")
             if isinstance(identifier, str) and identifier:
                 ids.append(identifier)
@@ -146,18 +146,18 @@ def _read_previous_models(path: Path) -> dict[str, list[object]]:
         parsed: object = yaml.safe_load(path.read_text(encoding="utf-8"))  # pyright: ignore[reportAny]
     except (OSError, yaml.YAMLError):
         return {}
-    if not _is_obj_dict(parsed):
+    if not is_obj_dict(parsed):
         return {}
     profiles = parsed.get("openai-compatibility")
-    if not _is_obj_list(profiles):
+    if not is_obj_list(profiles):
         return {}
     previous: dict[str, list[object]] = {}
     for profile in profiles:
-        if not _is_obj_dict(profile):
+        if not is_obj_dict(profile):
             continue
         name = profile.get("name")
         models = profile.get("models")
-        if isinstance(name, str) and _is_obj_list(models):
+        if isinstance(name, str) and is_obj_list(models):
             previous[name] = list(models)
     return previous
 
@@ -187,7 +187,7 @@ def _discover_profile_models(
         previous = previous_models.get(name)
     if previous:
         warn(f"model discovery unavailable for {name}; reusing previous models")
-        return [dict(item) for item in previous if _is_obj_dict(item)]
+        return [dict(item) for item in previous if is_obj_dict(item)]
     warn(f"model discovery unavailable for {name}; no models declared")
     return []
 
@@ -221,27 +221,19 @@ def _require_pool(
     return pool
 
 
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
-
-
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
 def _expand_native_credential_section(
     section_name: str,
     value: object,
     pools: dict[str, list[Credential]],
     referenced_pools: set[str],
 ) -> list[dict[str, object]]:
-    if not _is_obj_list(value):
+    if not is_obj_list(value):
         msg = f"invalid {section_name}: expected array"
         raise TypeError(msg)
     result: list[dict[str, object]] = []
     for index, raw_item in enumerate(value):
         label = f"{section_name}[{index}]"
-        if not _is_obj_dict(raw_item):
+        if not is_obj_dict(raw_item):
             msg = f"invalid {label}: expected object"
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
@@ -265,13 +257,13 @@ def _expand_compatibility_section(
     discover: ModelListFetcher | None,
     previous_models: Mapping[str, Sequence[object]] | None,
 ) -> list[dict[str, object]]:
-    if not _is_obj_list(value):
+    if not is_obj_list(value):
         msg = "invalid openai-compatibility: expected array"
         raise TypeError(msg)
     result: list[dict[str, object]] = []
     for index, raw_item in enumerate(value):
         label = f"openai-compatibility[{index}]"
-        if not _is_obj_dict(raw_item):
+        if not is_obj_dict(raw_item):
             msg = f"invalid {label}: expected object"
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
@@ -319,7 +311,7 @@ def render_cliproxy_config(
         msg = f"parse CLIProxyAPI template ({panic_message(error)})"
         raise RuntimeError(msg) from error
 
-    if not _is_obj_dict(parsed):
+    if not is_obj_dict(parsed):
         msg = "invalid CLIProxyAPI template root: expected object"
         raise TypeError(msg)
 
@@ -416,7 +408,7 @@ def sync_cliproxy_config(
         previous_models=_read_previous_models(dst_p),
     )
     try:
-        sync_private_text_file(dst_p, content)
+        sync_text_file(dst_p, content)
     except (OSError, ValueError, RuntimeError) as error:
         msg = f"render CLIProxyAPI config {src_p} -> {dst_p} ({panic_message(error)})"
         raise RuntimeError(msg) from error
