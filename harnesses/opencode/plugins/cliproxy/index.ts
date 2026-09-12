@@ -25,7 +25,7 @@ const INPUT_MODALITIES = ["text", "audio", "image", "video", "pdf"] as const;
 type InputModality = (typeof INPUT_MODALITIES)[number];
 
 interface GatewayModelsResponse {
-	data?: Array<{ id?: unknown }>;
+	data?: Array<{ id?: unknown; owned_by?: unknown }>;
 }
 
 interface CatalogModel {
@@ -136,12 +136,13 @@ function inputModalities(entry: CatalogModel | undefined): InputModality[] {
 	return filtered.length > 0 ? filtered : ["text"];
 }
 
-function toModelConfig(id: string, catalog: CatalogCache | undefined): ProviderModel {
+function toModelConfig(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ProviderModel {
 	const entry = catalogModel(catalog, id);
 	const input = inputModalities(entry);
 	// Multi-segment gateway ids are <pool>/<vendor>/<model>; the pool
-	// distinguishes upstreams that vend the same model.
-	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : undefined;
+	// distinguishes upstreams that vend the same model. Single-segment ids
+	// come from OAuth pools, so fall back to the gateway-reported owner.
+	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : ownedBy;
 	const name = entry?.name ?? id;
 	return {
 		name: pool ? `${name} (${pool})` : name,
@@ -164,10 +165,13 @@ function toModelConfig(id: string, catalog: CatalogCache | undefined): ProviderM
 	};
 }
 
-function gatewayModelIDs(payload: GatewayModelsResponse): string[] {
+function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; ownedBy?: string }> {
 	return (payload.data ?? [])
-		.map((model) => model.id)
-		.filter((id): id is string => typeof id === "string" && id.length > 0);
+		.map((model) => ({
+			id: model.id,
+			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
+		}))
+		.filter((entry): entry is { id: string; ownedBy?: string } => typeof entry.id === "string" && entry.id.length > 0);
 }
 
 const CliproxyDiscoveryPlugin = async (_input: PluginInput): Promise<Hooks> => ({
@@ -185,7 +189,7 @@ const CliproxyDiscoveryPlugin = async (_input: PluginInput): Promise<Hooks> => (
 				loadCatalog(),
 			]);
 			const models = Object.fromEntries(
-				gatewayModelIDs(payload).map((id) => [id, toModelConfig(id, catalog)]),
+				gatewayModels(payload).map((entry) => [entry.id, toModelConfig(entry.id, entry.ownedBy, catalog)]),
 			);
 			if (Object.keys(models).length > 0) provider.models = models;
 		} catch {

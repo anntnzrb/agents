@@ -21,6 +21,10 @@ Discovery order per plugin load:
 3. Unknown ids fall back to `FALLBACK_LIMIT` (200K context, 32K output). The fallback exists because
    OpenCode disables context compaction for models without a context limit.
 
+Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
+use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
+field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
+
 The models.dev snapshot is cached for 24 hours at `$XDG_CACHE_HOME/agents/models-dev.json`
 (`~/.cache/agents/models-dev.json` by default) and is shared with the pi extension; the cache carries its
 own format version and is ignored when that version changes. A failed fetch reuses the cached snapshot;
