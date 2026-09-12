@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { consumeCompletedReceipt, describeOperationLock, emitTrace, preparedCommitTreeMatchesIndex, selectPatch, unquoteGitPath, validateHunkCoverage } from "./index";
+import { consumeCompletedReceipt, describeOperationLock, emitTrace, preparedCommitTreeMatchesIndex, promptWithProviderErrors, runAtomicityCritic, runCommitAgent, selectPatch, unquoteGitPath, validateHunkCoverage } from "./index";
 import { readReceipt, writeReceipt } from "./transaction";
 
 
@@ -247,5 +247,192 @@ describe("describeOperationLock", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+type FakeSessionEvent = {
+  type: string;
+  message?: { role?: string; stopReason?: string; errorMessage?: string };
+};
+
+const assistantEnd = (stopReason: string, errorMessage?: string): FakeSessionEvent => ({
+  type: "message_end",
+  message: { role: "assistant", stopReason, ...(errorMessage === undefined ? {} : { errorMessage }) },
+});
+
+describe("promptWithProviderErrors", () => {
+  const makeSession = (
+    promptImpl: (emit: (event: FakeSessionEvent) => void, text: string) => void | Promise<void>,
+  ) => {
+    const prompts: string[] = [];
+    let listener: ((event: FakeSessionEvent) => void) | undefined;
+    let unsubscribeCount = 0;
+    const session = {
+      prompt: async (text: string) => {
+        prompts.push(text);
+        await promptImpl(event => listener?.(event), text);
+        return true;
+      },
+      subscribe: (next: (event: FakeSessionEvent) => void) => {
+        listener = next;
+        return () => {
+          unsubscribeCount += 1;
+        };
+      },
+    } as unknown as Parameters<typeof promptWithProviderErrors>[0];
+    return { session, prompts, unsubscribeCount: () => unsubscribeCount };
+  };
+
+  test("rejects with the provider detail when the prompt resolves after an assistant error", async () => {
+    const detail = "Devin stream error resource_exhausted: Reached overall message rate limit";
+    const { session, prompts, unsubscribeCount } = makeSession(emit => {
+      emit(assistantEnd("error", detail));
+    });
+    await expect(promptWithProviderErrors(session, "plan", undefined)).rejects.toThrow(detail);
+    expect(prompts).toHaveLength(1);
+    expect(unsubscribeCount()).toBe(1);
+  });
+
+  test("resolves when a successful assistant message follows a transient error", async () => {
+    const { session, unsubscribeCount } = makeSession(emit => {
+      emit(assistantEnd("error", "transient provider failure"));
+      emit(assistantEnd("stop"));
+    });
+    await expect(promptWithProviderErrors(session, "plan", undefined)).resolves.toBeUndefined();
+    expect(unsubscribeCount()).toBe(1);
+  });
+
+  test("keeps the assistant error when a non-assistant message ends last", async () => {
+    const { session } = makeSession(emit => {
+      emit(assistantEnd("error", "rate limited"));
+      emit({ type: "message_end", message: { role: "toolResult" } });
+    });
+    await expect(promptWithProviderErrors(session, "plan", undefined)).rejects.toThrow("rate limited");
+  });
+
+  test("falls back to a generic message when the provider reports no detail", async () => {
+    for (const errorMessage of [undefined, "   "]) {
+      const { session } = makeSession(emit => {
+        emit(assistantEnd("error", errorMessage));
+      });
+      await expect(promptWithProviderErrors(session, "plan", undefined)).rejects.toThrow(
+        "Model provider failed without an error message.",
+      );
+    }
+  });
+
+  test("resolves when the assistant message was intentionally aborted", async () => {
+    const { session } = makeSession(emit => {
+      emit(assistantEnd("aborted"));
+    });
+    await expect(promptWithProviderErrors(session, "plan", undefined)).resolves.toBeUndefined();
+  });
+
+  test("propagates a prompt rejection unchanged and unsubscribes", async () => {
+    const { session, unsubscribeCount } = makeSession(() => {
+      throw new Error("socket closed");
+    });
+    await expect(promptWithProviderErrors(session, "plan", undefined)).rejects.toThrow("socket closed");
+    expect(unsubscribeCount()).toBe(1);
+  });
+});
+
+describe("runCommitAgent provider errors", () => {
+  test("reports the terminal provider error instead of a missing proposal", async () => {
+    const detail = "Devin stream error resource_exhausted: Reached overall message rate limit";
+    const prompts: string[] = [];
+    let listener: ((event: FakeSessionEvent) => void) | undefined;
+    let disposed = 0;
+    const session = {
+      prompt: async (text: string) => {
+        prompts.push(text);
+        listener?.(assistantEnd("error", detail));
+        return true;
+      },
+      subscribe: (next: (event: FakeSessionEvent) => void) => {
+        listener = next;
+        return () => {};
+      },
+      dispose: async () => {
+        disposed += 1;
+      },
+    };
+    const api = {
+      exec: async (_command: string, args: readonly string[]) => (
+        args.includes("--name-only")
+          ? { code: 0, stdout: "a.txt\n", stderr: "" }
+          : { code: 0, stdout: "diff --git a/a.txt b/a.txt\n", stderr: "" }
+      ),
+      pi: {
+        Settings: { init: async () => ({}) },
+        discoverContextFiles: async () => [],
+        createAgentSession: async () => ({ session }),
+      },
+    } as unknown as Parameters<typeof runCommitAgent>[0];
+    const modelRegistry = {
+      authStorage: {},
+      refresh: async () => {},
+      getAvailable: () => [],
+      getApiKey: async () => "key",
+    } as unknown as Parameters<typeof runCommitAgent>[2];
+    const internals = {
+      resolveRoleSelection: () => ({ model: { provider: "p", id: "m" }, thinkingLevel: "off" }),
+      createCommitTools: () => [{ name: "propose_commit" }, { name: "split_commit" }],
+      assignLockFilesToPlan: () => {},
+      computeDependencyOrder: () => [],
+      capDetails: (details: unknown) => ({ details, warnings: [] }),
+      parseFileDiffs: () => [],
+      parseFileHunks: () => ({ hunks: [] }),
+      maxDetailItems: 3,
+      normalizeDetails: (details: unknown) => details,
+    } as unknown as Parameters<typeof runCommitAgent>[4];
+    await expect(
+      runCommitAgent(api, "/repo", modelRegistry, { context: [], debug: false }, internals),
+    ).rejects.toThrow(detail);
+    expect(prompts).toHaveLength(1);
+    expect(disposed).toBe(1);
+  });
+});
+
+describe("runAtomicityCritic provider errors", () => {
+  test("reports the terminal provider error instead of a missing verdict", async () => {
+    const detail = "Devin stream error resource_exhausted: Reached overall message rate limit";
+    const prompts: string[] = [];
+    let listener: ((event: FakeSessionEvent) => void) | undefined;
+    let disposed = 0;
+    const session = {
+      prompt: async (text: string) => {
+        prompts.push(text);
+        listener?.(assistantEnd("error", detail));
+        return true;
+      },
+      subscribe: (next: (event: FakeSessionEvent) => void) => {
+        listener = next;
+        return () => {};
+      },
+      dispose: async () => {
+        disposed += 1;
+      },
+    };
+    const arkNode: Record<string, unknown> = {};
+    for (const key of ["atMostLength", "matching", "array", "onUndeclaredKey", "narrow"]) {
+      arkNode[key] = () => arkNode;
+    }
+    const api = {
+      arktype: { type: () => arkNode },
+      pi: { createAgentSession: async () => ({ session }) },
+    } as unknown as Parameters<typeof runAtomicityCritic>[0];
+    const modelRegistry = { authStorage: {} } as unknown as Parameters<typeof runAtomicityCritic>[2];
+    const settings = {} as Parameters<typeof runAtomicityCritic>[3];
+    const selected = {
+      model: { provider: "p", id: "m" },
+      thinkingLevel: "off",
+    } as unknown as Parameters<typeof runAtomicityCritic>[4];
+    const proposalInput = { summary: "s", details: [], stagedFileCount: 2, changedHunkCount: 2 };
+    await expect(
+      runAtomicityCritic(api, "/repo", modelRegistry, settings, selected, proposalInput, "diff --git a/a.txt b/a.txt\n"),
+    ).rejects.toThrow(detail);
+    expect(prompts).toHaveLength(1);
+    expect(disposed).toBe(1);
   });
 });

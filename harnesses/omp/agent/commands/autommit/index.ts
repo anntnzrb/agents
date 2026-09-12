@@ -780,7 +780,31 @@ const buildAtomicityProposalInput = (
         .reduce((count, file) => count + internals.parseFileHunks(file).hunks.length, 0),
 });
 
-const runAtomicityCritic = async (
+type PromptSession = Pick<Awaited<ReturnType<CommandAPI["pi"]["createAgentSession"]>>["session"], "prompt" | "subscribe">;
+
+export const promptWithProviderErrors = async (
+    session: PromptSession,
+    text: string,
+    options: Parameters<PromptSession["prompt"]>[1],
+): Promise<void> => {
+    let providerError: string | undefined;
+    const unsubscribe = session.subscribe(event => {
+        if (event.type !== "message_end") return;
+        const message = event.message as { role?: string; stopReason?: string; errorMessage?: string };
+        if (message.role !== "assistant") return;
+        providerError = message.stopReason === "error"
+            ? message.errorMessage?.trim() || "Model provider failed without an error message."
+            : undefined;
+    });
+    try {
+        await session.prompt(text, options);
+        if (providerError) throw new Error(providerError);
+    } finally {
+        unsubscribe();
+    }
+};
+
+export const runAtomicityCritic = async (
     api: CommandAPI,
     cwd: string,
     modelRegistry: ModelRegistry,
@@ -865,7 +889,7 @@ const runAtomicityCritic = async (
     const criticPrompt = buildAtomicityCriticPrompt(proposalInput, diffText);
     try {
         for (let attempt = 0; attempt < 2 && !decision; attempt += 1) {
-            await session.prompt(
+            await promptWithProviderErrors(session,
                 attempt === 0
                     ? criticPrompt
                     : "Return exactly one valid atomicity_verdict tool call now. Prose is not a verdict; ambiguity must be reported as split.",
@@ -894,7 +918,7 @@ const throwIfCancelled = (signal?: AbortSignal): void => {
     if (signal?.aborted) throw new AutommitCancelledError("Autommit cancelled by user.");
 };
 
-const runCommitAgent = async (
+export const runCommitAgent = async (
     api: CommandAPI,
     cwd: string,
     modelRegistry: ModelRegistry,
@@ -993,7 +1017,7 @@ const runCommitAgent = async (
         if (proposalExists(state) || attempt >= MAX_RETRIES) return;
         emitTrace(isDebug, "agent_prompt", { attempt, hasProposal: Boolean(state.proposal), hasSplitProposal: Boolean(state.splitProposal) });
         try {
-            await session.prompt(
+            await promptWithProviderErrors(session,
                 attempt === 0
                     ? [AGENT_USER_PROMPT, composeContext(options)].filter(Boolean).join("\n\n")
                     : `Submit a valid ${state.splitProposal ? "split_commit" : "propose_commit"} proposal now. Attempt ${attempt} of ${MAX_RETRIES}.`,
@@ -1059,7 +1083,7 @@ const runCommitAgent = async (
             "Re-evaluate the full cached snapshot and submit exactly one valid split_commit proposal with at least two commits addressing these concerns.",
         ].join("\n");
         try {
-            await session.prompt(splitPrompt, {
+            await promptWithProviderErrors(session, splitPrompt, {
                 attribution: "agent",
                 expandPromptTemplates: false,
                 synthetic: true,
