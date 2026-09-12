@@ -1,0 +1,11 @@
+{
+	"server": {
+		"hostname": "munich"
+	},
+	"channel": "nightly",
+	"exposure": {
+		"tailscaleServe": true,
+		"connect": true,
+		"publishAgentActivity": true
+	}
+}

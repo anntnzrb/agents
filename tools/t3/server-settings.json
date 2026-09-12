@@ -1,0 +1,22 @@
+{
+  "continueThreadsAfterServerUpdate": true,
+  "defaultThreadEnvMode": "worktree",
+  "addProjectBaseDirectory": "~/repos",
+  "defaultAutoPull": true,
+  "backgroundActivity": {
+    "profile": "custom",
+    "baseProfile": "performance",
+    "overrides": {
+      "pauseWhenHostLocked": false
+    }
+  },
+  "pullRequestMergeMethod": "squash",
+  "sourceControlWritingStyle": {
+    "mode": "conventional_commits"
+  },
+  "providerInstances": {
+    "codex": {
+      "enabled": true
+    }
+  }
+}
