@@ -23,7 +23,7 @@ const QUALIFIER_PATTERN = /-(minimal|low|medium|high|max|thinking)$/i;
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 interface GatewayModelsResponse {
-	data?: Array<{ id?: unknown }>;
+	data?: Array<{ id?: unknown; owned_by?: unknown }>;
 }
 
 interface ReasoningOption {
@@ -196,13 +196,18 @@ function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogMod
 	);
 }
 
-function toModel(id: string, catalog: CatalogCache | undefined): ProviderModelConfig {
+function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ProviderModelConfig {
 	const entry = catalogModel(catalog, id);
 	const inputs = entry?.modalities?.input ?? ["text"];
 	const metadata = builtinMetadata(id);
+	// Multi-segment gateway ids are <pool>/<vendor>/<model>; the pool
+	// distinguishes upstreams that vend the same model. Single-segment ids
+	// come from OAuth pools, so fall back to the gateway-reported owner.
+	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : ownedBy;
+	const name = entry?.name ?? id;
 	return {
 		id,
-		name: entry?.name ?? id,
+		name: pool ? `${name} (${pool})` : name,
 		reasoning: entry?.reasoning ?? true,
 		thinkingLevelMap: metadata?.thinkingLevelMap ?? effortLevelMap(entry?.reasoning_options),
 		compat: metadata?.compat,
@@ -218,10 +223,13 @@ function toModel(id: string, catalog: CatalogCache | undefined): ProviderModelCo
 	};
 }
 
-function gatewayModelIDs(payload: GatewayModelsResponse): string[] {
+function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; ownedBy?: string }> {
 	return (payload.data ?? [])
-		.map((model) => model.id)
-		.filter((id): id is string => typeof id === "string" && id.length > 0);
+		.map((model) => ({
+			id: model.id,
+			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
+		}))
+		.filter((entry): entry is { id: string; ownedBy?: string } => typeof entry.id === "string" && entry.id.length > 0);
 }
 
 async function discover(signal: AbortSignal): Promise<ProviderModelConfig[]> {
@@ -233,7 +241,7 @@ async function discover(signal: AbortSignal): Promise<ProviderModelConfig[]> {
 		response.json() as Promise<GatewayModelsResponse>,
 		loadCatalog(),
 	]);
-	return gatewayModelIDs(payload).map((id) => toModel(id, catalog));
+	return gatewayModels(payload).map((entry) => toModel(entry.id, entry.ownedBy, catalog));
 }
 
 export default function cliproxy(pi: ExtensionAPI): void {

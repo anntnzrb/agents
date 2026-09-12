@@ -17,6 +17,10 @@ Discovery order per refresh:
 3. Unknown ids fall back to `FALLBACK_CONTEXT_WINDOW` (128K) and `FALLBACK_MAX_TOKENS` (16.4K), which
    are pi defaults for metadata-free models.
 
+Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
+use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
+field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
+
 ## Per-model request metadata
 
 One provider fronts many upstreams, so a model's request dialect cannot come from the provider or
