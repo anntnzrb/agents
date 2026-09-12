@@ -1,4 +1,30 @@
 {
   "version": 1,
-  "auto_update": false
+  "auto_update": false,
+  "theme_mode": "dark",
+  "notify": "always",
+  "show_hints": true,
+  "show_path": true,
+  "attribution": false,
+  "include_gitignored_files": false,
+  "read_config_from": {
+    "cursor": false,
+    "windsurf": false,
+    "claude": false
+  },
+  "agent": {
+    "model": "swe-2-max"
+  },
+  "permissions": {
+    "allow": [
+      "read",
+      "edit",
+      "exec",
+      "grep",
+      "glob",
+      "Read(/**)",
+      "Write(/**)",
+      "mcp__*"
+    ]
+  }
 }
