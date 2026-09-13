@@ -167,6 +167,12 @@ The template exposes upstream model names as-is. Aliases, forked model variants,
 
 Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role — same model through two pools are distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
 
+### Codex model catalog
+
+The Codex provider in `harnesses/codex/config.toml` declares a command-backed `auth` block. Command auth marks the provider as catalog-fetching, so Codex requests `{base_url}/models?client_version=...` on startup and on each cache expiry. CLIProxyAPI answers that request with a native Codex model catalog (`ModelInfo` entries: slug, display name, context window, reasoning levels, instructions), which Codex merges into its bundled catalog — every gateway model then resolves real metadata instead of the generic fallback, and `model/list` exposes them all as built-ins. The merged result is cached in `~/.codex/models_cache.json` (runtime state, never tracked); bundled native entries always come from the installed binary.
+
+The catalog's per-model metadata comes from the discovered `models[]` records described in [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs): `max-context-length` becomes `context_window`, `thinking.levels` becomes the reasoning-effort ladder, `display-name` becomes the display name. Pool models do not advertise `apply_patch_tool_type` — upstream strips it for non-template models — so foreign models edit through shell/exec tools rather than the structured patch tool.
+
 ## Verify model access
 
 Query the gateway without a client key:
