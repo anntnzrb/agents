@@ -232,6 +232,9 @@ def write_fixture_files(home: Path) -> None:
     _ = (skills_legacy / "old.txt").write_text("legacy-content", encoding="utf-8")
 
     _ = (
+        home / ".config" / "agents" / "harnesses" / "amp" / "settings.json"
+    ).write_text('{"fixture": "amp-settings"}\n', encoding="utf-8")
+    _ = (
         home / ".config" / "agents" / "harnesses" / "codex" / "config.toml"
     ).write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
@@ -283,6 +286,7 @@ def make_fixture(root: Path) -> Path:
         home / ".config" / "agents" / "harnesses" / "codex",
         home / ".config" / "agents" / "harnesses" / "deepseek",
         home / ".config" / "agents" / "harnesses" / "opencode",
+        home / ".config" / "agents" / "harnesses" / "amp",
         home / ".config" / "agents" / "harnesses" / "omp" / "agent",
         home / ".config" / "agents" / "harnesses" / "pi" / "agent",
         home / ".config" / "agents" / "tools" / "mcporter",
@@ -404,6 +408,7 @@ def snapshot_home(home: Path) -> list[SnapshotEntry]:
     roots = [
         ".codex",
         ".dsh",
+        ".config/amp",
         ".config/opencode",
         ".pi",
         ".omp",
@@ -523,6 +528,16 @@ def test_integration_malformed_config_fails_sync_exit_1(
     )
 
 
+def _assert_amp_outputs(home: Path) -> None:
+    """Assert published Amp instruction, settings, and skills targets."""
+    amp_home = home / ".config" / "amp"
+    assert (amp_home / "AGENTS.md").is_file()
+    assert (amp_home / "settings.json").read_text(encoding="utf-8") == (
+        '{"fixture": "amp-settings"}\n'
+    )
+    assert (amp_home / "skills" / "skill.txt").is_file()
+
+
 def test_integration_happy_path_matches_expected_outputs(
     tmp_path: Path,
 ) -> None:
@@ -536,6 +551,7 @@ def test_integration_happy_path_matches_expected_outputs(
     assert (home / ".dsh" / "cordis.patch.yml").is_file()
     assert (home / ".dsh" / "skills" / "skill.txt").is_file()
     assert (home / ".config" / "opencode" / "AGENTS.md").is_file()
+    _assert_amp_outputs(home)
     assert (home / ".pi" / "agent" / "AGENTS.md").is_file()
     assert (home / ".omp" / "agent" / "AGENTS.md").is_file()
     assert (home / ".omp" / "agent" / "config.yml").is_file()
@@ -592,7 +608,7 @@ def test_integration_happy_path_matches_expected_outputs(
 
     assert (home / ".pi" / "agent" / "auth.json").is_file()
 
-    for command in ("codex", "dsh", "opencode", "pi", "omp"):
+    for command in ("codex", "dsh", "opencode", "amp", "pi", "omp"):
         wrapper = home / ".local" / "bin" / command
         assert wrapper.is_file(), str(wrapper)
         text = wrapper.read_text(encoding="utf-8")

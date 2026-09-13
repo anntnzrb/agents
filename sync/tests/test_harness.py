@@ -9,6 +9,7 @@ import pytest
 
 from sync.cli import EXIT_USAGE, main
 from sync.core.harness import (
+    NpmLauncher,
     RootEnvReadError,
     StaticReleaseLauncher,
     SyncEnv,
@@ -19,6 +20,8 @@ from sync.core.harness import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from sync.core.harness import HostPlatform
 
 TEST_TIMEOUT_MS: int = 1000
 
@@ -126,6 +129,26 @@ def test_supported_harness_resolves_devin_static_release(tmp_path: Path) -> None
         "man",
         "man1",
     )
+
+
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
+def test_supported_harness_resolves_amp_npm_launcher(
+    tmp_path: Path,
+    platform: HostPlatform,
+) -> None:
+    """Verify the amp adapter resolves an npm launcher and its config home."""
+    amp = supported_harness(str(tmp_path), "amp", platform)
+    assert amp is not None
+    assert amp.home == str(tmp_path / ".config" / "amp")
+    assert isinstance(amp.launcher, NpmLauncher)
+    assert amp.launcher.package == "@ampcode/cli"
+    assert amp.launcher.bin == "amp"
+    assert amp.launcher.dist_tag == "latest"
+    assert amp.launcher.default_args == ("--remote-control-terminal",)
+    assert amp.instruction_file == "AGENTS.md"
+    assert amp.runtime_subdir is None
+    assert amp.preserve_json_keys == {}
+    assert amp.hooks == ()
 
 
 def test_assert_path_component_rejects_trailing_newline() -> None:

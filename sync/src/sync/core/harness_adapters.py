@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 type HostPlatform = Literal["darwin", "linux"]
 
-type HarnessId = Literal["codex", "deepseek", "devin", "opencode", "pi", "omp"]
+type HarnessId = Literal["amp", "codex", "deepseek", "devin", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
@@ -183,6 +183,16 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         ),
         runtime_subdir="agent",
         hooks=(ExtensionDepsHook(root_dir="."),),
+    ),
+    HarnessAdapter(
+        id="amp",
+        home_segments=(".config", "amp"),
+        platforms=("darwin", "linux"),
+        launcher=NpmLauncherSpec(
+            package="@ampcode/cli",
+            bin="amp",
+            default_args=("--remote-control-terminal",),
+        ),
     ),
 )
 

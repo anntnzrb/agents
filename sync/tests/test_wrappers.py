@@ -37,6 +37,8 @@ from sync.runtime.process import RunProcessOptions, run_process
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from sync.core.harness import HostPlatform
+
 MODE_READ_WRITE: Final[int] = 0o644
 MODE_EXECUTABLE: Final[int] = 0o755
 EXPECTED_MISSING_RUNTIME_EXIT_CODE: Final[int] = 127
@@ -184,6 +186,51 @@ def test_devin_wrapper_uses_the_release_launcher(tmp_path: Path) -> None:
     assert "launch 'devin'" in devin.content
     assert WRAPPER_MARKER in devin.content
     assert "export DEVIN_PERMISSION_MODE='bypass'" in devin.content
+
+
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
+def test_amp_wrapper_uses_the_npm_launcher(
+    tmp_path: Path,
+    platform: HostPlatform,
+) -> None:
+    """Verify the amp adapter renders a wrapper for its npm-distributed CLI."""
+    home = str(tmp_path)
+    _add_harness_sources(home, ["amp"])
+    sync_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform=platform)
+    destinations = wrapper_destinations(sync_env)
+    amp = next((e for e in destinations if e.path.endswith("/amp")), None)
+    assert amp is not None
+    assert amp.path == str(tmp_path / ".local" / "bin" / "amp")
+    assert "launch 'amp'" in amp.content
+    assert WRAPPER_MARKER in amp.content
+    assert ".local/share/agents/sync-current" in amp.content
+    assert str(tmp_path / ".config" / "agents") not in amp.content
+    # The default argument precedes caller arguments so a caller can override it.
+    assert "'--remote-control-terminal' \"$@\"" in amp.content
+
+
+def test_amp_wrapper_reconciliation_preserves_existing_symlink(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify an unmanaged ~/.local/bin/amp symlink survives reconciliation."""
+    home = str(tmp_path)
+    _add_harness_sources(home, ["amp"])
+    sync_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
+    target = tmp_path / ".amp" / "bin" / "amp"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _ = target.write_text("#!/bin/sh\necho user-amp\n", encoding="utf-8")
+    link = tmp_path / ".local" / "bin" / "amp"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+
+    assert reconcile_wrappers(sync_env) is True
+    assert link.readlink() == target
+    assert target.read_text(encoding="utf-8") == "#!/bin/sh\necho user-amp\n"
+    state_file = Path(sync_env.managed_state_home) / WRAPPER_STATE_FILE
+    assert str(link) not in state_file.read_text(encoding="utf-8")
+    captured = capsys.readouterr()
+    assert "preserving unmanaged wrapper conflict" in captured.err
 
 
 def test_generated_wrappers_do_not_embed_root_env_values(
