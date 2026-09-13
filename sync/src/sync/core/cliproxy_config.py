@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Final
+from typing import TYPE_CHECKING, ClassVar, Final, NotRequired, TypedDict
 
 import httpx
 import yaml
@@ -23,6 +26,16 @@ POOL_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9-]*$")
 POOL_MARKER: Final[str] = "x-credential-pool"
 DISCOVERY_MARKER: Final[str] = "x-model-discovery"
 DISCOVERY_TIMEOUT_SECONDS: Final[float] = 5.0
+MODELS_DEV_URL: Final[str] = "https://models.dev/api.json"
+MODELS_DEV_TTL_SECONDS: Final[float] = 24 * 60 * 60
+MODELS_DEV_TIMEOUT_SECONDS: Final[float] = 10.0
+MODELS_DEV_CACHE_VERSION: Final[int] = 2
+MODELS_DEV_QUALIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"-(minimal|low|medium|high|max|thinking)$",
+    re.IGNORECASE,
+)
+THINKING_LEVELS_DEFAULT: Final[tuple[str, ...]] = ("low", "medium", "high")
+THINKING_LEVELS_DISABLED: Final[tuple[str, ...]] = ("none",)
 MIN_CREDENTIAL_WEIGHT: Final[int] = 1
 MAX_CREDENTIAL_WEIGHT: Final[int] = 1_000_000
 
@@ -39,7 +52,33 @@ OWNED_NATIVE_FIELDS: Final[tuple[str, ...]] = ("api-key", "weight", "proxy-url")
 OWNED_COMPATIBILITY_FIELDS: Final[tuple[str, ...]] = ("api-key-entries",)
 
 
-type ModelListFetcher = Callable[[str, str], list[str] | None]
+class UpstreamModelEntry(TypedDict):
+    """Model record returned by an upstream /models endpoint."""
+
+    id: str
+    name: NotRequired[str]
+    context_length: NotRequired[int]
+
+
+class CatalogModelEntry(TypedDict):
+    """Normalized external-catalog metadata for a single model id."""
+
+    name: NotRequired[str]
+    context_length: NotRequired[int]
+    reasoning: NotRequired[bool]
+
+
+type ModelListFetcher = Callable[[str, str], list[UpstreamModelEntry] | None]
+type CatalogLookup = Callable[[str], CatalogModelEntry | None]
+
+
+@dataclass(frozen=True)
+class DiscoveryOptions:
+    """Collaborators for x-model-discovery pools during rendering."""
+
+    fetch: ModelListFetcher | None = None
+    previous: Mapping[str, Sequence[object]] | None = None
+    catalog: CatalogLookup | None = None
 
 
 class Credential(BaseModel):
@@ -109,8 +148,11 @@ def credential_config(credential: Credential) -> dict[str, object]:
     return result
 
 
-def fetch_upstream_model_ids(base_url: str, api_key: str) -> list[str] | None:
-    """Return upstream model ids, or None when the endpoint is unavailable."""
+def fetch_upstream_models(
+    base_url: str,
+    api_key: str,
+) -> list[UpstreamModelEntry] | None:
+    """Return upstream model records, or None when the endpoint is unavailable."""
     url = f"{base_url.rstrip('/')}/models"
     headers = {"Accept": "application/json", "Authorization": f"Bearer {api_key}"}
     try:
@@ -125,13 +167,188 @@ def fetch_upstream_model_ids(base_url: str, api_key: str) -> list[str] | None:
     data = payload.get("data")
     if not is_obj_list(data):
         return None
-    ids: list[str] = []
+    entries: list[UpstreamModelEntry] = []
     for item in data:
-        if is_obj_dict(item):
-            identifier = item.get("id")
-            if isinstance(identifier, str) and identifier:
-                ids.append(identifier)
-    return ids
+        if not is_obj_dict(item):
+            continue
+        identifier = item.get("id")
+        if not isinstance(identifier, str) or not identifier:
+            continue
+        entry: UpstreamModelEntry = {"id": identifier}
+        name = item.get("name")
+        if isinstance(name, str) and name:
+            entry["name"] = name
+        context_length = item.get("context_length")
+        if (
+            isinstance(context_length, int)
+            and not isinstance(context_length, bool)
+            and context_length > 0
+        ):
+            entry["context_length"] = context_length
+        entries.append(entry)
+    return entries
+
+
+def _models_dev_cache_path() -> Path:
+    cache_home = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(cache_home) / "agents" / "models-dev.json"
+
+
+def _widest_record(
+    current: dict[str, object] | None,
+    candidate: dict[str, object],
+) -> dict[str, object]:
+    """Keep the record reporting the largest context limit on id collisions."""
+    if current is None:
+        return candidate
+    current_limit = current.get("limit")
+    candidate_limit = candidate.get("limit")
+    current_ctx = current_limit.get("context") if is_obj_dict(current_limit) else None
+    candidate_ctx = (
+        candidate_limit.get("context") if is_obj_dict(candidate_limit) else None
+    )
+    if (
+        isinstance(candidate_ctx, int)
+        and not isinstance(candidate_ctx, bool)
+        and (
+            not isinstance(current_ctx, int)
+            or isinstance(current_ctx, bool)
+            or candidate_ctx > current_ctx
+        )
+    ):
+        return candidate
+    return current
+
+
+def _normalize_models_dev(
+    payload: object,
+) -> dict[str, dict[str, dict[str, object]]]:
+    """Flatten models.dev providers into id/suffix/stripped lookup maps."""
+    maps: dict[str, dict[str, dict[str, object]]] = {
+        "models": {},
+        "suffixes": {},
+        "stripped": {},
+    }
+    if not is_obj_dict(payload):
+        return maps
+    for provider in payload.values():
+        if not is_obj_dict(provider):
+            continue
+        provider_models = provider.get("models")
+        if not is_obj_dict(provider_models):
+            continue
+        for model_id, raw_model in provider_models.items():
+            if not is_obj_dict(raw_model):
+                continue
+            record = dict(raw_model)
+            suffix = model_id.rsplit("/", 1)[-1]
+            key = MODELS_DEV_QUALIFIER_PATTERN.sub("", suffix)
+            maps["models"][model_id] = _widest_record(
+                maps["models"].get(model_id), record
+            )
+            maps["suffixes"][suffix] = _widest_record(
+                maps["suffixes"].get(suffix), record
+            )
+            maps["stripped"][key] = _widest_record(maps["stripped"].get(key), record)
+    return maps
+
+
+def _catalog_entry(raw: Mapping[str, object]) -> CatalogModelEntry:
+    """Project a models.dev record into normalized catalog metadata."""
+    entry: CatalogModelEntry = {}
+    name = raw.get("name")
+    if isinstance(name, str) and name:
+        entry["name"] = name
+    limit = raw.get("limit")
+    if is_obj_dict(limit):
+        context = limit.get("context")
+        if isinstance(context, int) and not isinstance(context, bool) and context > 0:
+            entry["context_length"] = context
+    reasoning = raw.get("reasoning")
+    if isinstance(reasoning, bool):
+        entry["reasoning"] = reasoning
+    return entry
+
+
+def _read_models_dev_cache(
+    path: Path,
+) -> tuple[dict[str, dict[str, dict[str, object]]] | None, bool]:
+    """Read cached models.dev maps; reports (maps, fresh)."""
+    try:
+        cached: object = json.loads(path.read_text(encoding="utf-8"))  # pyright: ignore[reportAny]
+    except (OSError, ValueError):
+        return None, False
+    if not is_obj_dict(cached):
+        return None, False
+    maps: dict[str, dict[str, dict[str, object]]] = {}
+    for key in ("models", "suffixes", "stripped"):
+        value = cached.get(key)
+        if is_obj_dict(value):
+            maps[key] = {k: dict(v) for k, v in value.items() if is_obj_dict(v)}
+    if not maps.get("models"):
+        return None, False
+    fetched_at = cached.get("fetchedAt")
+    fresh = (
+        isinstance(fetched_at, int | float)
+        and not isinstance(fetched_at, bool)
+        and (time.time() * 1000 - fetched_at) < MODELS_DEV_TTL_SECONDS * 1000
+    )
+    return maps, fresh
+
+
+def _load_models_dev_maps() -> dict[str, dict[str, dict[str, object]]]:
+    """Load models.dev lookup maps, refreshing the shared cache when stale."""
+    path = _models_dev_cache_path()
+    cached, fresh = _read_models_dev_cache(path)
+    if cached is not None and fresh:
+        return cached
+    try:
+        response = httpx.get(MODELS_DEV_URL, timeout=MODELS_DEV_TIMEOUT_SECONDS)
+        if not response.is_success:
+            return cached or _normalize_models_dev(None)
+        payload: object = response.json()  # pyright: ignore[reportAny]
+    except (httpx.HTTPError, OSError, ValueError, TypeError):
+        return cached or _normalize_models_dev(None)
+    maps = _normalize_models_dev(payload)
+    if not maps["models"]:
+        return cached or maps
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(
+            json.dumps(
+                {
+                    "version": MODELS_DEV_CACHE_VERSION,
+                    "fetchedAt": int(time.time() * 1000),
+                    **maps,
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+    return maps
+
+
+def models_dev_lookup() -> CatalogLookup:
+    """Return a lazy lookup over the shared models.dev metadata cache."""
+    loaded: list[dict[str, dict[str, dict[str, object]]]] = []
+
+    def lookup(model_id: str) -> CatalogModelEntry | None:
+        if not loaded:
+            loaded.append(_load_models_dev_maps())
+        maps = loaded[0]
+        suffix = model_id.rsplit("/", 1)[-1]
+        record = (
+            maps["models"].get(model_id)
+            or maps["suffixes"].get(model_id)
+            or maps["stripped"].get(MODELS_DEV_QUALIFIER_PATTERN.sub("", model_id))
+            or maps["stripped"].get(MODELS_DEV_QUALIFIER_PATTERN.sub("", suffix))
+        )
+        if record is None:
+            return None
+        return _catalog_entry(record)
+
+    return lookup
 
 
 def _validate_discovery(value: object, label: str) -> None:
@@ -162,29 +379,61 @@ def _read_previous_models(path: Path) -> dict[str, list[object]]:
     return previous
 
 
+def _discovered_model_entry(
+    upstream: UpstreamModelEntry,
+    catalog_lookup: CatalogLookup | None,
+) -> dict[str, object]:
+    """Build a models[] entry from upstream data plus catalog fallback."""
+    entry: dict[str, object] = {"name": upstream["id"]}
+    catalog: CatalogModelEntry | None = None
+    if catalog_lookup is not None:
+        try:
+            catalog = catalog_lookup(upstream["id"])
+        except (httpx.HTTPError, OSError, RuntimeError, ValueError, TypeError):
+            catalog = None
+    name = upstream.get("name") or (catalog.get("name") if catalog else None)
+    context_length = upstream.get("context_length") or (
+        catalog.get("context_length") if catalog else None
+    )
+    if name:
+        entry["display-name"] = name
+    if context_length:
+        entry["max-context-length"] = context_length
+    if catalog is not None and "reasoning" in catalog:
+        levels = (
+            THINKING_LEVELS_DEFAULT
+            if catalog["reasoning"]
+            else THINKING_LEVELS_DISABLED
+        )
+        entry["thinking"] = {"levels": list(levels)}
+    return entry
+
+
 def _discover_profile_models(
     label: str,
     profile: dict[str, object],
     credential: Credential,
-    discover: ModelListFetcher | None,
-    previous_models: Mapping[str, Sequence[object]] | None,
+    discovery: DiscoveryOptions,
 ) -> list[dict[str, object]]:
     base_url = profile.get("base-url")
     if not isinstance(base_url, str) or not base_url:
         msg = f"invalid {label}: {DISCOVERY_MARKER} requires base-url"
         raise ValueError(msg)
-    ids: list[str] | None = None
-    if discover is not None:
+    upstream_models: list[UpstreamModelEntry] | None = None
+    if discovery.fetch is not None:
         try:
-            ids = discover(base_url, credential.api_key)
+            upstream_models = discovery.fetch(base_url, credential.api_key)
         except (httpx.HTTPError, OSError, RuntimeError, ValueError, TypeError):
-            ids = None
-    if ids is not None:
-        return [{"name": model_id} for model_id in ids]
+            upstream_models = None
+    if upstream_models is not None:
+        return [
+            _discovered_model_entry(upstream, discovery.catalog)
+            for upstream in upstream_models
+        ]
     name = profile.get("name")
     previous = None
-    if isinstance(name, str) and previous_models:
-        previous = previous_models.get(name)
+    if isinstance(name, str) and discovery.previous:
+        previous = discovery.previous.get(name)
     if previous:
         warn(f"model discovery unavailable for {name}; reusing previous models")
         return [dict(item) for item in previous if is_obj_dict(item)]
@@ -254,8 +503,7 @@ def _expand_compatibility_section(
     value: object,
     pools: dict[str, list[Credential]],
     referenced_pools: set[str],
-    discover: ModelListFetcher | None,
-    previous_models: Mapping[str, Sequence[object]] | None,
+    discovery: DiscoveryOptions,
 ) -> list[dict[str, object]]:
     if not is_obj_list(value):
         msg = "invalid openai-compatibility: expected array"
@@ -285,8 +533,7 @@ def _expand_compatibility_section(
                 label,
                 shared_profile,
                 credentials[0],
-                discover,
-                previous_models,
+                discovery,
             )
         result.append(
             shared_profile
@@ -301,8 +548,7 @@ def render_cliproxy_config(
     template: str,
     secrets: CliProxySecrets | Mapping[str, object],
     deployment: CliProxyDeployment,
-    discover: ModelListFetcher | None = None,
-    previous_models: Mapping[str, Sequence[object]] | None = None,
+    discovery: DiscoveryOptions | None = None,
 ) -> str:
     """Render CLIProxyAPI configuration YAML from template, secrets, and deployment."""
     try:
@@ -344,8 +590,7 @@ def render_cliproxy_config(
             config["openai-compatibility"],
             pools,
             referenced_pools,
-            discover,
-            previous_models,
+            discovery or DiscoveryOptions(),
         )
 
     unreferenced_pools = [name for name in pools if name not in referenced_pools]
@@ -404,8 +649,11 @@ def sync_cliproxy_config(
         template,
         secrets,
         deployment,
-        discover=fetch_upstream_model_ids,
-        previous_models=_read_previous_models(dst_p),
+        discovery=DiscoveryOptions(
+            fetch=fetch_upstream_models,
+            previous=_read_previous_models(dst_p),
+            catalog=models_dev_lookup(),
+        ),
     )
     try:
         sync_text_file(dst_p, content)

@@ -11,6 +11,9 @@ import pytest
 import yaml
 
 from sync.core.cliproxy_config import (
+    CatalogModelEntry,
+    DiscoveryOptions,
+    UpstreamModelEntry,
     render_cliproxy_config,
     sync_cliproxy_config,
 )
@@ -282,15 +285,15 @@ openai-compatibility:
     }
     calls: list[tuple[str, str]] = []
 
-    def fake_fetch(base_url: str, api_key: str) -> list[str] | None:
+    def fake_fetch(base_url: str, api_key: str) -> list[UpstreamModelEntry] | None:
         calls.append((base_url, api_key))
-        return ["model-a", "model-b"]
+        return [{"id": "model-a"}, {"id": "model-b"}]
 
     rendered = render_cliproxy_config(
         template,
         secrets,
         DEPLOYMENT,
-        discover=fake_fetch,
+        discovery=DiscoveryOptions(fetch=fake_fetch),
     )
     parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
@@ -303,6 +306,124 @@ openai-compatibility:
         },
     ]
     assert calls == [("https://upstream.example.test/v1", "key-1")]
+
+
+def test_cliproxy_render_config_enriches_discovered_models_from_upstream() -> None:
+    """Upstream catalog fields populate per-model metadata in rendered entries."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [
+            {
+                "id": "deepseek/deepseek-v4.1-flash",
+                "name": "DeepSeek V4.1 Flash",
+                "context_length": 1_000_000,
+            },
+            {"id": "plain-model"},
+        ]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=fake_fetch,
+            catalog=lambda _model_id: None,
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [
+                {
+                    "name": "deepseek/deepseek-v4.1-flash",
+                    "display-name": "DeepSeek V4.1 Flash",
+                    "max-context-length": 1_000_000,
+                },
+                {"name": "plain-model"},
+            ],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_cliproxy_render_config_enriches_discovered_models_from_catalog() -> None:
+    """models.dev metadata fills gaps the upstream catalog does not report."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    catalog: dict[str, CatalogModelEntry] = {
+        "deepseek-v4.1-flash": {
+            "name": "DeepSeek V4.1 Flash",
+            "context_length": 262_144,
+            "reasoning": True,
+        },
+        "kimi-k2.7": {
+            "name": "Kimi K2.7",
+            "context_length": 131_072,
+            "reasoning": False,
+        },
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [
+            {"id": "deepseek/deepseek-v4.1-flash"},
+            {"id": "moonshotai/kimi-k2.7"},
+        ]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=fake_fetch,
+            catalog=lambda model_id: catalog.get(model_id.rsplit("/", 1)[-1]),
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [
+                {
+                    "name": "deepseek/deepseek-v4.1-flash",
+                    "display-name": "DeepSeek V4.1 Flash",
+                    "max-context-length": 262_144,
+                    "thinking": {"levels": ["low", "medium", "high"]},
+                },
+                {
+                    "name": "moonshotai/kimi-k2.7",
+                    "display-name": "Kimi K2.7",
+                    "max-context-length": 131_072,
+                    "thinking": {"levels": ["none"]},
+                },
+            ],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
 
 
 def _unavailable_fetch(_base_url: str, _api_key: str) -> None:
@@ -326,8 +447,10 @@ openai-compatibility:
         template,
         secrets,
         DEPLOYMENT,
-        discover=_unavailable_fetch,
-        previous_models={"discovered": [{"name": "stale-model"}]},
+        discovery=DiscoveryOptions(
+            fetch=_unavailable_fetch,
+            previous={"discovered": [{"name": "stale-model"}]},
+        ),
     )
     parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
