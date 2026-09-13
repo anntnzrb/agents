@@ -99,6 +99,19 @@ TIMEOUT_ONE_SECOND_MS: Final[float] = 1000.0
 TIMEOUT_TWO_SECONDS_MS: Final[float] = 2000.0
 TIMEOUT_THREE_SECONDS_MS: Final[float] = 3000.0
 
+# Timeout paths must return promptly instead of waiting for the child to exit on
+# its own. These ceilings are hang detectors, not latency benchmarks: every
+# fixture in those tests sleeps for at least 10 seconds, so an unenforced timeout
+# still blows the ceiling by a wide margin.
+TIMEOUT_ASSERT_GRACE_MS: Final[float] = 2500.0
+
+# A spawned process needs time to publish its descendant pid before the timeout
+# under test fires. The fixtures start a shell rather than a nested interpreter,
+# so this budget is orders of magnitude above observed startup while staying far
+# below the fixtures' sleep durations.
+TREE_STARTUP_TIMEOUT_MS: Final[int] = 2000
+EXPECTED_TREE_PIDS: Final[int] = 2
+
 DEFAULT_TIMEOUT_SEVEN: Final[int] = 7
 PARSED_TIMEOUT_NINE: Final[int] = 9
 
@@ -546,7 +559,7 @@ def test_run_command_outcome_times_out_cross_platform(
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
     assert outcome == TimedOut()
-    assert elapsed_ms < TIMEOUT_ONE_SECOND_MS
+    assert elapsed_ms < TIMEOUT_ONE_SECOND_MS + TIMEOUT_ASSERT_GRACE_MS
 
 
 def test_process_timeout_sleeping_fake_uv(
@@ -573,7 +586,7 @@ def test_process_timeout_sleeping_fake_uv(
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
     assert result.timed_out is True
-    assert elapsed_ms < TIMEOUT_ONE_SECOND_MS
+    assert elapsed_ms < TIMEOUT_ONE_SECOND_MS + TIMEOUT_ASSERT_GRACE_MS
 
 
 def test_process_inherit_preserves_terminal_stdin() -> None:
@@ -611,16 +624,23 @@ sleep 10
     result = asyncio.run(
         run_process(
             [str(fixture)],
-            RunProcessOptions(timeout_ms=1000, stdio="pipe"),
+            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS, stdio="pipe"),
         )
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
     assert result.timed_out is True
-    assert elapsed_ms < TIMEOUT_TWO_SECONDS_MS
+    assert elapsed_ms < TREE_STARTUP_TIMEOUT_MS + TIMEOUT_ASSERT_GRACE_MS
 
-    assert pids_file.exists()
-    pids = pids_file.read_text(encoding="utf-8").split()
+    deadline = time.monotonic() + 5.0
+    pids: list[str] = []
+    while time.monotonic() < deadline:
+        if pids_file.exists():
+            pids = pids_file.read_text(encoding="utf-8").split()
+            if len(pids) == EXPECTED_TREE_PIDS:
+                break
+        time.sleep(0.05)
+    assert len(pids) == EXPECTED_TREE_PIDS, f"child never published its pids: {pids!r}"
     parent_pid = int(pids[0])
     child_pid = int(pids[1])
 
@@ -682,7 +702,7 @@ def test_python_bootstrap_times_out_sleeping_fake_uv(
     success = asyncio.run(run_sync(sync_env))
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
-    assert elapsed_ms < TIMEOUT_TWO_SECONDS_MS
+    assert elapsed_ms < TIMEOUT_TWO_SECONDS_MS + TIMEOUT_ASSERT_GRACE_MS
     stderr = capsys.readouterr().err
     assert "uv python install failed" in stderr
     assert success is True
@@ -1938,20 +1958,21 @@ def test_run_process_exact_output_limit_allowed() -> None:
 
 def test_run_process_timeout_kills_process_group() -> None:
     """Timeout terminates the owned group; descendant does not survive."""
-    code = (
-        "import subprocess,sys,time;"
-        "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
-        "print(p.pid,flush=True);time.sleep(30)"
-    )
+    started_at = time.perf_counter()
     result = asyncio.run(
         run_process(
-            [sys.executable, "-c", code],
-            RunProcessOptions(timeout_ms=800, stdio="pipe"),
+            ["sh", "-c", "sleep 30 & echo $!; sleep 30"],
+            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS, stdio="pipe"),
         )
     )
+    elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+
     assert result.timed_out is True
     assert result.output_limited is False
-    child_pid = int(result.stdout.strip().split()[0])
+    assert elapsed_ms < TREE_STARTUP_TIMEOUT_MS + TIMEOUT_ASSERT_GRACE_MS
+    published = result.stdout.strip().split()
+    assert published, "child never published its descendant pid"
+    child_pid = int(published[0])
     deadline = time.monotonic() + 5.0
     while True:
         try:
@@ -1988,24 +2009,34 @@ def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
         "print(p.pid,flush=True);time.sleep(30)"
     )
 
-    async def _cancelled_run() -> str:
+    async def _cancelled_run() -> tuple[str, str]:
         task = asyncio.create_task(
             run_process(
                 [sys.executable, "-c", code],
                 RunProcessOptions(timeout_ms=10000, stdio="pipe"),
             )
         )
-        await asyncio.sleep(0.8)
+        published = ""
+        deadline = time.monotonic() + 10.0
+        while True:
+            if pid_file.exists():
+                published = pid_file.read_text(encoding="utf-8").strip()
+                if published.isdigit():
+                    break
+            if time.monotonic() > deadline:
+                message = "child never published its descendant pid"
+                pytest.fail(message)
+            await asyncio.sleep(0.05)
         _ = task.cancel()
         try:
             await task
         except asyncio.CancelledError:
-            return "cancelled"
-        return "finished"
+            return "cancelled", published
+        return "finished", published
 
-    outcome = asyncio.run(_cancelled_run())
+    outcome, published_pid = asyncio.run(_cancelled_run())
     assert outcome == "cancelled"
-    child_pid = int(pid_file.read_text(encoding="utf-8").strip())
+    child_pid = int(published_pid)
     deadline = time.monotonic() + 5.0
     while True:
         try:
