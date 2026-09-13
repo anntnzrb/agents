@@ -38,6 +38,15 @@ name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
 
+# Command-backed auth flags the provider as fetching its model catalog:
+# codex then pulls {base_url}/models?client_version=... (which CLIProxyAPI serves
+# as a native Codex catalog) instead of relying on the bundled catalog alone.
+# The token value is ignored by the keyless gateway; point command at a key file
+# if api-keys are ever enabled upstream.
+[model_providers.cliproxy.auth]
+command = "echo"
+args = ["cliproxy"]
+
 # light theme
 [desktop.appearanceLightChromeTheme]
 accent = "#d7827e"
