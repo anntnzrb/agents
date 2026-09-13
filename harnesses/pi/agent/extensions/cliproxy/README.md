@@ -28,8 +28,9 @@ base URL. Each discovered model instead carries `compat` and `thinkingLevelMap` 
 shipped catalog, which already authors them per model:
 
 - The catalog is indexed once per process by model id and by `provider/modelId`. A gateway id resolves
-  by its exact id, then by the segment after the last `/`.
-- When several shipped providers publish the same model id, the provider named as a segment of the
+  through progressively shorter `/`-joined suffixes, so `command-code/meta/muse-spark-1.3-contributor`
+  reaches the catalog's `meta/muse-spark-1.3-contributor`.
+- When several shipped providers publish the same suffix, the provider named as a segment of the
   gateway id wins, so `opencode-go/deepseek-v4-pro` keeps the `opencode-go` dialect.
 - Only `openai-completions` models are indexed. This provider speaks that protocol to the gateway, so
   metadata authored for another protocol describes a request shape it never sends.

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import { findBuiltinMetadata } from "./metadata.js";
 
 // Sync replaces this placeholder with the deployment endpoint.
 const BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
@@ -91,17 +92,12 @@ function builtinMetadataIndex(): Map<string, BuiltinMetadata[]> {
 }
 
 /**
- * Resolve metadata for a gateway id, preferring the provider named in the id itself:
- * `opencode-go/deepseek-v4-pro` keeps the `opencode-go` dialect over any other provider
- * that ships the same model id.
+ * Resolve metadata for a gateway id, matching progressively shorter suffixes
+ * so leading pool segments (`command-code/...`) resolve to the catalog entry
+ * (`meta/...`), with the provider named in the id winning ties.
  */
 function builtinMetadata(id: string): ModelMetadata | undefined {
-	const index = builtinMetadataIndex();
-	const candidates = index.get(id) ?? index.get(segment(id));
-	if (!candidates || candidates.length === 0) return undefined;
-	const segments = new Set(id.split("/"));
-	const match = candidates.find((candidate) => segments.has(candidate.provider)) ?? candidates[0];
-	return match.metadata;
+	return findBuiltinMetadata(builtinMetadataIndex(), id);
 }
 
 /**
