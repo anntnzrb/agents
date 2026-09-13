@@ -1,0 +1,8 @@
+{
+  "amp.updates.mode": "warn",
+  "amp.remoteThreadCreation.enabled": true,
+  "amp.git.commit.ampThread.enabled": false,
+  "amp.git.commit.coauthor.enabled": false,
+  "amp.skills.disableClaudeCodeSkills": true,
+  "amp.tools.disable": ["web_search", "read_web_page", "painter"]
+}
