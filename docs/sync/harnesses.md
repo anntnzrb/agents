@@ -2,6 +2,8 @@
 
 `HARNESS_ADAPTERS` in `sync/src/sync/core/harness_adapters.py` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
 
+Harness-specific values, such as package names, distribution tags, default launch arguments, environment variables, manager setting keys, install paths, and preserved JSON paths, live in the adapter definitions and in `harnesses/<id>/`. This page describes mechanisms only; read the harness source for the values it owns.
+
 Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports macOS ARM64 and Linux x86_64.
 
 ## Adapter fields
@@ -18,6 +20,9 @@ Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports
 | `runtimeSubdir` | Subdirectory appended to the source and generated roots |
 | `compatManagedEntries` | Obsolete generated entries that sync can remove |
 | `preserveJsonKeys` | Source JSON files sync copies over the generated file, re-injecting only the listed dot-paths from the previous file |
+| `cliproxyTemplates` | Source-relative paths whose `${CLIPROXY_CLIENT_BASE_URL}` placeholder sync replaces; only declared paths that actually contain the placeholder are replaced |
+| `cliproxyPreserveTopLevels` | Per-template TOML table names re-injected from the previous generated file during endpoint publication |
+| `pythonEnvSegments` | Home-relative segments of the uv-managed Python environment sync bootstraps before reconciliation |
 | `hooks` | Package-bootstrap and extension-dependency jobs |
 
 Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated root comes from `homeSegments`. With `runtimeSubdir`, sync appends that value to both roots.
@@ -37,8 +42,6 @@ A static release manifest has the shape `{"version": "1.2.3", "platforms": {"<pl
 
 When `manSegments` and `manDestSegments` are set, sync also publishes versioned man page symlinks into the destination directory and removes owned stale links whose target points into the install root. It never removes unrelated entries in the shared man directory.
 
-Devin uses a static release launcher. Sync installs the current release into `~/.local/share/devin/cli/_versions/` and publishes the `devin` wrapper. The managed user config sets `auto_update: false` so Devin's background updater never replaces the sync-managed install. The adapter sets `DEVIN_PERMISSION_MODE=bypass` via `launcher.env`, so every wrapper launch auto-approves all tool calls; `--permission-mode` on the command line still overrides it per invocation.
-
 Adapters can declare these hooks:
 
 - `PackageBootstrap` prepares packages from the adapter's source manifest and updates runtime settings.
@@ -48,7 +51,7 @@ Adapters can declare these hooks:
 
 A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxyTemplates`; sync checks each declared path for the placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxyPreserveTopLevels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserveJsonKeys`, which carries JSON dot-paths.
 
 Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers
@@ -66,8 +69,6 @@ Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync 
 ## Preserved JSON keys
 
 `preserveJsonKeys` maps each source JSON filename to the dot-paths allowed to survive from the previous generated file. Sync copies the source file verbatim over the destination, then re-injects each declared path's previous value only where the source leaves it undefined: the source wins collisions, paths absent from the destination are skipped, and undeclared destination keys are removed. An empty path list is a pure copy, and a missing source file is a sync error.
-
-Devin declares `devin`, `shell.setup_complete`, and `shell.startup_messages_remaining` for `config.json` so the CLI's org identifier and startup state survive reconciliation while the SSOT owns everything else, including `auto_update`; other write-back values are re-derivable and intentionally not preserved.
 
 ## Package cache
 

@@ -24,6 +24,17 @@ uv run sync-gates --tests
 
 Run only the static gates (ruff check, ruff format check, basedpyright) with `uv run sync-gates`. When iterating on one tool, invoke it directly (`uv run ruff check .`, `uv run basedpyright`, ...).
 
+## Report code coverage
+
+In-process coverage is opt-in through the `pytest-cov` dev dependency:
+
+```bash
+cd sync
+uv run pytest -n auto --cov=sync --cov-report=term-missing
+```
+
+Coverage is a diagnostic, not a gate. The contract tests in `tests/test_integration.py` drive the CLI through subprocesses, so process-boundary modules (`sync/src/sync/cli.py`) report lower in-process coverage than the suite actually exercises. Do not add in-process tests that repeat an integration scenario just to raise that number.
+
 `uv run pytest -n auto` already includes `tests/test_integration.py`. Run the explicit single-process integration command when you are iterating on process-level behavior:
 
 ```bash
@@ -67,6 +78,7 @@ Keep tests of harness implementations and harness-local behavior beside their so
 - Assert observable behavior and contracts, not fixtures, mocks, or implementation details.
 - Add a test only when it can fail on a real regression. Delete tests that duplicate coverage or re-prove what another test already covers.
 - Keep skill and harness tests beside their owning source. `sync/tests/` covers sync behavior only.
+- Process-tree tests must not race child startup. Publish readiness from the child, gate the cancelling assertion on that signal, and keep wall-clock ceilings as hang detectors derived from the configured timeout rather than as latency budgets. A ceiling below the fixture's own sleep duration must still detect an unenforced timeout.
 
 ## Change sync behavior
 
@@ -99,12 +111,14 @@ Do not edit a generated harness home. Sync replaces managed files on the next ru
 
 ## Add a harness adapter
 
-1. Add the adapter to `sync/src/sync/core/harness_adapters.py`.
+1. Append the adapter to `HARNESS_ADAPTERS` in `sync/src/sync/core/harness_adapters.py`. `harness_from_adapter` is the only place adapter metadata becomes a resolved harness, so a new field is declared once there.
 2. Add its source directory under `harnesses/<harness>/`.
 3. Add wrapper tests for every supported platform.
 4. Add integration coverage for generated files and hooks.
 5. Run the full checks.
 6. Update the [Harness adapter reference](harnesses.md) only when the adapter changes the shared workflow or requires a harness-specific user action.
+
+`tests/test_harness_adapters.py` enforces the registry invariants: `HarnessId` matches the adapter ids, ids and `homeSegments` are safe path components, wrapper names are unique across harnesses and tools, every adapter declares supported platforms, and registration order stays stable. Append new adapters instead of reordering the table; order fixes discovery, plan, and wrapper reconciliation order.
 
 Store launcher metadata in the adapter. Do not repeat package names, target homes, or hook rules in user configuration.
 
