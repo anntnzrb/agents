@@ -97,7 +97,7 @@ Defaults, validation order, and interop rules live in `reference.md`.
 
 ## Assets
 
-- `assets/vitest.config.mjs` - minimal starter Vitest config for JS repos
+- `assets/vitest.config.mjs.example` - minimal starter Vitest config for JS repos; copy it as `vitest.config.mjs`
 - `assets/jest.config.mjs` - minimal starter Jest config for JS repos
 
 ## Research Tools
