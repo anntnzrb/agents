@@ -141,6 +141,40 @@ def test_missing_package_roots_reports_only_real_package_roots(
     assert package_is_healthy(str(tmp_path)) is True
 
 
+def test_missing_package_roots_ignores_node_builtin_roots(tmp_path: Path) -> None:
+    """missing_package_roots ignores Node builtin roots, including bare internals."""
+    source = (
+        'import { AsyncResource } from "async_hooks";\n'
+        'import { types } from "util/types";\n'
+        'import sys from "sys";\n'
+        'import { createHook } from "trace_events";\n'
+        'import { WASI } from "wasi";\n'
+        'import "node:async_hooks";\n'
+        'const agent = require("_http_agent");\n'
+        'const queue = require("_stream_readable");\n'
+        'const wrap = require("_tls_wrap");\n'
+        'import real from "real-package";\n'
+    )
+    _ = (tmp_path / "main.ts").write_text(source, encoding="utf-8")
+
+    assert missing_package_roots(str(tmp_path)) == ["real-package"]
+
+
+def test_missing_package_roots_skips_dot_directories(tmp_path: Path) -> None:
+    """missing_package_roots ignores sources inside dot-directories."""
+    vendored_script = tmp_path / ".venv" / "lib" / "pyright.js"
+    vendored_script.parent.mkdir(parents=True, exist_ok=True)
+    _ = vendored_script.write_text(
+        'const { AsyncResource } = require("phantom-vendored-pkg");\n',
+        encoding="utf-8",
+    )
+    _ = (tmp_path / "main.ts").write_text(
+        'import chalk from "chalk";\n', encoding="utf-8"
+    )
+
+    assert missing_package_roots(str(tmp_path)) == ["chalk"]
+
+
 def test_extract_import_specifiers_ignores_property_accesses() -> None:
     """extract_import_specifiers ignores properties and handles invalid syntax."""
     code = (

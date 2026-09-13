@@ -14,7 +14,22 @@ RESOURCE_KEYS: tuple[str, ...] = ("extensions", "skills", "prompts", "themes")
 
 BUILTIN_PACKAGE_ROOTS: frozenset[str] = frozenset(
     {
+        "_http_agent",
+        "_http_client",
+        "_http_common",
+        "_http_incoming",
+        "_http_outgoing",
+        "_http_server",
+        "_stream_duplex",
+        "_stream_passthrough",
+        "_stream_readable",
+        "_stream_transform",
+        "_stream_wrap",
+        "_stream_writable",
+        "_tls_common",
+        "_tls_wrap",
         "assert",
+        "async_hooks",
         "buffer",
         "child_process",
         "cluster",
@@ -43,13 +58,16 @@ BUILTIN_PACKAGE_ROOTS: frozenset[str] = frozenset(
         "repl",
         "stream",
         "string_decoder",
+        "sys",
         "timers",
         "tls",
+        "trace_events",
         "tty",
         "url",
         "util",
         "v8",
         "vm",
+        "wasi",
         "worker_threads",
         "zlib",
     }
@@ -536,7 +554,9 @@ def _package_source_files(root: str) -> list[str]:
     files: list[str] = []
     try:
         for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
-            dirnames[:] = [d for d in dirnames if d not in ("node_modules", ".git")]
+            dirnames[:] = [
+                d for d in dirnames if d != "node_modules" and not d.startswith(".")
+            ]
             files.extend(
                 str(Path(dirpath) / filename)
                 for filename in filenames
