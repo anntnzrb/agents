@@ -194,14 +194,6 @@ class SyncPlan:
     gateway_host: bool
 
 
-CLIPROXY_ENDPOINT_TEMPLATE_PATHS: dict[str, tuple[str, ...]] = {
-    "codex": ("config.toml",),
-    "opencode": ("opencode.jsonc",),
-    "omp": ("models.yml",),
-    "pi": ("extensions/cliproxy/index.ts",),
-}
-
-
 def top_level_entry_names(root: str) -> list[str]:
     """Return sorted unique top-level entry names in a directory."""
     path = Path(root)
@@ -324,8 +316,11 @@ def _build_harness_plan(sync_env: SyncEnv, harness: Harness) -> HarnessPlan:
     )
 
 
-def _cli_proxy_template_paths(source_root: str, harness_id: str) -> tuple[str, ...]:
-    candidates = CLIPROXY_ENDPOINT_TEMPLATE_PATHS.get(harness_id, ())
+def _cli_proxy_template_paths(
+    source_root: str,
+    candidates: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return adapter-declared template paths that carry the base URL placeholder."""
     found: list[str] = []
     for rel_path in candidates:
         source_path = Path(source_root) / rel_path
@@ -352,10 +347,8 @@ def _config_jobs(
         CliProxyEndpointTarget(
             src=str(Path(plan.source_root) / rel_path),
             dst=str(Path(plan.root) / rel_path),
-            preserve_top_levels=(
-                ("hooks.state", "projects")
-                if plan.harness.id == "codex" and rel_path == "config.toml"
-                else ()
+            preserve_top_levels=plan.harness.cliproxy_preserve_top_levels.get(
+                rel_path, ()
             ),
         )
         for plan in harnesses
@@ -415,7 +408,9 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
     )
     gateway_host = is_cliproxy_gateway_host(cli_proxy_deployment)
     template_paths_by_id = {
-        plan.harness.id: _cli_proxy_template_paths(plan.source_root, plan.harness.id)
+        plan.harness.id: _cli_proxy_template_paths(
+            plan.source_root, plan.harness.cliproxy_templates
+        )
         for plan in harnesses
     }
 

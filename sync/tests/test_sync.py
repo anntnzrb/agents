@@ -33,6 +33,7 @@ from sync.core.harness import (
 from sync.core.hook_state import fingerprint_tree
 from sync.core.index import (
     EXIT_TIMED_OUT,
+    ensure_python_env,
     parse_timeout_seconds,
     run_sync,
     run_sync_with_deadline,
@@ -40,8 +41,11 @@ from sync.core.index import (
 )
 from sync.core.jobs import run_jobs_with_preserve
 from sync.core.managed_state import (
+    ManagedSyncPlan,
+    clean_managed_entries,
     load_recorded_entry_names,
     plan_managed_entries,
+    record_managed_entries,
     write_recorded_entry_names,
 )
 from sync.core.managed_tools import supported_arch
@@ -71,6 +75,7 @@ from sync.runtime.lock import release_sync_lock
 from sync.runtime.process import (
     MAX_OUTPUT_BYTES,
     OutputLimit,
+    ProcessResult,
     RunProcessOptions,
     Success,
     TimedOut,
@@ -2058,7 +2063,9 @@ def test_run_sync_malformed_plan_skips_python_env_bootstrap(
     """Malformed plan fails before any Python-env bootstrap writes."""
     calls: list[str] = []
 
-    async def _no_bootstrap(_home: str, _timeout_ms: int) -> None:
+    async def _no_bootstrap(
+        _home: str, _segments: tuple[str, ...], _timeout_ms: int
+    ) -> None:
         calls.append("bootstrap")
 
     def _bad_plan(_env: object) -> object:
@@ -2070,3 +2077,236 @@ def test_run_sync_malformed_plan_skips_python_env_bootstrap(
     env = _make_sync_env(tmp_path)
     assert asyncio.run(run_sync(env)) is False
     assert calls == []
+
+
+def test_plan_managed_entries_cleans_up_inactive_harness(home: Path) -> None:
+    """An adapter whose source directory is gone still cleans its recorded entries."""
+    sync_env = _make_sync_env(home)
+    assert sync_env.harness("amp") is None
+
+    amp_home = home / ".config" / "amp"
+    amp_home.mkdir(parents=True, exist_ok=True)
+    stale_entry = amp_home / "settings.json"
+    _write_file(stale_entry, "{}\n")
+    state_path = home / ".local" / "share" / "agents" / "sync-managed" / "amp.json"
+    write_recorded_entry_names(state_path, ["settings.json"])
+
+    plan = plan_managed_entries(sync_env)
+    inactive = next(
+        (h for h in plan.harnesses if h.state_path == str(state_path)), None
+    )
+    assert inactive is not None
+    assert inactive.active is False
+    assert inactive.current_entry_names == []
+    assert inactive.cleanup_paths == [str(stale_entry)]
+
+    assert clean_managed_entries(plan) is True
+    assert not stale_entry.exists()
+    assert record_managed_entries(plan) is True
+    assert not state_path.exists()
+
+
+def test_run_sync_bootstraps_python_env_from_adapter_declaration(
+    monkeypatch: pytest.MonkeyPatch,
+    home: Path,
+) -> None:
+    """A harness declaring python_env_segments drives the uv bootstrap call."""
+    sync_env = _make_sync_env(home)
+    omp = sync_env.harness("omp")
+    assert omp is not None
+    assert omp.python_env_segments == (".omp", "python-env")
+
+    bootstrap_calls: list[tuple[str, tuple[str, ...], int]] = []
+
+    async def _record_bootstrap(
+        target_home: str,
+        segments: tuple[str, ...],
+        timeout_ms: int,
+    ) -> None:
+        bootstrap_calls.append((target_home, segments, timeout_ms))
+
+    async def _skip_jobs(_jobs: object, _preserve: object = None) -> bool:
+        return True
+
+    def _empty_managed_plan(_env: object, _plan: object) -> ManagedSyncPlan:
+        return ManagedSyncPlan(harnesses=[])
+
+    def _no_managed_tools(_env: object) -> list[object]:
+        return []
+
+    async def _skip_hooks(_hooks: object, _states: object) -> bool:
+        return True
+
+    monkeypatch.setattr("sync.core.index.ensure_python_env", _record_bootstrap)
+    monkeypatch.setattr("sync.core.index.run_jobs_with_preserve", _skip_jobs)
+    monkeypatch.setattr(
+        "sync.core.index.plan_managed_entries_for_sync_plan", _empty_managed_plan
+    )
+    monkeypatch.setattr("sync.core.index.prepare_managed_tools", _no_managed_tools)
+    monkeypatch.setattr("sync.core.index.run_sync_hooks", _skip_hooks)
+
+    assert asyncio.run(run_sync(sync_env)) is True
+    assert bootstrap_calls == [
+        (str(home), (".omp", "python-env"), sync_env.install_timeout_ms)
+    ]
+
+
+def _install_fake_python_env_process(
+    monkeypatch: pytest.MonkeyPatch,
+    results: dict[tuple[str, ...], ProcessResult],
+    seen: list[list[str]],
+) -> None:
+    """Install fake python-env collaborators keyed by command."""
+
+    async def _present(_command: str) -> bool:
+        return True
+
+    async def _fake(command: Sequence[str], _options: object) -> ProcessResult:
+        seen.append(list(command))
+        return results[tuple(command)]
+
+    monkeypatch.setattr("sync.core.index.command_exists", _present)
+    monkeypatch.setattr("sync.core.index.run_process", _fake)
+
+
+def test_ensure_python_env_returns_when_venv_python_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An existing venv python short-circuits the bootstrap without running uv."""
+    segments = (".omp", "python-env")
+    _write_file(tmp_path.joinpath(*segments, "bin", "python"), "")
+    seen: list[list[str]] = []
+
+    _install_fake_python_env_process(monkeypatch, {}, seen)
+
+    asyncio.run(ensure_python_env(str(tmp_path), segments, 1000))
+
+    assert seen == []
+
+
+def test_ensure_python_env_warns_when_uv_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A missing uv binary warns and leaves the python-env alone."""
+
+    async def _missing(_command: str) -> bool:
+        return False
+
+    monkeypatch.setattr("sync.core.index.command_exists", _missing)
+
+    asyncio.run(ensure_python_env(str(tmp_path), (".omp", "python-env"), 1000))
+
+    assert "uv not found; skipping python-env bootstrap" in capsys.readouterr().err
+    assert not (tmp_path / ".omp").exists()
+
+
+def test_ensure_python_env_warns_when_uv_python_install_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A failed uv python install warns and stops before creating a venv."""
+    seen: list[list[str]] = []
+    _install_fake_python_env_process(
+        monkeypatch,
+        {
+            ("uv", "python", "install"): ProcessResult(
+                exit_code=1,
+                stdout="",
+                stderr="boom",
+                timed_out=False,
+            )
+        },
+        seen,
+    )
+
+    asyncio.run(ensure_python_env(str(tmp_path), (".omp", "python-env"), 1000))
+
+    assert seen == [["uv", "python", "install"]]
+    assert "uv python install failed; skipping" in capsys.readouterr().err
+
+
+def test_ensure_python_env_warns_when_python_find_returns_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An empty uv python find result warns and stops before creating a venv."""
+    seen: list[list[str]] = []
+    _install_fake_python_env_process(
+        monkeypatch,
+        {
+            ("uv", "python", "install"): ProcessResult(
+                exit_code=0,
+                stdout="",
+                stderr="",
+                timed_out=False,
+            ),
+            ("uv", "python", "find"): ProcessResult(
+                exit_code=0,
+                stdout="   \n",
+                stderr="",
+                timed_out=False,
+            ),
+        },
+        seen,
+    )
+
+    asyncio.run(ensure_python_env(str(tmp_path), (".omp", "python-env"), 1000))
+
+    assert seen == [["uv", "python", "install"], ["uv", "python", "find"]]
+    assert "uv python find returned empty; skipping" in capsys.readouterr().err
+
+
+def test_ensure_python_env_warns_when_venv_creation_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A failed uv venv warns, and the venv targets the declared segments."""
+    segments = (".omp", "python-env")
+    seen: list[list[str]] = []
+    _install_fake_python_env_process(
+        monkeypatch,
+        {
+            ("uv", "python", "install"): ProcessResult(
+                exit_code=0,
+                stdout="",
+                stderr="",
+                timed_out=False,
+            ),
+            ("uv", "python", "find"): ProcessResult(
+                exit_code=0,
+                stdout="/fake/python\n",
+                stderr="",
+                timed_out=False,
+            ),
+            (
+                "uv",
+                "venv",
+                "--python",
+                "/fake/python",
+                str(tmp_path.joinpath(*segments)),
+            ): ProcessResult(
+                exit_code=1,
+                stdout="",
+                stderr="boom",
+                timed_out=False,
+            ),
+        },
+        seen,
+    )
+
+    asyncio.run(ensure_python_env(str(tmp_path), segments, 1000))
+
+    assert "failed to create python-env" in capsys.readouterr().err
+    assert seen[-1] == [
+        "uv",
+        "venv",
+        "--python",
+        "/fake/python",
+        str(tmp_path.joinpath(*segments)),
+    ]

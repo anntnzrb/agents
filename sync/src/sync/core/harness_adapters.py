@@ -94,6 +94,9 @@ class HarnessAdapter:
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] | None = None
     preserve_json_keys: Mapping[str, tuple[str, ...]] | None = None
+    cliproxy_templates: tuple[str, ...] = ()
+    cliproxy_preserve_top_levels: Mapping[str, tuple[str, ...]] | None = None
+    python_env_segments: tuple[str, ...] | None = None
     hooks: tuple[HarnessHookSpec, ...] | None = None
 
 
@@ -106,6 +109,8 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             package="@openai/codex",
             bin="codex",
         ),
+        cliproxy_templates=("config.toml",),
+        cliproxy_preserve_top_levels={"config.toml": ("hooks.state", "projects")},
     ),
     HarnessAdapter(
         id="deepseek",
@@ -153,6 +158,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             package="opencode-ai",
             bin="opencode",
         ),
+        cliproxy_templates=("opencode.jsonc",),
         hooks=(ExtensionDepsHook(root_dir="."),),
     ),
     HarnessAdapter(
@@ -165,6 +171,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         ),
         runtime_subdir="agent",
         compat_managed_entries=("legacy",),
+        cliproxy_templates=("extensions/cliproxy/index.ts",),
         hooks=(
             PackageBootstrapHook(
                 manifest_file="packages.json",
@@ -182,6 +189,8 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             bin="omp",
         ),
         runtime_subdir="agent",
+        cliproxy_templates=("models.yml",),
+        python_env_segments=(".omp", "python-env"),
         hooks=(ExtensionDepsHook(root_dir="."),),
     ),
     HarnessAdapter(

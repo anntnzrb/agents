@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
     from typing import Self
-from sync.core.harness import HarnessSpec, build_harness
+from sync.core.harness import harness_from_adapter
 from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.hook_state import (
     clear_extension_hook_state,
@@ -283,18 +283,7 @@ def test_prepare_extension_hook_state_produces_exact_serialized_fingerprint_and_
     managed_state_home.mkdir(parents=True)
 
     adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
-    harness = build_harness(
-        HarnessSpec(
-            id=adapter.id,
-            source_name=adapter.id,
-            home=str(home),
-            launcher=adapter.launcher,
-            instruction_file=adapter.instruction_file,
-            runtime_subdir=adapter.runtime_subdir,
-            compat_managed_entries=adapter.compat_managed_entries,
-            hooks=adapter.hooks,
-        )
-    )
+    harness = harness_from_adapter(adapter, str(home))
     state_path = managed_state_home / "opencode.extension-deps.json"
     fingerprint = fingerprint_tree(source_root)
     generated_entries = ["package.json"]
@@ -334,18 +323,7 @@ def test_prepare_extension_hook_state_uses_empty_relative_root_without_dot_slash
     managed_state_home.mkdir(parents=True)
 
     adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
-    harness = build_harness(
-        HarnessSpec(
-            id=adapter.id,
-            source_name=adapter.id,
-            home=str(home),
-            launcher=adapter.launcher,
-            instruction_file=adapter.instruction_file,
-            runtime_subdir=adapter.runtime_subdir,
-            compat_managed_entries=adapter.compat_managed_entries,
-            hooks=adapter.hooks,
-        )
-    )
+    harness = harness_from_adapter(adapter, str(home))
     state_path = managed_state_home / "opencode.extension-deps.json"
     fingerprint = fingerprint_tree(source_root)
     _ = state_path.write_text(
@@ -386,18 +364,7 @@ def test_prepare_extension_hook_state_records_and_preserves_nested_package_entri
     managed_state_home.mkdir(parents=True)
 
     adapter = next(a for a in HARNESS_ADAPTERS if a.id == "omp")
-    harness = build_harness(
-        HarnessSpec(
-            id=adapter.id,
-            source_name=adapter.id,
-            home=str(home),
-            launcher=adapter.launcher,
-            instruction_file=adapter.instruction_file,
-            runtime_subdir=adapter.runtime_subdir,
-            compat_managed_entries=adapter.compat_managed_entries,
-            hooks=adapter.hooks,
-        )
-    )
+    harness = harness_from_adapter(adapter, str(home))
     state_path = managed_state_home / "omp.skills-deps.json"
     hook = ExtensionDepsHookPlan(
         harness=harness,
@@ -482,18 +449,7 @@ def test_prepare_extension_hook_state_corrupt_state(tmp_path: Path) -> None:
     home.mkdir(parents=True)
 
     adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
-    harness = build_harness(
-        HarnessSpec(
-            id=adapter.id,
-            source_name=adapter.id,
-            home=str(home),
-            launcher=adapter.launcher,
-            instruction_file=adapter.instruction_file,
-            runtime_subdir=adapter.runtime_subdir,
-            compat_managed_entries=adapter.compat_managed_entries,
-            hooks=adapter.hooks,
-        )
-    )
+    harness = harness_from_adapter(adapter, str(home))
     state_path = home / "corrupt.json"
     _ = state_path.write_text("invalid json content!@#$", encoding="utf-8")
 
@@ -524,18 +480,7 @@ def test_prepare_extension_hook_state_branches(tmp_path: Path) -> None:
     fp = fingerprint_tree(source_root)
 
     adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
-    harness = build_harness(
-        HarnessSpec(
-            id=adapter.id,
-            source_name=adapter.id,
-            home=str(home),
-            launcher=adapter.launcher,
-            instruction_file=adapter.instruction_file,
-            runtime_subdir=adapter.runtime_subdir,
-            compat_managed_entries=adapter.compat_managed_entries,
-            hooks=adapter.hooks,
-        )
-    )
+    harness = harness_from_adapter(adapter, str(home))
     state_path = home / "state.json"
     hook = ExtensionDepsHookPlan(
         harness=harness,

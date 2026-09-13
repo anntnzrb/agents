@@ -17,9 +17,8 @@ if TYPE_CHECKING:
     from sync.core.plan import SyncPlan
 
 from sync.core.harness import (
-    HarnessSpec,
     SyncEnv,
-    build_harness,
+    harness_from_adapter,
     harness_managed_state_path,
     harness_root,
 )
@@ -156,18 +155,7 @@ def plan_managed_entries_for_sync_plan(
         if adapter.id in active_ids:
             continue
 
-        harness = build_harness(
-            HarnessSpec(
-                id=adapter.id,
-                source_name=adapter.id,
-                home=str(Path(sync_env.home).joinpath(*adapter.home_segments)),
-                launcher=adapter.launcher,
-                instruction_file=adapter.instruction_file,
-                runtime_subdir=adapter.runtime_subdir,
-                compat_managed_entries=adapter.compat_managed_entries,
-                hooks=adapter.hooks,
-            )
-        )
+        harness = harness_from_adapter(adapter, sync_env.home)
         state_path = harness_managed_state_path(harness, sync_env.managed_state_home)
         if not Path(state_path).exists():
             continue

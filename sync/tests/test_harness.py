@@ -3,19 +3,28 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import pytest
 
 from sync.cli import EXIT_USAGE, main
 from sync.core.harness import (
+    DEFAULT_PACKAGE_CACHE_SUBDIR,
     NpmLauncher,
+    PackageBootstrapHook,
     RootEnvReadError,
     StaticReleaseLauncher,
     SyncEnv,
     assert_path_component,
+    harness_from_adapter,
     load_root_env,
+    platform_from_process,
     supported_harness,
+)
+from sync.core.harness_adapters import (
+    HARNESS_ADAPTERS,
+    NpmLauncherSpec,
 )
 
 if TYPE_CHECKING:
@@ -165,3 +174,102 @@ def test_cli_launch_empty_name_returns_usage_error(
     assert exit_code == EXIT_USAGE
     captured = capsys.readouterr()
     assert "sync: usage: launch NAME -- [ARGS...]" in captured.err
+
+
+def test_harness_from_adapter_applies_launcher_defaults(tmp_path: Path) -> None:
+    """Adapter launcher defaults must resolve into concrete launcher values."""
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "codex")
+    harness = harness_from_adapter(adapter, str(tmp_path))
+    launcher = harness.launcher
+    assert isinstance(launcher, NpmLauncher)
+    assert launcher.dist_tag == "latest"
+    assert launcher.smoke_check == "--version"
+    assert launcher.default_args == ()
+    assert launcher.env is None
+
+
+def test_harness_from_adapter_resolves_callable_launcher_env(tmp_path: Path) -> None:
+    """A callable launcher env resolves against the generated harness home."""
+    adapter = replace(
+        next(a for a in HARNESS_ADAPTERS if a.id == "codex"),
+        launcher=NpmLauncherSpec(
+            package="@openai/codex",
+            bin="codex",
+            env=lambda home: {"CODEX_SYNC_HOME": home},
+        ),
+    )
+    harness = harness_from_adapter(adapter, str(tmp_path))
+    assert harness.launcher.env == {"CODEX_SYNC_HOME": str(tmp_path / ".codex")}
+
+
+def test_harness_from_adapter_normalizes_hook_defaults(tmp_path: Path) -> None:
+    """Package bootstrap hooks must receive their default files and cache."""
+    adapter = replace(
+        next(a for a in HARNESS_ADAPTERS if a.id == "pi"),
+        hooks=(PackageBootstrapHook(),),
+    )
+    harness = harness_from_adapter(adapter, str(tmp_path))
+    hook = harness.hooks[0]
+    assert isinstance(hook, PackageBootstrapHook)
+    assert hook.manifest_file == "packages.json"
+    assert hook.settings_file == "settings.json"
+    assert hook.cache_subdir == DEFAULT_PACKAGE_CACHE_SUBDIR
+
+
+def test_harness_from_adapter_propagates_declarative_adapter_fields(
+    tmp_path: Path,
+) -> None:
+    """Per-harness cliproxy and python-env declarations reach resolved harnesses."""
+    harnesses = {
+        adapter.id: harness_from_adapter(adapter, str(tmp_path))
+        for adapter in HARNESS_ADAPTERS
+    }
+    codex = harnesses["codex"]
+    assert codex.cliproxy_templates == ("config.toml",)
+    assert codex.cliproxy_preserve_top_levels == {
+        "config.toml": ("hooks.state", "projects")
+    }
+    assert codex.python_env_segments is None
+    assert harnesses["omp"].python_env_segments == (".omp", "python-env")
+    assert harnesses["omp"].cliproxy_templates == ("models.yml",)
+    assert harnesses["devin"].cliproxy_templates == ()
+    assert harnesses["devin"].cliproxy_preserve_top_levels == {}
+
+
+def test_harness_from_adapter_defaults_are_independent_per_harness(
+    tmp_path: Path,
+) -> None:
+    """Unset adapter fields must not leak state between resolved harnesses."""
+    codex = harness_from_adapter(
+        next(a for a in HARNESS_ADAPTERS if a.id == "codex"), str(tmp_path)
+    )
+    devin = harness_from_adapter(
+        next(a for a in HARNESS_ADAPTERS if a.id == "devin"), str(tmp_path)
+    )
+    assert codex.instruction_file == "AGENTS.md"
+    assert devin.instruction_file == "AGENTS.md"
+    assert codex.preserve_json_keys == {}
+    assert devin.compat_managed_entries == ()
+    assert codex.hooks == ()
+    # Empty mappings must be allocated per call, not shared between harnesses.
+    assert codex.preserve_json_keys is not devin.preserve_json_keys
+    assert codex.cliproxy_preserve_top_levels is not devin.cliproxy_preserve_top_levels
+
+
+def test_harness_from_adapter_treats_empty_segments_as_absent(tmp_path: Path) -> None:
+    """An empty python_env_segments tuple must resolve to None, never to the home."""
+    adapter = replace(
+        next(a for a in HARNESS_ADAPTERS if a.id == "omp"),
+        python_env_segments=(),
+    )
+    harness = harness_from_adapter(adapter, str(tmp_path))
+    assert harness.python_env_segments is None
+
+
+def test_platform_from_process_rejects_unsupported_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sync supports macOS and Linux only; other hosts must fail loudly."""
+    monkeypatch.setattr("sync.core.harness.sys.platform", "win32")
+    with pytest.raises(RuntimeError, match="unsupported platform: win32"):
+        _ = platform_from_process()

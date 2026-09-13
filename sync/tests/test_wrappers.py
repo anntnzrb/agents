@@ -12,13 +12,12 @@ from typing import TYPE_CHECKING, Final
 import pytest
 
 from sync.core.harness import (
-    HarnessSpec,
     NpmLauncher,
     SyncEnv,
-    build_harness,
+    harness_from_adapter,
     supported_harness,
 )
-from sync.core.harness_adapters import NpmLauncherSpec
+from sync.core.harness_adapters import HARNESS_ADAPTERS
 from sync.core.managed_tools import PreparedManagedTool
 from sync.core.wrappers import (
     WRAPPER_MARKER,
@@ -77,18 +76,9 @@ def test_harnesses_are_discovered_from_known_harness_directories(
 
 def test_harness_ownership_ids_cannot_escape_the_wrapper_directory() -> None:
     """Validate that harness IDs cannot contain directory traversal characters."""
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "codex")
     with pytest.raises(ValueError, match="invalid harness id"):
-        _ = build_harness(
-            HarnessSpec(
-                id="codex",
-                source_name="../codex",
-                home="/var/agents/codex",
-                launcher=NpmLauncherSpec(
-                    package="@openai/codex",
-                    bin="codex",
-                ),
-            )
-        )
+        _ = harness_from_adapter(adapter, "/var/agents", source_name="../codex")
 
 
 def test_installed_runtime_resolves_known_harness_without_ssot(

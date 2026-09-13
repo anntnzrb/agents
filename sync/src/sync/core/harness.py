@@ -81,21 +81,6 @@ type HarnessLauncher = NpmLauncher | StaticReleaseLauncher
 
 
 @dataclass(frozen=True, slots=True)
-class HarnessSpec:
-    """Input specification for building a resolved Harness."""
-
-    id: HarnessId
-    source_name: str
-    home: str
-    launcher: HarnessLauncherSpec
-    instruction_file: str | None = None
-    runtime_subdir: str | None = None
-    compat_managed_entries: tuple[str, ...] | None = None
-    preserve_json_keys: Mapping[str, tuple[str, ...]] | None = None
-    hooks: tuple[HarnessHookSpec, ...] | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class Harness:
     """Fully resolved harness configuration."""
 
@@ -107,6 +92,9 @@ class Harness:
     runtime_subdir: str | None = None
     compat_managed_entries: tuple[str, ...] = ()
     preserve_json_keys: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+    cliproxy_templates: tuple[str, ...] = ()
+    cliproxy_preserve_top_levels: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+    python_env_segments: tuple[str, ...] | None = None
     hooks: tuple[HarnessHook, ...] = ()
 
 
@@ -266,19 +254,33 @@ def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
     )
 
 
-def build_harness(spec: HarnessSpec) -> Harness:
-    """Build a resolved Harness instance from a specification."""
-    assert_path_component(spec.source_name, "harness id")
+def harness_from_adapter(
+    adapter: HarnessAdapter,
+    user_home: str,
+    source_name: str | None = None,
+) -> Harness:
+    """Build a resolved Harness from an adapter definition.
+
+    This is the only place adapter metadata becomes a resolved harness, so a new
+    adapter field is declared once in :mod:`sync.core.harness_adapters` and
+    propagated here.
+    """
+    resolved_source_name = source_name if source_name is not None else adapter.id
+    assert_path_component(resolved_source_name, "harness id")
+    target_home = _adapter_target_home(adapter, user_home)
     return Harness(
-        id=spec.id,
-        source_name=spec.source_name,
-        home=spec.home,
-        launcher=_build_launcher(spec.launcher, spec.home),
-        instruction_file=spec.instruction_file or DEFAULT_INSTRUCTION_FILE,
-        runtime_subdir=spec.runtime_subdir,
-        compat_managed_entries=spec.compat_managed_entries or (),
-        preserve_json_keys=spec.preserve_json_keys or {},
-        hooks=normalize_hooks(spec.hooks or ()),
+        id=adapter.id,
+        source_name=resolved_source_name,
+        home=target_home,
+        launcher=_build_launcher(adapter.launcher, target_home),
+        instruction_file=adapter.instruction_file or DEFAULT_INSTRUCTION_FILE,
+        runtime_subdir=adapter.runtime_subdir,
+        compat_managed_entries=adapter.compat_managed_entries or (),
+        preserve_json_keys=adapter.preserve_json_keys or {},
+        cliproxy_templates=adapter.cliproxy_templates,
+        cliproxy_preserve_top_levels=adapter.cliproxy_preserve_top_levels or {},
+        python_env_segments=adapter.python_env_segments or None,
+        hooks=normalize_hooks(adapter.hooks or ()),
     )
 
 
@@ -286,26 +288,6 @@ def _adapter_target_home(adapter: HarnessAdapter, user_home: str) -> str:
     for segment in adapter.home_segments:
         assert_path_component(segment, f"{adapter.id} home segment")
     return str(Path(user_home).joinpath(*adapter.home_segments))
-
-
-def _adapter_to_harness(
-    adapter: HarnessAdapter,
-    user_home: str,
-    source_name: str | None = None,
-) -> Harness:
-    target_home = _adapter_target_home(adapter, user_home)
-    spec = HarnessSpec(
-        id=adapter.id,
-        source_name=source_name if source_name is not None else adapter.id,
-        home=target_home,
-        launcher=adapter.launcher,
-        instruction_file=adapter.instruction_file,
-        runtime_subdir=adapter.runtime_subdir,
-        compat_managed_entries=adapter.compat_managed_entries,
-        preserve_json_keys=adapter.preserve_json_keys,
-        hooks=adapter.hooks,
-    )
-    return build_harness(spec)
 
 
 def discover_harnesses(
@@ -317,7 +299,7 @@ def discover_harnesses(
     resolved_platform = platform if platform is not None else platform_from_process()
     harnesses_path = Path(harnesses_home)
     return tuple(
-        _adapter_to_harness(adapter, home)
+        harness_from_adapter(adapter, home)
         for adapter in HARNESS_ADAPTERS
         if resolved_platform in adapter.platforms
         and is_directory(str(harnesses_path / adapter.id))
@@ -332,7 +314,7 @@ def supported_harness(
     """Find a supported harness adapter by name and platform."""
     for adapter in HARNESS_ADAPTERS:
         if adapter.id == source_name and platform in adapter.platforms:
-            return _adapter_to_harness(adapter, home, source_name=source_name)
+            return harness_from_adapter(adapter, home, source_name=source_name)
     return None
 
 
@@ -385,11 +367,6 @@ def harness_instruction_target(harness: Harness) -> str:
     return str(Path(harness_root(harness)) / harness.instruction_file)
 
 
-def harness_instruction_file_name(harness: Harness) -> str:
-    """Return the base instruction file name for a harness."""
-    return harness.instruction_file
-
-
 def harness_managed_state_path(harness: Harness, managed_state_home: str) -> str:
     """Return the managed state JSON path for a harness."""
     return str(Path(managed_state_home) / f"{harness.source_name}.json")
@@ -430,7 +407,6 @@ __all__ = [
     "HarnessHookSpec",
     "HarnessId",
     "HarnessLauncherSpec",
-    "HarnessSpec",
     "HostPlatform",
     "NpmLauncher",
     "PackageBootstrapHook",
@@ -439,8 +415,8 @@ __all__ = [
     "StaticReleaseLauncher",
     "SyncEnv",
     "assert_path_component",
-    "build_harness",
     "discover_harnesses",
+    "harness_from_adapter",
     "harness_instruction_target",
     "harness_managed_state_path",
     "harness_root",

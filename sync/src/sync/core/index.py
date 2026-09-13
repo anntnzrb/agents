@@ -93,9 +93,14 @@ class ExtensionHookRuntimeState:
     state: PreparedExtensionHookState
 
 
-async def ensure_python_env(home: str, timeout_ms: int) -> None:
-    """Ensure ~/.omp/python-env exists, installing uv/python if required."""
-    venv_python = Path(home) / ".omp" / "python-env" / "bin" / "python"
+async def ensure_python_env(
+    home: str,
+    segments: tuple[str, ...],
+    timeout_ms: int,
+) -> None:
+    """Ensure an adapter-declared python-env exists, installing uv/python if needed."""
+    venv_dir = Path(home).joinpath(*segments)
+    venv_python = venv_dir / "bin" / "python"
     if await asyncio.to_thread(venv_python.exists):
         return
 
@@ -115,8 +120,7 @@ async def ensure_python_env(home: str, timeout_ms: int) -> None:
         warn("uv python find returned empty; skipping.")
         return
 
-    venv_target = str(Path(home) / ".omp" / "python-env")
-    venv = await run_process(["uv", "venv", "--python", latest, venv_target], opts)
+    venv = await run_process(["uv", "venv", "--python", latest, str(venv_dir)], opts)
     if venv.timed_out or venv.output_limited or venv.exit_code != 0:
         warn("failed to create python-env")
 
@@ -181,8 +185,12 @@ async def run_sync(
         err(panic_message(error))
         return False
 
-    if any(plan.harness.id == "omp" for plan in sync_plan.harnesses):
-        await ensure_python_env(sync_env.home, sync_env.install_timeout_ms)
+    for harness_plan in sync_plan.harnesses:
+        segments = harness_plan.harness.python_env_segments
+        if segments is not None:
+            await ensure_python_env(
+                sync_env.home, segments, sync_env.install_timeout_ms
+            )
 
     cleanup_success = clean_managed_entries(managed_plan)
     base_success = False
