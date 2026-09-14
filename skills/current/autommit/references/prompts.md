@@ -54,7 +54,8 @@ Planning evidence, in order:
 2. Additional user context
 3. Advisory repository policy and recent subject evidence
 4. Exact staged path list
-5. Exact cached binary diff between explicit begin/end delimiters
+5. `STAGED INVENTORY (1-based hunk ids)`: one line per staged path with its status, followed by each hunk id, header, and changed-line count
+6. The exact zero-context staged diff between explicit begin/end delimiters
 
 When validation fails, preserve the original evidence and add only the exact rejection as correction context. Generate a complete replacement plan; never patch a rejected plan mentally and skip validation.
 

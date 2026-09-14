@@ -12,6 +12,8 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 
 Success is one JSON line on stdout. Expected failure is one JSON line on stderr. Every payload has `schema:"autommit/v1"`, `ok:true|false`, `command`, and either `result` or `error`.
 
+Human mode splits its streams: narrative lines such as `Prepared`, `Created`, and the final `Created N commit(s) on <ref>` go to stdout, while stage announcements (`Planning...`, `Reviewing atomicity...`, `Applying N commit(s)...`, and `Rebuilding N commit(s)...` for rewrite) go to stderr as they start. `--json` suppresses every narrative and stage line, so stdout stays exactly one payload, and `--dry-run` prints no stage announcement because no stage runs. Progress is always one static line per stage, never an animation, so it stays readable when piped.
+
 `--repo PATH` defaults to the current directory. Git is the only external executable.
 
 Settings come from CLI flags and environment variables only, with flags winning. Autommit reads no configuration file and creates none. `--model`, `--base-url`, and an API key are required: autommit ships no model or endpoint default, so an unconfigured machine fails as `missing_model`, `missing_base_url`, or `missing_api_key`.
@@ -34,7 +36,7 @@ uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|al
 
 Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and creates nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
 
-Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL`, `AUTOMMIT_REASONING_EFFORT`, or a `reasoning_effort` config key adds that field, and an unset level sends none. `--model` and `--base-url` are required: autommit ships no model or endpoint default. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
+Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL` or `AUTOMMIT_REASONING_EFFORT` adds that field, and an unset level sends none. `--model` and `--base-url` are required: autommit ships no model or endpoint default. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
 
 Plan files, decision files, and the snapshot token live in a private temporary directory. They are never caller-facing flags.
 
@@ -179,7 +181,7 @@ or:
 {"decision":"split","concerns":["Behavior A.","Behavior B."],"rationale":"They are independently reversible."}
 ```
 
-Valves: concern <=512 characters; rationale <=2,000 characters; concern count is not capped. The critic reviews a broad single-commit plan only. A narrow single-commit plan (one file, one hunk, at most one detail) and every multi-commit plan skip the review, because the critic can only demand more splits and would push an already-split plan toward over-fragmentation.
+Valves: concern <=512 characters; rationale <=2,048 characters; concern count is not capped. The critic reviews a broad single-commit plan only. A narrow single-commit plan (one file, one hunk, at most one detail) and every multi-commit plan skip the review, because the critic can only demand more splits and would push an already-split plan toward over-fragmentation.
 
 ## Exit Codes
 

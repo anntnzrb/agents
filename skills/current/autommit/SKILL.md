@@ -24,7 +24,7 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 | `--repo PATH` | Target repository (default: current directory) |
 | `--scope auto\|staged\|all` | `auto` reuses an existing staged snapshot and stages everything only when nothing is staged; `staged` requires an existing snapshot and never stages; `all` always stages everything (default: `auto`) |
 | `--model`, `--base-url` | Required endpoint identity; autommit ships no model or endpoint default |
-| `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment and config file values |
+| `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment variables |
 | `--base REV` | Rewrite mode only: rebuild the commits since this ancestor revision |
 | `--smoke CMD` | Run one validation command in the temporary worktree after each commit (default: off) |
 | `--dry-run` | Print the inventory and snapshot, call no model, create nothing |

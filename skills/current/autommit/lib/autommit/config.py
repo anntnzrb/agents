@@ -33,7 +33,7 @@ class AutommitConfig:
 
 @dataclass(frozen=True, slots=True)
 class ConfigOverrides:
-    """Explicit caller overrides that win over environment and file values."""
+    """Explicit caller overrides that win over the environment."""
 
     model: str | None = None
     base_url: str | None = None
