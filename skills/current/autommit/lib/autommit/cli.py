@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NoReturn, cast
+from typing import TYPE_CHECKING, Final, Literal, NoReturn, cast
 
 from autommit.client import ModelRequest, list_models
 from autommit.config import ConfigOverrides, load_config
@@ -57,6 +57,9 @@ def build_parser() -> Parser:
 
     subparsers.add_parser("schema")
     return parser
+
+
+MODELS_DISCOVERY_MODEL: Final[str] = "models-discovery-placeholder"
 
 
 def _run_parser() -> Parser:
@@ -274,10 +277,13 @@ def _dispatch(arguments: argparse.Namespace) -> object:
 
 
 def _print_models(arguments: argparse.Namespace) -> int:
-    """List the model ids the configured endpoint exposes."""
+    """List the model ids the configured endpoint exposes.
+
+    The models endpoint ignores the model id, so discovery must not require one.
+    """
     config = load_config(
         overrides=ConfigOverrides(
-            model=arguments.model,
+            model=arguments.model or MODELS_DISCOVERY_MODEL,
             base_url=arguments.base_url,
             api_key=arguments.api_key,
             timeout=arguments.timeout,

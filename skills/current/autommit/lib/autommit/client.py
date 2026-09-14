@@ -440,7 +440,12 @@ def list_models(
         )
     url = f"{request.base_url.rstrip('/')}/models"
     sender = _http_get(request) if fetch is None else fetch
-    response = sender(url)
+    try:
+        response = sender(url)
+    except OSError as error:
+        raise AutommitError(
+            "provider_error", f"{request.base_url} is unreachable: {error}.", 1
+        ) from error
     if response.status != OK_STATUS:
         raise AutommitError(
             "provider_error",

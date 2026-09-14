@@ -366,6 +366,16 @@ class ModelListingTests(unittest.TestCase):
 
         self.assertEqual(list_models(_request(), fetch=fetch), ("a-model", "z-model"))
 
+    def test_list_models_reports_an_unreachable_endpoint(self) -> None:
+        def fetch(url: str) -> HttpResponse:
+            del url
+            raise OSError("nodename nor servname provided")
+
+        with self.assertRaises(AutommitError) as raised:
+            _ = list_models(_request(), fetch=fetch)
+        self.assertEqual(raised.exception.code, "provider_error")
+        self.assertEqual(raised.exception.exit_code, 1)
+
     def test_list_models_requires_a_key(self) -> None:
         def fetch(url: str) -> HttpResponse:
             del url

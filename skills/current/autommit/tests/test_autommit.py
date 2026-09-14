@@ -442,6 +442,36 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("other.txt", message)
         self.assertIn("Overlapping", message)
 
+    def test_models_lists_ids_without_a_configured_model(self) -> None:
+        completed = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--quiet",
+                "--script",
+                str(CLI),
+                "models",
+                "--filter",
+                "nonexistent",
+                "--base-url",
+                "https://models.example.test/v1",
+                "--api-key",
+                "keyless",
+            ],
+            cwd=self.repo,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=self.environment(),
+        )
+        self.assertNotIn("missing_model", completed.stderr)
+        self.assertNotIn("missing_base_url", completed.stderr)
+        # The placeholder endpoint does not resolve, so discovery fails at
+        # transport rather than at configuration.
+        self.assertEqual(completed.returncode, 1, completed.stderr)
+        self.assertIn("provider_error", completed.stderr)
+
     def test_oversized_plan_file_is_rejected(self) -> None:
         _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         _ = self.git("add", "tracked.txt")
