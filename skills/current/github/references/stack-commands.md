@@ -4,7 +4,7 @@ Public preview; version-sensitive. Safe default: verify capability, target, remo
 
 Writes: `add` staging/commit, checkout/rebase/navigation, submit, sync, push, link, unstack, and merge change local or remote state. Require explicit authorization for each external write, plus local authorization when an assigned worktree changes; afterward re-read local `view --json`, branches, PRs, and stack state.
 
-Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees`, `commit`, and `gh-contrib` remain authorities for local lifecycle, staging/history, and ordinary contribution policy.
+Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees`, `autommit`, and `gh-contrib` remain authorities for local lifecycle, staging/history, and ordinary contribution policy.
 
 ## Capability and target gate
 
@@ -35,7 +35,7 @@ Set `GH_PROMPT_DISABLED=1` for automation and verification. It prevents prompts;
 # Initialize/adopt a linear stack with explicit branches (local state)
 GH_PROMPT_DISABLED=1 gh stack init --base <trunk> <layer-1> <layer-2> <layer-3>
 
-# Add one branch by name; hand staging/commit to `commit` unless explicitly allowed
+# Add one branch by name; hand staging/commit to `autommit` unless explicitly allowed
 GH_PROMPT_DISABLED=1 gh stack add <layer-name>
 
 # Read and refresh local/remote membership as JSON
@@ -53,7 +53,7 @@ GH_PROMPT_DISABLED=1 gh stack trunk
 ```
 
 - `init` records local tracking and can adopt/create explicit branches; default trunk is the repository default unless `--base` is set; it is not a remote write.
-- `add` creates/checks out a branch. Its `-A/-u/-m` staging/commit options are a write boundary owned by `commit`; do not use them to bypass staging policy.
+- `add` creates/checks out a branch. Its `-A/-u/-m` staging/commit options are a write boundary owned by `autommit`; do not use them to bypass staging policy.
 - `view --json` is the canonical refresh before and after any stack operation; avoid default pager/human output in automation.
 - `checkout` may fetch a remote stack and change the active worktree. Route lifecycle and ownership through `git-worktrees`; never adopt a foreign/consumer worktree.
 - Navigation changes local branch state. `switch` is interactive and is not an agent default.

@@ -6,7 +6,7 @@ Safe default: one strictly linear stack in one repository; plan bottom→top; on
 
 Write boundaries: branch creation/rewrites, staging/commits, pushes, PR creation, stack linking, and stack restructuring are separate local/remote writes. Obtain authorization for each applicable boundary; afterward re-read local `view --json` and remote PR/stack state.
 
-Ownership handoff: `git-worktrees` owns worktree lifecycle; `commit` owns staging, commit order, and GitButler-vs-Git engine selection; `gh-contrib` owns contribution rules, push policy, and ordinary PR creation/review; external branch managers own their local state. Return to `stack-commands.md` only after this design is sound.
+Ownership handoff: `git-worktrees` owns worktree lifecycle; `autommit` owns staging, commit segmentation, and message policy; `gh-contrib` owns contribution rules, push policy, and ordinary PR creation/review; external branch managers own their local state. Return to `stack-commands.md` only after this design is sound.
 
 ## Model
 
@@ -55,10 +55,10 @@ Where repository policy allows, every PR title/body should state its layer and d
 ## Local manager and handoffs
 
 1. Inspect existing worktrees and native manager ownership. `git-worktrees` is authoritative for create/assign/remove; never create a second manager beside it.
-2. Determine whether `commit` selects raw Git or GitButler. Do not mix GitButler writes with raw `git add/commit/rebase`.
+2. Determine which tool owns history: `autommit` for raw-Git staging and commit segmentation. Do not mix an external manager's writes with raw `git add/commit/rebase`.
 3. If `gh stack` owns the local stack, use its branch/navigation/rebase commands. If Jujutsu, Sapling, git-town, or another manager owns local branches, keep that manager authoritative; use `gh stack link` only for remote stack association.
 4. Do not let a stack operation silently adopt a consumer/foreign worktree. Preserve state when manager or worktree identity is uncertain.
-5. Hand each layer’s exact staged/commit state to `commit`; do not use `gh stack add -A/-u/-m` as an unreviewed substitute for repository staging policy.
+5. Hand each layer’s exact staged/commit state to `autommit`; do not use `gh stack add -A/-u/-m` as an unreviewed substitute for repository staging policy.
 
 ## Before stack commands
 

@@ -7,7 +7,7 @@ Safe default: stop at uncertainty; preserve evidence/current state; re-read loca
 
 Writes: conflict resolution; rebase continue/abort; force-with-lease push; stack unstack/prune; branch deletion; PR retarget/merge; API recovery. Require explicit authorization and owning manager at every write boundary.
 
-Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` graph/manager ownership; `git-worktrees` worktree lifecycle; `commit` staging/history; `gh-contrib` contribution policy; `api.md` custom endpoint recovery.
+Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` graph/manager ownership; `git-worktrees` worktree lifecycle; `autommit` staging/history; `gh-contrib` contribution policy; `api.md` custom endpoint recovery.
 
 ## Any failure
 1. Record command, target host/repository, branch/PR/stack IDs, exit code, stdout, stderr, and whether a write was attempted.
@@ -16,12 +16,12 @@ Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` 
 4. Do not retry push, POST, merge, unstack, prune, or dispatch because output looks incomplete; compare stable IDs/tips first.
 
 ## Dirty trees and ownership
-`init`, `add`, `checkout`, `rebase`, `sync`, and `modify` may require a clean tree or change the current branch. With uncommitted changes, NEVER clean, reset, stash, commit, or move them without an explicit plan and owning `commit`/`git-worktrees` authority. Determine whether the checkout is assigned, consumer/foreign, or native-manager-owned; the current directory grants no rewrite permission. Report dirty paths and stop stack mutation; do not hide state with a new branch or force option.
+`init`, `add`, `checkout`, `rebase`, `sync`, and `modify` may require a clean tree or change the current branch. With uncommitted changes, NEVER clean, reset, stash, commit, or move them without an explicit plan and owning `autommit`/`git-worktrees` authority. Determine whether the checkout is assigned, consumer/foreign, or native-manager-owned; the current directory grants no rewrite permission. Report dirty paths and stop stack mutation; do not hide state with a new branch or force option.
 
 ## Rebase conflicts/recovery
 For `gh stack rebase`, `sync`, or cascading operations:
 1. Preserve conflict markers and operation metadata; inspect conflicted files and `git status`; do not run an unrelated rebase.
-2. The layer owner resolves intended content, stages exactly that resolution under `commit` policy, then runs `gh stack rebase --continue` or the installed command's documented continue form.
+2. The layer owner resolves intended content, stages exactly that resolution under `autommit` policy, then runs `gh stack rebase --continue` or the installed command's documented continue form.
 3. Run `gh stack rebase --abort` only when abandonment, authorization, and ownership are clear; afterward re-read every branch tip and `gh stack view --json`.
 4. Post-rebase push uses force-with-lease, NEVER `--force`. Lease failure means stop, fetch/read remote, and resolve divergence without overwriting.
 
@@ -44,7 +44,7 @@ A branch may occur in multiple stacks; exit `6` requires explicit disambiguation
 Jujutsu, Sapling, git-town, GitButler, native harness managers, and linked worktrees may own branch movement/history. Determine ownership before `checkout`, `rebase`, `push`, `link`, or `unstack`.
 
 - Use `gh stack link` for remote association when another local manager owns branches; it does not create local tracking and may still push/create/retarget PRs.
-- Do not mix `gh stack` local rewrites with GitButler or raw-Git writes. Delegate staging/commits to `commit` and lifecycle to `git-worktrees`.
+- Do not mix `gh stack` local rewrites with GitButler or raw-Git writes. Delegate staging/commits to `autommit` and lifecycle to `git-worktrees`.
 - NEVER adopt, delete, relocate, or reset a consumer/foreign worktree; preserve it and report the ownership blocker.
 
 ## Unstack, prune, partial writes
