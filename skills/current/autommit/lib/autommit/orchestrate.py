@@ -120,6 +120,21 @@ def _write_error(message: str) -> None:
     sys.stderr.flush()
 
 
+def _note(options: RunOptions, message: str) -> None:
+    """Write one human line to stdout unless the caller asked for JSON."""
+    if options.json_output:
+        return
+    _write(message)
+
+
+def _progress(options: RunOptions, message: str) -> None:
+    """Announce a blocking stage on stderr; machine output stays on stdout."""
+    if options.json_output:
+        return
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
+
+
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
     stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
@@ -256,6 +271,7 @@ def _forced_split_correction(concerns: tuple[str, ...], rationale: str) -> str:
 
 def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path | None:
     """Run the critic gate; return a decision file when one is required."""
+    _progress(context.options, "Reviewing atomicity...")
     provisional = normalize_proposal(proposal_payload)
     first = provisional.commits[0]
     evidence = CriticEvidence(
@@ -328,7 +344,7 @@ def _report(options: RunOptions, result: dict[str, object]) -> None:
     before = str(result.get("before", ""))[:7]
     after = str(result.get("after", ""))[:7]
     _write(
-        f"Published {len(commits)} commit(s) on {result.get('ref', '')} "
+        f"Created {len(commits)} commit(s) on {result.get('ref', '')} "
         f"({before} -> {after})."
     )
 
@@ -339,10 +355,12 @@ def run_orchestrated(options: RunOptions) -> int:
     try:
         prepared = prepare(options.repo, options.context, scope=options.scope)
         if prepared.get("status") == "recovered":
-            _write(f"Recovered an interrupted run at {prepared.get('after', '')}.")
+            _note(
+                options, f"Recovered an interrupted run at {prepared.get('after', '')}."
+            )
             prepared = prepare(options.repo, options.context, scope=options.scope)
             if prepared.get("status") == "recovered":
-                _write("Nothing left to commit after recovery.")
+                _note(options, "Nothing left to commit after recovery.")
                 return 0
         snapshot = str(prepared["snapshot"])
         staged_files = tuple(cast("list[str]", prepared["staged_files"]))
@@ -353,9 +371,10 @@ def run_orchestrated(options: RunOptions) -> int:
         zero_diff = str(prepared.get("zero_diff", ""))
         ref = str(prepared["ref"])
         before = str(prepared["before"])
-        _write(
+        _note(
+            options,
             f"Prepared {len(staged_files)} file(s), {hunk_count} hunk(s) "
-            f"(snapshot {snapshot[:8]})."
+            f"(snapshot {snapshot[:8]}).",
         )
 
         if options.dry_run:
@@ -390,6 +409,7 @@ def run_orchestrated(options: RunOptions) -> int:
                 hunk_count=hunk_count,
                 diff=str(prepared["diff"]),
             )
+            _progress(options, "Planning...")
             planned = _attempt_plan(
                 context,
                 evidence,
@@ -403,6 +423,8 @@ def run_orchestrated(options: RunOptions) -> int:
                 )
             payload, review = planned
             decision_file = _review(context, payload) if review else None
+            settled = normalize_proposal(payload)
+            _progress(options, f"Applying {len(settled.commits)} commit(s)...")
             result = apply(
                 options.repo,
                 snapshot,

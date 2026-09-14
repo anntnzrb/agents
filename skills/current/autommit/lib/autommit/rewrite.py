@@ -110,6 +110,21 @@ def _write_error(message: str) -> None:
     sys.stderr.flush()
 
 
+def _note(options: RunOptions, message: str) -> None:
+    """Write one human line to stdout unless the caller asked for JSON."""
+    if options.json_output:
+        return
+    _write(message)
+
+
+def _progress(options: RunOptions, message: str) -> None:
+    """Announce a blocking stage on stderr; machine output stays on stdout."""
+    if options.json_output:
+        return
+    sys.stderr.write(message + "\n")
+    sys.stderr.flush()
+
+
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
     stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
@@ -509,9 +524,10 @@ def run_rewrite(options: RunOptions) -> int:
     try:
         prepared = prepare_rewrite(options.repo, options.context, base_rev=options.base)
         evidence = _evidence(options.repo, prepared)
-        _write(
+        _note(
+            options,
             f"Frozen {len(evidence.staged_files)} file(s) since "
-            f"{evidence.base[:7]} (snapshot {evidence.snapshot[:8]})."
+            f"{evidence.base[:7]} (snapshot {evidence.snapshot[:8]}).",
         )
         if options.dry_run:
             payload = {
@@ -532,6 +548,7 @@ def run_rewrite(options: RunOptions) -> int:
             return 0
 
         brain = _brain(options)
+        _progress(options, "Planning...")
         with tempfile.TemporaryDirectory(prefix="autommit-rewrite-run-") as run_dir:
             plan_file = Path(run_dir) / "plan.json"
             decision_file = Path(run_dir) / "decision.json"
@@ -556,7 +573,12 @@ def run_rewrite(options: RunOptions) -> int:
             validation = _validate_rewrite_plan(options.repo, evidence, plan_file)
             chosen: Path | None = None
             if bool(validation["requires_atomicity_review"]):
+                _progress(options, "Reviewing atomicity...")
                 chosen = _review(options, brain, evidence, plan_file, decision_file)
+            _progress(
+                options,
+                f"Rebuilding {int(cast('int', validation['commit_count']))} commit(s)...",
+            )
             result = publish_rewrite(
                 options.repo, evidence, plan_file, chosen, smoke=options.smoke
             )

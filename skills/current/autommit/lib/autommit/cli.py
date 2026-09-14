@@ -63,7 +63,7 @@ def _run_parser() -> Parser:
     """Build the default single-command parser."""
     parser = Parser(
         prog="autommit",
-        description="Plan and publish atomic commits from the staged snapshot.",
+        description="Plan and create atomic commits from the staged snapshot.",
     )
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument(

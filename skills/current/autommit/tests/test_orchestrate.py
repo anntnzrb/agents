@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -328,6 +330,52 @@ class PlumbingRungTests(_Sandbox):
         )
         self.assertFalse((worktree / "doomed.txt").exists())
         self.assertIsNone(read_recovery_point(self.repo / ".git"))
+
+
+class ProgressFeedbackTests(_Sandbox):
+    """Cover the human progress lines and the local-commit summary wording."""
+
+    def test_human_progress_goes_to_stderr_and_the_summary_says_created(self) -> None:
+        self.stage()
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(PLAN)
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(post=post))
+
+        self.assertEqual(code, 0)
+        self.assertIn("Planning...", err.getvalue())
+        self.assertIn("Applying 1 commit(s)...", err.getvalue())
+        self.assertIn("Created 1 commit(s) on", out.getvalue())
+        self.assertNotIn("Published", out.getvalue() + err.getvalue())
+
+    def test_json_mode_emits_one_line_and_no_progress(self) -> None:
+        self.stage()
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(PLAN)
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(json_output=True, post=post))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(len(out.getvalue().splitlines()), 1)
+        self.assertEqual(err.getvalue(), "")
+
+    def test_dry_run_prints_no_progress(self) -> None:
+        self.stage()
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(dry_run=True))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(err.getvalue(), "")
 
 
 class ModelContractTests(unittest.TestCase):

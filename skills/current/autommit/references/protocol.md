@@ -28,9 +28,9 @@ uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|al
 2. Send the inventory, repository policy, and exact zero-context diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation.
 3. Validate each returned plan against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context.
 4. When the plan needs atomicity review, ask an independent critic, at most twice. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two commits.
-5. Apply commits in dependency order inside a detached temporary worktree, then publish by compare-and-swap.
+5. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
 
-Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and publishes nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
+Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and creates nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
 
 Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL`, `AUTOMMIT_REASONING_EFFORT`, or a `reasoning_effort` config key adds that field, and an unset level sends none. `--model` and `--base-url` are required: autommit ships no model or endpoint default. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
 
@@ -189,13 +189,13 @@ Valves: concern <=512 characters; rationale <=2,000 characters; concern count is
 |3|Lock, snapshot, branch, index, in-progress Git state, or receipt refusal|Preserve state; report exact blocker|
 |4|Git, filesystem, cleanup, or smoke failure|Preserve state and inspect evidence|
 |127|Git executable unavailable|Install/fix Git before retrying|
-|130|Cancelled by a signal|Lock released, temporary worktree removed; no commits were published|
+|130|Cancelled by a signal|Lock released, temporary worktree removed; no commits were created|
 
 ## Recovery Point
 
 An interrupted or failed run that already built commits writes `recovery.json` beside the lock in the worktree-local autommit state directory, holding the branch ref and the commit it pointed at before the run. The failure message repeats it as `Recovery point: <ref> at <before>.`
 
-Autommit never restores a recovery point automatically. Read it, inspect the repository, and decide. A successful publication removes the file.
+Autommit never restores a recovery point automatically. Read it, inspect the repository, and decide. A successful run removes the file.
 
 ## Environment Invariants
 

@@ -39,8 +39,8 @@ class RefusalError(AutommitError):
 
 
 class CancelledError(AutommitError):
-    """A signal interrupted the run before publication."""
+    """A signal interrupted the run before commit creation."""
 
-    def __init__(self, message: str = "Cancelled; no commits were published.") -> None:
+    def __init__(self, message: str = "Cancelled; no commits were created.") -> None:
         """Store the cancellation code and message."""
         super().__init__("cancelled", message, 130)

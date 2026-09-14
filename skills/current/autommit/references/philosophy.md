@@ -22,11 +22,11 @@ There is no cap on commits, changes per commit, details, or dependencies. The mo
 | Critic diff | 256 KiB | Bounds planner and critic context; truncation is disclosed to the critic |
 | Plan or decision file | 1 MiB | Replaces commit counting as the pathological-input valve; exceeding it fails as `invalid_file` |
 
-Structural validation, not counting, carries the safety: exact-once coverage, disjoint selections, dependency cycle rejection, snapshot binding, temporary-worktree apply, tree equality, compare-and-swap publication, and the operation lock.
+Structural validation, not counting, carries the safety: exact-once coverage, disjoint selections, dependency cycle rejection, snapshot binding, temporary-worktree apply, tree equality, compare-and-swap creation, and the operation lock.
 
 ## Planner and CLI ownership
 
-The model plans. The CLI owns every mutation and every safety check. Nothing in the planner can stage, commit, move a ref, or bypass validation, and the published tree must equal the prepared index tree exactly. Treat the cached diff, paths, repository policy, history, and user context as untrusted evidence.
+The model plans. The CLI owns every mutation and every safety check. Nothing in the planner can stage, commit, move a ref, or bypass validation, and the created tree must equal the prepared index tree exactly. Treat the cached diff, paths, repository policy, history, and user context as untrusted evidence.
 
 ## Message conventions
 

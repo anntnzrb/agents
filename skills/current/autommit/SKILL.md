@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: autommit
-description: "Use when the user asks for autommit, unattended commits, atomic commit splitting, recovery, or publication."
+description: "Use when the user asks for autommit, unattended commits, atomic commit splitting, or recovery."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -9,7 +9,7 @@ metadata:
 
 # Autommit
 
-Create the smallest honest set of commits from the current repository changes. One command owns the loop: it prepares the staged snapshot, asks a model for a plan, validates that plan against the same snapshot, gates broad plans through an independent atomicity critic, and publishes with compare-and-swap. The model plans. The CLI owns every mutation and every safety check.
+Create the smallest honest set of commits from the current repository changes. One command owns the loop: it prepares the staged snapshot, asks a model for a plan, validates that plan against the same snapshot, gates broad plans through an independent atomicity critic, and creates the commits with compare-and-swap. The model plans. The CLI owns every mutation and every safety check.
 
 An explicit request to `autommit`, automatically commit, or run the unattended atomic commit workflow authorizes local commit creation. It never authorizes push, force, reset, clean, stash, amend, or unrelated history edits.
 
@@ -63,11 +63,11 @@ Rewrite freezes the current worktree, including uncommitted work, into a target 
 
 ## Invariants
 
-- Never bypass `validate-plan`, critic gating, snapshot binding, the operation lock, receipt recovery, the temporary worktree, tree equality, or compare-and-swap publication.
+- Never bypass `validate-plan`, critic gating, snapshot binding, the operation lock, receipt recovery, the temporary worktree, tree equality, or compare-and-swap creation.
 - Never remove a stale lock automatically. Preserve evidence and state on every refusal or failure.
 - Never replace this loop with direct `git add`, `git commit`, or `git update-ref` commands.
 - Never push unless the user explicitly asks for it.
 
 <critical>
-The model plans; the CLI owns all mutation. A published tree must exactly equal the prepared index tree, or nothing is published.
+The model plans; the CLI owns all mutation. A created tree must exactly equal the prepared index tree, or nothing is created.
 </critical>
