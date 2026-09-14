@@ -41,6 +41,7 @@ from autommit.transaction import (
 )
 
 MAX_POLICY_FILE_BYTES = 32 * 1024
+MAX_PLAN_FILE_BYTES = 1024 * 1024
 MAX_LOG_ENTRIES = 8
 SMOKE_TIMEOUT_SECONDS = 300
 _MIN_SPLIT_COMMITS = 2
@@ -306,17 +307,25 @@ def prepare(
 
 def read_json_file(path: Path, kind: str) -> object:
     """Read bounded JSON from a regular file."""
+    limit = (
+        MAX_PLAN_FILE_BYTES if kind in ("plan", "decision") else MAX_POLICY_FILE_BYTES
+    )
     if not path.exists() or path.is_symlink() or not path.is_file():
         raise AutommitError(
             "invalid_file", f"Autommit {kind} file must be an existing regular file."
         )
     try:
         with path.open("rb") as handle:
-            content = handle.read(MAX_POLICY_FILE_BYTES)
+            content = handle.read(limit + 1)
     except OSError as error:
         raise AutommitError(
             "file_io", f"Unable to read {kind} file: {error}."
         ) from error
+    if len(content) > limit:
+        raise AutommitError(
+            "invalid_file",
+            f"Autommit {kind} file exceeds {limit} bytes; reduce the scope and re-run.",
+        )
     try:
         return json.loads(content.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -365,10 +374,11 @@ def validate_plan(
 
 
 def _commit_message(group: CommitGroup) -> str:
+    subject = group.summary.removesuffix(".").rstrip()
     details = tuple(
         detail if detail.startswith("- ") else f"- {detail}" for detail in group.details
     )
-    return group.summary if not details else f"{group.summary}\n\n" + "\n".join(details)
+    return subject if not details else f"{subject}\n\n" + "\n".join(details)
 
 
 def _require_atomicity_decision(

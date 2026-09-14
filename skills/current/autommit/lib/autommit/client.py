@@ -12,15 +12,11 @@ from typing import TYPE_CHECKING, Final, cast
 
 from autommit.errors import AutommitError
 from autommit.proposal import (
-    MAX_CHANGES_PER_COMMIT,
-    MAX_COMMITS,
     MAX_CONCERN_LENGTH,
-    MAX_DEPENDENCIES,
     MAX_DETAIL_LENGTH,
-    MAX_DETAILS,
     MAX_PATH_LENGTH,
     MAX_RATIONALE_LENGTH,
-    MAX_SUMMARY_LENGTH,
+    MAX_SUBJECT_LENGTH,
     normalize_atomicity_decision,
     normalize_proposal,
 )
@@ -94,16 +90,14 @@ PLAN_JSON_SCHEMA: Final[dict[str, object]] = {
         "commits": {
             "type": "array",
             "minItems": 1,
-            "maxItems": MAX_COMMITS,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "required": ["summary", "details", "dependencies", "changes"],
                 "properties": {
-                    "summary": {"type": "string", "maxLength": MAX_SUMMARY_LENGTH},
+                    "summary": {"type": "string", "maxLength": MAX_SUBJECT_LENGTH},
                     "details": {
                         "type": "array",
-                        "maxItems": MAX_DETAILS,
                         "items": {
                             "type": "string",
                             "maxLength": MAX_DETAIL_LENGTH,
@@ -111,13 +105,11 @@ PLAN_JSON_SCHEMA: Final[dict[str, object]] = {
                     },
                     "dependencies": {
                         "type": "array",
-                        "maxItems": MAX_DEPENDENCIES,
                         "items": {"type": "integer", "minimum": 0},
                     },
                     "changes": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": MAX_CHANGES_PER_COMMIT,
                         "items": _CHANGE_SCHEMA,
                     },
                 },
@@ -134,7 +126,6 @@ CRITIC_JSON_SCHEMA: Final[dict[str, object]] = {
         "decision": {"type": "string", "enum": ["accept", "split"]},
         "concerns": {
             "type": "array",
-            "maxItems": 8,
             "items": {"type": "string", "maxLength": MAX_CONCERN_LENGTH},
         },
         "rationale": {"type": "string", "maxLength": MAX_RATIONALE_LENGTH},

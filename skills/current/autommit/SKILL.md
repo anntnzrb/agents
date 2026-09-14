@@ -51,10 +51,11 @@ Rewrite freezes the current worktree, including uncommitted work, into a target 
 | --- | --- | --- |
 | CLI contract, plan shape, exit codes, recovery | `references/protocol.md` | Before every run or recovery |
 | Planner and critic contracts | `references/prompts.md` | Before changing plan rules or critique behavior |
+| Rules, valves, message and inference policy | `references/philosophy.md` | Before changing limits, prompts, or critic behavior |
 
 ## Workflow
 
-1. Read both required references.
+1. Read the required references the table names for the change.
 2. Run the public entrypoint from the target repository. Prefer the default `--scope auto`.
 3. Report the command output verbatim: created commits oldest to newest, or the exact structured error with its recovery point.
 4. On failure, report the error code and the `operation.lock` or `recovery.json` path when the command names one. Do not repair state by hand.

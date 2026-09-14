@@ -7,17 +7,13 @@ from typing import Literal, cast
 
 from autommit.errors import AutommitError
 
-MAX_COMMITS = 16
-MAX_CHANGES_PER_COMMIT = 128
-MAX_DETAILS = 32
-MAX_SUMMARY_LENGTH = 512
+MAX_SUBJECT_LENGTH = 72
 MAX_DETAIL_LENGTH = 2048
 MAX_PATH_LENGTH = 4096
 MAX_CONCERN_LENGTH = 512
 MAX_RATIONALE_LENGTH = 2048
 _MIN_SPLIT_COMMITS = 2
 MAX_OCTAL_DIGITS = 3
-MAX_DEPENDENCIES = 15
 MAX_ATOMICITY_DIFF_CHARS = 256 * 1024
 
 
@@ -213,11 +209,9 @@ def _normalize_commit(value: object, index: int) -> CommitGroup:
     label = f"commits[{index}]"
     obj = _mapping(value, label)
     _record(obj, label, frozenset({"summary", "details", "changes", "dependencies"}))
-    summary = _str(obj.get("summary"), f"{label}.summary", MAX_SUMMARY_LENGTH)
+    summary = _str(obj.get("summary"), f"{label}.summary", MAX_SUBJECT_LENGTH)
     raw_details = obj.get("details", [])
     details_list = _list(raw_details, f"{label}.details")
-    if len(details_list) > MAX_DETAILS:
-        raise _invalid(f"{label}.details exceeds maximum length of {MAX_DETAILS}")
     details = tuple(
         _str(item, f"{label}.details[{i}]", MAX_DETAIL_LENGTH)
         for i, item in enumerate(details_list)
@@ -228,10 +222,6 @@ def _normalize_commit(value: object, index: int) -> CommitGroup:
     changes_list = _list(raw_changes, f"{label}.changes")
     if not changes_list:
         raise _invalid(f"{label}.changes must not be empty")
-    if len(changes_list) > MAX_CHANGES_PER_COMMIT:
-        raise _invalid(
-            f"{label}.changes exceeds maximum length of {MAX_CHANGES_PER_COMMIT}"
-        )
     changes = tuple(
         _normalize_change(item, f"{label}.changes[{i}]")
         for i, item in enumerate(changes_list)
@@ -243,10 +233,8 @@ def _normalize_commit(value: object, index: int) -> CommitGroup:
 
 
 def _normalize_dependencies(raw: object, label: str) -> tuple[int, ...]:
-    """Parse optional dependency indices, rejecting duplicates, negatives, excess."""
+    """Parse optional dependency indices, rejecting duplicates and negatives."""
     items = _list(raw, label)
-    if len(items) > MAX_DEPENDENCIES:
-        raise _invalid(f"{label} exceeds maximum length of {MAX_DEPENDENCIES}")
     indices: list[int] = []
     for position, item in enumerate(items):
         value = _integer(item, f"{label}[{position}]")
@@ -303,8 +291,6 @@ def normalize_proposal(value: object) -> CommitProposal:
     commits_list = _list(raw_commits, "proposal.commits")
     if not commits_list:
         raise _invalid("proposal.commits must not be empty")
-    if len(commits_list) > MAX_COMMITS:
-        raise _invalid(f"proposal.commits exceeds maximum of {MAX_COMMITS} commits")
     commits = tuple(_normalize_commit(item, i) for i, item in enumerate(commits_list))
     _validate_dependencies(commits)
     _ = compute_apply_order(commits)

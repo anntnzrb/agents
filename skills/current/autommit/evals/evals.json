@@ -48,6 +48,18 @@
         "Uncommitted work is included and the worktree files are left unchanged",
         "Nothing is pushed and the previous tip is reported as the recovery point"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Autommit a large dirty tree that mixes many independently revertible changes, including two unrelated changes inside one modified file. One subject would naturally run long.",
+      "expected_output": "Produces as many commits as the staged concerns require without any commit-count ceiling, splits the mixed file by hunk or line range, writes short imperative subjects, and keeps the body bullets uncapped.",
+      "files": [],
+      "expectations": [
+        "The plan is never trimmed to fit a fixed commit count",
+        "Two unrelated changes inside one modified file land in different commits with disjoint selections",
+        "Every subject is imperative and at most 72 characters with no trailing period",
+        "The body bullet count is not limited and every detail used by the plan is preserved"
+      ]
     }
   ]
 }

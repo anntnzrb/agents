@@ -22,9 +22,12 @@ from autommit.proposal import (
     compute_apply_order,
     normalize_atomicity_decision,
     normalize_proposal,
+    parse_file_diffs,
     requires_atomicity_review,
     truncate_critic_diff,
+    validate_proposal_coverage,
 )
+from autommit.service import MAX_PLAN_FILE_BYTES, _commit_message
 from autommit.transaction import Receipt, read_receipt, write_receipt
 
 CLI = SKILL_ROOT / "scripts" / "cli.py"
@@ -438,6 +441,26 @@ class AutommitCliTests(unittest.TestCase):
         message = error["message"]
         self.assertIn("other.txt", message)
         self.assertIn("Overlapping", message)
+
+    def test_oversized_plan_file_is_rejected(self) -> None:
+        _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        prepared = self.prepare()
+        plan = self.temp_path / "huge-plan.json"
+        _ = plan.write_text("x" * (MAX_PLAN_FILE_BYTES + 1), encoding="utf-8")
+
+        payload = self.cli(
+            "apply",
+            "--snapshot",
+            prepared["snapshot"],
+            "--plan-file",
+            str(plan),
+            expected_code=2,
+        )
+
+        error = cast("_ErrorDetail", payload["error"])
+        self.assertEqual(error["code"], "invalid_file")
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), "initial")
 
     def test_context_options_match_the_pi_command_contract(self) -> None:
         _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
@@ -952,6 +975,187 @@ class AutommitUnitTests(unittest.TestCase):
         narrow = normalize_proposal(plan([]))
         self.assertTrue(requires_atomicity_review(broad, diff))
         self.assertFalse(requires_atomicity_review(narrow, diff))
+
+        split = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Broad change",
+                        "details": [],
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    },
+                    {
+                        "summary": "Second change",
+                        "details": ["one"],
+                        "changes": [{"path": "b.txt", "hunks": "all"}],
+                    },
+                ]
+            }
+        )
+        self.assertFalse(requires_atomicity_review(split, diff))
+
+    def test_plans_are_not_capped_by_arbitrary_counts(self) -> None:
+        commits = [
+            {
+                "summary": f"Change {index}",
+                "details": [f"detail {number}" for number in range(80)],
+                "changes": [
+                    {"path": f"path-{number}.txt", "hunks": "all"}
+                    for number in range(300)
+                ],
+                "dependencies": list(range(index)),
+            }
+            for index in range(40)
+        ]
+        proposal = normalize_proposal({"commits": commits})
+        self.assertEqual(len(proposal.commits), 40)
+        self.assertEqual(len(proposal.commits[0].details), 80)
+        self.assertEqual(len(proposal.commits[0].changes), 300)
+        self.assertEqual(len(proposal.commits[-1].dependencies), 39)
+
+    def test_subjects_are_capped_at_seventy_two_characters(self) -> None:
+        def plan(summary: str) -> dict[str, object]:
+            return {
+                "commits": [
+                    {
+                        "summary": summary,
+                        "details": [],
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    }
+                ]
+            }
+
+        self.assertEqual(len(normalize_proposal(plan("a" * 72)).commits), 1)
+        with self.assertRaises(AutommitError) as raised:
+            _ = normalize_proposal(plan("a" * 73))
+        self.assertEqual(raised.exception.code, "invalid_plan")
+
+    def test_commit_message_normalizes_the_subject_period(self) -> None:
+        proposal = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Add retry to the planner.",
+                        "details": [
+                            "Retry once after a transport failure.",
+                            "- Keeps the ladder",
+                        ],
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    }
+                ]
+            }
+        )
+        self.assertEqual(
+            _commit_message(proposal.commits[0]),
+            "Add retry to the planner\n\n"
+            "- Retry once after a transport failure.\n"
+            "- Keeps the ladder",
+        )
+
+    def test_commit_message_keeps_a_subject_without_a_period(self) -> None:
+        proposal = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Add retry to the planner",
+                        "details": [],
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    }
+                ]
+            }
+        )
+        self.assertEqual(
+            _commit_message(proposal.commits[0]), "Add retry to the planner"
+        )
+
+    def test_lines_selector_coverage_accepts_a_modified_file(self) -> None:
+        diff = (
+            "diff --git a/a.txt b/a.txt\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/a.txt\n"
+            "+++ b/a.txt\n"
+            "@@ -1,3 +1,4 @@\n"
+            "-one\n"
+            "+one changed\n"
+            " two\n"
+            " three\n"
+            "+four\n"
+        )
+        proposal = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Change the first line",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "a.txt",
+                                "hunks": {"type": "lines", "start": 1, "end": 1},
+                            }
+                        ],
+                    },
+                    {
+                        "summary": "Add the fourth line",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "a.txt",
+                                "hunks": {"type": "lines", "start": 4, "end": 4},
+                            }
+                        ],
+                    },
+                ]
+            }
+        )
+        parsed = parse_file_diffs(diff)
+        self.assertEqual(
+            validate_proposal_coverage(proposal, ("a.txt",), parsed),
+            (),
+        )
+
+    def test_lines_selector_coverage_rejects_overlapping_ranges(self) -> None:
+        diff = (
+            "diff --git a/a.txt b/a.txt\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/a.txt\n"
+            "+++ b/a.txt\n"
+            "@@ -1,3 +1,3 @@\n"
+            "-one\n"
+            "+one changed\n"
+            "-two\n"
+            "+two changed\n"
+            " three\n"
+        )
+        proposal = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Change the first line",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "a.txt",
+                                "hunks": {"type": "lines", "start": 1, "end": 2},
+                            }
+                        ],
+                    },
+                    {
+                        "summary": "Change the second line",
+                        "details": [],
+                        "changes": [
+                            {
+                                "path": "a.txt",
+                                "hunks": {"type": "lines", "start": 2, "end": 3},
+                            }
+                        ],
+                    },
+                ]
+            }
+        )
+        errors = validate_proposal_coverage(
+            proposal, ("a.txt",), parse_file_diffs(diff)
+        )
+        self.assertTrue(any("Overlapping" in error for error in errors), errors)
 
     def test_run_git(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

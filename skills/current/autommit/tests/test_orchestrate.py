@@ -17,6 +17,7 @@ from autommit.client import HttpResponse
 from autommit.errors import CancelledError
 from autommit.fallback import CommitWork, _rung_plumbing
 from autommit.inventory import (
+    PLAN_SYSTEM,
     CriticEvidence,
     PlannerEvidence,
     build_inventory,
@@ -214,9 +215,7 @@ class OrchestratorTests(_Sandbox):
         self.stage()
 
         def post(payload: dict[str, object]) -> HttpResponse:
-            if _system_of(payload).startswith(
-                "You are an independent atomicity critic"
-            ):
+            if "Independent atomicity critic" in _system_of(payload):
                 return _model_reply(
                     {
                         "decision": "accept",
@@ -327,6 +326,27 @@ class PlumbingRungTests(_Sandbox):
         )
         self.assertFalse((worktree / "doomed.txt").exists())
         self.assertIsNone(read_recovery_point(self.repo / ".git"))
+
+
+class ModelContractTests(unittest.TestCase):
+    """Keep the runtime prompts and their documented mirror in step."""
+
+    def test_planner_contract_keeps_policy_subjects_and_opinionated_limits(
+        self,
+    ) -> None:
+        self.assertIn("matching repository policy", PLAN_SYSTEM)
+        self.assertIn("reuse their prefixes, scopes, and language", PLAN_SYSTEM)
+        self.assertIn("NEVER more than 72", PLAN_SYSTEM)
+        self.assertIn("the count is never limited", PLAN_SYSTEM)
+        self.assertIn("RFC 2119", PLAN_SYSTEM)
+
+    def test_documented_planner_mirror_carries_the_same_rules(self) -> None:
+        mirror = (SKILL_ROOT / "references" / "prompts.md").read_text(encoding="utf-8")
+
+        self.assertIn("matching repository policy", mirror)
+        self.assertIn("reuse their prefixes, scopes, and language", mirror)
+        self.assertIn("NEVER more than 72", mirror)
+        self.assertIn("the count is never limited", mirror)
 
 
 if __name__ == "__main__":

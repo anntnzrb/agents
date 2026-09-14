@@ -7,10 +7,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
 from autommit.client import (
+    CRITIC_JSON_SCHEMA,
+    PLAN_JSON_SCHEMA,
     HttpResponse,
     ModelRequest,
     call_critic,
@@ -25,7 +28,7 @@ from autommit.config import (
     load_config,
 )
 from autommit.errors import AutommitError
-from autommit.proposal import normalize_proposal
+from autommit.proposal import MAX_SUBJECT_LENGTH, normalize_proposal
 
 PLAN = {
     "commits": [
@@ -266,6 +269,37 @@ class ConfigResolutionTests(unittest.TestCase):
             with self.assertRaises(AutommitError) as raised:
                 _ = load_config(repo, environ={})
             self.assertEqual(raised.exception.code, "invalid_json")
+
+    def test_unknown_config_keys_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            _ = (repo / ".autommit.json").write_text(
+                json.dumps(
+                    {"model": "file-model", "smoke": "make test", "max_commits": 500}
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(repo, environ={})
+            self.assertEqual(config.model, "file-model")
+            self.assertFalse(hasattr(config, "smoke"))
+            self.assertFalse(hasattr(config, "max_commits"))
+
+    def test_plan_schema_publishes_no_count_ceilings(self) -> None:
+        plan_properties = cast("dict[str, object]", PLAN_JSON_SCHEMA["properties"])
+        commits = cast("dict[str, object]", plan_properties["commits"])
+        commit_items = cast("dict[str, object]", commits["items"])
+        commit_properties = cast("dict[str, object]", commit_items["properties"])
+        summary = cast("dict[str, object]", commit_properties["summary"])
+        self.assertEqual(summary["maxLength"], MAX_SUBJECT_LENGTH)
+        self.assertEqual(MAX_SUBJECT_LENGTH, 72)
+        self.assertNotIn("maxItems", commits)
+        for name in ("details", "dependencies", "changes"):
+            self.assertNotIn(
+                "maxItems", cast("dict[str, object]", commit_properties[name])
+            )
+        critic_properties = cast("dict[str, object]", CRITIC_JSON_SCHEMA["properties"])
+        critic_concerns = cast("dict[str, object]", critic_properties["concerns"])
+        self.assertNotIn("maxItems", critic_concerns)
 
 
 class ModelListingTests(unittest.TestCase):

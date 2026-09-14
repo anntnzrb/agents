@@ -30,7 +30,9 @@ uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|al
 4. When the plan needs atomicity review, ask an independent critic, at most twice. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two commits.
 5. Apply commits in dependency order inside a detached temporary worktree, then publish by compare-and-swap.
 
-Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and publishes nothing when it fails.
+Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and publishes nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
+
+Each request carries `model`, the system and user messages, and `reasoning_effort: low`, plus the response-format or tool field for the current rung. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
 
 Plan files, decision files, and the snapshot token live in a private temporary directory. They are never caller-facing flags.
 
@@ -124,7 +126,7 @@ Apply behavior:
 2. Recheck the snapshot and complete plan coverage.
 3. Build selected patches from the original staged diff.
 4. Apply commits in exact plan order in a detached temporary worktree.
-5. Commit from a temporary UTF-8 message file. Details become `- ` body bullets.
+5. Commit from a temporary UTF-8 message file. Details become `- ` body bullets, and one trailing period on the subject is stripped before the commit.
 6. Require the final commit tree to equal the prepared index tree exactly.
 7. Recheck the cached diff and snapshot.
 8. Fsync a prepared receipt in the worktree-local directory, advance the branch with CAS (`git update-ref REF AFTER BEFORE`), verify branch/index evidence, then remove the receipt.
@@ -153,7 +155,7 @@ The original worktree index becomes clean relative to the new `HEAD`. In `auto` 
 
 `dependencies` is optional per commit. It holds 0-based indices into `commits` for commits that must be applied first. Autommit rejects self-references, duplicates, out-of-range indices, and cycles, then applies commits in dependency order. Dependency order matters because every commit is applied as a patch into one temporary worktree.
 
-Limits: 1-16 commits; 1-128 changes per commit; 0-32 details; 0-15 dependencies per commit; summary <=512 characters; detail <=2,000 characters; path <=4,096 characters.
+Valves, not product limits: there is no ceiling on commits, changes per commit, details, or dependencies. `summary` is capped at 72 characters and each detail and path at 2,048 and 4,096 characters. A plan or decision file is capped at 1 MiB and rejected as `invalid_file` above that.
 
 Selectors:
 
@@ -161,7 +163,7 @@ Selectors:
 - `{"type":"indices","indices":[1]}`: unique positive 1-based regular-diff hunk indices
 - `{"type":"lines","start":1,"end":8}`: inclusive positive new-file line range, selected from the zero-context diff
 
-Use line selectors when separate commits must own disjoint changed lines inside one new or added file.
+Use line selectors when hunk selectors cannot separate the concerns and separate commits must own disjoint changed lines inside one file, including a modified file. Ranges must be disjoint and cover every changed new-file line exactly once.
 
 ## Atomicity Shape
 
@@ -175,7 +177,7 @@ or:
 {"decision":"split","concerns":["Behavior A.","Behavior B."],"rationale":"They are independently reversible."}
 ```
 
-Limits: at most 8 concerns; concern <=512 characters; rationale <=2,000 characters.
+Valves: concern <=512 characters; rationale <=2,000 characters; concern count is not capped. The critic reviews a broad single-commit plan only. A narrow single-commit plan (one file, one hunk, at most one detail) and every multi-commit plan skip the review, because the critic can only demand more splits and would push an already-split plan toward over-fragmentation.
 
 ## Exit Codes
 
