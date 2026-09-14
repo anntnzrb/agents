@@ -6,6 +6,7 @@ import json
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -93,7 +94,7 @@ class TransportLadderTests(unittest.TestCase):
             normalize_proposal(result).commits[0].summary, "Update tracked value"
         )
 
-    def test_payload_declares_low_reasoning_without_risky_sampling_fields(self) -> None:
+    def test_payload_carries_no_reasoning_or_sampling_field_by_default(self) -> None:
         payloads: list[dict[str, object]] = []
 
         def post(payload: dict[str, object]) -> HttpResponse:
@@ -104,9 +105,11 @@ class TransportLadderTests(unittest.TestCase):
 
         self.assertEqual(len(payloads), 1)
         payload = payloads[0]
-        self.assertEqual(payload["reasoning_effort"], "low")
         self.assertEqual(payload["model"], _request().model)
         for absent in (
+            "reasoning_effort",
+            "reasoning",
+            "thinking",
             "temperature",
             "top_p",
             "max_tokens",
@@ -116,16 +119,39 @@ class TransportLadderTests(unittest.TestCase):
         ):
             self.assertNotIn(absent, payload)
 
-    def test_critic_payload_also_declares_low_reasoning(self) -> None:
-        payloads: list[dict[str, object]] = []
+    def test_configured_reasoning_effort_reaches_every_rung_and_the_critic(
+        self,
+    ) -> None:
+        escalated = replace(_request(), reasoning_effort="xhigh")
+        planner_payloads: list[dict[str, object]] = []
+        critic_payloads: list[dict[str, object]] = []
 
-        def post(payload: dict[str, object]) -> HttpResponse:
-            payloads.append(payload)
+        def planner_post(payload: dict[str, object]) -> HttpResponse:
+            planner_payloads.append(payload)
+            if "tools" in payload:
+                return _unsupported()
+            response_format = payload.get("response_format")
+            kind = (
+                response_format.get("type")
+                if isinstance(response_format, dict)
+                else None
+            )
+            if kind == "json_schema":
+                return _unsupported()
+            return _content(PLAN)
+
+        def critic_post(payload: dict[str, object]) -> HttpResponse:
+            critic_payloads.append(payload)
             return _content({"decision": "accept", "concerns": [], "rationale": "one"})
 
-        _ = call_critic(_request(), post=post, attempts=1)
+        _ = call_planner(escalated, post=planner_post, attempts=1)
+        _ = call_critic(escalated, post=critic_post, attempts=1)
 
-        self.assertEqual(payloads[0]["reasoning_effort"], "low")
+        self.assertEqual(len(planner_payloads), 3)
+        self.assertTrue(
+            all(payload["reasoning_effort"] == "xhigh" for payload in planner_payloads)
+        )
+        self.assertEqual(critic_payloads[0]["reasoning_effort"], "xhigh")
 
     def test_tool_rung_arguments_are_accepted(self) -> None:
         def post(payload: dict[str, object]) -> HttpResponse:

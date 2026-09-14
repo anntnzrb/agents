@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 USER_AGENT: Final[str] = "autommit/1.0"
 MAX_ATTEMPTS: Final[int] = 3
 BACKOFF_SECONDS: Final[float] = 1.5
-REASONING_EFFORT: Final[str] = "low"
 RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
 UNSUPPORTED_RUNG_STATUSES: Final[frozenset[int]] = frozenset({400, 422})
 OK_STATUS: Final[int] = 200
@@ -143,6 +142,7 @@ class ModelRequest:
     timeout: float
     system: str
     user: str
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,11 +336,9 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
             {"role": "system", "content": request.system},
             {"role": "user", "content": request.user},
         ],
-        # Planning is bounded structured extraction over evidence the CLI already
-        # computed, so a low effort is enough. A gateway without thinking support
-        # drops the field instead of failing the request.
-        "reasoning_effort": REASONING_EFFORT,
     }
+    if request.reasoning_effort:
+        base_payload["reasoning_effort"] = request.reasoning_effort
     attempts = max(1, options.attempts)
     last_invalid: AutommitError | None = None
     for rung in options.rungs:

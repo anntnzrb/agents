@@ -54,6 +54,7 @@ class RunOptions:
     base_url: str | None = None
     api_key: str | None = None
     timeout: float | None = None
+    reasoning_effort: str | None = None
     config_file: Path | None = None
     smoke: str | None = None
     base: str | None = None
@@ -70,6 +71,7 @@ class _Brain:
     base_url: str
     api_key: str
     timeout: float
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +157,7 @@ def _planner_request(brain: _Brain, evidence: PlannerEvidence) -> ModelRequest:
         timeout=brain.timeout,
         system=PLAN_SYSTEM,
         user=render_planner_prompt(evidence),
+        reasoning_effort=brain.reasoning_effort,
     )
 
 
@@ -166,6 +169,7 @@ def _critic_request(brain: _Brain, evidence: CriticEvidence) -> ModelRequest:
         timeout=brain.timeout,
         system=CRITIC_SYSTEM,
         user=render_critic_prompt(evidence),
+        reasoning_effort=brain.reasoning_effort,
     )
 
 
@@ -190,6 +194,7 @@ def _brain(options: RunOptions) -> _Brain:
             base_url=options.base_url,
             api_key=options.api_key,
             timeout=options.timeout,
+            reasoning_effort=options.reasoning_effort,
             config_file=options.config_file,
         ),
         environ=os.environ,
@@ -204,6 +209,7 @@ def _brain(options: RunOptions) -> _Brain:
         base_url=config.base_url,
         api_key=config.api_key,
         timeout=config.timeout,
+        reasoning_effort=config.reasoning_effort,
     )
 
 

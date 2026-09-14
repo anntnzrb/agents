@@ -74,6 +74,7 @@ def _run_parser() -> Parser:
     parser.add_argument("--base-url", type=str, default=None)
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--timeout", type=float, default=None)
+    parser.add_argument("--reasoning-effort", type=str, default=None)
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--smoke", type=str, default=None)
     parser.add_argument("--base", type=str, default=None)
@@ -93,6 +94,7 @@ def _run_options(arguments: argparse.Namespace) -> RunOptions:
         base_url=arguments.base_url,
         api_key=arguments.api_key,
         timeout=arguments.timeout,
+        reasoning_effort=arguments.reasoning_effort,
         config_file=arguments.config,
         smoke=arguments.smoke,
         base=arguments.base,
@@ -282,6 +284,7 @@ def _print_models(arguments: argparse.Namespace) -> int:
             base_url=arguments.base_url,
             api_key=arguments.api_key,
             timeout=arguments.timeout,
+            reasoning_effort=arguments.reasoning_effort,
             config_file=arguments.config,
         ),
         environ=os.environ,
@@ -291,6 +294,7 @@ def _print_models(arguments: argparse.Namespace) -> int:
         base_url=config.base_url,
         api_key=config.api_key,
         timeout=config.timeout,
+        reasoning_effort=config.reasoning_effort,
         system="",
         user="",
     )
