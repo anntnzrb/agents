@@ -90,6 +90,40 @@ class TransportLadderTests(unittest.TestCase):
             normalize_proposal(result).commits[0].summary, "Update tracked value"
         )
 
+    def test_payload_declares_low_reasoning_without_risky_sampling_fields(self) -> None:
+        payloads: list[dict[str, object]] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            payloads.append(payload)
+            return _content(PLAN)
+
+        _ = call_planner(_request(), post=post, attempts=1)
+
+        self.assertEqual(len(payloads), 1)
+        payload = payloads[0]
+        self.assertEqual(payload["reasoning_effort"], "low")
+        self.assertEqual(payload["model"], _request().model)
+        for absent in (
+            "temperature",
+            "top_p",
+            "max_tokens",
+            "max_completion_tokens",
+            "stream",
+            "seed",
+        ):
+            self.assertNotIn(absent, payload)
+
+    def test_critic_payload_also_declares_low_reasoning(self) -> None:
+        payloads: list[dict[str, object]] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            payloads.append(payload)
+            return _content({"decision": "accept", "concerns": [], "rationale": "one"})
+
+        _ = call_critic(_request(), post=post, attempts=1)
+
+        self.assertEqual(payloads[0]["reasoning_effort"], "low")
+
     def test_tool_rung_arguments_are_accepted(self) -> None:
         def post(payload: dict[str, object]) -> HttpResponse:
             if "tools" in payload:
