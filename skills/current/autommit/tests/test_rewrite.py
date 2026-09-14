@@ -241,6 +241,8 @@ class RewriteCliTests(_RewriteSandbox):
     """Cover the public CLI wiring for the rewrite subcommand."""
 
     def cli(self, *args: str) -> subprocess.CompletedProcess[str]:
+        isolated_home = Path(self.temporary_directory.name) / "home"
+        isolated_home.mkdir(exist_ok=True)
         return subprocess.run(
             [
                 "uv",
@@ -255,7 +257,13 @@ class RewriteCliTests(_RewriteSandbox):
             capture_output=True,
             text=True,
             timeout=60,
-            env={**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "LC_ALL": "C"},
+            env={
+                **os.environ,
+                "HOME": str(isolated_home),
+                "XDG_CONFIG_HOME": str(isolated_home / ".config"),
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "LC_ALL": "C",
+            },
         )
 
     def test_cli_dry_run_reports_the_frozen_scope(self) -> None:

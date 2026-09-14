@@ -55,7 +55,6 @@ class RunOptions:
     api_key: str | None = None
     timeout: float | None = None
     reasoning_effort: str | None = None
-    config_file: Path | None = None
     smoke: str | None = None
     base: str | None = None
     dry_run: bool = False
@@ -203,14 +202,12 @@ def _with_correction(
 
 def _brain(options: RunOptions) -> _Brain:
     config = load_config(
-        options.repo,
         overrides=ConfigOverrides(
             model=options.model,
             base_url=options.base_url,
             api_key=options.api_key,
             timeout=options.timeout,
             reasoning_effort=options.reasoning_effort,
-            config_file=options.config_file,
         ),
         environ=os.environ,
     )

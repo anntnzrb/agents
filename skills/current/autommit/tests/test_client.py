@@ -226,139 +226,115 @@ class TransportLadderTests(unittest.TestCase):
 
 
 class ConfigResolutionTests(unittest.TestCase):
-    """Cover precedence, environment aliases, and invalid configuration."""
+    """Cover flag and environment resolution for the required settings."""
 
-    def test_precedence_flags_env_file_defaults(self) -> None:
+    def test_precedence_flags_beat_environment(self) -> None:
+        environ = {
+            "AUTOMMIT_MODEL": "from-env",
+            "AUTOMMIT_BASE_URL": "https://env.test/v1",
+            "AUTOMMIT_API_KEY": "env-key",
+            "AUTOMMIT_TIMEOUT": "42",
+        }
+        config = load_config(environ=environ)
+        self.assertEqual(config.model, "from-env")
+        self.assertEqual(config.base_url, "https://env.test/v1")
+        self.assertEqual(config.api_key, "env-key")
+        self.assertEqual(config.timeout, 42.0)
+
+        overridden = load_config(
+            overrides=ConfigOverrides(
+                model="from-flag",
+                base_url="https://flag.test/v1/",
+                api_key="flag-key",
+                timeout=9.5,
+                reasoning_effort="xhigh",
+            ),
+            environ=environ,
+        )
+        self.assertEqual(overridden.model, "from-flag")
+        self.assertEqual(overridden.base_url, "https://flag.test/v1")
+        self.assertEqual(overridden.api_key, "flag-key")
+        self.assertEqual(overridden.timeout, 9.5)
+        self.assertEqual(overridden.reasoning_effort, "xhigh")
+
+    def test_no_config_file_layer_exists(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            _ = (repo / ".autommit.json").write_text(
-                json.dumps(
-                    {
-                        "model": "from-file",
-                        "base_url": "https://file.test/v1",
-                        "timeout": 60,
-                    }
-                ),
+            root = Path(temp_dir)
+            config_home = root / "xdg"
+            (config_home / "autommit").mkdir(parents=True)
+            _ = (config_home / "autommit" / "config.json").write_text(
+                json.dumps({"model": "user-model", "base_url": "https://user.test/v1"}),
                 encoding="utf-8",
             )
-            environ = {"AUTOMMIT_MODEL": "from-env", "AUTOMMIT_TIMEOUT": "42"}
-            config = load_config(repo, environ=environ)
-            self.assertEqual(config.model, "from-env")
-            self.assertEqual(config.base_url, "https://file.test/v1")
-            self.assertEqual(config.timeout, 42.0)
-            self.assertIsNone(config.api_key)
-
-            overridden = load_config(
-                repo,
-                overrides=ConfigOverrides(
-                    model="from-flag", api_key="flag-key", timeout=9.5
-                ),
-                environ=environ,
+            _ = (root / ".autommit.json").write_text(
+                json.dumps({"model": "repo-model"}), encoding="utf-8"
             )
-            self.assertEqual(overridden.model, "from-flag")
-            self.assertEqual(overridden.api_key, "flag-key")
-            self.assertEqual(overridden.timeout, 9.5)
 
-    def test_model_and_endpoint_are_required_and_timeout_keeps_its_default(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            with self.assertRaises(AutommitError) as missing_model:
-                _ = load_config(repo, environ={})
-            self.assertEqual(missing_model.exception.code, "missing_model")
-
-            with self.assertRaises(AutommitError) as missing_base_url:
+            with self.assertRaises(AutommitError) as raised:
                 _ = load_config(
-                    repo, overrides=ConfigOverrides(model="chosen-model"), environ={}
+                    environ={"XDG_CONFIG_HOME": str(config_home), "HOME": str(root)}
                 )
-            self.assertEqual(missing_base_url.exception.code, "missing_base_url")
+            self.assertEqual(raised.exception.code, "missing_model")
 
-            config = load_config(
-                repo,
-                overrides=ConfigOverrides(
-                    model="chosen-model", base_url="https://flag.test/v1/"
-                ),
-                environ={},
-            )
-            self.assertEqual(config.model, "chosen-model")
-            self.assertEqual(config.base_url, "https://flag.test/v1")
-            self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
-            self.assertIsNone(config.reasoning_effort)
+    def test_model_endpoint_and_key_are_required(self) -> None:
+        with self.assertRaises(AutommitError) as missing_model:
+            _ = load_config(environ={})
+        self.assertEqual(missing_model.exception.code, "missing_model")
 
-    def test_reasoning_effort_comes_only_from_the_caller(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            base = ConfigOverrides(model="m", base_url="https://e.test/v1")
+        with self.assertRaises(AutommitError) as missing_base_url:
+            _ = load_config(overrides=ConfigOverrides(model="chosen-model"), environ={})
+        self.assertEqual(missing_base_url.exception.code, "missing_base_url")
 
-            self.assertIsNone(
-                load_config(repo, overrides=base, environ={}).reasoning_effort
-            )
+        config = load_config(
+            overrides=ConfigOverrides(
+                model="chosen-model",
+                base_url="https://flag.test/v1/",
+                api_key="keyless",
+            ),
+            environ={},
+        )
+        self.assertEqual(config.model, "chosen-model")
+        self.assertEqual(config.base_url, "https://flag.test/v1")
+        self.assertEqual(config.api_key, "keyless")
+        self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
+        self.assertIsNone(config.reasoning_effort)
 
-            from_env = load_config(
-                repo, overrides=base, environ={"AUTOMMIT_REASONING_EFFORT": "high"}
-            )
-            self.assertEqual(from_env.reasoning_effort, "high")
-
-            _ = (repo / ".autommit.json").write_text(
-                json.dumps({"reasoning_effort": "minimal"}), encoding="utf-8"
-            )
-            self.assertEqual(
-                load_config(repo, overrides=base, environ={}).reasoning_effort,
-                "minimal",
-            )
-            self.assertEqual(
-                load_config(
-                    repo,
-                    overrides=ConfigOverrides(
-                        model="m",
-                        base_url="https://e.test/v1",
-                        reasoning_effort="xhigh",
-                    ),
-                    environ={"AUTOMMIT_REASONING_EFFORT": "high"},
-                ).reasoning_effort,
-                "xhigh",
-            )
+        unkeyed = load_config(
+            overrides=ConfigOverrides(model="m", base_url="https://e.test/v1"),
+            environ={},
+        )
+        self.assertIsNone(unkeyed.api_key)
 
     def test_openai_environment_aliases_are_honored(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config = load_config(
-                Path(temp_dir),
-                overrides=ConfigOverrides(model="alias-model"),
-                environ={
-                    "OPENAI_API_KEY": "openai-key",
-                    "OPENAI_BASE_URL": "https://openai.test/v1",
-                },
-            )
-            self.assertEqual(config.api_key, "openai-key")
-            self.assertEqual(config.base_url, "https://openai.test/v1")
+        config = load_config(
+            overrides=ConfigOverrides(model="alias-model"),
+            environ={
+                "OPENAI_API_KEY": "openai-key",
+                "OPENAI_BASE_URL": "https://openai.test/v1",
+            },
+        )
+        self.assertEqual(config.api_key, "openai-key")
+        self.assertEqual(config.base_url, "https://openai.test/v1")
 
-    def test_invalid_config_file_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            _ = (repo / ".autommit.json").write_text("{not json", encoding="utf-8")
-            with self.assertRaises(AutommitError) as raised:
-                _ = load_config(repo, environ={})
-            self.assertEqual(raised.exception.code, "invalid_json")
+    def test_reasoning_effort_comes_only_from_the_caller(self) -> None:
+        base = ConfigOverrides(model="m", base_url="https://e.test/v1")
 
-    def test_unknown_config_keys_are_ignored(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            _ = (repo / ".autommit.json").write_text(
-                json.dumps(
-                    {
-                        "model": "file-model",
-                        "base_url": "https://file.test/v1",
-                        "smoke": "make test",
-                        "max_commits": 500,
-                    }
+        self.assertIsNone(load_config(overrides=base, environ={}).reasoning_effort)
+        self.assertEqual(
+            load_config(
+                overrides=base, environ={"AUTOMMIT_REASONING_EFFORT": "high"}
+            ).reasoning_effort,
+            "high",
+        )
+        self.assertEqual(
+            load_config(
+                overrides=ConfigOverrides(
+                    model="m", base_url="https://e.test/v1", reasoning_effort="xhigh"
                 ),
-                encoding="utf-8",
-            )
-            config = load_config(repo, environ={})
-            self.assertEqual(config.model, "file-model")
-            self.assertFalse(hasattr(config, "smoke"))
-            self.assertFalse(hasattr(config, "max_commits"))
+                environ={"AUTOMMIT_REASONING_EFFORT": "high"},
+            ).reasoning_effort,
+            "xhigh",
+        )
 
     def test_plan_schema_publishes_no_count_ceilings(self) -> None:
         plan_properties = cast("dict[str, object]", PLAN_JSON_SCHEMA["properties"])

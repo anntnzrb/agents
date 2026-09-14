@@ -25,23 +25,33 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 | `--scope auto\|staged\|all` | `auto` reuses an existing staged snapshot and stages everything only when nothing is staged; `staged` requires an existing snapshot and never stages; `all` always stages everything (default: `auto`) |
 | `--model`, `--base-url` | Required endpoint identity; autommit ships no model or endpoint default |
 | `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment and config file values |
-| `--config PATH` | JSON config file (default: `<repo>/.autommit.json`) |
 | `--base REV` | Rewrite mode only: rebuild the commits since this ancestor revision |
 | `--smoke CMD` | Run one validation command in the temporary worktree after each commit (default: off) |
-| `--dry-run` | Print the inventory and snapshot, call no model, publish nothing |
+| `--dry-run` | Print the inventory and snapshot, call no model, create nothing |
 | `--json` | Emit one `autommit/v1` object on stdout; exit codes are unchanged |
 
 Positional arguments and repeated `--context` values pass user intent to the planner unchanged.
 
 Other subcommands: `cli.py models [--filter TEXT]` lists the model ids the configured endpoint advertises, so a model can be chosen before a run. `cli.py rewrite --base <rev>` is described under Modes. `run` stays the default when no subcommand is given.
 
-Environment variables: `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, `AUTOMMIT_API_KEY`, `AUTOMMIT_TIMEOUT`, `AUTOMMIT_REASONING_EFFORT`, plus the `OPENAI_*` aliases. `AUTOMMIT_MODEL` and `AUTOMMIT_BASE_URL` are required.
+Environment variables: `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, `AUTOMMIT_API_KEY`, `AUTOMMIT_TIMEOUT`, `AUTOMMIT_REASONING_EFFORT`, plus the `OPENAI_*` aliases. `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, and an API key are required, so the environment is the whole contract:
+
+```bash
+export AUTOMMIT_BASE_URL="https://models.example.test/v1"
+export AUTOMMIT_MODEL="MODEL_ID"
+export AUTOMMIT_API_KEY="keyless"
+export AUTOMMIT_REASONING_EFFORT="high"   # optional, unset sends no effort field
+```
+
+Settings come from flags and environment only: CLI flags beat environment variables. Autommit reads no configuration file, creates none, and holds no default endpoint, model, or credential.
+
+`keyless` is the conventional value for a gateway that accepts any key. Against an endpoint that requires a real key it produces `provider_error` with HTTP 401 or 403, not `missing_api_key`.
 
 ## Modes
 
 | Mode | Command | Use it when |
 | --- | --- | --- |
-| Publish | `cli.py [options]` | The staged snapshot is what should become commits |
+| Run | `cli.py [options]` | The staged snapshot is what should become commits |
 | Rewrite | `cli.py rewrite --base <rev> [options]` | Committed and uncommitted changes since a revision must become logical commits again |
 
 Rewrite freezes the current worktree, including uncommitted work, into a target tree, rebuilds the commits from `--base` inside a detached temporary worktree, and moves the branch only after the rebuilt tree equals that frozen tree. It never pushes, and the previous tip stays reachable through the reflog.

@@ -104,7 +104,7 @@ def _legacy_api_key(args: argparse.Namespace) -> str | None:
     if args.ogo:
         return os.environ.get("OPENCODE_API_KEY")
     if args.ozen:
-        return "public"
+        return "keyless"
     return os.environ.get("AUTOMMIT_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
 

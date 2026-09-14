@@ -14,12 +14,14 @@ Success is one JSON line on stdout. Expected failure is one JSON line on stderr.
 
 `--repo PATH` defaults to the current directory. Git is the only external executable.
 
+Settings come from CLI flags and environment variables only, with flags winning. Autommit reads no configuration file and creates none. `--model`, `--base-url`, and an API key are required: autommit ships no model or endpoint default, so an unconfigured machine fails as `missing_model`, `missing_base_url`, or `missing_api_key`.
+
 ## Commands
 
 ### `run` (default)
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--reasoning-effort LEVEL] [--config PATH] [--smoke CMD] [--dry-run] [--json] [context ...]
+uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--reasoning-effort LEVEL] [--smoke CMD] [--dry-run] [--json] [context ...]
 ```
 
 `run` is the default command when no subcommand is given, and the only one that mutates anything. It owns the whole loop:
@@ -55,7 +57,7 @@ The previous tip is reported as the recovery point and stays reachable through t
 ### `models`
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py models [--filter TEXT] [--base-url URL] [--api-key KEY] [--reasoning-effort LEVEL] [--config PATH] [--json]
+uv run --script <skill-dir>/scripts/cli.py models [--filter TEXT] [--base-url URL] [--api-key KEY] [--reasoning-effort LEVEL] [--json]
 ```
 
 Read-only discovery against the configured endpoint's `GET {base-url}/models`. It lists the advertised model ids, one per line, filtered by a case-insensitive substring when `--filter` is given. `--json` wraps the same ids and the resolved `base_url` in one `autommit/v1` object on stdout. It never reads or writes a repository, so use it to pick a `--model` before a run.

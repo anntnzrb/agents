@@ -417,14 +417,12 @@ def publish_rewrite(
 
 def _brain(options: RunOptions) -> _Brain:
     config = load_config(
-        options.repo,
         overrides=ConfigOverrides(
             model=options.model,
             base_url=options.base_url,
             api_key=options.api_key,
             timeout=options.timeout,
             reasoning_effort=options.reasoning_effort,
-            config_file=options.config_file,
         ),
         environ=os.environ,
     )

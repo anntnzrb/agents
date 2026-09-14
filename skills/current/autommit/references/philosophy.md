@@ -56,7 +56,7 @@ The independent atomicity critic runs only for a broad single-commit plan, becau
 
 ## Zero configuration
 
-The single command is the interface. Only the model, the endpoint, the API key, the timeout, and the reasoning effort are configurable, through flags, environment, or an optional repository config file. The model and the endpoint have no built-in default: an unset model or endpoint fails as `missing_model` or `missing_base_url` instead of silently reaching a vendor. No other setting will be added, and no per-repository tuning is expected. `--smoke` is the deliberate exception: a per-invocation validation command that is never persisted.
+The single command is the interface. Only the model, the endpoint, the API key, the timeout, and the reasoning effort are configurable. The environment is the only surface: flags and environment variables carry every setting. Autommit reads no configuration file, creates none, and writes no endpoint or credential state into a repository. The model and the endpoint have no built-in default: an unset model or endpoint fails as `missing_model` or `missing_base_url` instead of silently reaching a vendor. No other setting will be added, and no per-repository tuning is expected. `--smoke` is the deliberate exception: a per-invocation validation command that is never persisted.
 
 ## Limits policy for future changes
 
