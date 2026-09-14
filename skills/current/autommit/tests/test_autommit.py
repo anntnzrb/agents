@@ -922,6 +922,15 @@ class AutommitUnitTests(unittest.TestCase):
         with self.assertRaises(AutommitError):
             _ = normalize_atomicity_decision(invalid_split)
 
+        contradictory_accept = {
+            "decision": "accept",
+            "concerns": ["Stray concern."],
+            "rationale": "Contradictory.",
+        }
+        with self.assertRaises(AutommitError) as raised:
+            _ = normalize_atomicity_decision(contradictory_accept)
+        self.assertEqual(raised.exception.code, "invalid_atomicity_decision")
+
     def test_dependencies_reject_self_range_duplicates_and_cycles(self) -> None:
         def single_commit(dependencies: object) -> dict[str, object]:
             return {

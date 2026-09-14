@@ -322,6 +322,8 @@ def normalize_atomicity_decision(value: object) -> AtomicityDecision:
     rationale = _str(raw_rationale, "rationale", MAX_RATIONALE_LENGTH)
     if raw_decision == "split" and not concerns:
         raise _invalid_decision("a 'split' decision must list at least one concern")
+    if raw_decision == "accept" and concerns:
+        raise _invalid_decision("an 'accept' decision must list no concerns")
     return AtomicityDecision(raw_decision, concerns, rationale)
 
 
