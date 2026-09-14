@@ -308,7 +308,9 @@ def prepare(
 def read_json_file(path: Path, kind: str) -> object:
     """Read bounded JSON from a regular file."""
     limit = (
-        MAX_PLAN_FILE_BYTES if kind in ("plan", "decision") else MAX_POLICY_FILE_BYTES
+        MAX_PLAN_FILE_BYTES
+        if ("plan" in kind or "decision" in kind)
+        else MAX_POLICY_FILE_BYTES
     )
     if not path.exists() or path.is_symlink() or not path.is_file():
         raise AutommitError(
