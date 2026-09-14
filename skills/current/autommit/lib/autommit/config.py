@@ -13,8 +13,6 @@ from autommit.errors import AutommitError
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-DEFAULT_MODEL: Final[str] = "big-pickle"
-DEFAULT_BASE_URL: Final[str] = "https://opencode.ai/zen/v1"
 DEFAULT_TIMEOUT: Final[float] = 300.0
 CONFIG_FILENAME: Final[str] = ".autommit.json"
 MAX_CONFIG_BYTES: Final[int] = 16 * 1024
@@ -128,7 +126,7 @@ def load_config(
 
     model = _first_text(
         (chosen.model, _first_env(resolved_env, MODEL_ENV), file_values.get("model")),
-        DEFAULT_MODEL,
+        "",
     )
     base_url = _first_text(
         (
@@ -136,8 +134,18 @@ def load_config(
             _first_env(resolved_env, BASE_URL_ENV),
             file_values.get("base_url"),
         ),
-        DEFAULT_BASE_URL,
+        "",
     ).rstrip("/")
+    if not model:
+        raise AutommitError(
+            "missing_model",
+            "Set AUTOMMIT_MODEL or pass --model; autommit has no model default.",
+        )
+    if not base_url:
+        raise AutommitError(
+            "missing_base_url",
+            "Set AUTOMMIT_BASE_URL or pass --base-url; autommit has no endpoint default.",
+        )
     api_key = _first_text(
         (
             chosen.api_key,

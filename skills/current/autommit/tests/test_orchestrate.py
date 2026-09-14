@@ -120,6 +120,8 @@ class _Sandbox(unittest.TestCase):
             "repo": self.repo,
             "scope": "auto",
             "api_key": "test-key",
+            "model": "test-model",
+            "base_url": "https://model.test/v1",
         }
         values.update(overrides)
         return RunOptions(**values)  # type: ignore[arg-type]

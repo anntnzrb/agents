@@ -32,7 +32,7 @@ uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|al
 
 Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and publishes nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
 
-Each request carries `model`, the system and user messages, and `reasoning_effort: low`, plus the response-format or tool field for the current rung. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
+Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL`, `AUTOMMIT_REASONING_EFFORT`, or a `reasoning_effort` config key adds that field, and an unset level sends none. `--model` and `--base-url` are required: autommit ships no model or endpoint default. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
 
 Plan files, decision files, and the snapshot token live in a private temporary directory. They are never caller-facing flags.
 

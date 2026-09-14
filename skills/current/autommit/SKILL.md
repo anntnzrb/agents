@@ -23,7 +23,8 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 |---|---|
 | `--repo PATH` | Target repository (default: current directory) |
 | `--scope auto\|staged\|all` | `auto` reuses an existing staged snapshot and stages everything only when nothing is staged; `staged` requires an existing snapshot and never stages; `all` always stages everything (default: `auto`) |
-| `--model`, `--base-url`, `--api-key`, `--timeout` | Endpoint overrides that beat environment and config file values |
+| `--model`, `--base-url` | Required endpoint identity; autommit ships no model or endpoint default |
+| `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment and config file values |
 | `--config PATH` | JSON config file (default: `<repo>/.autommit.json`) |
 | `--base REV` | Rewrite mode only: rebuild the commits since this ancestor revision |
 | `--smoke CMD` | Run one validation command in the temporary worktree after each commit (default: off) |
@@ -34,7 +35,7 @@ Positional arguments and repeated `--context` values pass user intent to the pla
 
 Other subcommands: `cli.py models [--filter TEXT]` lists the model ids the configured endpoint advertises, so a model can be chosen before a run. `cli.py rewrite --base <rev>` is described under Modes. `run` stays the default when no subcommand is given.
 
-Environment variables: `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, `AUTOMMIT_API_KEY`, `AUTOMMIT_TIMEOUT`, plus the `OPENAI_*` aliases.
+Environment variables: `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, `AUTOMMIT_API_KEY`, `AUTOMMIT_TIMEOUT`, `AUTOMMIT_REASONING_EFFORT`, plus the `OPENAI_*` aliases. `AUTOMMIT_MODEL` and `AUTOMMIT_BASE_URL` are required.
 
 ## Modes
 

@@ -49,14 +49,14 @@ The independent atomicity critic runs only for a broad single-commit plan, becau
 ## Inference policy
 
 - Run a cheap model. Planning is bounded structured extraction over evidence the CLI already computed, so quality comes from evidence and validation retries rather than from a large thinking budget.
-- Autommit sends `model`, the system and user messages, `reasoning_effort: low`, and the response-format or tool field for the current transport rung. A low effort is enough for bounded structured extraction, and a gateway whose provider lacks thinking support drops the field instead of failing.
+- Autommit sends `model`, the system and user messages, and the response-format or tool field for the current transport rung. It adds `reasoning_effort` only when the caller sets one, because the effort level belongs to the operator and never to the tool. A gateway whose provider lacks thinking support drops the field instead of failing.
 - Autommit deliberately sends no sampling or token parameter. A route that rejects `temperature` would fail every ladder rung and mask the real cause, and a token cap would truncate a large plan that the CLI has already accepted as valid.
 - Every transport rung ends in local validation against the same snapshot.
 - Provider failures are terminal and never consume plan retries.
 
 ## Zero configuration
 
-The single command is the interface. Only the endpoint, the model, the API key, and the timeout are configurable, through flags, environment, or an optional repository config file. No other setting will be added, and no per-repository tuning is expected. `--smoke` is the deliberate exception: a per-invocation validation command that is never persisted.
+The single command is the interface. Only the model, the endpoint, the API key, the timeout, and the reasoning effort are configurable, through flags, environment, or an optional repository config file. The model and the endpoint have no built-in default: an unset model or endpoint fails as `missing_model` or `missing_base_url` instead of silently reaching a vendor. No other setting will be added, and no per-repository tuning is expected. `--smoke` is the deliberate exception: a per-invocation validation command that is never persisted.
 
 ## Limits policy for future changes
 

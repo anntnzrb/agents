@@ -22,8 +22,6 @@ from autommit.client import (
     list_models,
 )
 from autommit.config import (
-    DEFAULT_BASE_URL,
-    DEFAULT_MODEL,
     DEFAULT_TIMEOUT,
     ConfigOverrides,
     load_config,
@@ -261,25 +259,72 @@ class ConfigResolutionTests(unittest.TestCase):
             self.assertEqual(overridden.api_key, "flag-key")
             self.assertEqual(overridden.timeout, 9.5)
 
-    def test_defaults_and_trailing_slash_normalization(self) -> None:
+    def test_model_and_endpoint_are_required_and_timeout_keeps_its_default(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            config = load_config(repo, environ={})
-            self.assertEqual(config.model, DEFAULT_MODEL)
-            self.assertEqual(config.base_url, DEFAULT_BASE_URL)
-            self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
+            with self.assertRaises(AutommitError) as missing_model:
+                _ = load_config(repo, environ={})
+            self.assertEqual(missing_model.exception.code, "missing_model")
 
-            trimmed = load_config(
+            with self.assertRaises(AutommitError) as missing_base_url:
+                _ = load_config(
+                    repo, overrides=ConfigOverrides(model="chosen-model"), environ={}
+                )
+            self.assertEqual(missing_base_url.exception.code, "missing_base_url")
+
+            config = load_config(
                 repo,
-                overrides=ConfigOverrides(base_url="https://flag.test/v1/"),
+                overrides=ConfigOverrides(
+                    model="chosen-model", base_url="https://flag.test/v1/"
+                ),
                 environ={},
             )
-            self.assertEqual(trimmed.base_url, "https://flag.test/v1")
+            self.assertEqual(config.model, "chosen-model")
+            self.assertEqual(config.base_url, "https://flag.test/v1")
+            self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
+            self.assertIsNone(config.reasoning_effort)
+
+    def test_reasoning_effort_comes_only_from_the_caller(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            base = ConfigOverrides(model="m", base_url="https://e.test/v1")
+
+            self.assertIsNone(
+                load_config(repo, overrides=base, environ={}).reasoning_effort
+            )
+
+            from_env = load_config(
+                repo, overrides=base, environ={"AUTOMMIT_REASONING_EFFORT": "high"}
+            )
+            self.assertEqual(from_env.reasoning_effort, "high")
+
+            _ = (repo / ".autommit.json").write_text(
+                json.dumps({"reasoning_effort": "minimal"}), encoding="utf-8"
+            )
+            self.assertEqual(
+                load_config(repo, overrides=base, environ={}).reasoning_effort,
+                "minimal",
+            )
+            self.assertEqual(
+                load_config(
+                    repo,
+                    overrides=ConfigOverrides(
+                        model="m",
+                        base_url="https://e.test/v1",
+                        reasoning_effort="xhigh",
+                    ),
+                    environ={"AUTOMMIT_REASONING_EFFORT": "high"},
+                ).reasoning_effort,
+                "xhigh",
+            )
 
     def test_openai_environment_aliases_are_honored(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             config = load_config(
                 Path(temp_dir),
+                overrides=ConfigOverrides(model="alias-model"),
                 environ={
                     "OPENAI_API_KEY": "openai-key",
                     "OPENAI_BASE_URL": "https://openai.test/v1",
@@ -301,7 +346,12 @@ class ConfigResolutionTests(unittest.TestCase):
             repo = Path(temp_dir)
             _ = (repo / ".autommit.json").write_text(
                 json.dumps(
-                    {"model": "file-model", "smoke": "make test", "max_commits": 500}
+                    {
+                        "model": "file-model",
+                        "base_url": "https://file.test/v1",
+                        "smoke": "make test",
+                        "max_commits": 500,
+                    }
                 ),
                 encoding="utf-8",
             )
