@@ -206,6 +206,98 @@ def remove_receipt(git_dir: Path) -> None:
         ) from err
 
 
+RECOVERY_FILENAME = "recovery.json"
+MAX_RECOVERY_BYTES = 4 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryPoint:
+    """The ref and commit an interrupted run can return to."""
+
+    ref: str
+    before: str
+    pid: int
+
+
+def _recovery_path(git_dir: Path) -> Path:
+    directory, _, _ = _paths(git_dir)
+    return directory / RECOVERY_FILENAME
+
+
+def write_recovery_point(git_dir: Path, point: RecoveryPoint) -> None:
+    """Atomically persist the recovery point for an interrupted run."""
+    directory = _ensure_directory(git_dir)
+    target = _recovery_path(git_dir)
+    if target.is_symlink():
+        raise RefusalError(
+            "unsafe_recovery_file",
+            f"Autommit recovery file must not be a symlink: {target}",
+        )
+    payload = json.dumps(
+        {"ref": point.ref, "before": point.before, "pid": point.pid}, indent=2
+    ).encode("utf-8")
+    temp_path = directory / f"recovery.{os.getpid()}.tmp"
+    try:
+        temp_path.write_bytes(payload)
+        temp_path.replace(target)
+        _sync_directory(directory)
+    except OSError as err:
+        with contextlib.suppress(OSError):
+            temp_path.unlink(missing_ok=True)
+        raise AutommitError(
+            "write_failed", f"Failed to write recovery point to {target}: {err}"
+        ) from err
+
+
+def read_recovery_point(git_dir: Path) -> RecoveryPoint | None:
+    """Read a recovery point without following symlinks."""
+    _ensure_git_dir(git_dir)
+    target = _recovery_path(git_dir)
+    if not _regular_file(target, "recovery"):
+        return None
+    try:
+        raw = target.read_bytes()
+    except OSError:
+        return None
+    if len(raw) > MAX_RECOVERY_BYTES:
+        return None
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    ref = payload.get("ref")
+    before = payload.get("before")
+    pid = payload.get("pid")
+    if not isinstance(ref, str) or not isinstance(before, str):
+        return None
+    if not isinstance(pid, int) or isinstance(pid, bool):
+        return None
+    return RecoveryPoint(ref=ref, before=before, pid=pid)
+
+
+def clear_recovery_point(git_dir: Path) -> None:
+    """Remove a recovery point idempotently."""
+    _ensure_git_dir(git_dir)
+    directory, _, _ = _paths(git_dir)
+    target = directory / RECOVERY_FILENAME
+    if not _regular_file(target, "recovery"):
+        return
+    try:
+        target.unlink(missing_ok=True)
+        _sync_directory(directory)
+    except OSError as err:
+        raise AutommitError(
+            "remove_failed", f"Failed to remove recovery point at {target}: {err}"
+        ) from err
+
+
+def format_recovery_hint(ref: str, before: str) -> str:
+    """Render the recovery hint printed after a failed run."""
+    return f"Recovery point: {ref} at {before}."
+
+
 def describe_operation_lock(git_dir: Path) -> str | None:
     """Inspect existing operation lock file and return diagnosis if present."""
     _, _, lock_path = _paths(git_dir)

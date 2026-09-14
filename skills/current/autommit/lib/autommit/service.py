@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import shlex
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal
 
 from autommit.errors import AutommitError, RefusalError
-from autommit.git import run_git, try_git
+from autommit.fallback import CommitWork, apply_with_fallback
+from autommit.git import GIT_DIFF_FLAGS, run_git, try_git
+from autommit.inventory import build_inventory, inventory_payload
 from autommit.proposal import (
     AtomicityDecision,
     CommitGroup,
     CommitProposal,
-    build_commit_patch,
     changed_hunk_count,
+    compute_apply_order,
     normalize_atomicity_decision,
     normalize_proposal,
     parse_file_diffs,
@@ -25,15 +31,29 @@ from autommit.proposal import (
 )
 from autommit.transaction import (
     Receipt,
+    RecoveryPoint,
+    clear_recovery_point,
     operation_lock,
     read_receipt,
     remove_receipt,
     write_receipt,
+    write_recovery_point,
 )
 
 MAX_POLICY_FILE_BYTES = 32 * 1024
 MAX_LOG_ENTRIES = 8
+SMOKE_TIMEOUT_SECONDS = 300
 _MIN_SPLIT_COMMITS = 2
+
+_BLOCKING_GIT_FILES: Final[tuple[str, ...]] = (
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+)
+
+# A completed rebase can leave REBASE_HEAD behind, so the directories Git writes
+# for the lifetime of the operation are the authoritative rebase markers.
+_BLOCKING_GIT_DIRECTORIES: Final[tuple[str, ...]] = ("rebase-merge", "rebase-apply")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +69,23 @@ def _git_dir(cwd: Path) -> Path:
     """Resolve the worktree-local Git directory."""
     value_str = run_git(cwd, "rev-parse", "--absolute-git-dir")
     return Path(value_str.strip()).resolve()
+
+
+def _blocking_state(git_dir: Path) -> str | None:
+    """Detect an in-progress Git operation that makes mutation unsafe."""
+    for name in _BLOCKING_GIT_FILES:
+        if (git_dir / name).exists():
+            return (
+                f"A Git operation is in progress ({name}); "
+                "finish or abort it before running autommit."
+            )
+    for name in _BLOCKING_GIT_DIRECTORIES:
+        if (git_dir / name).is_dir():
+            return (
+                f"A Git rebase is in progress ({name}); "
+                "finish or abort it before running autommit."
+            )
+    return None
 
 
 def _current_evidence(cwd: Path, *, index_file: Path | None = None) -> Evidence:
@@ -103,9 +140,9 @@ def _staged_diff(
         "diff",
         "--cached",
         "--binary",
-        "--no-ext-diff",
         "--src-prefix=a/",
         "--dst-prefix=b/",
+        *GIT_DIFF_FLAGS,
     ]
     if zero_context:
         arguments.append("--unified=0")
@@ -230,6 +267,8 @@ def prepare(
     """Recover if needed, stage per scope, and expose exact planning evidence."""
     git_dir = _git_dir(cwd)
     with operation_lock(git_dir):
+        if blocking := _blocking_state(git_dir):
+            raise RefusalError("in_progress_state", blocking)
         if recovered := _consume_or_recover(cwd, git_dir):
             return recovered
         staged = _staged_files(cwd)
@@ -244,6 +283,8 @@ def prepare(
             raise AutommitError("no_changes", "No local changes to commit.")
         evidence = _current_evidence(cwd)
         diff = _staged_diff(cwd)
+        zero_diff = _staged_diff(cwd, zero_context=True)
+        inventory = build_inventory(cwd, staged, diff)
         repo_context = _repository_policy(cwd)
         return {
             "status": "prepared",
@@ -255,6 +296,8 @@ def prepare(
             "staged_file_count": len(staged),
             "changed_hunk_count": changed_hunk_count(diff),
             "diff": diff,
+            "zero_diff": zero_diff,
+            "inventory": inventory_payload(inventory),
             "repository_context": repo_context,
             "user_context": list(context),
             "context": "\n\n".join(context),
@@ -350,15 +393,56 @@ def _require_atomicity_decision(
     return decision
 
 
+def _record_recovery_point(git_dir: Path, ref: str, before: str) -> None:
+    """Persist a recovery point without masking the original failure."""
+    with contextlib.suppress(AutommitError, OSError):
+        write_recovery_point(
+            git_dir,
+            RecoveryPoint(ref=ref, before=before, pid=os.getpid()),
+        )
+
+
+def _run_smoke(worktree: Path, command: str, ref: str, before: str) -> None:
+    """Run one opt-in validation command inside the temporary worktree."""
+    try:
+        completed = subprocess.run(
+            shlex.split(command),
+            cwd=worktree,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=SMOKE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise AutommitError(
+            "smoke_failed",
+            f"Smoke validation could not run: {error}. "
+            f"Recovery point: {ref} at {before}.",
+            4,
+        ) from error
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "no output"
+        raise AutommitError(
+            "smoke_failed",
+            f"Smoke validation failed ({completed.returncode}): {detail}. "
+            f"Recovery point: {ref} at {before}.",
+            4,
+        )
+
+
 def apply(
     cwd: Path,
     snapshot: str,
     plan_file: Path,
     decision_file: Path | None,
+    *,
+    smoke: str | None = None,
 ) -> dict[str, object]:
     """Prepare commits off-branch, verify final tree, and publish by CAS."""
     git_dir = _git_dir(cwd)
     with operation_lock(git_dir):
+        if blocking := _blocking_state(git_dir):
+            raise RefusalError("in_progress_state", blocking)
         _consume_or_recover(cwd, git_dir)
         expected, proposal, _, staged_diff, review = _load_validated_plan(
             cwd, snapshot, plan_file
@@ -372,22 +456,24 @@ def apply(
             tempfile.TemporaryDirectory(prefix="autommit-patch-") as patch_name,
         ):
             worktree = Path(worktree_name)
-            patch = Path(patch_name) / "commit.patch"
             message = Path(patch_name) / "message.txt"
             run_git(cwd, "worktree", "add", "--detach", str(worktree), expected.before)
             try:
-                for group in proposal.commits:
-                    patch_content = build_commit_patch(
-                        group.changes, staged_diff, zero_context_diff
+                for commit_index in compute_apply_order(proposal.commits):
+                    group = proposal.commits[commit_index]
+                    work = CommitWork(
+                        repo=cwd,
+                        worktree=worktree,
+                        patch_dir=Path(patch_name),
+                        index_tree=expected.index_tree,
+                        ref=expected.ref,
+                        before=expected.before,
+                        staged_diff=staged_diff,
+                        zero_diff=zero_context_diff,
                     )
-                    patch.write_text(patch_content, encoding="utf-8")
-                    apply_args = ["apply", "--index", "--unidiff-zero", str(patch)]
-                    apply_res = try_git(worktree, *apply_args)
-                    if apply_res.returncode != 0:
-                        detail = apply_res.stderr.strip() or apply_res.stdout.strip()
-                        raise AutommitError(
-                            "patch_failed", f"Unable to apply patch: {detail}"
-                        )
+                    _ = apply_with_fallback(work, group)
+                    if smoke is not None:
+                        _run_smoke(worktree, smoke, expected.ref, expected.before)
                     message.write_text(_commit_message(group), encoding="utf-8")
                     run_git(
                         worktree,
@@ -402,14 +488,19 @@ def apply(
                     created.append({"sha": sha, "summary": group.summary})
 
                 final_head = run_git(worktree, "rev-parse", "HEAD").strip()
+            except AutommitError:
+                _record_recovery_point(git_dir, expected.ref, expected.before)
+                raise
             finally:
                 try_git(cwd, "worktree", "remove", "--force", str(worktree))
+                try_git(cwd, "worktree", "prune")
             current_evidence = _current_evidence(cwd)
             if (
                 current_evidence.ref != expected.ref
                 or current_evidence.before != expected.before
                 or current_evidence.index_tree != expected.index_tree
             ):
+                _record_recovery_point(git_dir, expected.ref, expected.before)
                 raise RefusalError(
                     "snapshot_changed",
                     "Target repository changed while atomic commits were being prepared.",
@@ -417,6 +508,7 @@ def apply(
 
             created_tree = _tree_for_commit(cwd, final_head)
             if created_tree != expected.index_tree:
+                _record_recovery_point(git_dir, expected.ref, expected.before)
                 raise RefusalError(
                     "tree_mismatch",
                     "Prepared commit tree does not match staged index tree.",
@@ -433,6 +525,7 @@ def apply(
             write_receipt(git_dir, receipt)
             _cas_ref(cwd, expected.ref, final_head, expected.before)
             remove_receipt(git_dir)
+            clear_recovery_point(git_dir)
 
             return {
                 "status": "committed",

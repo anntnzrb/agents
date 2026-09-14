@@ -4,17 +4,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NoReturn, cast
 
+from autommit.client import ModelRequest, list_models
+from autommit.config import ConfigOverrides, load_config
 from autommit.errors import AutommitError
+from autommit.orchestrate import RunOptions, run_orchestrated
+from autommit.rewrite import run_rewrite
 from autommit.service import apply, prepare, validate_plan
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 SCHEMA = "autommit/v1"
+DEBUG_COMMANDS = ("prepare", "validate-plan", "apply", "schema")
 
 
 class Parser(argparse.ArgumentParser):
@@ -51,6 +57,48 @@ def build_parser() -> Parser:
 
     subparsers.add_parser("schema")
     return parser
+
+
+def _run_parser() -> Parser:
+    """Build the default single-command parser."""
+    parser = Parser(
+        prog="autommit",
+        description="Plan and publish atomic commits from the staged snapshot.",
+    )
+    parser.add_argument("--repo", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--scope", choices=["auto", "staged", "all"], default="auto", type=str
+    )
+    parser.add_argument("--context", action="append", default=[])
+    parser.add_argument("--model", type=str, default=None)
+    parser.add_argument("--base-url", type=str, default=None)
+    parser.add_argument("--api-key", type=str, default=None)
+    parser.add_argument("--timeout", type=float, default=None)
+    parser.add_argument("--config", type=Path, default=None)
+    parser.add_argument("--smoke", type=str, default=None)
+    parser.add_argument("--base", type=str, default=None)
+    parser.add_argument("--filter", type=str, default=None)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("positional_context", nargs="*", default=[])
+    return parser
+
+
+def _run_options(arguments: argparse.Namespace) -> RunOptions:
+    return RunOptions(
+        repo=arguments.repo.resolve(),
+        scope=cast('Literal["auto", "staged", "all"]', arguments.scope),
+        context=tuple(arguments.context + arguments.positional_context),
+        model=arguments.model,
+        base_url=arguments.base_url,
+        api_key=arguments.api_key,
+        timeout=arguments.timeout,
+        config_file=arguments.config,
+        smoke=arguments.smoke,
+        base=arguments.base,
+        dry_run=bool(arguments.dry_run),
+        json_output=bool(arguments.json_output),
+    )
 
 
 def _prepare_arguments(values: Sequence[str]) -> argparse.Namespace:
@@ -121,6 +169,31 @@ def _schema() -> dict[str, object]:
         "protocol": SCHEMA,
         "version": SCHEMA,
         "commands": {
+            "run": {
+                "inputs": {
+                    "scope": "auto | staged | all (optional, default: auto)",
+                    "repo": "path (optional, default: cwd)",
+                    "model": "string (optional)",
+                    "base_url": "string (optional)",
+                    "api_key": "string (optional)",
+                    "timeout": "number (optional)",
+                    "smoke": "shell command run per commit (optional)",
+                    "dry_run": "boolean (optional)",
+                    "context": "array of strings (optional)",
+                },
+                "returns": "Publication evidence with created commit objects",
+            },
+            "rewrite": {
+                "inputs": {
+                    "base": "revision to rebuild from (optional, default: origin/HEAD, origin/main, main)",
+                    "repo": "path (optional, default: cwd)",
+                    "model": "string (optional)",
+                    "dry_run": "boolean (optional)",
+                    "smoke": "shell command run per commit (optional)",
+                    "context": "array of strings (optional)",
+                },
+                "returns": "Rewrite evidence with the rebuilt commit objects",
+            },
             "prepare": {
                 "inputs": {
                     "scope": "auto | staged | all (optional, default: auto)",
@@ -200,24 +273,62 @@ def _dispatch(arguments: argparse.Namespace) -> object:
     raise AutommitError("usage_error", "Unknown command.")
 
 
+def _print_models(arguments: argparse.Namespace) -> int:
+    """List the model ids the configured endpoint exposes."""
+    config = load_config(
+        arguments.repo.resolve(),
+        overrides=ConfigOverrides(
+            model=arguments.model,
+            base_url=arguments.base_url,
+            api_key=arguments.api_key,
+            timeout=arguments.timeout,
+            config_file=arguments.config,
+        ),
+        environ=os.environ,
+    )
+    request = ModelRequest(
+        model=config.model,
+        base_url=config.base_url,
+        api_key=config.api_key,
+        timeout=config.timeout,
+        system="",
+        user="",
+    )
+    pattern = (arguments.filter or "").lower()
+    ids = [item for item in list_models(request) if pattern in item.lower()]
+    if arguments.json_output:
+        _emit(_success("models", {"base_url": config.base_url, "models": ids}))
+    else:
+        for item in ids:
+            sys.stdout.write(item + "\n")
+        sys.stdout.flush()
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the CLI and preserve protocol output on expected failures."""
+    """Run the single command by default, or a hidden debug subcommand."""
     args_list = list(sys.argv[1:] if argv is None else argv)
     command = args_list[0] if args_list and not args_list[0].startswith("-") else ""
     try:
-        if command == "prepare":
-            arguments = _prepare_arguments(args_list[1:])
-        else:
-            parser = build_parser()
-            arguments = parser.parse_args(args_list)
-        result = _dispatch(arguments)
-        _emit(_success(command, result))
+        if command in DEBUG_COMMANDS:
+            if command == "prepare":
+                arguments = _prepare_arguments(args_list[1:])
+            else:
+                arguments = build_parser().parse_args(args_list)
+            result = _dispatch(arguments)
+            _emit(_success(command, result))
+            return 0
+        run_args = args_list[1:] if command == "run" else args_list
+        if command == "models":
+            return _print_models(_run_parser().parse_args(args_list[1:]))
+        if command == "rewrite":
+            run_args = args_list[1:]
+            return run_rewrite(_run_options(_run_parser().parse_args(run_args)))
+        return run_orchestrated(_run_options(_run_parser().parse_args(run_args)))
     except AutommitError as err:
-        _emit(_failure(command or "autommit", err), error=True)
+        _emit(_failure(command or "run", err), error=True)
         return err.exit_code
     except Exception as err:
         unknown = AutommitError("internal_error", f"Unexpected failure: {err}", 1)
-        _emit(_failure(command or "autommit", unknown), error=True)
+        _emit(_failure(command or "run", unknown), error=True)
         return 1
-    else:
-        return 0

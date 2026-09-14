@@ -14,7 +14,13 @@ from autommit.errors import GitError, GitMissingError
 GIT_ENVIRONMENT: Final[dict[str, str]] = {
     "GIT_TERMINAL_PROMPT": "0",
     "LC_ALL": "C",
+    "GIT_PAGER": "cat",
 }
+
+GIT_ENVIRONMENT_DROPS: Final[tuple[str, ...]] = (
+    "GIT_DIFF_OPTS",
+    "GIT_EXTERNAL_DIFF",
+)
 
 GIT_SAFE_ARGS: Final[tuple[str, ...]] = (
     "-c",
@@ -23,6 +29,18 @@ GIT_SAFE_ARGS: Final[tuple[str, ...]] = (
     "diff.mnemonicprefix=false",
     "-c",
     "diff.noprefix=false",
+    "-c",
+    "diff.algorithm=myers",
+    "-c",
+    "diff.renames=true",
+    "-c",
+    "diff.interHunkContext=0",
+)
+
+GIT_DIFF_FLAGS: Final[tuple[str, ...]] = (
+    "--no-color",
+    "--no-ext-diff",
+    "--no-textconv",
 )
 
 
@@ -31,6 +49,8 @@ def try_git(
 ) -> subprocess.CompletedProcess[str]:
     """Run Git when the caller needs to interpret a nonzero status."""
     merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
+    for dropped in GIT_ENVIRONMENT_DROPS:
+        merged_env.pop(dropped, None)
     cmd = ["git", *GIT_SAFE_ARGS, *args]
     try:
         return subprocess.run(

@@ -17,6 +17,8 @@ MAX_CONCERN_LENGTH = 512
 MAX_RATIONALE_LENGTH = 2048
 _MIN_SPLIT_COMMITS = 2
 MAX_OCTAL_DIGITS = 3
+MAX_DEPENDENCIES = 15
+MAX_ATOMICITY_DIFF_CHARS = 256 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +82,7 @@ class CommitGroup:
     summary: str
     details: tuple[str, ...]
     changes: tuple[CommitChange, ...]
+    dependencies: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,7 +212,7 @@ def _normalize_change(value: object, label: str) -> CommitChange:
 def _normalize_commit(value: object, index: int) -> CommitGroup:
     label = f"commits[{index}]"
     obj = _mapping(value, label)
-    _record(obj, label, frozenset({"summary", "details", "changes"}))
+    _record(obj, label, frozenset({"summary", "details", "changes", "dependencies"}))
     summary = _str(obj.get("summary"), f"{label}.summary", MAX_SUMMARY_LENGTH)
     raw_details = obj.get("details", [])
     details_list = _list(raw_details, f"{label}.details")
@@ -233,7 +236,61 @@ def _normalize_commit(value: object, index: int) -> CommitGroup:
         _normalize_change(item, f"{label}.changes[{i}]")
         for i, item in enumerate(changes_list)
     )
-    return CommitGroup(summary, details, changes)
+    dependencies = _normalize_dependencies(
+        obj.get("dependencies", []), f"{label}.dependencies"
+    )
+    return CommitGroup(summary, details, changes, dependencies)
+
+
+def _normalize_dependencies(raw: object, label: str) -> tuple[int, ...]:
+    """Parse optional dependency indices, rejecting duplicates, negatives, excess."""
+    items = _list(raw, label)
+    if len(items) > MAX_DEPENDENCIES:
+        raise _invalid(f"{label} exceeds maximum length of {MAX_DEPENDENCIES}")
+    indices: list[int] = []
+    for position, item in enumerate(items):
+        value = _integer(item, f"{label}[{position}]")
+        if value < 0:
+            raise _invalid(f"{label}[{position}] must be >= 0")
+        if value in indices:
+            raise _invalid(f"{label}[{position}] duplicates index {value}")
+        indices.append(value)
+    return tuple(sorted(indices))
+
+
+def _validate_dependencies(commits: tuple[CommitGroup, ...]) -> None:
+    """Reject self-references and out-of-range dependency indices."""
+    total = len(commits)
+    for index, commit in enumerate(commits):
+        for dependency in commit.dependencies:
+            if dependency == index:
+                raise _invalid(f"commits[{index}].dependencies cannot reference itself")
+            if dependency >= total:
+                raise _invalid(
+                    f"commits[{index}].dependencies index {dependency} is out of range"
+                )
+
+
+def compute_apply_order(commits: tuple[CommitGroup, ...]) -> tuple[int, ...]:
+    """Return a stable dependency order for the plan commits."""
+    dependents: dict[int, list[int]] = {index: [] for index in range(len(commits))}
+    pending = [len(commit.dependencies) for commit in commits]
+    for index, commit in enumerate(commits):
+        for dependency in commit.dependencies:
+            dependents[dependency].append(index)
+    ready = [index for index, count in enumerate(pending) if count == 0]
+    order: list[int] = []
+    while ready:
+        current = ready.pop(0)
+        order.append(current)
+        for dependent in dependents[current]:
+            pending[dependent] -= 1
+            if pending[dependent] == 0:
+                ready.append(dependent)
+        ready.sort()
+    if len(order) != len(commits):
+        raise _invalid("commits contain circular dependencies")
+    return tuple(order)
 
 
 def normalize_proposal(value: object) -> CommitProposal:
@@ -249,6 +306,8 @@ def normalize_proposal(value: object) -> CommitProposal:
     if len(commits_list) > MAX_COMMITS:
         raise _invalid(f"proposal.commits exceeds maximum of {MAX_COMMITS} commits")
     commits = tuple(_normalize_commit(item, i) for i, item in enumerate(commits_list))
+    _validate_dependencies(commits)
+    _ = compute_apply_order(commits)
     return CommitProposal(commits)
 
 
@@ -705,13 +764,24 @@ def changed_hunk_count(diff_text: str) -> int:
     return sum(len(file.hunks) for file in parse_file_diffs(diff_text))
 
 
+def truncate_critic_diff(diff: str) -> tuple[str, bool]:
+    """Bound the diff handed to the atomicity critic."""
+    if len(diff) <= MAX_ATOMICITY_DIFF_CHARS:
+        return diff, False
+    return diff[:MAX_ATOMICITY_DIFF_CHARS], True
+
+
 def requires_atomicity_review(proposal: CommitProposal, staged_diff: str) -> bool:
     """Match the narrow-proposal critic bypass."""
     if len(proposal.commits) > 1:
         return False
-    return not (
-        len(proposal.commits) == 1
-        and len(proposal.commits[0].changes) == 1
-        and isinstance(proposal.commits[0].changes[0].hunks, AllSelector)
+    if not proposal.commits:
+        return True
+    single = proposal.commits[0]
+    narrow = (
+        len(single.changes) == 1
+        and isinstance(single.changes[0].hunks, AllSelector)
+        and len(single.details) <= 1
         and changed_hunk_count(staged_diff) <= 1
     )
+    return not narrow

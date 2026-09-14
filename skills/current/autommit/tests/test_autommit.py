@@ -18,8 +18,12 @@ _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
 from autommit.errors import AutommitError
 from autommit.git import run_git
 from autommit.proposal import (
+    MAX_ATOMICITY_DIFF_CHARS,
+    compute_apply_order,
     normalize_atomicity_decision,
     normalize_proposal,
+    requires_atomicity_review,
+    truncate_critic_diff,
 )
 from autommit.transaction import Receipt, read_receipt, write_receipt
 
@@ -35,6 +39,7 @@ class _PrepareResult(TypedDict):
     status: str
     context: str
     staged_files: list[str]
+    changed_hunk_count: int
     diff: str
     snapshot: str
 
@@ -178,7 +183,8 @@ class AutommitCliTests(unittest.TestCase):
             env=self.environment(),
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("prepare", completed.stdout)
+        self.assertIn("--dry-run", completed.stdout)
+        self.assertIn("--smoke", completed.stdout)
 
     def test_prepare_stages_all_only_when_the_index_is_empty(self) -> None:
         _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
@@ -696,6 +702,125 @@ class AutommitCliTests(unittest.TestCase):
         )
         self.assertEqual(error["code"], "invalid_plan")
 
+    def test_dependencies_drive_the_apply_order(self) -> None:
+        for name, content in (
+            ("a.txt", "alpha\n"),
+            ("b.txt", "bravo\n"),
+            ("c.txt", "charlie\n"),
+        ):
+            _ = (self.repo / name).write_text(content, encoding="utf-8")
+        _ = self.git("add", "--all")
+        prepared = self.prepare()
+        expected_tree = self.git("write-tree").stdout.strip()
+        plan = self.write_json(
+            "dependency-plan.json",
+            {
+                "commits": [
+                    {
+                        "summary": "Third file",
+                        "details": [],
+                        "dependencies": [2],
+                        "changes": [{"path": "c.txt", "hunks": "all"}],
+                    },
+                    {
+                        "summary": "Second file",
+                        "details": [],
+                        "dependencies": [2],
+                        "changes": [{"path": "b.txt", "hunks": "all"}],
+                    },
+                    {
+                        "summary": "First file",
+                        "details": [],
+                        "dependencies": [],
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    },
+                ]
+            },
+        )
+
+        applied = cast(
+            "_ApplyResult",
+            self.cli(
+                "apply",
+                "--snapshot",
+                prepared["snapshot"],
+                "--plan-file",
+                str(plan),
+            )["result"],
+        )
+        self.assertEqual(len(applied["commits"]), 3)
+        self.assertEqual(
+            self.git("rev-parse", "HEAD^{tree}").stdout.strip(), expected_tree
+        )
+        self.assertEqual(
+            self.git("log", "-3", "--format=%s").stdout.splitlines(),
+            ["Second file", "Third file", "First file"],
+        )
+
+    def test_diff_indices_survive_hostile_git_configuration(self) -> None:
+        original = "\n".join(f"line {index}" for index in range(1, 25)) + "\n"
+        _ = (self.repo / "tracked.txt").write_text(original, encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        _ = self.git("commit", "-m", "expand fixture")
+        changed = original.splitlines()
+        changed[0] = "first changed"
+        changed[11] = "twelfth changed"
+        _ = (self.repo / "tracked.txt").write_text(
+            "\n".join(changed) + "\n", encoding="utf-8"
+        )
+        _ = self.git("add", "tracked.txt")
+        _ = self.git("config", "diff.interHunkContext", "12")
+        _ = self.git("config", "diff.algorithm", "minimal")
+        previous = os.environ.get("GIT_DIFF_OPTS")
+        os.environ["GIT_DIFF_OPTS"] = "--unified=12"
+        try:
+            prepared = self.prepare()
+        finally:
+            if previous is None:
+                _ = os.environ.pop("GIT_DIFF_OPTS", None)
+            else:
+                os.environ["GIT_DIFF_OPTS"] = previous
+        self.assertEqual(prepared["changed_hunk_count"], 2)
+        self.assertEqual(prepared["staged_files"], ["tracked.txt"])
+
+    def test_refuses_while_a_git_operation_is_in_progress(self) -> None:
+        _ = (self.repo / "tracked.txt").write_text("merged\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        git_dir = Path(self.git("rev-parse", "--absolute-git-dir").stdout.strip())
+        _ = (git_dir / "MERGE_HEAD").write_text("0" * 40 + "\n", encoding="utf-8")
+
+        payload = self.cli("prepare", expected_code=3)
+        error = cast("_ErrorDetail", payload["error"])
+        self.assertEqual(error["code"], "in_progress_state")
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), "initial")
+        self.assertEqual(
+            self.git("diff", "--cached", "--name-only").stdout.strip(), "tracked.txt"
+        )
+
+    def test_ignores_a_finished_rebase_marker(self) -> None:
+        _ = (self.repo / "tracked.txt").write_text("after rebase\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        git_dir = Path(self.git("rev-parse", "--absolute-git-dir").stdout.strip())
+        # A completed rebase can leave REBASE_HEAD behind. Only the rebase-merge or
+        # rebase-apply directory marks a rebase that is still running.
+        _ = (git_dir / "REBASE_HEAD").write_text("0" * 40 + "\n", encoding="utf-8")
+
+        prepared = self.prepare()
+
+        self.assertEqual(prepared["staged_files"], ["tracked.txt"])
+
+    def test_refuses_while_a_rebase_directory_exists(self) -> None:
+        _ = (self.repo / "tracked.txt").write_text("rebasing\n", encoding="utf-8")
+        _ = self.git("add", "tracked.txt")
+        git_dir = Path(self.git("rev-parse", "--absolute-git-dir").stdout.strip())
+        (git_dir / "rebase-merge").mkdir()
+
+        payload = self.cli("prepare", expected_code=3)
+
+        error = cast("_ErrorDetail", payload["error"])
+        self.assertEqual(error["code"], "in_progress_state")
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), "initial")
+
 
 class AutommitUnitTests(unittest.TestCase):
     """Unit tests for normalized proposals and Git helpers."""
@@ -743,6 +868,90 @@ class AutommitUnitTests(unittest.TestCase):
         }
         with self.assertRaises(AutommitError):
             _ = normalize_atomicity_decision(invalid_split)
+
+    def test_dependencies_reject_self_range_duplicates_and_cycles(self) -> None:
+        def single_commit(dependencies: object) -> dict[str, object]:
+            return {
+                "commits": [
+                    {
+                        "summary": "One",
+                        "details": [],
+                        "dependencies": dependencies,
+                        "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                    }
+                ]
+            }
+
+        for invalid in ([0], [1], [0, 0]):
+            with self.assertRaises(AutommitError) as raised:
+                _ = normalize_proposal(single_commit(invalid))
+            self.assertEqual(raised.exception.code, "invalid_plan")
+
+        cyclic = {
+            "commits": [
+                {
+                    "summary": "One",
+                    "details": [],
+                    "dependencies": [1],
+                    "changes": [{"path": "a.txt", "hunks": "all"}],
+                },
+                {
+                    "summary": "Two",
+                    "details": [],
+                    "dependencies": [0],
+                    "changes": [{"path": "b.txt", "hunks": "all"}],
+                },
+            ]
+        }
+        with self.assertRaises(AutommitError) as raised_cycle:
+            _ = normalize_proposal(cyclic)
+        self.assertEqual(raised_cycle.exception.code, "invalid_plan")
+
+        chain = {
+            "commits": [
+                {
+                    "summary": "One",
+                    "details": [],
+                    "dependencies": [1],
+                    "changes": [{"path": "a.txt", "hunks": "all"}],
+                },
+                {
+                    "summary": "Two",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "b.txt", "hunks": "all"}],
+                },
+            ]
+        }
+        proposal = normalize_proposal(chain)
+        self.assertEqual(compute_apply_order(proposal.commits), (1, 0))
+
+    def test_critic_diff_cap_bounds_only_oversized_diffs(self) -> None:
+        small = "diff --git a/x b/x\n"
+        self.assertEqual(truncate_critic_diff(small), (small, False))
+        oversized = "x" * (MAX_ATOMICITY_DIFF_CHARS + 64)
+        bounded, truncated = truncate_critic_diff(oversized)
+        self.assertTrue(truncated)
+        self.assertEqual(len(bounded), MAX_ATOMICITY_DIFF_CHARS)
+
+    def test_single_commit_with_extra_details_requires_review(self) -> None:
+        diff = "diff --git a/a.txt b/a.txt\n@@ -1 +1 @@\n-old\n+new\n"
+
+        def plan(details: list[str]) -> dict[str, object]:
+            return {
+                "commits": [
+                    {
+                        "summary": "Broad change",
+                        "details": details,
+                        "changes": [{"path": "a.txt", "hunks": "all"}],
+                    }
+                ]
+            }
+
+        broad = normalize_proposal(plan(["one", "two"]))
+        narrow = normalize_proposal(plan([]))
+        self.assertTrue(requires_atomicity_review(broad, diff))
+        self.assertFalse(requires_atomicity_review(narrow, diff))
 
     def test_run_git(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -4,10 +4,10 @@ Read this before invoking the CLI, parsing its JSON, or recovering a transaction
 
 ## Invocation
 
-Use only:
+Run one command:
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py <command> ...
+uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 ```
 
 Success is one JSON line on stdout. Expected failure is one JSON line on stderr. Every payload has `schema:"autommit/v1"`, `ok:true|false`, `command`, and either `result` or `error`.
@@ -15,6 +15,52 @@ Success is one JSON line on stdout. Expected failure is one JSON line on stderr.
 `--repo PATH` defaults to the current directory. Git is the only external executable.
 
 ## Commands
+
+### `run` (default)
+
+```text
+uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--config PATH] [--smoke CMD] [--dry-run] [--json] [context ...]
+```
+
+`run` is the default command when no subcommand is given, and the only one that mutates anything. It owns the whole loop:
+
+1. Recover a prepared receipt, then re-prepare in the same invocation.
+2. Send the inventory, repository policy, and exact zero-context diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation.
+3. Validate each returned plan against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context.
+4. When the plan needs atomicity review, ask an independent critic, at most twice. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two commits.
+5. Apply commits in dependency order inside a detached temporary worktree, then publish by compare-and-swap.
+
+Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and publishes nothing when it fails.
+
+Plan files, decision files, and the snapshot token live in a private temporary directory. They are never caller-facing flags.
+
+### `rewrite`
+
+```text
+uv run --script <skill-dir>/scripts/cli.py rewrite --base <rev> [options]
+```
+
+`rewrite` rebuilds the commits since an ancestor revision while preserving the final content exactly. It:
+
+1. Resolves `--base` (default order: `origin/HEAD`, `origin/main`, `main`) and refuses a revision that is not an ancestor of `HEAD`.
+2. Freezes the current worktree, including uncommitted work, into a target tree through a temporary index, so the real index is never touched.
+3. Builds the planner evidence from the range diff between `--base` and that target tree.
+4. Rebuilds the commits in dependency order inside a detached temporary worktree placed at `--base`.
+5. Requires the rebuilt tip tree to equal the frozen target tree, then moves the branch with one compare-and-swap and refreshes the index. Worktree files never change.
+
+The previous tip is reported as the recovery point and stays reachable through the reflog. `rewrite` never pushes. Use `--dry-run` to print the frozen scope without a model call.
+
+### `models`
+
+```text
+uv run --script <skill-dir>/scripts/cli.py models [--filter TEXT] [--base-url URL] [--api-key KEY] [--config PATH] [--json]
+```
+
+Read-only discovery against the configured endpoint's `GET {base-url}/models`. It lists the advertised model ids, one per line, filtered by a case-insensitive substring when `--filter` is given. `--json` wraps the same ids and the resolved `base_url` in one `autommit/v1` object on stdout. It never reads or writes a repository, so use it to pick a `--model` before a run.
+
+### Debug subcommands
+
+`prepare`, `validate-plan`, `apply`, and `schema` remain available for debugging and tests. They keep the exact envelopes, snapshot algorithm, and exit codes documented below. Do not build workflows on them.
 
 ### `schema`
 
@@ -94,6 +140,7 @@ The original worktree index becomes clean relative to the new `HEAD`. In `auto` 
     {
       "summary": "Imperative repository-style subject",
       "details": ["Concrete change detail."],
+      "dependencies": [],
       "changes": [
         {"path": "src/example.py", "hunks": "all"},
         {"path": "tests/test_example.py", "hunks": {"type": "indices", "indices": [1, 2]}},
@@ -104,7 +151,9 @@ The original worktree index becomes clean relative to the new `HEAD`. In `auto` 
 }
 ```
 
-Limits: 1-16 commits; 1-128 changes per commit; 0-32 details; summary <=512 characters; detail <=2,000 characters; path <=4,096 characters.
+`dependencies` is optional per commit. It holds 0-based indices into `commits` for commits that must be applied first. Autommit rejects self-references, duplicates, out-of-range indices, and cycles, then applies commits in dependency order. Dependency order matters because every commit is applied as a patch into one temporary worktree.
+
+Limits: 1-16 commits; 1-128 changes per commit; 0-32 details; 0-15 dependencies per commit; summary <=512 characters; detail <=2,000 characters; path <=4,096 characters.
 
 Selectors:
 
@@ -133,9 +182,21 @@ Limits: at most 8 concerns; concern <=512 characters; rationale <=2,000 characte
 |Code|Meaning|Action|
 |---|---|---|
 |0|Success|Parse `result`|
-|2|Usage, JSON, plan, coverage, or critic error|Correct bounded model/input data; retry only within workflow limits|
-|3|Lock, snapshot, branch, index, or receipt refusal|Preserve state; report exact blocker|
-|4|Git, filesystem, cleanup, or unexpected runtime failure|Preserve state and inspect evidence|
+|1|Provider or network failure|Wait for the provider, or configure another endpoint|
+|2|Usage, JSON, plan, coverage, config, or critic error|Correct bounded model/input data; retry only within workflow limits|
+|3|Lock, snapshot, branch, index, in-progress Git state, or receipt refusal|Preserve state; report exact blocker|
+|4|Git, filesystem, cleanup, or smoke failure|Preserve state and inspect evidence|
 |127|Git executable unavailable|Install/fix Git before retrying|
+|130|Cancelled by a signal|Lock released, temporary worktree removed; no commits were published|
+
+## Recovery Point
+
+An interrupted or failed run that already built commits writes `recovery.json` beside the lock in the worktree-local autommit state directory, holding the branch ref and the commit it pointed at before the run. The failure message repeats it as `Recovery point: <ref> at <before>.`
+
+Autommit never restores a recovery point automatically. Read it, inspect the repository, and decide. A successful publication removes the file.
+
+## Environment Invariants
+
+Every Git invocation pins diff shape so hunk indices stay portable across machines: `core.quotepath=false`, `diff.mnemonicprefix=false`, `diff.noprefix=false`, `diff.algorithm=myers`, `diff.renames=true`, `diff.interHunkContext=0`, and the diff flags `--no-color --no-ext-diff --no-textconv`. `GIT_DIFF_OPTS` and `GIT_EXTERNAL_DIFF` are dropped from the environment, and `GIT_PAGER` is `cat`. Commits are created with `core.hooksPath=` and `--no-verify` inside the temporary worktree, so repository hooks never observe the temporary state. Pass `--smoke` to run repository validation deliberately.
 
 Locks are never broken automatically. A prepared receipt is durable recovery evidence. Re-run `prepare` to recover it under the same branch and index state.

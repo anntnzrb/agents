@@ -36,3 +36,11 @@ class RefusalError(AutommitError):
     def __init__(self, code: str, message: str) -> None:
         """Store the refusal code and message."""
         super().__init__(code, message, 3)
+
+
+class CancelledError(AutommitError):
+    """A signal interrupted the run before publication."""
+
+    def __init__(self, message: str = "Cancelled; no commits were published.") -> None:
+        """Store the cancellation code and message."""
+        super().__init__("cancelled", message, 130)
