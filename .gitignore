@@ -28,3 +28,4 @@ htmlcov/
 *.cover
 *.pyo
 *.egg-info/
+.amp/portals/*

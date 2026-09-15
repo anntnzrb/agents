@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Prepare this repository to run in an Amp orb (Debian 12 sandbox).
+# Idempotent and non-interactive: safe to rerun on a warm snapshot.
+# See https://ampcode.com/docs/orbs
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+log() {
+  printf '+ %s\n' "$*"
+}
+
+# 1. System prerequisites (check first so warm snapshots skip apt entirely).
+missing_pkgs=()
+if ! command -v git >/dev/null 2>&1; then missing_pkgs+=(git); fi
+if ! command -v curl >/dev/null 2>&1; then missing_pkgs+=(curl); fi
+if ! command -v tar >/dev/null 2>&1; then missing_pkgs+=(tar); fi
+if ! command -v jq >/dev/null 2>&1; then missing_pkgs+=(jq); fi
+if ! command -v python3 >/dev/null 2>&1; then missing_pkgs+=(python3); fi
+if ! command -v ca-certificates >/dev/null 2>&1 && [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
+  # ca-certificates provides no binary; check the bundle instead.
+  missing_pkgs+=(ca-certificates)
+fi
+
+if [ "${#missing_pkgs[@]}" -gt 0 ]; then
+  log "apt-get install ${missing_pkgs[*]}"
+  start=$SECONDS
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq "${missing_pkgs[@]}"
+  log "apt done in $((SECONDS - start))s"
+else
+  log "system packages present (git, curl, tar, jq, python3)"
+fi
+
+# 2. uv (Python package manager). Orb base images usually provide it.
+if ! command -v uv >/dev/null 2>&1; then
+  log "installing uv"
+  start=$SECONDS
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # The installer cannot update this running process; export for the rest of setup.
+  export PATH="$HOME/.local/bin:$PATH"
+  log "uv install done in $((SECONDS - start))s"
+else
+  log "uv present: $(uv --version)"
+fi
+
+# 3. Node.js toolchain (node, npm, bun). Needed for harness extension deps
+# and npm-distributed harness launchers. Orb base images usually provide them.
+if ! command -v bun >/dev/null 2>&1; then
+  log "installing bun"
+  start=$SECONDS
+  curl -fsSL https://bun.sh/install | bash
+  export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+  export PATH="$BUN_INSTALL/bin:$PATH"
+  log "bun install done in $((SECONDS - start))s"
+else
+  log "bun present: $(bun --version)"
+fi
+
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  log "installing nodejs + npm via apt"
+  start=$SECONDS
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq nodejs npm
+  log "node install done in $((SECONDS - start))s"
+else
+  log "node present: $(node --version), npm present: $(npm --version)"
+fi
+
+# 4. Sync application dependencies (pinned by sync/uv.lock, Python >=3.12
+# provisioned automatically by uv). Warm snapshots reuse sync/.venv + uv cache.
+log "uv sync --frozen (sync/)"
+start=$SECONDS
+(
+  cd sync
+  uv sync --frozen
+)
+log "uv sync done in $((SECONDS - start))s"
+
+# 5. Smoke test: CLI loads without a full reconciliation.
+# Full `sync` is a no-op in orbs where the SSOT is not at ~/.config/agents,
+# so --help is the meaningful fast check here.
+log "sync --help smoke test"
+start=$SECONDS
+uv run --project sync sync --help >/dev/null
+log "smoke test done in $((SECONDS - start))s"
+
+# 6. Shared env template (never clobber an existing .env).
+if [ ! -f .env ]; then
+  log "creating .env from .env.example"
+  cp -- .env.example .env
+  chmod 600 .env
+else
+  log ".env already exists, leaving it alone"
+fi
+
+log "orb setup complete"

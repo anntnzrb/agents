@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fast, idempotent orb wake check. Never installs dependencies here.
+# Amp waits at most 10s; keep this script in the foreground and exit 0
+# with warnings so a repairable state never blocks wake.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+warn() {
+  printf 'resume: %s\n' "$*" >&2
+}
+
+for cmd in uv python3 git bun node npm jq; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    warn "$cmd not on PATH"
+  fi
+done
+
+if [ ! -d sync/.venv ]; then
+  warn "sync/.venv missing; run .agents/setup to reconcile dependencies"
+fi
+
+if [ ! -f .env ] && [ -f .env.example ]; then
+  warn ".env missing; run .agents/setup to create it from .env.example"
+fi
+
+exit 0
