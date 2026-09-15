@@ -1056,9 +1056,13 @@ def _evaluate_odoo_test_result(exit_code: int, output: str) -> tuple[bool, list[
             if "odoo.tests.result:" in line or "odoo.modules.loading:" in line
         )
     )
+    executed_tests = max(
+        (int(count) for count in re.findall(r"of (\d+) tests", output)), default=0
+    )
     has_passed = (
         exit_code == 0
         and not has_test_failures
+        and executed_tests > 0
         and ("0 failed, 0 error(s)" in output or "0 failures, 0 errors" in output)
     )
     return has_passed, summary_lines

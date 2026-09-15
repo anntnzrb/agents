@@ -87,6 +87,17 @@ class TestEvaluateOdooTestResult:
         passed, _ = odooctl._evaluate_odoo_test_result(127, output)  # pyright: ignore[reportPrivateUsage]
         assert not passed
 
+    def test_zero_test_run_is_not_success(self) -> None:
+        """Verify a run that executed no tests never reports success."""
+        output = (
+            "2026-09-15 00:51:38,529 1 WARNING erptech "
+            "odoo.tests.result: 0 failed, 0 error(s) of 0 tests when loading "
+            "database 'erptech'\n"
+        )
+        passed, summary = odooctl._evaluate_odoo_test_result(0, output)  # pyright: ignore[reportPrivateUsage]
+        assert not passed
+        assert any("of 0 tests" in line for line in summary)
+
 
 class TestCmdTestLifecycle:
     """Tests for cmd_test execution, cleanup, and signal handling."""
