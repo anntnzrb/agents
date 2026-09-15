@@ -156,6 +156,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Public run paths use `uv run --script`; do not invoke raw `python`, `python3`, `pip`, `node`, or `npm`.
 - Docs use `<temp-dir>` and code uses `tempfile` or platform temp directories; avoid POSIX-only paths like `/tmp`.
 - Skill scripts, default headers (e.g. `User-Agent`), and prompt templates MUST NOT contain personal usernames, machine hostnames, or private URLs.
+- Docs, examples, and code defaults MUST NOT hardcode values tied to one environment, deployment, or instance (names, paths, identifiers). Use clearly marked placeholders in examples and make runtime defaults overridable via configuration or environment variables. Exempt: files whose purpose is per-instance configuration, and fixtures that need concrete values by design.
 
 ## Cross-platform code rules
 
