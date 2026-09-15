@@ -10,6 +10,7 @@ import argparse
 import ast
 import concurrent.futures
 import configparser
+import gzip
 import ipaddress
 import json
 import os
@@ -20,6 +21,7 @@ import sys
 import time
 import urllib.parse
 from dataclasses import dataclass, field
+from io import BufferedIOBase
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -45,7 +47,10 @@ DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
 DEFAULT_DB_USER = "odoo"
 DEFAULT_DB_PASS = "odoo"  # noqa: S105 - default dev password for local container
-DEFAULT_DB_NAME = "erptech_0908"
+# Fallback replica used when the runtime config leaves ``db_name`` unset. Follows
+# the ``<prod-name>_work_<YYYYMMDD>`` convention via POSTGRES_DB; override per
+# call with ``--db``.
+DEFAULT_DB_NAME = os.environ.get("POSTGRES_DB", "odoo_replica")
 
 # Container Topology (Local Podman Pod)
 DEFAULT_POD_NAME = "odoo-pod"
@@ -1796,6 +1801,157 @@ def cmd_db_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _filestore_path(ctx: WorkspaceContext, db_name: str) -> Path:
+    """Return the host path of a database filestore inside the runtime data dir."""
+    return (
+        ctx.runtime
+        / "data"
+        / "web"
+        / ".local"
+        / "share"
+        / "Odoo"
+        / "filestore"
+        / _validate_db_name(db_name)
+    )
+
+
+def _regenerate_db_uuid(db_name: str) -> None:
+    """Drop the copied ``database.uuid`` so Odoo issues a fresh one on next load.
+
+    ``CREATE DATABASE ... TEMPLATE`` and SQL restores copy the identifier, and two
+    databases sharing a uuid confuse telemetry and anything keyed on database
+    identity. Odoo regenerates the parameter because it is declared in
+    ``ir.config_parameter._default_parameters`` and initialized when missing.
+    """
+    _ = _exec_sql(
+        "DELETE FROM ir_config_parameter WHERE key = 'database.uuid';",
+        db=db_name,
+    )
+
+
+def _copy_filestore(ctx: WorkspaceContext, source: str, target: str) -> bool:
+    """Copy a database filestore, warning when the source has none.
+
+    A raw SQL clone never carries the filestore, so attachments and downloads
+    fail with ``FileNotFoundError`` unless the directory is copied too.
+    """
+    from_fs = _filestore_path(ctx, source)
+    to_fs = _filestore_path(ctx, target)
+    if not from_fs.is_dir() or not any(from_fs.iterdir()):
+        print(
+            f"[WARN] {source!r} has no filestore: attachments will not resolve "
+            f"in {target!r}."
+        )
+        return False
+    _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
+    print(f"[OK] Filestore copied: {from_fs} -> {to_fs}")
+    return True
+
+
+def _pipe_stream_to_psql(stream: BufferedIOBase, db_name: str, dump_path: Path) -> None:
+    """Pipe an open dump stream into psql inside the database container."""
+    _ensure_podman()
+    cmd = [
+        "podman",
+        "exec",
+        "-i",
+        DEFAULT_DB_CONTAINER,
+        "psql",
+        "-U",
+        DEFAULT_DB_USER,
+        "-d",
+        _validate_db_name(db_name),
+        "-X",
+        "-v",
+        "ON_ERROR_STOP=1",
+    ]
+    with subprocess.Popen(cmd, stdin=subprocess.PIPE) as proc:
+        if proc.stdin is None:
+            msg = "psql stdin is not available"
+            raise CliError(msg)
+        _ = shutil.copyfileobj(stream, proc.stdin)
+        proc.stdin.close()
+        if proc.wait() != 0:
+            msg = f"psql restore failed for {dump_path}"
+            raise CliError(msg)
+
+
+def _stream_dump_to_psql(dump_path: Path, db_name: str) -> None:
+    """Stream a plain or gzip-compressed SQL dump into psql in the DB container."""
+    if dump_path.suffix == ".gz":
+        with gzip.open(dump_path, "rb") as stream:
+            _pipe_stream_to_psql(stream, db_name, dump_path)
+    else:
+        with dump_path.open("rb") as stream:
+            _pipe_stream_to_psql(stream, db_name, dump_path)
+
+
+def cmd_db_restore(args: argparse.Namespace) -> int:
+    """Restore a SQL dump into a new local replica database.
+
+    Restores plain or gzip-compressed SQL dumps, which is the format the DBA
+    delivers. Neutralization and data masking happen before the dump reaches
+    this runtime, and a SQL dump carries no filestore.
+    """
+    dump_path = Path(_require_str(args, "dump")).expanduser()
+    target = _validate_db_name(_require_str(args, "target"))
+    force = _require_bool(args, "force")
+    json_mode = _require_bool(args, "json")
+
+    if not dump_path.is_file():
+        msg = f"Dump file not found: {dump_path}"
+        raise CliError(msg)
+    if dump_path.suffix not in {".sql", ".gz"}:
+        msg = (
+            f"Unsupported dump format {dump_path.suffix!r}: this command restores "
+            "plain or gzip-compressed SQL dumps only."
+        )
+        raise CliError(msg)
+
+    ctx = _resolve_workspace()
+    _ensure_runtime_pod(ctx)
+
+    existing = _exec_sql_json(
+        f"SELECT datname FROM pg_database WHERE datname = '{target}';",  # noqa: S608 - validated database identifier
+        db="postgres",
+    )
+    if existing and not force:
+        msg = (
+            f"Target database {target!r} already exists. Pass --force to drop and "
+            "recreate it (destructive)."
+        )
+        raise CliError(msg)
+
+    size_mib = dump_path.stat().st_size / (1024 * 1024)
+    print(f"Restoring {dump_path.name} ({size_mib:.0f} MiB) -> {target!r}...")
+
+    drop_sql = f'DROP DATABASE IF EXISTS "{target}";'  # noqa: S608 - validated database identifier
+    _ = _exec_sql(drop_sql, db="postgres")
+    create_sql = (
+        f'CREATE DATABASE "{target}" OWNER "{_validate_db_name(DEFAULT_DB_USER)}";'  # noqa: S608 - validated database identifier
+    )
+    _ = _exec_sql(create_sql, db="postgres")
+
+    started = time.monotonic()
+    _stream_dump_to_psql(dump_path, target)
+    _regenerate_db_uuid(target)
+    elapsed = time.monotonic() - started
+
+    print(
+        f"[WARN] A SQL dump carries no filestore: attachments will not resolve in "
+        f"{target!r}."
+    )
+    if json_mode:
+        print(
+            json.dumps(
+                {"status": "restored", "target": target, "seconds": round(elapsed, 1)}
+            )
+        )
+    else:
+        print(f"[OK] Database restored: {target} in {elapsed:.0f}s")
+    return 0
+
+
 def cmd_db_clone(args: argparse.Namespace) -> int:
     """Clone a PostgreSQL database template to a new target database."""
     source = _validate_db_name(_require_str(args, "source"))
@@ -1828,6 +1984,11 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
     # 3. Create database as template copy
     create_sql = f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'  # noqa: S608 - create database with validated identifiers
     _ = _exec_sql(create_sql, db="postgres")
+
+    # 4. A template copy is neither filestore-aware nor uuid-unique
+    _ = _copy_filestore(ctx, source, target)
+    _regenerate_db_uuid(target)
+
     if json_mode:
         print(json.dumps({"status": "cloned", "source": source, "target": target}))
     else:
@@ -2052,6 +2213,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="Drop target if already exists"
     )
 
+    # DB Restore
+    p_restore = subparsers.add_parser(
+        "db-restore",
+        parents=[parent_parser],
+        help="Restore a plain or gzip SQL dump into a new local replica database",
+    )
+    _ = p_restore.add_argument("dump", help="Path to the .sql or .sql.gz dump")
+    _ = p_restore.add_argument("target", help="Target database name")
+    _ = p_restore.add_argument(
+        "--force", action="store_true", help="Drop target if already exists"
+    )
+
     return parser
 
 
@@ -2076,6 +2249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "db-tables": cmd_db_tables,
         "db-query": cmd_db_query,
         "db-clone": cmd_db_clone,
+        "db-restore": cmd_db_restore,
     }
 
     command_name = _require_str(args, "command")

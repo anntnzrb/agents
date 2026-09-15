@@ -603,3 +603,104 @@ class TestDatabaseAndSafetyValidation:
             pytest.raises(odooctl.CliError, match="Remote Podman host"),
         ):
             odooctl._ensure_podman()
+
+
+class TestDbReplicaMaintenance:
+    """Tests for filestore-aware cloning, uuid handling, and dump restores."""
+
+    def test_filestore_path_uses_runtime_data_dir(self, tmp_path: Path) -> None:
+        """Verify the filestore path resolves inside the runtime data directory."""
+        ctx = make_workspace_context(tmp_path)
+        path = odooctl._filestore_path(ctx, "prod_work_20260101")  # pyright: ignore[reportPrivateUsage]
+        expected = (
+            ctx.runtime
+            / "data"
+            / "web"
+            / ".local"
+            / "share"
+            / "Odoo"
+            / "filestore"
+            / "prod_work_20260101"
+        )
+        assert path == expected
+
+    def test_regenerate_db_uuid_deletes_parameter(self) -> None:
+        """Verify uuid regeneration deletes the copied config parameter."""
+        with patch.object(odooctl, "_exec_sql") as exec_sql:
+            odooctl._regenerate_db_uuid("seed")  # pyright: ignore[reportPrivateUsage]
+        statement = exec_sql.call_args.args[0]
+        assert statement == (
+            "DELETE FROM ir_config_parameter WHERE key = 'database.uuid';"
+        )
+        assert exec_sql.call_args.kwargs["db"] == "seed"
+
+    def test_copy_filestore_warns_when_source_is_missing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify a missing source filestore warns instead of failing the clone."""
+        ctx = make_workspace_context(tmp_path)
+        copied = odooctl._copy_filestore(ctx, "seed", "work")  # pyright: ignore[reportPrivateUsage]
+        assert not copied
+        assert "no filestore" in capsys.readouterr().out
+
+    def test_copy_filestore_copies_existing_directory(self, tmp_path: Path) -> None:
+        """Verify an existing filestore is copied file by file."""
+        ctx = make_workspace_context(tmp_path)
+        from_fs = odooctl._filestore_path(ctx, "seed")  # pyright: ignore[reportPrivateUsage]
+        from_fs.mkdir(parents=True)
+        _ = (from_fs / "attachment").write_text("payload")
+        assert odooctl._copy_filestore(ctx, "seed", "work")  # pyright: ignore[reportPrivateUsage]
+        to_fs = odooctl._filestore_path(ctx, "work")  # pyright: ignore[reportPrivateUsage]
+        assert (to_fs / "attachment").read_text() == "payload"
+
+    def test_cmd_db_clone_copies_filestore_and_regenerates_uuid(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify db-clone carries the filestore and drops the copied uuid."""
+        ctx = make_workspace_context(tmp_path)
+        seed_fs = odooctl._filestore_path(ctx, "seed")  # pyright: ignore[reportPrivateUsage]
+        seed_fs.mkdir(parents=True)
+        _ = (seed_fs / "attachment").write_text("payload")
+        args = argparse.Namespace(source="seed", target="work", force=True, json=False)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql") as exec_sql,
+        ):
+            assert odooctl.cmd_db_clone(args) == 0
+        statements = [call.args[0] for call in exec_sql.call_args_list]
+        assert any("CREATE DATABASE" in statement for statement in statements)
+        assert any(
+            statement.startswith("DELETE FROM ir_config_parameter")
+            for statement in statements
+        )
+        work_fs = odooctl._filestore_path(ctx, "work")  # pyright: ignore[reportPrivateUsage]
+        assert (work_fs / "attachment").read_text() == "payload"
+
+    def test_cmd_db_restore_requires_force_when_target_exists(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify restoring over an existing database demands an explicit --force."""
+        ctx = make_workspace_context(tmp_path)
+        dump = tmp_path / "replica.sql.gz"
+        _ = dump.write_bytes(b"")
+        args = argparse.Namespace(
+            dump=str(dump), target="work", force=False, json=False
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql_json", return_value=[{"datname": "work"}]),
+            pytest.raises(odooctl.CliError, match="already exists"),
+        ):
+            _ = odooctl.cmd_db_restore(args)
+
+    def test_cmd_db_restore_rejects_unknown_dump_format(self, tmp_path: Path) -> None:
+        """Verify Odoo backup archives are rejected with actionable guidance."""
+        dump = tmp_path / "backup.zip"
+        _ = dump.write_bytes(b"")
+        args = argparse.Namespace(
+            dump=str(dump), target="work", force=False, json=False
+        )
+        with pytest.raises(odooctl.CliError, match="Unsupported dump format"):
+            _ = odooctl.cmd_db_restore(args)

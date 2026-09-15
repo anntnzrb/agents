@@ -57,9 +57,14 @@ odoo-ops lint crm --fix
 odoo-ops fmt crm --check
 odoo-ops lint-views crm --strict --json
 odoo-ops routes --json
+odoo-ops db-restore <dump-path>.sql.gz <prod-name>_seed_<YYYYMMDD> --force
+odoo-ops db-clone <prod-name>_seed_<YYYYMMDD> <prod-name>_work_<YYYYMMDD> --force
 odoo-ops stop
 odoo-ops logs
 ```
+
+See [Database recipes](references/db-recipes.md) for the seed/work replica
+naming convention before rebuilding a replica.
 
 Workflows live in `profiles/<profile>.json`. Lint and format rules live in `config/ruff.toml`. Local test execution can write data and run addon code. Keep replica email, webhooks, scheduled jobs, and external integrations disabled or pointed at test services before running it.
 
