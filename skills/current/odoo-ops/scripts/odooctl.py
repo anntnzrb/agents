@@ -42,6 +42,7 @@ RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
 
 # Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
+DEFAULT_HTTP_BIND = os.environ.get("ODOO_HTTP_BIND", "0.0.0.0")
 DEFAULT_TEST_HTTP_PORT = int(os.environ.get("ODOO_TEST_HTTP_PORT", "8079"))
 DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
@@ -869,7 +870,7 @@ def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> Non
                 "--name",
                 DEFAULT_POD_NAME,
                 "-p",
-                f"127.0.0.1:{DEFAULT_HTTP_PORT}:8069",
+                f"{DEFAULT_HTTP_BIND}:{DEFAULT_HTTP_PORT}:8069",
                 "-p",
                 f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
             ]
