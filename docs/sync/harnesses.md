@@ -74,7 +74,7 @@ Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync 
 
 Each npm harness has a versioned cache under `<cache-home>/npm-tools/`. `<cache-home>` is `XDG_CACHE_HOME` or `~/.cache`.
 
-The cache keeps the current and previous known-good package versions. Newly installed packages pass the adapter smoke command before promotion. Cached packages are checked for package identity and an executable before promotion.
+The cache keeps the current and previous known-good package versions. Newly installed packages pass the adapter smoke command before promotion. Cached packages are checked for package identity and an executable before promotion. Changing an adapter's npm package selects a separate package-key cache; it does not reuse the previous package's `current` install. The wrapper name and generated home can remain unchanged during that migration.
 
 Static release harnesses install one directory per resolved manifest version under the adapter `installSegments` root instead of the npm cache. Those installs also keep the current and previous versions.
 

@@ -155,7 +155,7 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         home_segments=(".config", "opencode"),
         platforms=("darwin", "linux"),
         launcher=NpmLauncherSpec(
-            package="opencode-ai",
+            package="@opencode/cli",
             bin="opencode",
         ),
         cliproxy_templates=("opencode.jsonc",),

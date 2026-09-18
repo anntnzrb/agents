@@ -100,6 +100,14 @@ def test_harness_id_alias_matches_adapter_registry() -> None:
     assert set(values) == {adapter.id for adapter in HARNESS_ADAPTERS}
 
 
+def test_opencode_launcher_uses_v2_package() -> None:
+    """Keep the existing wrapper name while resolving the V2 distribution."""
+    adapter = next(adapter for adapter in HARNESS_ADAPTERS if adapter.id == "opencode")
+    assert isinstance(adapter.launcher, NpmLauncherSpec)
+    assert adapter.launcher.package == "@opencode/cli"
+    assert adapter.launcher.bin == "opencode"
+
+
 def test_adapter_registration_order_is_stable() -> None:
     """Registration order is observable behavior and must only grow by appending."""
     assert tuple(adapter.id for adapter in HARNESS_ADAPTERS) == EXPECTED_ADAPTER_ORDER
