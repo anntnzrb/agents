@@ -81,10 +81,12 @@ openai-compatibility:
     base-url: "https://opencode.ai/zen/go/v1"
     prefix: "opencode-go"
     x-credential-pool: "opencode-go"
-    # The Go API rejects requests without a session key; the gateway's own affinity
-    # still chooses the credential, so a fixed routing key is sufficient.
+    # `$CPA-SESSION-ID` expands to the gateway's internal session identifier
+    # for session affinity, so Go's required `x-opencode-session` is always
+    # sent and prompt-cache affinity holds across turns. The resolver never
+    # reads a client-supplied session header.
     headers:
-      x-opencode-session: "cliproxy"
+      x-opencode-session: "$CPA-SESSION-ID"
     # Sync derives the model list from {base-url}/models.
     x-model-discovery: true
   - name: "opencode-zen-custom"
@@ -92,7 +94,7 @@ openai-compatibility:
     prefix: "opencode-zen"
     x-credential-pool: "opencode-zen"
     headers:
-      x-opencode-session: "cliproxy"
+      x-opencode-session: "$CPA-SESSION-ID"
     x-model-discovery: true
   - name: "cline-pass-custom"
     base-url: "https://api.cline.bot/api/v1"
