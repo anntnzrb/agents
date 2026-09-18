@@ -31,7 +31,7 @@ MODELS_DEV_TTL_SECONDS: Final[float] = 24 * 60 * 60
 MODELS_DEV_TIMEOUT_SECONDS: Final[float] = 10.0
 MODELS_DEV_CACHE_VERSION: Final[int] = 2
 MODELS_DEV_QUALIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"-(minimal|low|medium|high|max|thinking)$",
+    r"-(minimal|low|medium|high|xhigh|max|thinking)$",
     re.IGNORECASE,
 )
 THINKING_LEVELS_DEFAULT: Final[tuple[str, ...]] = ("low", "medium", "high")
@@ -66,6 +66,7 @@ class CatalogModelEntry(TypedDict):
     name: NotRequired[str]
     context_length: NotRequired[int]
     reasoning: NotRequired[bool]
+    reasoning_levels: NotRequired[list[str]]
 
 
 type ModelListFetcher = Callable[[str, str], list[UpstreamModelEntry] | None]
@@ -253,6 +254,33 @@ def _normalize_models_dev(
     return maps
 
 
+def _effort_levels(raw: Mapping[str, object]) -> list[str]:
+    """Collect discrete reasoning-effort values from a models.dev record."""
+    options = raw.get("reasoning_options")
+    if not is_obj_list(options):
+        return []
+    levels: list[str] = []
+    seen: set[str] = set()
+    for option in options:
+        if not is_obj_dict(option):
+            continue
+        option_type = option.get("type")
+        if not isinstance(option_type, str) or option_type.lower() != "effort":
+            continue
+        values = option.get("values")
+        if not is_obj_list(values):
+            continue
+        for value in values:
+            if not isinstance(value, str):
+                continue
+            stripped = value.strip()
+            if not stripped or stripped in seen:
+                continue
+            seen.add(stripped)
+            levels.append(stripped)
+    return levels
+
+
 def _catalog_entry(raw: Mapping[str, object]) -> CatalogModelEntry:
     """Project a models.dev record into normalized catalog metadata."""
     entry: CatalogModelEntry = {}
@@ -267,6 +295,9 @@ def _catalog_entry(raw: Mapping[str, object]) -> CatalogModelEntry:
     reasoning = raw.get("reasoning")
     if isinstance(reasoning, bool):
         entry["reasoning"] = reasoning
+    levels = _effort_levels(raw)
+    if levels:
+        entry["reasoning_levels"] = levels
     return entry
 
 
@@ -399,7 +430,10 @@ def _discovered_model_entry(
         entry["display-name"] = name
     if context_length:
         entry["max-context-length"] = context_length
-    if catalog is not None and "reasoning" in catalog:
+    reasoning_levels = catalog.get("reasoning_levels") if catalog is not None else None
+    if catalog is not None and isinstance(reasoning_levels, list) and reasoning_levels:
+        entry["thinking"] = {"levels": list(reasoning_levels)}
+    elif catalog is not None and "reasoning" in catalog:
         levels = (
             THINKING_LEVELS_DEFAULT
             if catalog["reasoning"]

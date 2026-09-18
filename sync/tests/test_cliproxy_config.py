@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from sync.core.cliproxy_config import (
+    MODELS_DEV_QUALIFIER_PATTERN,
     CatalogModelEntry,
     DiscoveryOptions,
     UpstreamModelEntry,
@@ -424,6 +425,156 @@ openai-compatibility:
             "api-key-entries": [{"api-key": "key-1"}],
         },
     ]
+
+
+def test_cliproxy_render_config_uses_catalog_reasoning_levels_verbatim() -> None:
+    """Catalog reasoning_levels render verbatim instead of default levels."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    catalog: dict[str, CatalogModelEntry] = {
+        "effort-model": {
+            "reasoning": True,
+            "reasoning_levels": ["minimal", "low", "medium", "high", "xhigh"],
+        },
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [{"id": "effort-model"}]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=fake_fetch,
+            catalog=catalog.get,
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [
+                {
+                    "name": "effort-model",
+                    "thinking": {
+                        "levels": ["minimal", "low", "medium", "high", "xhigh"]
+                    },
+                },
+            ],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_cliproxy_render_config_defaults_thinking_levels_without_levels() -> None:
+    """Reasoning catalog entries without levels keep the default ladder."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    catalog: dict[str, CatalogModelEntry] = {
+        "reasoning-model": {"reasoning": True},
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [{"id": "reasoning-model"}]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=fake_fetch,
+            catalog=catalog.get,
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [
+                {
+                    "name": "reasoning-model",
+                    "thinking": {"levels": ["low", "medium", "high"]},
+                },
+            ],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_cliproxy_render_config_disables_thinking_without_levels() -> None:
+    """Non-reasoning catalog entries render the disabled thinking level."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    catalog: dict[str, CatalogModelEntry] = {
+        "plain-model": {"reasoning": False},
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [{"id": "plain-model"}]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=fake_fetch,
+            catalog=catalog.get,
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "models": [
+                {"name": "plain-model", "thinking": {"levels": ["none"]}},
+            ],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_models_dev_qualifier_pattern_strips_xhigh() -> None:
+    """The qualifier pattern strips the -xhigh effort suffix."""
+    assert (
+        MODELS_DEV_QUALIFIER_PATTERN.sub("", "example-model-xhigh") == "example-model"
+    )
+    assert (
+        MODELS_DEV_QUALIFIER_PATTERN.sub("", "example-model-XHIGH") == "example-model"
+    )
 
 
 def _unavailable_fetch(_base_url: str, _api_key: str) -> None:
