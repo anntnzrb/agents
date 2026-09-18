@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "effect": "4.0.0-rc.110"
+    "@opencode/plugin": "2.0.7",
+    "@opencode/schema": "2.0.7"
   },
   "devDependencies": {
     "@types/node": "25.9.5"

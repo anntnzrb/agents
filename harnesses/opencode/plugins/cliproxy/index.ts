@@ -1,10 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Config, Hooks, PluginInput } from "@opencode-ai/plugin";
-
-type ProviderConfig = NonNullable<Config["provider"]>[string];
-type ProviderModel = NonNullable<NonNullable<ProviderConfig["models"]>[string]>;
+import { Model, Plugin, Provider } from "@opencode/plugin";
+import { Money } from "@opencode/schema/money";
 
 const GATEWAY_TIMEOUT_MS = 5000;
 
@@ -28,11 +26,17 @@ interface GatewayModelsResponse {
 	data?: Array<{ id?: unknown; owned_by?: unknown }>;
 }
 
+interface ReasoningOption {
+	type?: string;
+	values?: Array<string | null>;
+}
+
 interface CatalogModel {
 	name?: string;
 	family?: string;
 	release_date?: string;
 	reasoning?: boolean;
+	reasoning_options?: ReasoningOption[];
 	attachment?: boolean;
 	tool_call?: boolean;
 	temperature?: boolean;
@@ -136,7 +140,35 @@ function inputModalities(entry: CatalogModel | undefined): InputModality[] {
 	return filtered.length > 0 ? filtered : ["text"];
 }
 
-function toModelConfig(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ProviderModel {
+// Default effort ladder for the Responses route (matches upstream
+// Variant.resolve openaiResponses: none/minimal + low/medium/high + xhigh).
+// The cliproxy provider runs aisdk:@ai-sdk/openai, rewritten to
+// @opencode/ai/providers/openai, so variants carry Responses-style settings.
+const DEFAULT_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
+
+function effortValues(entry: CatalogModel | undefined): string[] {
+	const values = entry?.reasoning_options?.find((option) => option.type === "effort")?.values;
+	const seen = new Map<string, true>();
+	for (const value of values ?? []) {
+		const effort = value ?? "none";
+		if (effort.length > 0 && !seen.has(effort)) seen.set(effort, true);
+	}
+	if (seen.size > 0) return [...seen.keys()];
+	return [...DEFAULT_EFFORTS];
+}
+
+function toVariants(entry: CatalogModel | undefined): Model.Info["variants"] {
+	return effortValues(entry).map((effort) => ({
+		id: Model.VariantID.make(effort),
+		settings: {
+			reasoningEffort: effort,
+			reasoningSummary: "auto",
+			include: ["reasoning.encrypted_content"],
+		},
+	}));
+}
+
+function toModelConfig(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): Model.Info {
 	const entry = catalogModel(catalog, id);
 	const input = inputModalities(entry);
 	// Multi-segment gateway ids are <pool>/<vendor>/<model>; the pool
@@ -145,23 +177,23 @@ function toModelConfig(id: string, ownedBy: string | undefined, catalog: Catalog
 	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : ownedBy;
 	const name = entry?.name ?? id;
 	return {
+		...Model.Info.default(Provider.ID.make("cliproxy"), Model.ID.make(id)),
 		name: pool ? `${name} (${pool})` : name,
-		release_date: entry?.release_date ?? "",
-		reasoning: entry?.reasoning ?? true,
-		attachment: entry?.attachment ?? input.includes("image"),
-		tool_call: entry?.tool_call ?? true,
-		temperature: entry?.temperature ?? true,
-		modalities: { input, output: ["text"] },
+		time: { released: Date.parse(entry?.release_date ?? "") || 0 },
+		capabilities: { tools: entry?.tool_call ?? true, input, output: ["text"] },
+		variants: toVariants(entry),
 		limit: {
 			context: entry?.limit?.context ?? FALLBACK_LIMIT.context,
 			output: entry?.limit?.output ?? FALLBACK_LIMIT.output,
 		},
-		cost: {
-			input: entry?.cost?.input ?? 0,
-			output: entry?.cost?.output ?? 0,
-			cache_read: entry?.cost?.cache_read ?? 0,
-			cache_write: entry?.cost?.cache_write ?? 0,
-		},
+		cost: [{
+			input: Money.USDPerMillionTokens.make(entry?.cost?.input ?? 0),
+			output: Money.USDPerMillionTokens.make(entry?.cost?.output ?? 0),
+			cache: {
+				read: Money.USDPerMillionTokens.make(entry?.cost?.cache_read ?? 0),
+				write: Money.USDPerMillionTokens.make(entry?.cost?.cache_write ?? 0),
+			},
+		}],
 	};
 }
 
@@ -171,15 +203,15 @@ function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; owne
 			id: model.id,
 			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
 		}))
-		.filter((entry): entry is { id: string; ownedBy?: string } => typeof entry.id === "string" && entry.id.length > 0);
+		.filter((entry): entry is { id: string; ownedBy: string | undefined } => typeof entry.id === "string" && entry.id.length > 0);
 }
 
-const CliproxyDiscoveryPlugin = async (_input: PluginInput): Promise<Hooks> => ({
-	config: async (config) => {
-		const provider = config.provider?.["cliproxy"];
-		const baseURL = provider?.options?.["baseURL"];
-		if (!provider || typeof baseURL !== "string") return;
+export default Plugin.define({
+	id: "cliproxy",
+	async setup(ctx) {
 		try {
+			const baseURL = ctx.options.baseURL;
+			if (typeof baseURL !== "string") throw new Error("cliproxy requires the baseURL plugin option");
 			const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
 				signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
 			});
@@ -188,17 +220,21 @@ const CliproxyDiscoveryPlugin = async (_input: PluginInput): Promise<Hooks> => (
 				response.json() as Promise<GatewayModelsResponse>,
 				loadCatalog(),
 			]);
-			const models = Object.fromEntries(
-				gatewayModels(payload).map((entry) => [entry.id, toModelConfig(entry.id, entry.ownedBy, catalog)]),
-			);
-			if (Object.keys(models).length > 0) provider.models = models;
-		} catch {
-			// Leave the configured model map untouched when discovery is unavailable.
+			const models = gatewayModels(payload).map((entry) => toModelConfig(entry.id, entry.ownedBy, catalog));
+			if (models.length > 0) {
+				await ctx.provider.transform((editor) => {
+					editor.add({
+						info: {
+							...Provider.Info.empty(Provider.ID.make("cliproxy")),
+							activation: "enabled",
+							settings: { baseURL },
+						},
+						models,
+					});
+				});
+			}
+		} catch (error) {
+			console.warn("cliproxy model discovery failed", error);
 		}
 	},
 });
-
-export default {
-	id: "cliproxy",
-	server: CliproxyDiscoveryPlugin,
-};

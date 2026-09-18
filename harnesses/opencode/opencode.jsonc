@@ -5,25 +5,30 @@
    * MODELS
    * ************************************************************************ */
 
-  "model": "cliproxy/gemini-3.8-flash-high",
+  "model": "cliproxy/gemini-3.7-flash-high",
 
   /* **************************************************************************
    * PLUGINS
    * ************************************************************************ */
 
-  "plugin": ["./plugins/cliproxy"],
+  "plugins": [
+    {
+      "package": "./plugins/cliproxy",
+      "options": { "baseURL": "${CLIPROXY_CLIENT_BASE_URL}" },
+    },
+    "./plugins/tmap",
+  ],
 
   /* **************************************************************************
    * PROVIDERS
    * ************************************************************************ */
 
-  "provider": {
+  "providers": {
     "cliproxy": {
       "name": "CLIProxyAPI",
-      "npm": "@ai-sdk/openai",
-      "options": {
+      "package": "aisdk:@ai-sdk/openai",
+      "settings": {
         "apiKey": "keyless",
-        "baseURL": "${CLIPROXY_CLIENT_BASE_URL}",
       },
     },
   },
@@ -34,31 +39,30 @@
 
   "default_agent": "build",
 
-  "subagent_depth": 2,
-
-  "agent": {
+  "agents": {
     "plan": {
-      "disable": true,
+      "disabled": true,
     },
     "build": {
       "description":
         "Orchestrator Agent: executes tools and delegates exploration, wide searches, and analysis to subagents in parallel to keep the main context lean.",
-      "prompt":
+      "system":
         "You are the orchestrator agent. Proactively delegate multi-file searches, open-ended codebase exploration, and heavy research to subagents ('explore' and 'general') in parallel to keep your primary context clean and efficient. Synthesize subagent findings to plan and execute precise file edits and commands.",
     },
     "general": {
       "description":
         "Use proactively for researching complex questions, isolated investigations, and multi-step tasks in parallel. Returns only a concise final summary to keep the main session context clean.",
-      "permission": {
-        "task": { "*": "deny", "explore": "allow" },
-      },
+      "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "explore", "effect": "allow" },
+      ],
     },
     "explore": {
       "description":
         "Use proactively for exploring codebases: pattern matching, structural search, keyword search, finding usages, and multi-file analysis. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
-      "permission": {
-        "edit": { "*": "deny" },
-      },
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+      ],
     },
   },
 
@@ -66,10 +70,10 @@
    * PERMISSIONS
    * ************************************************************************ */
 
-  "permission": {
-    "*": "allow",
-    "webfetch": "deny",
-  },
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "deny" },
+  ],
 
   /* **************************************************************************
    * SERVER
@@ -85,11 +89,11 @@
    * MISC
    * ************************************************************************ */
 
-  "autoupdate": false,
+  "update": "disable",
   "share": "manual",
   "formatter": false,
   "lsp": false,
-    "experimental": {
-    "disable_paste_summary": true,
+  "experimental": {
+    "subagent_depth": 2,
   },
 }

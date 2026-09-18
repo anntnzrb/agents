@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session.compact": false,
+    "session.share": false,
+    "agent.cycle": false,
+    "agent.cycle.reverse": false
+  },
+  "prompt": {
+    "paste": "full"
+  },
+  "session": {
+    "sidebar": "hide"
+  }
+}
