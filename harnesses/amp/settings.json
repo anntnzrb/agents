@@ -1,5 +1,6 @@
 {
   "amp.updates.mode": "warn",
+  "amp.runner.autoUpdate.enabled": true,
   "amp.remoteThreadCreation.enabled": true,
   "amp.git.commit.ampThread.enabled": false,
   "amp.git.commit.coauthor.enabled": false,
