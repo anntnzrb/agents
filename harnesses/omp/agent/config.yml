@@ -3,19 +3,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 modelRoles:
-  default: devin/swe-2:max
-  smol: devin/swe-2:max
-  vision: cliproxy/gemini-3.8-flash-high:high
-  commit: cliproxy/gemini-3.8-flash-high:high
+  default: cliproxy/gemini-3.7-flash-high:medium
+  smol: cliproxy/gemini-3.7-flash-high:medium
+  vision: cliproxy/gemini-3.7-flash-high:medium
+  commit: cliproxy/gemini-3.7-flash-high:medium
   tiny: cliproxy/gemini-3.7-flash-high:medium
-  task: devin/swe-2:max
-  advisor: cliproxy/gemini-3.8-flash-high:high
-  slow: devin/swe-2:max
+  task: cliproxy/gemini-3.7-flash-high:medium
+  advisor: cliproxy/gemini-3.7-flash-high:medium
+  slow: cliproxy/gpt-6-astra:medium
 
+  gem: cliproxy/gemini-3.7-flash-high:medium
   ds-flash: cliproxy/command-code/deepseek/deepseek-v4.1-flash:max
   swe: devin/swe-2:max
-  muse: cliproxy/opencode-go/muse-spark-1.3-contributor:max
-  astra: cliproxy/gpt-6-astra:low
+  muse: cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh
+  astra: cliproxy/gpt-6-astra:medium
 
 cycleOrder:
   - default
@@ -24,6 +25,7 @@ cycleOrder:
   - muse
   - swe
   - ds-flash
+  - gem
 
 modelRoleStorage: global
 defaultThinkingLevel: auto
