@@ -341,9 +341,9 @@ memories:
   enabled: false
 
 autolearn:
-  enabled: false
+  enabled: true
   # EXPERIMENTAL: Automatically triggers a post-turn capture pass to codify managed skills; consumes extra tokens.
-  autoContinue: false
+  autoContinue: true
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. APPEARANCE, DISPLAY & THEME (Tab: appearance)
