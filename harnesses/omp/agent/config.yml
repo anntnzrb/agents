@@ -372,7 +372,7 @@ terminal:
 
 display:
   hideToolActivity: false
-  showTokenUsage: false
+  showTokenUsage: true
   cacheMissMarker: true
 
 tui:
