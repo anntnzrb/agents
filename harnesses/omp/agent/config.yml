@@ -49,7 +49,7 @@ retry:
   #     - cliproxy/gemini-3.7-flash-high:medium
 
 advisor:
-  enabled: true
+  enabled: false
   syncBacklog: "1"
   immuneTurns: 3
 
