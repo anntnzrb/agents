@@ -30,9 +30,13 @@ _FILLER_EN_RE = re.compile(
 _FILLER_ES_RE = re.compile(
     r"\b(?:este\.\.\.|o sea,\s*o sea|tipo,\s*tipo|eh\.\.\.)\b", re.IGNORECASE
 )
-_SPEAKER_RE = re.compile(
-    r"^(?:\[?([A-Za-z0-9\s._-]+)\]?|\*\*([A-Za-z0-9\s._-]+)\*\*):\s*(.*)$"
-)
+_SPEAKER_RE = re.compile(r"^(?:\[?([^:\n]+?)\]?|\*\*([^:\n]+?)\*\*):\s*(.*)$")
+
+
+def normalize_speaker(name: str) -> str:
+    """Normalize speaker name by stripping trailing annotations such as (You)."""
+    cleaned = re.sub(r"\s*\((?:You|Tú|Host|Guest)\)\s*$", "", name, flags=re.IGNORECASE)
+    return cleaned.strip()
 
 
 def check_qmd_available() -> bool:
@@ -86,55 +90,49 @@ def handle_get(args: argparse.Namespace) -> int:
     return run_qmd_command(cmd_args)
 
 
+def denoise_line_text(line: str) -> str:
+    """Remove repetitive stutter loops and verbal fillers from a line."""
+    denoised = _STUTTER_RE.sub(r"\1", line)
+    denoised = _FILLER_EN_RE.sub("", denoised)
+    denoised = _FILLER_ES_RE.sub("", denoised)
+    return re.sub(r"[ \t]+", " ", denoised).strip()
+
+
 def clean_text_lossless(raw_text: str) -> str:
-    """Perform lossless transcript denoising preserving 100% of facts and numbers."""
-    cleaned_lines: list[str] = []
+    """Perform lossless transcript denoising preserving facts and turn order."""
+    cleaned_blocks: list[str] = []
     current_speaker: str | None = None
-    speaker_paragraphs: list[str] = []
+    current_paragraphs: list[str] = []
+
+    def flush() -> None:
+        nonlocal current_speaker, current_paragraphs
+        if current_paragraphs:
+            content = " ".join(current_paragraphs).strip()
+            if content:
+                prefix = f"**{current_speaker}:**\n" if current_speaker else ""
+                cleaned_blocks.append(f"{prefix}{content}")
+        current_paragraphs = []
 
     for raw_line in raw_text.splitlines():
         line = raw_line.strip()
         if not line:
-            if speaker_paragraphs:
-                cleaned_lines.append(" ".join(speaker_paragraphs))
-                cleaned_lines.append("")
-                speaker_paragraphs = []
             continue
 
-        # Check for speaker header
-        match = _SPEAKER_RE.match(line)
-        if match:
-            if speaker_paragraphs:
-                cleaned_lines.append(" ".join(speaker_paragraphs))
-                cleaned_lines.append("")
-                speaker_paragraphs = []
-
-            speaker_name = (match.group(1) or match.group(2) or "").strip()
+        if match := _SPEAKER_RE.match(line):
+            speaker_name = normalize_speaker(
+                (match.group(1) or match.group(2) or "").strip()
+            )
             rest = match.group(3).strip()
-
             if speaker_name != current_speaker:
-                cleaned_lines.append(f"**{speaker_name}:**")
+                flush()
                 current_speaker = speaker_name
+            line = rest
 
-            if rest:
-                line = rest
-            else:
-                continue
+        if line and (denoised := denoise_line_text(line)):
+            current_paragraphs.append(denoised)
 
-        # Denoise text: remove repetitive stutter loops and verbal fillers
-        denoised = _STUTTER_RE.sub(r"\1", line)
-        denoised = _FILLER_EN_RE.sub("", denoised)
-        denoised = _FILLER_ES_RE.sub("", denoised)
-        # Normalize multiple spaces
-        denoised = re.sub(r"[ \t]+", " ", denoised).strip()
-
-        if denoised:
-            speaker_paragraphs.append(denoised)
-
-    if speaker_paragraphs:
-        cleaned_lines.append(" ".join(speaker_paragraphs))
-
-    return "\n".join(cleaned_lines).strip() + "\n"
+    flush()
+    return "\n\n".join(cleaned_blocks).strip() + "\n"
 
 
 def handle_denoise(args: argparse.Namespace) -> int:

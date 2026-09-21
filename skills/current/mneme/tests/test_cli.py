@@ -142,6 +142,28 @@ def test_clean_text_lossless_stutter_and_fillers() -> None:
     assert "we need to deploy" in cleaned
 
 
+def test_clean_text_lossless_turn_order_and_speaker_annotations() -> None:
+    raw = (
+        "Mónica Díaz: Acá B2C no interactúa en estos negocios.\n"
+        "Juan Antonio Gonzalez Orbe (You):  Sí, comentarios.\n"
+        "Mónica Díaz:  Al lado de comentarios.\n"
+        "Vanessa Lizbeth Ormeño Candelario: En B2C tenemos problemas."
+    )
+    cleaned = clean_text_lossless(raw)
+    assert "**Mónica Díaz:**\nAcá B2C no interactúa en estos negocios." in cleaned
+    assert "**Juan Antonio Gonzalez Orbe:**\nSí, comentarios." in cleaned
+    assert "**Mónica Díaz:**\nAl lado de comentarios." in cleaned
+    assert (
+        "**Vanessa Lizbeth Ormeño Candelario:**\nEn B2C tenemos problemas." in cleaned
+    )
+    # Verify turn sequence
+    pos_monica1 = cleaned.find("**Mónica Díaz:**")
+    pos_juan = cleaned.find("**Juan Antonio Gonzalez Orbe:**")
+    pos_monica2 = cleaned.find("**Mónica Díaz:**\nAl lado de comentarios.")
+    pos_vanessa = cleaned.find("**Vanessa Lizbeth Ormeño Candelario:**")
+    assert 0 <= pos_monica1 < pos_juan < pos_monica2 < pos_vanessa
+
+
 def test_handle_denoise_file_output(tmp_path: Path) -> None:
     raw_file = tmp_path / "raw.md"
     raw_file.write_text(
