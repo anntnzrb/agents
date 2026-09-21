@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from autoreview.engines import invoke_engine_review
 from autoreview.models import ENGINES, PRIORITIES
 from autoreview.targets import capture_diff_bundle, choose_review_target
 from autoreview.verification import (
@@ -116,15 +117,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Diff Size: {len(bundle.diff_text)} bytes")
         return 0
 
-    # Default empty clean report structure (to be populated by review passes)
-    report: dict[str, Any] = {
-        "overall_correctness": "patch is correct",
-        "overall_explanation": f"Diff reviewed in {bundle.mode} mode against {len(bundle.changed_files)} changed files.",
-        "overall_confidence": 1.0,
-        "findings": [],
-    }
+    # Dispatch to review engine
+    report = invoke_engine_review(bundle, engine=args.engine)
 
-    # Filter and verify findings
+    # Filter and verify findings against real physical disk files
     raw_findings = report.get("findings", [])
     verified_findings: list[dict[str, Any]] = []
 

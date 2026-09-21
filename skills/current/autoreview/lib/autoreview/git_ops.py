@@ -48,11 +48,36 @@ def safe_git_env(repo: Path) -> dict[str, str]:
 
 
 def resolve_git(repo: Path) -> str:
-    """Locate the trusted system git executable."""
+    """Locate the trusted system git executable, rejecting repo-local or relative paths."""
+    path_env = os.environ.get("PATH", "")
+    repo_resolved = repo.resolve()
+
+    for entry in path_env.split(os.pathsep):
+        if not entry:
+            continue
+        entry_path = Path(entry)
+        if not entry_path.is_absolute():
+            continue
+        try:
+            entry_resolved = entry_path.resolve()
+            if (
+                entry_resolved == repo_resolved
+                or repo_resolved in entry_resolved.parents
+            ):
+                continue
+        except OSError:
+            continue
+
+        candidate = entry_path / "git"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+
+    # Fallback to standard system which
     resolved = shutil.which("git")
-    if resolved is not None:
+    if resolved is not None and Path(resolved).is_absolute():
         return resolved
-    raise SystemExit("executable not found: git")
+
+    raise SystemExit("trusted executable not found: git")
 
 
 def git_run(

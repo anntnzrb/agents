@@ -15,12 +15,14 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from autoreview.cli import format_human_report
+from autoreview.engines import invoke_engine_review
 from autoreview.git_ops import safe_git_env
 from autoreview.redaction import (
     filter_diff_paths,
     is_sensitive_path,
     redact_sensitive_text,
 )
+from autoreview.targets import ReviewBundle
 from autoreview.verification import (
     filter_findings_by_priority,
     validate_finding_structure,
@@ -152,6 +154,21 @@ def test_filter_findings_by_priority() -> None:
     assert len(kept) == 2
     assert [f["title"] for f in kept] == ["P0 Blocker", "P1 High"]
     assert len(filtered) == 2
+
+
+def test_invoke_engine_review_empty_diff() -> None:
+    """Verify that empty diffs produce a clean verdict without invoking external engines."""
+    bundle = ReviewBundle(
+        mode="local",
+        base_ref=None,
+        commit_sha=None,
+        changed_files=[],
+        redacted_files=[],
+        diff_text="",
+    )
+    report = invoke_engine_review(bundle)
+    assert report["overall_correctness"] == "patch is correct"
+    assert report["findings"] == []
 
 
 def test_format_human_report() -> None:
