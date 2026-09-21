@@ -61,12 +61,11 @@ uv run --script skills/current/mneme/scripts/cli.py search "battery issues" --js
 ```json
 [
   {
-    "docid": "abc1234",
-    "file": "/path/to/transcripts/clean_ES2004b.md",
-    "collection": "meetings",
+    "docid": "#abc1234",
+    "file": "transcripts/clean_ES2004b.md",
+    "title": "Clean Transcript: ES2004b",
     "score": 0.892,
     "line": 42,
-    "lines": "42-58",
     "snippet": "Industrial Designer: On battery issue, we want to minimize the size of the battery. Meanwhile, cost, power consumption, wireless range and data transmission were supposed to be considered."
   }
 ]
@@ -76,12 +75,12 @@ uv run --script skills/current/mneme/scripts/cli.py search "battery issues" --js
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `docid` | string | Unique document identifier in the index |
-| `file` | string | Absolute or relative path to the transcript file |
-| `collection` | string | Name of the collection the document belongs to |
+| `docid` | string | Unique document identifier in the index (includes leading `#`) |
+| `file` | string | Relative or display path to the transcript file in the index |
+| `title` | string | Document title or heading |
 | `score` | float | Relevance / reranking score |
-| `line` | integer | Starting line number of the matching passage |
-| `lines` | string | Line span range (e.g., `"42-58"`) |
+| `line` | integer (optional) | Starting line number of the matching passage |
+| `context` | string (optional) | Surrounding context header if available |
 | `snippet` | string | Verbatim transcript dialogue text surrounding the match |
 
 Agents can parse the returned JSON directly to answer user queries from the matched snippets without making an additional read call.
