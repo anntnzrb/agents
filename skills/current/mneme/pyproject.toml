@@ -1,0 +1,54 @@
+[project]
+name = "mneme"
+version = "0.1.0"
+description = "Process transcripts losslessly, synthesize specs, and query meeting history"
+readme = "SKILL.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "COM812",
+  "CPY001",
+  "D203",
+  "D213",
+  "ISC001",
+  "ISC003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201", "INP001", "D103", "D401"]
+"tests/**/*.py" = [
+  "ANN",
+  "ARG",
+  "D",
+  "PLR2004",
+  "S101",
+  "SLF001",
+  "TC002",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["scripts", "tests"]
+extraPaths = ["scripts"]
+pythonVersion = "3.12"
+pythonPlatform = "All"

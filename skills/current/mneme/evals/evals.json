@@ -1,0 +1,262 @@
+{
+  "skill_name": "mneme",
+  "dataset": "QMSum / AMI Corpus (NAACL)",
+  "evals": [
+    {
+      "id": 1,
+      "name": "lossless_denoise_ES2004b",
+      "dataset_source": "QMSum/AMI/ES2004b",
+      "files": [
+        "evals/fixtures/ES2004b_raw.txt"
+      ],
+      "prompt": "Denoise the real meeting transcript in 'ES2004b_raw.txt' losslessly. Remove vocal noise and ASR disfluency markers without summarizing or dropping speaker turns.",
+      "expected_output": "Produces a clean, full-length markdown transcript preserving all 528 speaker turns and technical/design arguments.",
+      "expectations": [
+        "All disfluency tags ({disfmarker}, {vocalsound}) and repetitive fillers are cleaned",
+        "Speaker attribution is formatted properly using markdown headers",
+        "Zero dialogue turns, numbers, or technical trade-offs are omitted or summarized",
+        "The output preserves chronological flow across all participants"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "spec_synthesis_ES2004b",
+      "dataset_source": "QMSum/AMI/ES2004b",
+      "files": [
+        "evals/fixtures/ES2004b_raw.txt"
+      ],
+      "prompt": "Synthesize an executive summary and structured action items from 'ES2004b_raw.txt'.",
+      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expectations": [
+        "Summary captures core discussion themes including: A brief review of the last meeting, Battery issue and flip top design, Market research and adjustments due to new project requirements",
+        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Each action item specifies owner, context, scope, and completion criteria",
+        "No vague stakeholder language is retained without concrete actionable scope"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "targeted_search_ES2004b_3",
+      "dataset_source": "QMSum/AMI/ES2004b",
+      "files": [
+        "evals/fixtures/ES2004b_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'ES2004b', answer: 'What did the group discuss about battery issues and flip top design?'",
+      "expected_output": "On battery issue, Industrial Designer expressed a desire to minimize the size of the battery. Meanwhile, cost, power consumption, wireless range and data transmission were supposed to be considered. User Interface's presentation followed. The remote control design would be simplified and user-friendly. To make the style more trendy, User Interface decided on a flip-top model.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: On battery issue, Industrial Designer expressed a desire to minimize the size of the battery. Meanwhile, cost, power con...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "targeted_search_ES2004b_4",
+      "dataset_source": "QMSum/AMI/ES2004b",
+      "files": [
+        "evals/fixtures/ES2004b_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'ES2004b', answer: 'What did Industrial Designer think of triple A batteries when discussing battery issues and flip top design?'",
+      "expected_output": "Industrial Designer admitted that current remote controls were mostly powered by triple A batteries. However, Industrial Designer also pointed out that they were bulky, although they had been the smallest fit-in batteries at present. Industrial Designer expressed a desire to find a smaller alternative for triple A batteries.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: Industrial Designer admitted that current remote controls were mostly powered by triple A batteries. However, Industrial...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "lossless_denoise_Bed003",
+      "dataset_source": "QMSum/AMI/Bed003",
+      "files": [
+        "evals/fixtures/Bed003_raw.txt"
+      ],
+      "prompt": "Denoise the real meeting transcript in 'Bed003_raw.txt' losslessly. Remove vocal noise and ASR disfluency markers without summarizing or dropping speaker turns.",
+      "expected_output": "Produces a clean, full-length markdown transcript preserving all 1029 speaker turns and technical/design arguments.",
+      "expectations": [
+        "All disfluency tags ({disfmarker}, {vocalsound}) and repetitive fillers are cleaned",
+        "Speaker attribution is formatted properly using markdown headers",
+        "Zero dialogue turns, numbers, or technical trade-offs are omitted or summarized",
+        "The output preserves chronological flow across all participants"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "spec_synthesis_Bed003",
+      "dataset_source": "QMSum/AMI/Bed003",
+      "files": [
+        "evals/fixtures/Bed003_raw.txt"
+      ],
+      "prompt": "Synthesize an executive summary and structured action items from 'Bed003_raw.txt'.",
+      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expectations": [
+        "Summary captures core discussion themes including: Meeting preliminaries, Belief net Intentions, Belief net structure",
+        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Each action item specifies owner, context, scope, and completion criteria",
+        "No vague stakeholder language is retained without concrete actionable scope"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "targeted_search_Bed003_7",
+      "dataset_source": "QMSum/AMI/Bed003",
+      "files": [
+        "evals/fixtures/Bed003_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'Bed003', answer: 'What did Grad B say about the structure of the belief net?'",
+      "expected_output": "It is necessary for the belief-net to have at least one layer of nodes between the features and the final output. This makes the structure more flexible in terms of coding feature-layer probabilities. ",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: It is necessary for the belief-net to have at least one layer of nodes between the features and the final output. This m...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "targeted_search_Bed003_8",
+      "dataset_source": "QMSum/AMI/Bed003",
+      "files": [
+        "evals/fixtures/Bed003_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'Bed003', answer: 'What was the next step on features?'",
+      "expected_output": "The next stage is to refine the set of feature nodes and identify possible clusters. Although, in theory, traditional AI plan recognition techniques could also be helpful for inferring intentions, the schemas involved are too elaborate for this task. ",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: The next stage is to refine the set of feature nodes and identify possible clusters. Although, in theory, traditional AI...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "lossless_denoise_ES2004a",
+      "dataset_source": "QMSum/AMI/ES2004a",
+      "files": [
+        "evals/fixtures/ES2004a_raw.txt"
+      ],
+      "prompt": "Denoise the real meeting transcript in 'ES2004a_raw.txt' losslessly. Remove vocal noise and ASR disfluency markers without summarizing or dropping speaker turns.",
+      "expected_output": "Produces a clean, full-length markdown transcript preserving all 320 speaker turns and technical/design arguments.",
+      "expectations": [
+        "All disfluency tags ({disfmarker}, {vocalsound}) and repetitive fillers are cleaned",
+        "Speaker attribution is formatted properly using markdown headers",
+        "Zero dialogue turns, numbers, or technical trade-offs are omitted or summarized",
+        "The output preserves chronological flow across all participants"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "spec_synthesis_ES2004a",
+      "dataset_source": "QMSum/AMI/ES2004a",
+      "files": [
+        "evals/fixtures/ES2004a_raw.txt"
+      ],
+      "prompt": "Synthesize an executive summary and structured action items from 'ES2004a_raw.txt'.",
+      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expectations": [
+        "Summary captures core discussion themes including: Agenda announcement and team ice breaking, Price issue and target groups of remote control, Remote control style and design optimization",
+        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Each action item specifies owner, context, scope, and completion criteria",
+        "No vague stakeholder language is retained without concrete actionable scope"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "targeted_search_ES2004a_11",
+      "dataset_source": "QMSum/AMI/ES2004a",
+      "files": [
+        "evals/fixtures/ES2004a_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'ES2004a', answer: 'What did the group discuss about remote control style and design optimization?'",
+      "expected_output": "Industrial Designer desired to integrate remote controls for different appliances into one. Marketing pointed out that such integration would lead to too many buttons, which was not user-friendly enough. Instead, Marketing suggested that a menu display should be incorporated. Project Manager and User Interface agreed and added that basic buttons could remain. User Interface and Industrial Designer refused the flip top, however, for it costs a lot. The team temporarily chose lightweight plastic to be the material.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: Industrial Designer desired to integrate remote controls for different appliances into one. Marketing pointed out that s...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "targeted_search_ES2004a_12",
+      "dataset_source": "QMSum/AMI/ES2004a",
+      "files": [
+        "evals/fixtures/ES2004a_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'ES2004a', answer: 'Why did the group decide to incorporate a menu display when discussing remote control style and design optimization?'",
+      "expected_output": "Marketing believed that most of the market would want convenient channel browsing and volume adjustment features instead of any tampering or programming with too many buttons. User Interface agreed with the simplification of symbols. The team came up with a menu display to make the remote more user-friendly.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: Marketing believed that most of the market would want convenient channel browsing and volume adjustment features instead...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "lossless_denoise_Bed008",
+      "dataset_source": "QMSum/AMI/Bed008",
+      "files": [
+        "evals/fixtures/Bed008_raw.txt"
+      ],
+      "prompt": "Denoise the real meeting transcript in 'Bed008_raw.txt' losslessly. Remove vocal noise and ASR disfluency markers without summarizing or dropping speaker turns.",
+      "expected_output": "Produces a clean, full-length markdown transcript preserving all 769 speaker turns and technical/design arguments.",
+      "expectations": [
+        "All disfluency tags ({disfmarker}, {vocalsound}) and repetitive fillers are cleaned",
+        "Speaker attribution is formatted properly using markdown headers",
+        "Zero dialogue turns, numbers, or technical trade-offs are omitted or summarized",
+        "The output preserves chronological flow across all participants"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "spec_synthesis_Bed008",
+      "dataset_source": "QMSum/AMI/Bed008",
+      "files": [
+        "evals/fixtures/Bed008_raw.txt"
+      ],
+      "prompt": "Synthesize an executive summary and structured action items from 'Bed008_raw.txt'.",
+      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expectations": [
+        "Summary captures core discussion themes including: value for user and situation models, endpoint decision, Go-there decision",
+        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Each action item specifies owner, context, scope, and completion criteria",
+        "No vague stakeholder language is retained without concrete actionable scope"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "targeted_search_Bed008_15",
+      "dataset_source": "QMSum/AMI/Bed008",
+      "files": [
+        "evals/fixtures/Bed008_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'Bed008', answer: 'Summarize the discussion about value for user and situation models.'",
+      "expected_output": "First, Grad E proposed a question about better discriminating the definition of user and situation models, and it was necessary to set values for the models. Then, they discussed the issues in terms of the user's running budget, which was vital for the outcome of decisions. They tried to design a set of terms to describe the user's financial policy, such as thrift, average, spendy, or more finer scale ones.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: First, Grad E proposed a question about better discriminating the definition of user and situation models, and it was ne...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "targeted_search_Bed008_16",
+      "dataset_source": "QMSum/AMI/Bed008",
+      "files": [
+        "evals/fixtures/Bed008_raw.txt"
+      ],
+      "prompt": "Using hybrid search on meeting 'Bed008', answer: 'What did the group members think of the value of user budget when discussing value for user and situation models?'",
+      "expected_output": "The reason why they mentioned user budget was that they wanted to take this example to further discuss the value for user model. Also, user budget was an important factor for the outcomes of decisions. Then, they tried to decide which set of words could represent the budget better. Finally, they found that the words that could describe financial policy of users, such as user thrift, was appropriate.",
+      "expectations": [
+        "Retrieves exact dialogue snippets directly answering the question",
+        "Matches ground-truth facts: The reason why they mentioned user budget was that they wanted to take this example to further discuss the value for use...",
+        "Does not load unnecessary meeting files into context",
+        "Cites specific speaker statements or decisions"
+      ]
+    }
+  ]
+}
