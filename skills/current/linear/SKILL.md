@@ -1,115 +1,88 @@
 ---
 disable-model-invocation: true
 name: linear
-description: "Use when Linear issues or projects must be read or changed through MCPorter."
+description: "Use when working with Linear to manage issues, projects, documents, or team workflows."
 license: AGPL-3.0-or-later
-compatibility: Requires MCPorter configuration and Linear authentication.
+compatibility: Requires Linear authentication via MCPorter.
 ---
 
 # Linear
 
-Linear work MUST use literal MCPorter server `linear`.
+Interact with Linear via the dynamic MCP runner (`mcporter call linear.<tool>`).
 
-- Live schema MUST remain authoritative when inspected
-- The catalog is a dated fallback snapshot
+Tool schemas are dynamic and authoritative. When discovering capabilities or parameter requirements, inspect the live server directly.
 
-## Required follow-up reads
+## Discovery Workflow for Agents (Cold Start)
 
-| Need | Read | When |
-| --- | --- | --- |
-| Tool signature or safety notes | Relevant section of `references/tool-catalog.md` | Needed details are absent from common recipes; NEVER load the whole catalog |
-| Live discovery failure | `references/tool-catalog.md` | Current live schema cannot be retrieved |
+When executing without prior context or looking for available capabilities:
 
-## Tool routes
+1. **Roster of available tools (Short listing):**
+   ```sh
+   mcporter list linear --brief
+   ```
+2. **Inspect exact parameters and schema for a specific tool:**
+   ```sh
+   mcporter list linear.<tool_name> --schema
+   ```
 
-This stable name index is the default discovery layer. Read only the matching catalog section when its signature or safety notes are needed.
+## Common Operations
 
-| Domain | Tools |
-| --- | --- |
-| Attachments | `get_attachment`, `prepare_attachment_upload`, `create_attachment_from_upload`, `create_attachment`, `delete_attachment` |
-| Agent skills | `list_agent_skills`, `get_agent_skill` |
-| Comments | `list_comments`, `save_comment`, `delete_comment` |
-| Cycles | `list_cycles` |
-| Documents | `get_document`, `list_documents`, `save_document`, `extract_images` |
-| Issues | `get_issue`, `list_issues`, `save_issue`, `list_issue_statuses`, `get_issue_status`, `list_issue_labels`, `create_issue_label` |
-| Projects | `list_projects`, `get_project`, `save_project`, `list_project_labels` |
-| Releases | `list_release_pipelines`, `list_releases`, `get_release`, `save_release`, `list_release_notes`, `get_release_note`, `save_release_note` |
-| Diffs | `get_diff`, `list_diffs`, `get_diff_threads` |
-| Milestones | `list_milestones`, `get_milestone`, `save_milestone` |
-| Teams and users | `list_teams`, `get_team`, `list_users`, `get_user` |
-| Documentation | `search_documentation` |
-| Status updates | `get_status_updates`, `save_status_update`, `delete_status_update` |
-
-## Common reads
-
-These complete recipes use known inputs and SHOULD be called directly:
-
-```text
-mcporter call linear.list_issues assignee=me orderBy=updatedAt limit=5 --output json
-mcporter call linear.get_issue id=ENG-42 --output json
-mcporter call linear.list_projects query='<name>' limit=50 --output json
-mcporter call linear.list_comments issueId=ENG-42 limit=50 --output json
-mcporter call linear.list_teams query='<name>' limit=50 --output json
-mcporter call linear.list_users query='<name-or-email>' limit=50 --output json
+### 1. Workspace & Teams Discovery
+```sh
+mcporter call linear.get_workspace --output json
+mcporter call linear.list_teams --output json
 ```
 
-`list_issues` common inputs: `limit?:number=50`, `orderBy?:createdAt|updatedAt=updatedAt`, `assignee?:string|null`; `assignee=me` selects the current user. Priority values are `0=None`, `1=Urgent`, `2=High`, `3=Medium`, `4=Low`.
+### 2. Issues (Tickets)
+- **List issues:**
+  ```sh
+  mcporter call linear.list_issues team="<team>" limit=10 --output json
+  mcporter call linear.list_issues assignee="me" orderBy="updatedAt" limit=5 --output json
+  ```
+- **Create an issue:**
+  ```sh
+  mcporter call linear.save_issue \
+    title="<Title>" \
+    description="<Markdown description>" \
+    team="<Team>" \
+    priority=2 \
+    --output json
+  ```
+  *(Priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low).*
+- **Get issue details:**
+  ```sh
+  mcporter call linear.get_issue id="<ID-or-KEY>" --output json
+  ```
 
-`--output json` selects rendering, not a response contract. Inspect returned issue records defensively for requested fields; input-schema discovery cannot validate output fields.
+### 3. Documents (Meeting Notes & Specs)
+- **List documents:**
+  ```sh
+  mcporter call linear.list_documents teamId="<team_id>" --output json
+  ```
+- **Create a document:**
+  ```sh
+  mcporter call linear.save_document \
+    title="<Title>" \
+    content=@path/to/content.md \
+    team="<Team>" \
+    --output json
+  ```
+- **Get a document:**
+  ```sh
+  mcporter call linear.get_document id="<doc_id_or_slug>" --output json
+  ```
 
-## Recovery
+### 4. Projects & Milestones
+- **List projects:**
+  ```sh
+  mcporter call linear.list_projects limit=20 --output json
+  ```
+- **Get project details:**
+  ```sh
+  mcporter call linear.get_project query="<project_name_or_slug>" --output json
+  ```
 
-- Missing generated registry: MUST report the setup failure.
-- NEVER add or substitute a registry.
-- NEVER expose, copy, or log tokens
-
-```text
-mcporter list linear --status --no-oauth --exit-code
-mcporter list linear --brief
-mcporter list linear.<tool> --schema
-```
-
-- Select the tool from the route index; search only its catalog section for an unknown signature
-- If the needed capability is absent from the index, use brief live inventory
-- Inputs absent from a common recipe or catalog signature: inspect targeted live schema
-- Rejected inputs or tool-not-found errors: inspect targeted live schema, then retry once
-- Every mutation: MUST inspect targeted live schema
-- Live discovery failure: MAY use the relevant catalog entry and MUST disclose possible drift
-- NEVER invent tools, arguments, or response fields
-
-- Run status only after a connection or authentication failure
-- Auth failure: MUST run `mcporter auth linear`, then recheck status
-- Persistent 401/403: MUST report missing access. NEVER write
-
-## Calls
-
-```text
-mcporter call linear.<tool> key=value --output json
-mcporter call 'linear.<tool>(arg: "value")' --output json
-mcporter call linear.<tool> --args '{"id":"ENG-42","labels":["Bug"]}' --output json
-mcporter call linear.<tool> body=@comment.md --output json
-```
-
-- Simple scalars SHOULD use `key=value`
-- Typed literals SHOULD use function syntax
-- Structured or multiline values SHOULD use `--args`
-- UTF-8 files SHOULD use `key=@path`; `@@` means literal `@`
-- MUST quote shell-sensitive values
-- Image responses SHOULD use `--save-images <directory>`
-
-## Safety
-
-- Before writes: MUST resolve target and inspect write schema
-- MUST apply the smallest change, then re-read
-- `save_issue`: omitted `id` creates; supplied `id` updates
-- Creation MUST include `title` and `team`
-- `labels` replaces all labels; omission preserves them
-- Nullable fields clear only with explicit `null`
-- NEVER combine mutually exclusive release fields
-- New comments MUST include `body` and exactly one parent
-- Replies MUST use `parentId`
-- Uncertain timeout: MUST read/search before retrying
-- Bulk/destructive writes MUST have intent, confirmation, targeted schema
-- Validation errors: MUST correct payload against live schema
-- NEVER drop rejected fields silently
-- Paginated reads MUST use filters/cursors and disclose boundaries
+## Execution Rules & Safety
+- **Inspect schema before mutation:** Run `mcporter list linear.<tool> --schema` when parameters or required arguments are uncertain.
+- **Passing multiline content or files:** Use `--args '{"key": "value"}'` for JSON or `content=@file.md` for Markdown payloads.
+- **Authentication recovery:** If a 401/403 error occurs, execute `mcporter auth linear`.
