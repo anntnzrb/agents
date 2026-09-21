@@ -1,0 +1,33 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = [
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201", "INP001"]
+"tests/**/*.py" = ["S101", "ANN", "ARG", "E402", "INP001"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+include = ["scripts", "tests"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+reportMissingImports = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportIncompatibleMethodOverride = false
+reportOptionalSubscript = false
+reportOptionalOperand = false
+reportPossiblyUnboundVariable = false
+reportOptionalMemberAccess = false
+reportOperatorIssue = false
+reportReturnType = false

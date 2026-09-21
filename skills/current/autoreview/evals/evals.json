@@ -1,0 +1,19 @@
+[
+  {
+    "eval_id": 0,
+    "name": "help_discovery",
+    "prompt": "Inspect autoreview capabilities and flag reference",
+    "expected_output": {
+      "contains": ["--mode", "--severity", "--base"]
+    }
+  },
+  {
+    "eval_id": 1,
+    "name": "local_review_staged",
+    "prompt": "Perform an automated code review on local staged changes",
+    "expected_output": {
+      "mode": "local",
+      "format": "json"
+    }
+  }
+]
