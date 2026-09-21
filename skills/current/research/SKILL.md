@@ -32,10 +32,10 @@ Route each request to the right source class; return a source-backed answer with
 
 ### Web/live
 
-- Ordinary live discovery: built-in web search.
+- Ordinary live discovery: `parallel-search` for LLM-optimized web search, excerpts, and deep research tasks.
+- Full-page scraping, crawling, mapping, and JS/PDF extraction: `firecrawl`.
 - Use `omp-search` when its OMP CLI automatic provider chain, explicit provider selection, or structured headless output is useful.
-- Known static pages: URL retrieval tool; browser tool only for interaction, authentication, or JavaScript-rendered pages.
-- Direct Brave-backed scoping and recency checks: `brave-search`.
+- Known static pages: URL retrieval tool; browser tool only for interaction, authentication, or complex JavaScript-rendered pages.
 
 ### Sentiment/discussion
 
