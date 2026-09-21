@@ -25,17 +25,18 @@ Route each request to the right source class; return a source-backed answer with
 
 ### Code/docs
 
+- Current library/API docs, signatures, and examples: `context7`.
 - Repository inspection/code search: available GitHub or repository tools, or `gh`.
 - Repository docs/Q&A over `owner/repo`: `deepwiki`.
-- Current library/API docs and examples: `context7`.
 - Public OSS usage patterns: `grep-app`.
 
 ### Web/live
 
-- Ordinary live discovery: `parallel-search` for LLM-optimized web search, excerpts, and deep research tasks.
-- Full-page scraping, crawling, mapping, and JS/PDF extraction: `firecrawl`.
-- Use `omp-search` when its OMP CLI automatic provider chain, explicit provider selection, or structured headless output is useful.
-- Known static pages: URL retrieval tool; browser tool only for interaction, authentication, or complex JavaScript-rendered pages.
+- Ordinary live discovery & citations: `parallel-search` for LLM-optimized web search, excerpts, and deep research tasks.
+- Clean page scraping, site crawling, sitemaps, and JS/PDF extraction: `firecrawl`.
+- Interactive browser automation, UI testing, clicks, forms, login, and screenshots: `agent-browser`.
+- Unified headless provider cascade: `omp-search` for automatic fallback across configured search providers.
+- Known static pages: URL retrieval tool.
 
 ### Sentiment/discussion
 
