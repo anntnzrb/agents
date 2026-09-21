@@ -399,4 +399,14 @@ secrets:
 dev:
   autoqa: false
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. COLLABORATION & REMOTE ACCESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+collab:
+  autoStart: control
+  relayUrl: wss://my.omp.sh
+  webUrl: https://my.omp.sh
+  displayName: джаг
 setupVersion: 2
