@@ -34,7 +34,6 @@ Route each request to the right source class; return a source-backed answer with
 
 - Ordinary live discovery & citations: `parallel-search` for LLM-optimized web search, excerpts, and deep research tasks.
 - Clean page scraping, site crawling, sitemaps, and JS/PDF extraction: `firecrawl`.
-- Interactive browser automation, UI testing, clicks, forms, login, and screenshots: `agent-browser`.
 - Unified headless provider cascade: `omp-search` for automatic fallback across configured search providers.
 - Known static pages: URL retrieval tool.
 
