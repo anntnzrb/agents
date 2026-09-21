@@ -1,101 +1,31 @@
 ---
 disable-model-invocation: true
 name: openai-docs
-description: "Use when OpenAI or Codex APIs, models, configuration, or behavior require current official documentation."
+description: "Use when fetching official OpenAI API reference, SDK documentation, and model specifications."
 license: AGPL-3.0-or-later
+compatibility: Redirects to Context7 MCPorter runner.
 ---
 
 # OpenAI Docs
 
-- MUST use MCPorter `openai-docs` for official documentation
-- Public server: NEVER authenticate
-- MUST ground answers in fetched documentation
-- NEVER invent undocumented behavior
+Official OpenAI developer documentation, API references, and SDK guidelines are provided directly via **Context7** (`context7` MCP server) or the official **OpenAI Docs MCP** (`openai-docs`).
 
-## Call and recover
+## Preferred Entry Point: Context7 via MCPorter
 
-- The known recipes below SHOULD be called directly without inventory or schema discovery
-- Live server schema MUST remain authoritative when inspected
-- Unknown optional arguments or input-validation failures: MUST inspect only targeted live schema, then retry once:
+Query OpenAI SDKs, Structured Outputs, Realtime API, and model capabilities through Context7:
 
-```text
-mcporter list openai-docs.<tool> --schema
+1. **Resolve OpenAI library ID:**
+   ```sh
+   mcporter call context7.resolve_library_id query="openai" --output json
+   ```
+2. **Fetch verified documentation snippets:**
+   ```sh
+   mcporter call context7.get_library_docs library_id="/openai/openai-node" query="structured outputs schema" --output json
+   ```
+
+## Direct OpenAI Docs MCP (Alternative)
+
+For live exploration against the official developer portal endpoint:
+```sh
+mcporter list openai-docs --brief
 ```
-
-- Output fields: MUST inspect actual results
-- Tool declarations MAY omit output schemas
-
-Use these live tools:
-
-```text
-mcporter call openai-docs.search_openai_docs query='responses api tools'
-mcporter call openai-docs.fetch_openai_doc url='https://developers.openai.com/...'
-mcporter call openai-docs.list_openai_docs
-mcporter call openai-docs.list_api_endpoints
-mcporter call openai-docs.get_openapi_spec url='https://developers.openai.com/...'
-```
-
-Complex arguments SHOULD use `--args '<JSON object>'`.
-
-## Routes
-
-### Documentation
-
-1. Compact query (2-6 terms): MUST use `search_openai_docs`
-2. MUST fetch the best URL; `anchor` requires a known section
-3. MUST cite the narrow source before broadening search
-
-- Clear query absent: MAY browse with `list_openai_docs`
-- MCP unavailable/unhelpful: MUST use official OpenAI domains
-- MUST cite the fetched page
-
-### API reference
-
-- Endpoint discovery MUST use `list_api_endpoints`
-- Endpoint schemas MUST use `get_openapi_spec`
-- MUST pair schemas with relevant guides or references
-- Optional output controls: MUST inspect targeted live schema first
-
-### API troubleshooting
-
-- You MUST first distinguish pre-response DNS, TLS, or network failures from API responses
-- You MUST classify `401` from the actual error payload and headers as authentication
-- You MUST classify `403` from the actual error payload and headers as project, model, or permission access
-- For `429`, you MUST use the actual error payload and headers to distinguish `insufficient_quota` from rate limiting
-- You MUST use current official documentation via the documentation route for remediation
-- NEVER guess about configuration errors or blindly retry them
-
-### Models and Codex
-
-- Latest/current/default model: MUST fetch `https://developers.openai.com/api/docs/guides/latest-model.md` first
-- Explicit model targets MUST win. NEVER migrate silently
-
-Unspecified migration or prompt upgrade: MUST run the resolver:
-
-```text
-uv run --script <skill-dir>/scripts/cli.py latest-model
-```
-
-- Resolver output MUST include all three fields:
-  `model`, `migrationGuideUrl`, `promptingGuideUrl`.
-- MUST fetch returned guides through `fetch_openai_doc`
-
-Broad Codex self-knowledge: MUST run the helper in a writable session:
-
-```text
-uv run --script <skill-dir>/scripts/cli.py codex-manual
-```
-
-- MUST read only relevant outline/manual sections
-- Helper unavailable/insufficient: MUST use the documentation route
-- Official evidence absent: MUST state bounded uncertainty
-
-## Required follow-up reads
-
-| Need | Read | When |
-| --- | --- | --- |
-| Dated tool snapshot | `references/tool-schema-snapshot.md` | Broad tool comparison or targeted live-schema failure; not for a known recipe |
-| Latest-model fallback | `references/latest-model.md` | The live latest-model page is unavailable |
-| Upgrade fallback | `references/upgrade-guide.md` | Live migration guidance is unavailable |
-| Prompting fallback | `references/prompting-guide.md` | Live prompting guidance is unavailable |
-| GPT-5.6-family migration | `references/upgrading-to-gpt-5p6-sol.md` | The requested migration targets that family |
