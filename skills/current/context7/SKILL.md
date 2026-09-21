@@ -1,80 +1,46 @@
 ---
 disable-model-invocation: true
 name: context7
-description: "Use when current library, SDK, or API documentation and code examples must be fetched. For up-to-date documentation."
+description: "Fetch up-to-date documentation, API signatures, and verified code examples via Context7."
 license: AGPL-3.0-or-later
-metadata:
-  author: anntnzrb
-
+compatibility: Requires Context7 MCP server via MCPorter.
 ---
 
 # Context7
 
-Use this skill to fetch up-to-date documentation, API signatures, migration guides, and verified code examples directly from Context7 for libraries, frameworks, SDKs, and CLI tools.
+Fetch verified, version-accurate documentation and code examples via the dynamic MCP runner (`mcporter call context7.<tool>`).
 
-## Follow-up reads
+Tool schemas are dynamic and authoritative. When discovering capabilities or parameter requirements, inspect the live server directly.
 
-| Need | Read | When |
-|---|---|---|
-| CLI subcommands and flags | [references/cli-reference.md](references/cli-reference.md) | Querying with custom API keys, timeouts, or running agent setup |
-| Library selection heuristics | [references/library-resolution.md](references/library-resolution.md) | Disambiguating multiple library candidates or choosing versions |
-| Practical workflows | [cookbook/recipes.md](cookbook/recipes.md) | Copying ready-to-run recipes for React, Next.js, Effect, and CLI scripting |
+## Discovery Workflow for Agents (Cold Start)
 
-## When to use
+1. **Roster of available tools (Short listing):**
+   ```sh
+   mcporter list context7 --brief
+   ```
+2. **Inspect exact parameters and schema for a specific tool:**
+   ```sh
+   mcporter list context7.<tool_name> --schema
+   ```
 
-- Fetching current API syntax, configuration options, and verified code snippets
-- Investigating version migrations (e.g. Next.js 14 to 15, React 18 to 19)
-- Library-specific debugging and setup guides
-- Prefer over general web search for library, SDK, and framework documentation
-
-Do NOT use for general programming concepts, debugging pure business logic, refactoring from scratch, or code review.
-
-## Entry point
-
-Run `bun x ctx7@latest` directly in terminal:
-
-```bash
-# Verify availability
-bun x ctx7@latest --version
-```
-
-Set `CTX7_TELEMETRY_DISABLED=1` to disable telemetry.
-
-## Core workflow
+## Core Workflow
 
 Documentation retrieval is a two-step process:
 
-### 1. Resolve library name to Context7 ID
+### 1. Resolve Library to Context7 ID
+Search the index with the library name (e.g., `"Next.js"`, `"React"`, `"OpenAI"`, `"Effect"`, `"Pydantic"`):
+```sh
+mcporter call context7.resolve_library_id query="Next.js" --output json
+```
+*(Returns candidate library IDs starting with `/`, such as `/vercel/next.js` or `/openai/openai-node`).*
 
-Search the Context7 index with the official library name and an optional task query:
-
-```bash
-bun x ctx7@latest library <name> ["<what to look up>"] [--json]
+### 2. Query Documentation Snippets
+Fetch targeted documentation using the resolved library ID:
+```sh
+mcporter call context7.get_library_docs library_id="/vercel/next.js" query="App Router Server Actions" --output json
 ```
 
-Use official punctuation (e.g. `"Next.js"` not `"nextjs"`, `"Three.js"` not `"threejs"`).
-
-Results return candidate library IDs starting with `/` (such as `/reactjs/react.dev` or `/facebook/react`), alongside code snippet counts, source reputation, and benchmark scores.
-
-### 2. Query documentation with Context7 ID
-
-Fetch targeted documentation snippets with the resolved library ID:
-
-```bash
-bun x ctx7@latest docs <libraryId> "<single topic question>" [--json]
-```
-
-Queries MUST use the full library ID starting with `/`. Calling with a bare name will fail.
-
-### Best practices and guardrails
-
-- Keep each query focused on a single topic. If a question spans multiple distinct concepts (e.g. routing, auth, caching), run separate queries per concept. Combined queries dilute search ranking.
-- Do not call `library` or `docs` more than 3 times per question. If unresolved after 3 attempts, proceed with the best available data.
-- Never include credentials, API keys, or private code in queries.
-- Always cite the resolved library ID in your final answer.
-
-## Authentication and setup
-
-- Anonymous queries: Documentation commands work without login.
-- Higher rate limits: Authenticate via `bun x ctx7@latest login` or set `export CONTEXT7_API_KEY=your_key`.
-- Configure agent MCP: `bun x ctx7@latest setup --mcp --claude` or `bun x ctx7@latest setup --mcp --cursor`.
+## Best Practices
+- **Single-topic queries:** Keep each query focused on a single topic (e.g. routing, caching, auth).
+- **Exact library ID:** Always pass the full library ID starting with `/` returned by step 1.
+- **Do not guess:** If a library is not found, search with official punctuation.
