@@ -1,31 +1,50 @@
 ---
 disable-model-invocation: true
 name: openai-docs
-description: "Use when fetching official OpenAI API reference, SDK documentation, and model specifications."
+description: "Search and fetch official OpenAI API reference, endpoints, OpenAPI specs, and developer docs via MCPorter."
 license: AGPL-3.0-or-later
-compatibility: Redirects to Context7 MCPorter runner.
+compatibility: Requires openai-docs remote MCP server via MCPorter.
 ---
 
 # OpenAI Docs
 
-Official OpenAI developer documentation, API references, and SDK guidelines are provided directly via **Context7** (`context7` MCP server) or the official **OpenAI Docs MCP** (`openai-docs`).
+Search and fetch official OpenAI documentation, API endpoints, and OpenAPI specifications via the first-party OpenAI Developer Docs MCP server (`mcporter call openai-docs.<tool>`).
 
-## Preferred Entry Point: Context7 via MCPorter
+Tool schemas are dynamic and authoritative. When discovering capabilities or parameter requirements, inspect the live server directly.
 
-Query OpenAI SDKs, Structured Outputs, Realtime API, and model capabilities through Context7:
+## Discovery Workflow for Agents (Cold Start)
 
-1. **Resolve OpenAI library ID:**
+1. **Roster of available tools (Short listing):**
    ```sh
-   mcporter call context7.resolve_library_id query="openai" --output json
+   mcporter list openai-docs --brief
    ```
-2. **Fetch verified documentation snippets:**
+2. **Inspect exact parameters and schema for a specific tool:**
    ```sh
-   mcporter call context7.get_library_docs library_id="/openai/openai-node" query="structured outputs schema" --output json
+   mcporter list openai-docs.<tool_name> --schema
    ```
 
-## Direct OpenAI Docs MCP (Alternative)
+## Core Operations
 
-For live exploration against the official developer portal endpoint:
+### 1. Search Official Documentation
+Search across all official guides, conceptual docs, and migration manuals:
 ```sh
-mcporter list openai-docs --brief
+mcporter call openai-docs.search_openai_docs query="structured outputs response_format json_schema" --output json
+```
+
+### 2. Fetch Full Document by URL / Path
+Retrieve the complete content of a specific documentation page:
+```sh
+mcporter call openai-docs.fetch_openai_doc url="https://developers.openai.com/docs/guides/structured-outputs" --output json
+```
+
+### 3. List API Endpoints
+List all current API endpoints published by OpenAI:
+```sh
+mcporter call openai-docs.list_api_endpoints --output json
+```
+
+### 4. Get OpenAPI Spec & Code Examples
+Fetch the exact OpenAPI schema and code examples for a specific endpoint:
+```sh
+mcporter call openai-docs.get_openapi_spec url="/v1/chat/completions" languages='["python", "typescript"]' --output json
 ```
