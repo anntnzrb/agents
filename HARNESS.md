@@ -26,3 +26,9 @@ Stable locations, referenceable anytime:
 - Rice: `~/repos/rice/` (centralized system configurations for setting up machines)
 - Agents: `~/.config/agents/` (centralized AI-agent configurations, including sync)
 - Vendored sources: `~/src/vendored/` (shared, read-only upstream source checkouts)
+
+# Nodes (Tailscale Mesh)
+- `beirut`: Laptop / GUI & interactive client device
+- `munich`: server / compute, builders & CLIProxyAPI host
+- `oulu`: work server / builder
+- `iphone17`: Mobile client
