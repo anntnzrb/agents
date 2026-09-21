@@ -3,9 +3,12 @@ target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "PIE", "RUF"]
 ignore = [
     "E501",
+    "B008",
+    "SIM108",
+    "RUF012",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -16,18 +19,9 @@ ignore = [
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "basic"
-include = ["scripts", "tests"]
+typeCheckingMode = "standard"
+include = ["scripts", "lib", "tests"]
+extraPaths = ["lib"]
 pythonVersion = "3.12"
 pythonPlatform = "All"
 reportMissingImports = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-reportIncompatibleMethodOverride = false
-reportOptionalSubscript = false
-reportOptionalOperand = false
-reportPossiblyUnboundVariable = false
-reportOptionalMemberAccess = false
-reportOperatorIssue = false
-reportReturnType = false

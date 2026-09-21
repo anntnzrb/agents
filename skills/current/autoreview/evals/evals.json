@@ -1,19 +1,36 @@
 [
   {
     "eval_id": 0,
-    "name": "help_discovery",
-    "prompt": "Inspect autoreview capabilities and flag reference",
+    "name": "cli_help_discovery",
+    "prompt": "Inspect AutoReview CLI capabilities, target modes, and priority threshold flags",
     "expected_output": {
-      "contains": ["--mode", "--severity", "--base"]
+      "contains": ["--mode", "--max-priority", "--base", "--dry-run"]
     }
   },
   {
     "eval_id": 1,
-    "name": "local_review_staged",
-    "prompt": "Perform an automated code review on local staged changes",
+    "name": "local_dry_run_inspection",
+    "prompt": "Execute a dry-run review on local uncommitted changes to inspect bundle metadata",
     "expected_output": {
       "mode": "local",
-      "format": "json"
+      "dry_run": true
+    }
+  },
+  {
+    "eval_id": 2,
+    "name": "sensitive_credential_redaction",
+    "prompt": "Verify that sensitive files (.env, private keys) are automatically stripped from the review diff",
+    "expected_output": {
+      "redacted_patterns": [".env", "*.pem", "id_rsa"]
+    }
+  },
+  {
+    "eval_id": 3,
+    "name": "invariant_and_security_finding_schema",
+    "prompt": "Validate that reported review findings match the strict structured JSON schema with physical line verification",
+    "expected_output": {
+      "schema_fields": ["title", "body", "priority", "confidence", "category", "code_location"],
+      "severities": ["P0", "P1", "P2", "P3"]
     }
   }
 ]
