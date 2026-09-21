@@ -13,20 +13,19 @@
       "description": "Linear MCP",
       "serverUrl": "https://mcp.linear.app/mcp",
     },
+    "context7": {
+      "description": "Context7 Docs & Libraries MCP",
+      "serverUrl": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY:-}",
+      },
+    },
     "firecrawl": {
       "description": "Firecrawl MCP",
       "command": "bun",
       "args": ["x", "-y", "firecrawl-mcp"],
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY:-}",
-      },
-    },
-    "context7": {
-      "description": "Context7 Docs & Libraries MCP",
-      "command": "bun",
-      "args": ["x", "-y", "@upstash/context7-mcp"],
-      "env": {
-        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY:-}",
       },
     },
     "n8n": {
