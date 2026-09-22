@@ -51,6 +51,8 @@ Use the same weight for accounts with equal priority. Add `proxyUrl` only when a
 
 For ClinePass, create a long-lived API key in **Settings > API Keys** at [app.cline.bot](https://app.cline.bot). Add the key to the `cline-pass` pool. Do not use an OAuth token from the Cline extension or CLI. CLIProxyAPI credential pools require stable API keys.
 
+For the MiMo Token Plan, use the API key shown with the plan's dedicated base URL in the MiMo platform console ([Plan Management](https://platform.xiaomimimo.com/#/console/plan-manage)) and add it to the `mimo` pool. The plan meters a fixed Credits quota and suspends its dedicated endpoint at exhaustion without falling back to bonus or account balance.
+
 Apply the change:
 
 ```bash

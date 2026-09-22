@@ -505,6 +505,7 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
         "opencode-zen-custom",
         "cline-pass-custom",
         "command-code-custom",
+        "mimo-custom",
     }
 
     # Every compatibility profile derives its model list from its upstream.
