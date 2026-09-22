@@ -111,4 +111,16 @@ openai-compatibility:
     base-url: "https://token-plan-sgp.xiaomimimo.com/v1"
     prefix: "mimo"
     x-credential-pool: "mimo"
-    x-model-discovery: true
+    models:
+      - name: "mimo-v2.6-flash"
+        display-name: "MiMo-V2.6-Flash"
+        max-context-length: 1048576
+        thinking:
+          levels:
+            - "high"
+      - name: "mimo-v2.6-pro"
+        display-name: "MiMo-V2.6-Pro"
+        max-context-length: 1048576
+        thinking:
+          levels:
+            - "high"

@@ -497,7 +497,7 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
             continue
         for model in models:
             assert _is_obj_dict(model)
-            assert set(model.keys()) == {"name"}
+            assert "name" in model
 
     # Shared pools are namespaced so every model id maps to exactly one owner.
     assert prefixed == {
@@ -508,12 +508,13 @@ def test_cliproxy_config_template_uses_upstream_model_names() -> None:
         "mimo-custom",
     }
 
-    # Every compatibility profile derives its model list from its upstream.
+    # Compatibility profiles either derive dynamically or declare explicit whitelists.
     for profile in profiles:
         assert _is_obj_dict(profile)
-        assert profile.get("x-model-discovery") is True
-        assert "models" not in profile
-
+        if profile.get("x-model-discovery") is True:
+            assert "models" not in profile
+        else:
+            assert _is_obj_list(profile.get("models"))
     # Quota exhaustion falls back across projects, preview variants, and credits
     # before a request fails; a dead or exhausted credential never sinks a pool.
     quota = config.get("quota-exceeded")
