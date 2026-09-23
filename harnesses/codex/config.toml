@@ -142,12 +142,10 @@ enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max"]
 [agents]
 enabled = true
 interrupt_message = true
+max_concurrent_threads_per_session = 12
 
-# (see codex-rs issue #32031)
 [features.multi_agent_v2]
-hide_spawn_agent_metadata = false
-expose_spawn_agent_model_overrides = true
-max_concurrent_threads_per_session = 8
+enabled = true
 
 # -----------------------------------------------------------------------------
 # MISC
