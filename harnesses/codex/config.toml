@@ -149,26 +149,6 @@ hide_spawn_agent_metadata = false
 expose_spawn_agent_model_overrides = true
 max_concurrent_threads_per_session = 8
 
-[agents.explorer]
-description = "Codebase explorer with full local tool access that returns structured evidence."
-config_file = "agents/explorer.toml"
-
-[agents.code-reviewer]
-description = "Code-quality reviewer with unrestricted local tool access and artifact-backed findings."
-config_file = "agents/code-reviewer.toml"
-
-[agents.qa-executor]
-description = "Manual QA executor that runs real scenarios and records evidence."
-config_file = "agents/qa-executor.toml"
-
-[agents.worker-high]
-description = "Implementation worker for large, complex changes with one clear goal."
-config_file = "agents/worker-high.toml"
-
-[agents.worker-medium]
-description = "Implementation worker for mid-sized changes that follow established patterns."
-config_file = "agents/worker-medium.toml"
-
 # -----------------------------------------------------------------------------
 # MISC
 # -----------------------------------------------------------------------------
