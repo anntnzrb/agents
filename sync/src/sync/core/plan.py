@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from sync.core.cliproxy_deployment import (
-    CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
     CLI_PROXY_SOURCE_DIR,
     CliProxyDeployment,
     CliProxyEndpointTarget,
+    has_cliproxy_endpoint_placeholder,
     is_cliproxy_gateway_host,
     read_cliproxy_deployment,
 )
@@ -320,14 +320,12 @@ def _cli_proxy_template_paths(
     source_root: str,
     candidates: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Return adapter-declared template paths that carry the base URL placeholder."""
+    """Return adapter-declared template paths that carry an endpoint placeholder."""
     found: list[str] = []
     for rel_path in candidates:
         source_path = Path(source_root) / rel_path
-        if (
-            source_path.is_file()
-            and CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER
-            in source_path.read_text(encoding="utf-8")
+        if source_path.is_file() and has_cliproxy_endpoint_placeholder(
+            source_path.read_text(encoding="utf-8")
         ):
             found.append(rel_path)
     return tuple(found)

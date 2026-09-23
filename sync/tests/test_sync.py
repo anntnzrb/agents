@@ -51,6 +51,7 @@ from sync.core.managed_state import (
 from sync.core.managed_tools import supported_arch
 from sync.core.plan import (
     CliProxyConfigJob,
+    CliProxyEndpointTemplatesJob,
     DirJob,
     ExtensionDepsHookPlan,
     FileJob,
@@ -879,6 +880,31 @@ def test_sync_plan_preserves_declared_devin_config_keys(home: Path) -> None:
         "auto_update": False,
         "devin": {"org_id": "org-1"},
     }
+
+
+def test_sync_plan_publishes_client_origin_templates(home: Path) -> None:
+    """Verify a file carrying only the origin placeholder is an endpoint target."""
+    _ = _make_sync_env(home)
+    claude_source = home / ".config" / "agents" / "harnesses" / "claude"
+    _write_file(
+        claude_source / "settings.json",
+        '{"env": {"ANTHROPIC_BASE_URL": "${CLIPROXY_CLIENT_ORIGIN}"}}\n',
+    )
+    sync_env = SyncEnv.from_home(str(home), 10_000, platform="linux")
+
+    sync_plan = build_sync_plan(sync_env)
+    templates_job = next(
+        j for j in sync_plan.jobs if isinstance(j, CliProxyEndpointTemplatesJob)
+    )
+    claude_dst = str(home / ".claude" / "settings.json")
+    assert claude_dst in [target.dst for target in templates_job.targets]
+
+    dir_job = next(
+        j
+        for j in sync_plan.jobs
+        if isinstance(j, DirJob) and j.dst == str(home / ".claude")
+    )
+    assert "settings.json" in dir_job.preserve_paths
 
 
 def test_sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host(

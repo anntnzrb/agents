@@ -15,6 +15,7 @@ import yaml
 
 from sync.core.cliproxy_deployment import (
     CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
+    CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER,
     ClientConfig,
     CliProxyDeployment,
     CliProxyEndpointSyncOptions,
@@ -178,6 +179,17 @@ def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None
         match="missing CLIProxyAPI endpoint placeholder",
     ):
         _ = render_cliproxy_endpoint_template("base_url = local\n", DEPLOYMENT)
+
+
+def test_cliproxy_endpoint_template_renders_client_origin() -> None:
+    """Test the origin placeholder renders the client base URL without /v1."""
+    origin = CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER
+    base_url = CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER
+    rendered = render_cliproxy_endpoint_template(f"{origin} {base_url}", DEPLOYMENT)
+    assert rendered.split() == [
+        "https://gateway.example.test:9443",
+        "https://gateway.example.test:9443/v1",
+    ]
 
 
 def test_cliproxy_target_readiness_requires_a_nonempty_models_payload() -> None:

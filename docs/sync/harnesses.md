@@ -20,7 +20,7 @@ Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports
 | `runtimeSubdir` | Subdirectory appended to the source and generated roots |
 | `compatManagedEntries` | Obsolete generated entries that sync can remove |
 | `preserveJsonKeys` | Source JSON files sync copies over the generated file, re-injecting only the listed dot-paths from the previous file |
-| `cliproxyTemplates` | Source-relative paths whose `${CLIPROXY_CLIENT_BASE_URL}` placeholder sync replaces; only declared paths that actually contain the placeholder are replaced |
+| `cliproxyTemplates` | Source-relative paths whose `${CLIPROXY_CLIENT_BASE_URL}` or `${CLIPROXY_CLIENT_ORIGIN}` placeholders sync replaces; only declared paths that actually contain a placeholder are replaced |
 | `cliproxyPreserveTopLevels` | Per-template TOML table names re-injected from the previous generated file during endpoint publication |
 | `pythonEnvSegments` | Home-relative segments of the uv-managed Python environment sync bootstraps before reconciliation |
 | `hooks` | Package-bootstrap and extension-dependency jobs |
@@ -49,9 +49,9 @@ Adapters can declare these hooks:
 
 ## CLIProxyAPI integration
 
-A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
+A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider or points its API base URL at an endpoint placeholder. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`. A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxyTemplates`; sync checks each declared path for the placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxyPreserveTopLevels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserveJsonKeys`, which carries JSON dot-paths.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`, and `${CLIPROXY_CLIENT_ORIGIN}` with the same URL without its `/v1` path, for clients that append the version path themselves (Claude Code's `ANTHROPIC_BASE_URL`). A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxyTemplates`; sync checks each declared path for either placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxyPreserveTopLevels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserveJsonKeys`, which carries JSON dot-paths.
 
 Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers

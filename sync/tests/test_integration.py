@@ -255,9 +255,6 @@ def write_fixture_files(home: Path) -> None:
         encoding="utf-8",
     )
     _ = (
-        home / ".config" / "agents" / "harnesses" / "deepseek" / "cordis.patch.yml"
-    ).write_text("[]\n", encoding="utf-8")
-    _ = (
         home / ".config" / "agents" / "harnesses" / "omp" / "agent" / "config.yml"
     ).write_text("theme:\n  dark: graphite\n", encoding="utf-8")
     _ = (
@@ -284,7 +281,6 @@ def make_fixture(root: Path) -> Path:
     home = root / "fixture-home"
     for p in (
         home / ".config" / "agents" / "harnesses" / "codex",
-        home / ".config" / "agents" / "harnesses" / "deepseek",
         home / ".config" / "agents" / "harnesses" / "opencode",
         home / ".config" / "agents" / "harnesses" / "amp",
         home / ".config" / "agents" / "harnesses" / "omp" / "agent",
@@ -298,7 +294,6 @@ def make_fixture(root: Path) -> Path:
         home / ".config" / "opencode",
         home / ".mcporter",
         home / ".summarize",
-        home / ".dsh",
         home / ".local" / "bin",
         home / ".local" / "share" / "agents" / "sync-managed",
         home / ".local" / "share" / "agents" / "sync-releases",
@@ -407,7 +402,6 @@ def snapshot_home(home: Path) -> list[SnapshotEntry]:
     """Capture snapshot of managed directories in home sandbox."""
     roots = [
         ".codex",
-        ".dsh",
         ".config/amp",
         ".config/opencode",
         ".pi",
@@ -547,9 +541,7 @@ def test_integration_happy_path_matches_expected_outputs(
     assert result.exit_code == 0, result.stderr or result.stdout
 
     assert (home / ".codex" / "AGENTS.md").is_file()
-    assert (home / ".dsh" / "AGENTS.md").is_file()
-    assert (home / ".dsh" / "cordis.patch.yml").is_file()
-    assert (home / ".dsh" / "skills" / "skill.txt").is_file()
+    assert (home / ".codex" / "skills" / "skill.txt").is_file()
     assert (home / ".config" / "opencode" / "AGENTS.md").is_file()
     _assert_amp_outputs(home)
     assert (home / ".pi" / "agent" / "AGENTS.md").is_file()
@@ -608,7 +600,7 @@ def test_integration_happy_path_matches_expected_outputs(
 
     assert (home / ".pi" / "agent" / "auth.json").is_file()
 
-    for command in ("codex", "dsh", "opencode", "amp", "pi", "omp"):
+    for command in ("codex", "opencode", "amp", "pi", "omp"):
         wrapper = home / ".local" / "bin" / command
         assert wrapper.is_file(), str(wrapper)
         text = wrapper.read_text(encoding="utf-8")

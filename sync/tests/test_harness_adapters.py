@@ -32,12 +32,12 @@ if TYPE_CHECKING:
 # order, and wrapper reconciliation order. Append new adapters; do not reorder.
 EXPECTED_ADAPTER_ORDER: tuple[str, ...] = (
     "codex",
-    "deepseek",
     "devin",
     "opencode",
     "pi",
     "omp",
     "amp",
+    "claude",
 )
 
 VALID_PLATFORMS: frozenset[str] = frozenset({"darwin", "linux"})

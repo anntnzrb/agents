@@ -1,6 +1,6 @@
 # CLIProxyAPI
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider. `tools/cliproxyapi/deployment.json` is the only deployment-specific resource. It selects the gateway host, listener, and client endpoint.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider, and the Anthropic Messages endpoint (`/v1/messages`) that Claude Code reaches through `ANTHROPIC_BASE_URL`. `tools/cliproxyapi/deployment.json` is the only deployment-specific resource. It selects the gateway host, listener, and client endpoint.
 
 T3 Code sessions on the gateway host also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
 
@@ -102,6 +102,23 @@ Open the printed URL in the browser. Restrict the generated file:
 ```bash
 chmod 600 ~/.cli-proxy-api/antigravity-*.json
 ```
+
+## Authenticate Claude
+
+Each Claude Pro or Max subscription is one OAuth file. Use the control panel or the CLI. Both flows end at `http://localhost:54545/callback`, so forward that port when operating the gateway remotely:
+
+```bash
+ssh -L 54545:localhost:54545 <gateway-host>
+```
+
+On the gateway host:
+
+```bash
+cli-proxy-api --claude-login --no-browser
+chmod 600 ~/.cli-proxy-api/claude-*.json
+```
+
+Repeat per subscription. The gateway loads new files without a restart. To give a larger plan a bigger share of new sessions, add a top-level integer `"weight"` to its auth JSON; the default is `1`.
 
 ## Start the gateway
 
@@ -226,7 +243,7 @@ Sync prepares the managed binary and wrapper only on the gateway host. Client ho
 | `listen.port` | Integer from 1 through 65,535 | Port that CLIProxyAPI binds |
 | `client.baseUrl` | HTTP or HTTPS `/v1` URL without credentials, query, or fragment | Endpoint used by harnesses and readiness checks |
 
-Sync rejects wildcard listeners, unspecified IPv6 addresses, unknown fields, malformed client URLs, raw query or fragment delimiters, and invalid ports. It renders the listener into `~/.cli-proxy-api/config.yaml` and replaces `${CLIPROXY_CLIENT_BASE_URL}` in configured harness targets.
+Sync rejects wildcard listeners, unspecified IPv6 addresses, unknown fields, malformed client URLs, raw query or fragment delimiters, and invalid ports. It renders the listener into `~/.cli-proxy-api/config.yaml` and replaces `${CLIPROXY_CLIENT_BASE_URL}` (the `/v1` URL) and `${CLIPROXY_CLIENT_ORIGIN}` (the same URL without `/v1`) in configured harness targets.
 
 Sync compares the local OS hostname with `server.hostname` to choose the host role:
 
@@ -306,6 +323,16 @@ request leaves, which breaks the WAF's literal match while staying invisible
 to the model.
 
 Sync passes these values through to CLIProxyAPI. It does not derive or override them at runtime.
+
+### Claude subscriptions
+
+Anthropic's prompt cache is scoped per account, so a conversation must stay on one credential:
+
+- `session-affinity` pins each session to its first credential for `session-affinity-ttl`, matching the 1h cache lifetime; subagents inherit the parent's binding. `weighted-round-robin` only spreads new sessions. Fill-first would drain one account's 5h window while the others sit idle, with no cache benefit.
+- For every non-Claude-Code client (OMP, Pi, OpenCode), CLIProxyAPI places the cache breakpoints (last system block and last message) and upgrades them to the 1h TTL on OAuth credentials. No client or template setting is needed. Check it by sending the same request twice: the second response reports the prefix under `prompt_tokens_details.cached_tokens` (`cache_read_input_tokens` on `/v1/messages`), and `/v1/messages` usage reports writes under `cache_creation.ephemeral_1h_input_tokens`.
+- A 429 whose `anthropic-ratelimit-unified-5h/7d-status` is `rejected` cools the whole credential, and the session fails over. A model-only rejection (Fable or overage) cools only that model. Leave `claude.model-level-cooling` unset: setting it `true` downgrades shared 5h/7d rejections to model scope, so sibling models keep hitting an exhausted account.
+- CLIProxyAPI does not switch accounts at a soft utilization threshold. It records the unified headers but moves only on rejection.
+- `claude-sonnet-4-6` is served by both the Claude and Antigravity pools, so a new session can land on either. Pin a Claude-only model id when the route matters.
 
 ## Upstream truth
 

@@ -47,7 +47,7 @@ DEFAULT_SYNC_TIMEOUT_MS: Final[int] = 1000
 
 def _add_harness_sources(
     home: str | Path,
-    ids: Sequence[str] = ("codex", "deepseek", "opencode", "pi", "omp"),
+    ids: Sequence[str] = ("codex", "opencode", "pi", "omp"),
 ) -> None:
     for harness_id in ids:
         Path(home, ".config", "agents", "harnesses", harness_id).mkdir(
@@ -87,17 +87,18 @@ def test_installed_runtime_resolves_known_harness_without_ssot(
     """Test supported harness resolution when SSOT configuration is absent."""
     home = str(tmp_path)
     assert not (tmp_path / ".config" / "agents").exists()
-    deepseek = supported_harness(home, "deepseek", "linux")
-    assert deepseek is not None
-    assert deepseek.home == str(tmp_path / ".dsh")
-    assert isinstance(deepseek.launcher, NpmLauncher)
-    assert deepseek.launcher.package == "@deepseek-ai/dsh"
-    assert deepseek.launcher.bin == "dsh"
+    codex = supported_harness(home, "codex", "linux")
+    assert codex is not None
+    assert codex.home == str(tmp_path / ".codex")
+    assert isinstance(codex.launcher, NpmLauncher)
+    assert codex.launcher.package == "@openai/codex"
+    assert codex.launcher.bin == "codex"
 
     pi = supported_harness(home, "pi", "linux")
     assert pi is not None
     assert pi.home == str(tmp_path / ".pi")
     assert supported_harness(home, "unknown", "linux") is None
+    assert supported_harness(home, "deepseek", "linux") is None
 
 
 def test_wrapper_destinations_render_unix_launchers(tmp_path: Path) -> None:
@@ -137,11 +138,6 @@ def test_wrapper_destinations_render_unix_launchers(tmp_path: Path) -> None:
             .replace("<sourceName>", "codex")
         )
         assert codex.content == expected_content
-
-    deepseek_unix = next((e for e in unix if e.path.endswith("/dsh")), None)
-    assert deepseek_unix is not None
-    assert deepseek_unix.path == str(tmp_path / ".local" / "bin" / "dsh")
-    assert "launch 'deepseek'" in deepseek_unix.content
 
     mcporter_unix = next((e for e in unix if e.path.endswith("/mcporter")), None)
     assert mcporter_unix is not None

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 type HostPlatform = Literal["darwin", "linux"]
 
-type HarnessId = Literal["amp", "codex", "deepseek", "devin", "opencode", "pi", "omp"]
+type HarnessId = Literal["amp", "claude", "codex", "devin", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
@@ -113,15 +113,6 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         cliproxy_preserve_top_levels={"config.toml": ("hooks.state", "projects")},
     ),
     HarnessAdapter(
-        id="deepseek",
-        home_segments=(".dsh",),
-        platforms=("darwin", "linux"),
-        launcher=NpmLauncherSpec(
-            package="@deepseek-ai/dsh",
-            bin="dsh",
-        ),
-    ),
-    HarnessAdapter(
         id="devin",
         home_segments=(".config", "devin"),
         platforms=("darwin", "linux"),
@@ -202,6 +193,17 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             bin="amp",
             default_args=("--remote-control-terminal",),
         ),
+    ),
+    HarnessAdapter(
+        id="claude",
+        home_segments=(".claude",),
+        platforms=("darwin", "linux"),
+        launcher=NpmLauncherSpec(
+            package="@anthropic-ai/claude-code",
+            bin="claude",
+        ),
+        instruction_file="CLAUDE.md",
+        cliproxy_templates=("settings.json",),
     ),
 )
 

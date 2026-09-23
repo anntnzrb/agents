@@ -36,6 +36,11 @@ CLI_PROXY_SOURCE_DIR: Final[str] = "tools/cliproxyapi"
 CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER: Final[str] = (
     f"${{{CLIENT_BASE_URL_PLACEHOLDER_NAME}}}"
 )
+CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER: Final[str] = "${CLIPROXY_CLIENT_ORIGIN}"
+CLI_PROXY_ENDPOINT_PLACEHOLDERS: Final[tuple[str, ...]] = (
+    CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
+    CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER,
+)
 
 ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
 MIN_PORT: Final[int] = 1
@@ -245,17 +250,26 @@ def render_cliproxy_endpoint_template(
     template: str,
     deployment: CliProxyDeployment,
 ) -> str:
-    """Render endpoint template by substituting ${CLIPROXY_CLIENT_BASE_URL}."""
-    if CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER not in template:
+    """Render endpoint template by substituting the client endpoint placeholders.
+
+    ${CLIPROXY_CLIENT_BASE_URL} is the /v1 base URL; ${CLIPROXY_CLIENT_ORIGIN}
+    is the same URL without /v1, for clients that append the version path.
+    """
+    if not has_cliproxy_endpoint_placeholder(template):
         msg = (
             "missing CLIProxyAPI endpoint placeholder: "
-            f"{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"
+            f"{' or '.join(CLI_PROXY_ENDPOINT_PLACEHOLDERS)}"
         )
         raise ValueError(msg)
-    return template.replace(
-        CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
-        deployment.client.base_url,
+    base_url = deployment.client.base_url
+    return template.replace(CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER, base_url).replace(
+        CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER, base_url.removesuffix("/v1")
     )
+
+
+def has_cliproxy_endpoint_placeholder(text: str) -> bool:
+    """Return True if text carries any CLIProxyAPI client endpoint placeholder."""
+    return any(placeholder in text for placeholder in CLI_PROXY_ENDPOINT_PLACEHOLDERS)
 
 
 def parse_toml_key_path(raw: str) -> list[str] | None:

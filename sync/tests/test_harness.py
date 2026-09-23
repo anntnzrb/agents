@@ -160,6 +160,25 @@ def test_supported_harness_resolves_amp_npm_launcher(
     assert amp.hooks == ()
 
 
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
+def test_supported_harness_resolves_claude_npm_launcher(
+    tmp_path: Path,
+    platform: HostPlatform,
+) -> None:
+    """Verify the claude adapter resolves its npm launcher, home, and memory file."""
+    claude = supported_harness(str(tmp_path), "claude", platform)
+    assert claude is not None
+    assert claude.home == str(tmp_path / ".claude")
+    assert isinstance(claude.launcher, NpmLauncher)
+    assert claude.launcher.package == "@anthropic-ai/claude-code"
+    assert claude.launcher.bin == "claude"
+    assert claude.launcher.dist_tag == "latest"
+    assert claude.instruction_file == "CLAUDE.md"
+    assert claude.runtime_subdir is None
+    assert claude.preserve_json_keys == {}
+    assert claude.hooks == ()
+
+
 def test_assert_path_component_rejects_trailing_newline() -> None:
     """Test that assert_path_component rejects names with trailing newlines."""
     with pytest.raises(ValueError, match=r"invalid harness id: codex\n"):
@@ -232,6 +251,7 @@ def test_harness_from_adapter_propagates_declarative_adapter_fields(
     assert codex.python_env_segments is None
     assert harnesses["omp"].python_env_segments == (".omp", "python-env")
     assert harnesses["omp"].cliproxy_templates == ("models.yml",)
+    assert harnesses["claude"].cliproxy_templates == ("settings.json",)
     assert harnesses["devin"].cliproxy_templates == ()
     assert harnesses["devin"].cliproxy_preserve_top_levels == {}
 
