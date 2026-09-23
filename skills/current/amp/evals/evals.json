@@ -1,0 +1,65 @@
+{
+  "skill_name": "amp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Plan a new Amp user-plugin mode with GPT-6 Sol at medium effort for main, GPT-6 Sol at high for Oracle, and GPT-6 Luna at max for subagents. Use the existing personal plugins checkout. Explain the exact source and verification steps, but make no changes.",
+      "expected_output": "Routes to the personal plugins repository, covers mode registration and discoverability metadata, checks model and tool policy, and validates the loaded mode before deployment.",
+      "expectations": [
+        "Identifies the personal plugins checkout as the mode source.",
+        "Checks both the mode registry and @amp-agent-mode header.",
+        "Checks model IDs, tool policy, typecheck, and loaded mode settings."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "An Amp custom-url router already has several model mappings. Plan how to add one more mapping for a mode whose Oracle uses a second model. Explain verification, but do not change the router.",
+      "expected_output": "Reads both model inventories and the full existing router mapping, preserves unrelated entries, verifies main and Oracle routes after the edit.",
+      "expectations": [
+        "Distinguishes Amp model IDs from backend model IDs.",
+        "States that edit-router --model-mapping replaces the whole list and preserves existing entries and their matching order.",
+        "Verifies both the main and Oracle routes after an authorized edit."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Plan a reload of one long-lived Amp runner on a host where someone also has an interactive Amp session. The user has authorized reloading only the runner. Explain the action and proof of recovery, but execute nothing.",
+      "expected_output": "Avoids host-wide pkill, targets the runner or supervisor, and verifies a new runner PID and service state.",
+      "expectations": [
+        "Does not recommend pkill -x amp for a runner-only authorization.",
+        "Distinguishes the long-lived runner from the interactive session.",
+        "Checks the replacement Amp PID and supervisor state."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "An Amp keybinding keeps reverting after I edit ~/.config/amp/settings.json and run the agent sync. Diagnose where the durable change belongs and how to verify it. Do not edit files.",
+      "expected_output": "Finds the sync-owned settings source and verifies the installed copy after sync without treating the generated home as authoritative.",
+      "expectations": [
+        "Names harnesses/amp/settings.json in the agent configuration repository as the durable settings source.",
+        "Does not recommend editing the generated ~/.config/amp/settings.json as the fix.",
+        "Checks the relevant harness instructions and compares the installed setting after sync."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I explicitly authorize pkill -x amp on hosts alpha and beta so their supervised Amp runners auto-restart. Describe the execution and recovery checks for those two hosts, but do not run commands in this evaluation.",
+      "expected_output": "Uses the existing approval, limits the operation to alpha and beta, and verifies a new Amp runner process on each host.",
+      "expectations": [
+        "Treats the explicit host-wide restart authorization as sufficient without asking again.",
+        "Limits pkill -x amp to alpha and beta and acknowledges that it also stops interactive Amp sessions there.",
+        "Records old runner PIDs and checks each supervisor plus a new Amp runner PID after restart."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The exact model mapping exists on our Amp custom router, but a previous check-access call reported that a subscription connection served the model. Diagnose the route and propose the smallest fix. Do not run commands or change configuration.",
+      "expected_output": "Finds the higher-priority matching connection and proposes a targeted priority or exclusion change instead of duplicating the mapping.",
+      "expectations": [
+        "Checks active connection order and matching mappings, including personal versus workspace precedence.",
+        "Explains that the first active matching connection wins and does not add a duplicate mapping as the fix.",
+        "Proposes a targeted priority or exclusion change and verifies the serving connection after authorization."
+      ]
+    }
+  ]
+}
