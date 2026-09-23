@@ -3,28 +3,25 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 modelRoles:
-  default: cliproxy/gemini-3.7-flash-high:medium
-  smol: cliproxy/gemini-3.7-flash-high:medium
-  vision: cliproxy/gemini-3.7-flash-high:medium
-  commit: cliproxy/gemini-3.7-flash-high:medium
-  tiny: cliproxy/gemini-3.7-flash-high:medium
-  task: cliproxy/gemini-3.7-flash-high:medium
-  advisor: cliproxy/gemini-3.7-flash-high:medium
-  slow: cliproxy/gpt-6-astra:medium
+  default: cliproxy/mimo/mimo-v2.6-pro:max
+  smol: cliproxy/mimo/mimo-v2.6-pro:max
+  vision: cliproxy/gemini-3.8-flash-high:medium
+  commit: cliproxy/gemini-3.8-flash-high:medium
+  tiny: cliproxy/mimo/mimo-v2.6-pro:max
+  task: cliproxy/mimo/mimo-v2.6-pro:max
+  advisor: cliproxy/mimo/mimo-v2.6-pro:max
+  slow: cliproxy/mimo/mimo-v2.6-pro:max
 
-  gem: cliproxy/gemini-3.7-flash-high:medium
-  ds-flash: cliproxy/command-code/deepseek/deepseek-v4.1-flash:max
-  swe: devin/swe-2:max
+  gem: cliproxy/gemini-3.8-flash-high:medium
   muse: cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh
   astra: cliproxy/gpt-6-astra:medium
+  opus: cliproxy/claude-opus-5-5:medium
 
 cycleOrder:
   - default
-  - smol
+  - opus
   - astra
   - muse
-  - swe
-  - ds-flash
   - gem
 
 modelRoleStorage: global
@@ -46,7 +43,7 @@ retry:
   maxDelayMs: 300000
   # fallbackChains:
   #   default:
-  #     - cliproxy/gemini-3.7-flash-high:medium
+  #     - cliproxy/gemini-3.8-flash-high:medium
 
 advisor:
   enabled: false
