@@ -27,10 +27,10 @@ SYNC_ROOT: Path = Path(__file__).resolve().parent.parent
 UV_BIN = shutil.which("uv") or "uv"
 shared_tool_cache_env: dict[str, str] = {
     "UV_CACHE_DIR": subprocess.check_output(  # noqa: S603 - fixed uv query
-        [UV_BIN, "cache", "dir"], text=True
+        [UV_BIN, "--color", "never", "cache", "dir"], text=True
     ).strip(),
     "UV_PYTHON_INSTALL_DIR": subprocess.check_output(  # noqa: S603 - fixed uv query
-        [UV_BIN, "python", "dir"], text=True
+        [UV_BIN, "--color", "never", "python", "dir"], text=True
     ).strip(),
 }
 
