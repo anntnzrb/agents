@@ -26,6 +26,7 @@ from autommit.inventory import (
     planner_diff,
     render_critic_prompt,
     render_planner_prompt,
+    stack_correction,
 )
 from autommit.proposal import (
     normalize_atomicity_decision,
@@ -283,7 +284,10 @@ def _attempt_plan(
             if error.code not in RETRYABLE_PLAN_CODES:
                 raise
             last_error = error.message
-            current = _with_correction(evidence, error.message)
+            # keep the standing correction (the critic's concerns) and add the rejection
+            current = _with_correction(
+                evidence, stack_correction(evidence.correction, error.message)
+            )
             continue
         return (payload, requires_atomicity_review(model_proposal, context.diff)), ""
     return None, last_error

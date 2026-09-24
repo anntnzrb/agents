@@ -28,6 +28,7 @@ from autommit.inventory import (
     planner_diff,
     render_critic_prompt,
     render_planner_prompt,
+    stack_correction,
 )
 from autommit.proposal import (
     changed_hunk_count,
@@ -527,7 +528,7 @@ def _plan_loop(
         except AutommitError as error:
             if error.code not in RETRYABLE_PLAN_CODES:
                 raise
-            current = error.message
+            current = stack_correction(correction, error.message)
             continue
         return payload
     return None

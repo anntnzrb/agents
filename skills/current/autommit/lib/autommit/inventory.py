@@ -261,6 +261,13 @@ def inventory_payload(inventory: tuple[FileInventory, ...]) -> list[dict[str, ob
     ]
 
 
+def stack_correction(standing: str | None, rejection: str) -> str:
+    """Add one rejection under the standing correction instead of replacing it."""
+    if not standing:
+        return rejection
+    return f"{standing}\n\nYour previous plan was rejected: {rejection}"
+
+
 def render_planner_prompt(evidence: PlannerEvidence) -> str:
     """Render the planner user prompt. It carries evidence, never a skeleton."""
     sections: list[str] = []

@@ -532,6 +532,31 @@ class ProgressAndEfficiencyTests(_Sandbox):
         self.assertIn("json_schema", seen[1])
         self.assertIn("CORRECTION REQUIRED", seen[1])
 
+    def test_split_retries_keep_the_critic_concerns(self) -> None:
+        self.stage()
+        replans: list[str] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            if "Independent atomicity critic" in _system_of(payload):
+                return _model_reply(
+                    {
+                        "decision": "split",
+                        "concerns": ["UNIQUE-CONCERN-MARKER"],
+                        "rationale": "Two behaviors.",
+                    }
+                )
+            body = json.dumps(payload)
+            if "CORRECTION REQUIRED" in body:
+                replans.append(body)
+            return _model_reply(BROAD_PLAN)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertNotEqual(code, 0)
+        self.assertEqual(len(replans), 3)
+        for body in replans:
+            self.assertIn("UNIQUE-CONCERN-MARKER", body)
+        self.assertIn("Your previous plan was rejected", replans[-1])
+
     def test_planner_diff_keeps_only_the_head_of_a_deleted_file(self) -> None:
         lines = "".join(f"line {n}\n" for n in range(200))
         _ = (self.repo / "gone.txt").write_text(lines, encoding="utf-8")
