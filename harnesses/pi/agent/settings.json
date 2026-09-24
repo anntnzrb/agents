@@ -1,4 +1,5 @@
 {
+  "cacheWarming": "idle",
   "collapseChangelog": true,
   "defaultTools": ["read", "bash", "edit", "write"],
   "doubleEscapeAction": "none",
