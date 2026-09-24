@@ -597,6 +597,55 @@ class ProgressAndEfficiencyTests(_Sandbox):
         self.assertEqual(subjects, ["Add other file", "Update tracked value"])
         self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
 
+    def test_apply_count_reports_the_critic_replan(self) -> None:
+        _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
+        self.git("add", "other.txt")
+        self.stage()
+        broad = {
+            "commits": [
+                {
+                    "summary": "Change two things",
+                    "details": ["one", "two"],
+                    "dependencies": [],
+                    "changes": [
+                        {"path": "tracked.txt", "hunks": "all"},
+                        {"path": "other.txt", "hunks": "all"},
+                    ],
+                }
+            ]
+        }
+        split = {
+            "commits": [
+                {
+                    "summary": "Update tracked value",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                },
+                {
+                    "summary": "Add other file",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "other.txt", "hunks": "all"}],
+                },
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            if "Independent atomicity critic" in _system_of(payload):
+                return _model_reply(
+                    {"decision": "split", "concerns": ["a", "b"], "rationale": "Two."}
+                )
+            return _model_reply(
+                split if "CORRECTION REQUIRED" in json.dumps(payload) else broad
+            )
+
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(post=post))
+        self.assertEqual(code, 0)
+        self.assertIn("Applying 2 commit(s)...", err.getvalue())
+
     def test_planner_diff_keeps_only_the_head_of_a_deleted_file(self) -> None:
         lines = "".join(f"line {n}\n" for n in range(200))
         _ = (self.repo / "gone.txt").write_text(lines, encoding="utf-8")

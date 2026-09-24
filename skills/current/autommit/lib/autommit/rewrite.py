@@ -590,10 +590,9 @@ def run_rewrite(options: RunOptions) -> int:
             if bool(validation["requires_atomicity_review"]):
                 _progress(options, "Reviewing atomicity...")
                 chosen = _review(options, brain, evidence, plan_file, decision_file)
-            _progress(
-                options,
-                f"Rebuilding {int(cast('int', validation['commit_count']))} commit(s)...",
-            )
+            # a critic replan rewrites the plan file; count what will be rebuilt
+            applied = normalize_proposal(read_json_file(plan_file, "plan"))
+            _progress(options, f"Rebuilding {len(applied.commits)} commit(s)...")
             result = publish_rewrite(
                 options.repo, evidence, plan_file, chosen, smoke=options.smoke
             )

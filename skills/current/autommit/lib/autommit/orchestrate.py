@@ -615,7 +615,10 @@ def run_orchestrated(options: RunOptions) -> int:
                 )
             payload, review = planned
             decision_file = _review(context, payload) if review else None
-            settled = normalize_proposal(payload)
+            # a critic replan rewrites the plan file; count what will be applied
+            settled = normalize_proposal(
+                json.loads(context.plan_path.read_text(encoding="utf-8"))
+            )
             _progress(options, f"Applying {len(settled.commits)} commit(s)...")
             result = apply(
                 options.repo,
