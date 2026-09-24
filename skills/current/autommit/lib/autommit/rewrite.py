@@ -25,6 +25,7 @@ from autommit.inventory import (
     PlannerEvidence,
     build_inventory,
     inventory_payload,
+    planner_diff,
     render_critic_prompt,
     render_planner_prompt,
 )
@@ -60,6 +61,8 @@ from autommit.transaction import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from autommit.orchestrate import RunOptions
 
 SCHEMA: Final[str] = "autommit/v1"
@@ -99,6 +102,7 @@ class _Brain:
     api_key: str
     timeout: float
     reasoning_effort: str | None = None
+    notify: Callable[[str], None] | None = None
 
 
 def _write(message: str) -> None:
@@ -117,12 +121,15 @@ def _note(options: RunOptions, message: str) -> None:
     _write(message)
 
 
-def _progress(options: RunOptions, message: str) -> None:
-    """Announce a blocking stage on stderr; machine output stays on stdout."""
-    if options.json_output:
-        return
+def _stderr_line(message: str) -> None:
     sys.stderr.write(message + "\n")
     sys.stderr.flush()
+
+
+def _progress(options: RunOptions, message: str) -> None:
+    """Announce a blocking stage on stderr; machine output stays on stdout."""
+    if not options.json_output:
+        _stderr_line(message)
 
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
@@ -426,17 +433,13 @@ def _brain(options: RunOptions) -> _Brain:
         ),
         environ=os.environ,
     )
-    if not config.api_key:
-        raise AutommitError(
-            "missing_api_key",
-            "Set AUTOMMIT_API_KEY or OPENAI_API_KEY, or pass an API key argument.",
-        )
     return _Brain(
         model=config.model,
         base_url=config.base_url,
         api_key=config.api_key,
         timeout=config.timeout,
         reasoning_effort=config.reasoning_effort,
+        notify=None if options.json_output else _stderr_line,
     )
 
 
@@ -449,11 +452,13 @@ def _planner_evidence(
         repository_context=evidence.repository_context,
         user_context=evidence.user_context,
         correction=correction,
-        zero_diff=evidence.zero_diff,
+        diff=planner_diff(evidence.diff, frozenset()),
     )
 
 
-def _planner_request(brain: _Brain, evidence: PlannerEvidence) -> ModelRequest:
+def _planner_request(
+    brain: _Brain, evidence: PlannerEvidence, label: str
+) -> ModelRequest:
     return ModelRequest(
         model=brain.model,
         base_url=brain.base_url,
@@ -462,10 +467,14 @@ def _planner_request(brain: _Brain, evidence: PlannerEvidence) -> ModelRequest:
         system=PLAN_SYSTEM,
         user=render_planner_prompt(evidence),
         reasoning_effort=brain.reasoning_effort,
+        label=label,
+        notify=brain.notify,
     )
 
 
-def _critic_request(brain: _Brain, evidence: CriticEvidence) -> ModelRequest:
+def _critic_request(
+    brain: _Brain, evidence: CriticEvidence, label: str
+) -> ModelRequest:
     return ModelRequest(
         model=brain.model,
         base_url=brain.base_url,
@@ -474,6 +483,8 @@ def _critic_request(brain: _Brain, evidence: CriticEvidence) -> ModelRequest:
         system=CRITIC_SYSTEM,
         user=render_critic_prompt(evidence),
         reasoning_effort=brain.reasoning_effort,
+        label=label,
+        notify=brain.notify,
     )
 
 
@@ -495,13 +506,18 @@ def _plan_loop(
     attempts: int,
 ) -> dict[str, object] | None:
     current = correction
-    for _ in range(max(1, attempts)):
-        payload = call_planner(
-            _planner_request(runner.brain, _planner_evidence(runner.evidence, current)),
-            post=runner.options.post,
-        )
-        runner.plan_file.write_text(json.dumps(payload), encoding="utf-8")
+    stage = "Replanning for the critic" if require_split else "Planning"
+    for attempt in range(1, max(1, attempts) + 1):
         try:
+            payload = call_planner(
+                _planner_request(
+                    runner.brain,
+                    _planner_evidence(runner.evidence, current),
+                    f"{stage} (attempt {attempt}/{attempts})",
+                ),
+                post=runner.options.post,
+            )
+            runner.plan_file.write_text(json.dumps(payload), encoding="utf-8")
             _ = _validate_rewrite_plan(
                 runner.options.repo,
                 runner.evidence,
@@ -619,10 +635,15 @@ def _review(
         diff=evidence.diff,
     )
     decision: dict[str, object] | None = None
-    for _ in range(MAX_CRITIC_ATTEMPTS):
+    for attempt in range(1, MAX_CRITIC_ATTEMPTS + 1):
         try:
             decision = call_critic(
-                _critic_request(brain, critic_evidence), post=options.post
+                _critic_request(
+                    brain,
+                    critic_evidence,
+                    f"Reviewing atomicity (attempt {attempt}/{MAX_CRITIC_ATTEMPTS})",
+                ),
+                post=options.post,
             )
         except AutommitError as error:
             if error.code != "invalid_atomicity_decision":

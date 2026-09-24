@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import sys
 import tempfile
@@ -22,10 +23,15 @@ from autommit.inventory import (
     FileInventory,
     PlannerEvidence,
     build_inventory,
+    planner_diff,
     render_critic_prompt,
     render_planner_prompt,
 )
-from autommit.proposal import normalize_atomicity_decision, normalize_proposal
+from autommit.proposal import (
+    normalize_atomicity_decision,
+    normalize_proposal,
+    requires_atomicity_review,
+)
 from autommit.service import apply, prepare, validate_plan
 from autommit.transaction import format_recovery_hint, read_recovery_point
 
@@ -41,6 +47,10 @@ MAX_CRITIC_ATTEMPTS: Final[int] = 2
 RETRYABLE_PLAN_CODES: Final[frozenset[str]] = frozenset(
     {"invalid_plan", "split_required"}
 )
+MIN_SPLIT_COMMITS: Final[int] = 2
+MAX_ERROR_CHARS: Final[int] = 2000
+_SUBJECT: Final[re.Pattern[str]] = re.compile(r"^### \S+ (.+)$", re.MULTILINE)
+_CONVENTIONAL: Final[re.Pattern[str]] = re.compile(r"[a-z]+(\([^)]*\))?!?: ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +81,7 @@ class _Brain:
     api_key: str
     timeout: float
     reasoning_effort: str | None = None
+    notify: Callable[[str], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +97,8 @@ class _PlanContext:
     staged_count: int
     hunk_count: int
     diff: str
+    move_commit: dict[str, object] | None = None
+    whole_files: frozenset[str] = frozenset()
 
 
 def _raise_cancelled(signum: int, frame: object) -> None:
@@ -126,12 +139,15 @@ def _note(options: RunOptions, message: str) -> None:
     _write(message)
 
 
-def _progress(options: RunOptions, message: str) -> None:
-    """Announce a blocking stage on stderr; machine output stays on stdout."""
-    if options.json_output:
-        return
+def _stderr_line(message: str) -> None:
     sys.stderr.write(message + "\n")
     sys.stderr.flush()
+
+
+def _progress(options: RunOptions, message: str) -> None:
+    """Announce a blocking stage on stderr; machine output stays on stdout."""
+    if not options.json_output:
+        _stderr_line(message)
 
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
@@ -163,7 +179,9 @@ def _recovery_hint(repo: Path) -> str | None:
     return format_recovery_hint(point.ref, point.before)
 
 
-def _planner_request(brain: _Brain, evidence: PlannerEvidence) -> ModelRequest:
+def _planner_request(
+    brain: _Brain, evidence: PlannerEvidence, label: str
+) -> ModelRequest:
     return ModelRequest(
         model=brain.model,
         base_url=brain.base_url,
@@ -172,10 +190,14 @@ def _planner_request(brain: _Brain, evidence: PlannerEvidence) -> ModelRequest:
         system=PLAN_SYSTEM,
         user=render_planner_prompt(evidence),
         reasoning_effort=brain.reasoning_effort,
+        label=label,
+        notify=brain.notify,
     )
 
 
-def _critic_request(brain: _Brain, evidence: CriticEvidence) -> ModelRequest:
+def _critic_request(
+    brain: _Brain, evidence: CriticEvidence, label: str
+) -> ModelRequest:
     return ModelRequest(
         model=brain.model,
         base_url=brain.base_url,
@@ -184,6 +206,8 @@ def _critic_request(brain: _Brain, evidence: CriticEvidence) -> ModelRequest:
         system=CRITIC_SYSTEM,
         user=render_critic_prompt(evidence),
         reasoning_effort=brain.reasoning_effort,
+        label=label,
+        notify=brain.notify,
     )
 
 
@@ -196,7 +220,7 @@ def _with_correction(
         repository_context=evidence.repository_context,
         user_context=evidence.user_context,
         correction=correction,
-        zero_diff=evidence.zero_diff,
+        diff=evidence.diff,
     )
 
 
@@ -211,17 +235,13 @@ def _brain(options: RunOptions) -> _Brain:
         ),
         environ=os.environ,
     )
-    if not config.api_key:
-        raise AutommitError(
-            "missing_api_key",
-            "Set AUTOMMIT_API_KEY or OPENAI_API_KEY, or pass an API key argument.",
-        )
     return _Brain(
         model=config.model,
         base_url=config.base_url,
         api_key=config.api_key,
         timeout=config.timeout,
         reasoning_effort=config.reasoning_effort,
+        notify=None if options.json_output else _stderr_line,
     )
 
 
@@ -231,29 +251,143 @@ def _attempt_plan(
     *,
     require_split: bool,
     attempts: int,
-) -> tuple[dict[str, object], bool] | None:
-    """Run a bounded planner loop, feeding exact validation errors back."""
+) -> tuple[tuple[dict[str, object], bool] | None, str]:
+    """Run a bounded planner loop, feeding exact validation errors back.
+
+    Returns the settled plan (or None) and the last validation error. Pure
+    renames never reach the model; their move-only commit is appended here,
+    and the split and critic gates judge the model's commits alone.
+    """
     current = evidence
-    for _ in range(max(1, attempts)):
+    last_error = ""
+    stage = "Replanning for the critic" if require_split else "Planning"
+    for attempt in range(1, max(1, attempts) + 1):
         try:
-            payload = call_planner(
-                _planner_request(context.brain, current), post=context.options.post
+            planned = call_planner(
+                _planner_request(
+                    context.brain, current, f"{stage} (attempt {attempt}/{attempts})"
+                ),
+                post=context.options.post,
             )
+            planned = _whole_file_selectors(planned, context.whole_files)
+            model_proposal = normalize_proposal(planned)
+            if require_split and len(model_proposal.commits) < MIN_SPLIT_COMMITS:
+                raise AutommitError(
+                    "split_required",
+                    "Atomicity review requires at least two commits.",
+                )
+            payload = _with_move_commit(planned, context.move_commit)
             context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
-            validation = validate_plan(
-                context.options.repo,
-                context.snapshot,
-                context.plan_path,
-                require_split=require_split,
-            )
+            _ = validate_plan(context.options.repo, context.snapshot, context.plan_path)
         except AutommitError as error:
             if error.code not in RETRYABLE_PLAN_CODES:
                 raise
+            last_error = error.message
             current = _with_correction(evidence, error.message)
             continue
-        review = bool(validation["requires_atomicity_review"])
-        return payload, review
-    return None
+        return (payload, requires_atomicity_review(model_proposal, context.diff)), ""
+    return None, last_error
+
+
+def _plan(
+    context: _PlanContext, evidence: PlannerEvidence
+) -> tuple[tuple[dict[str, object], bool] | None, str]:
+    """Plan the staged snapshot; a moves-only snapshot needs no model."""
+    if not evidence.staged_files and context.move_commit is not None:
+        payload: dict[str, object] = {"commits": [context.move_commit]}
+        context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
+        _ = validate_plan(context.options.repo, context.snapshot, context.plan_path)
+        return (payload, False), ""
+    if context.move_commit is not None:
+        moved = len(cast("list[object]", context.move_commit["changes"]))
+        _progress(
+            context.options,
+            f"Committing {moved} pure rename(s) as one move-only commit.",
+        )
+    return _attempt_plan(
+        context, evidence, require_split=False, attempts=MAX_PLAN_ATTEMPTS
+    )
+
+
+def _whole_file_selectors(
+    planned: dict[str, object], whole_files: frozenset[str]
+) -> dict[str, object]:
+    """Select hunkless files whole: no other selector can apply to them."""
+    commits = planned.get("commits")
+    if not whole_files or not isinstance(commits, list):
+        return planned
+    return {
+        **planned,
+        "commits": [
+            {
+                **commit,
+                "changes": [
+                    {**change, "hunks": "all"}
+                    if isinstance(change, dict) and change.get("path") in whole_files
+                    else change
+                    for change in commit.get("changes", [])
+                ],
+            }
+            if isinstance(commit, dict)
+            else commit
+            for commit in commits
+        ],
+    }
+
+
+def _with_move_commit(
+    planned: dict[str, object], move_commit: dict[str, object] | None
+) -> dict[str, object]:
+    """Append the move-only commit and apply it first: later commits use its paths."""
+    if move_commit is None:
+        return planned
+    commits = cast("list[object]", planned.get("commits", []))
+    move_index = len(commits)
+    return {
+        **planned,
+        "commits": [
+            *(
+                {
+                    **commit,
+                    "dependencies": [
+                        *cast("list[object]", commit.get("dependencies", [])),
+                        move_index,
+                    ],
+                }
+                if isinstance(commit, dict)
+                else commit
+                for commit in commits
+            ),
+            move_commit,
+        ],
+    }
+
+
+def _move_commit(
+    moves: tuple[str, ...], repository_context: str
+) -> dict[str, object] | None:
+    """One deterministic move-only commit for renames with identical content."""
+    if not moves:
+        return None
+    subjects = _SUBJECT.findall(repository_context)
+    conventional = sum(1 for subject in subjects if _CONVENTIONAL.match(subject))
+    summary = (
+        "refactor: move files without content changes"
+        if subjects and conventional * 2 > len(subjects)
+        else "Move files without content changes"
+    )
+    return {
+        "summary": summary,
+        "details": [f"Rename {len(moves)} file(s); content is unchanged."],
+        "dependencies": [],
+        "changes": [{"path": path, "hunks": "all"} for path in moves],
+    }
+
+
+def _brief(message: str) -> str:
+    if len(message) <= MAX_ERROR_CHARS:
+        return message
+    return message[:MAX_ERROR_CHARS].rstrip() + " ..."
 
 
 def _forced_split_correction(concerns: tuple[str, ...], rationale: str) -> str:
@@ -279,10 +413,15 @@ def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path 
         diff=context.diff,
     )
     decision: dict[str, object] | None = None
-    for _ in range(MAX_CRITIC_ATTEMPTS):
+    for attempt in range(1, MAX_CRITIC_ATTEMPTS + 1):
         try:
             decision = call_critic(
-                _critic_request(context.brain, evidence), post=context.options.post
+                _critic_request(
+                    context.brain,
+                    evidence,
+                    f"Reviewing atomicity (attempt {attempt}/{MAX_CRITIC_ATTEMPTS})",
+                ),
+                post=context.options.post,
             )
         except AutommitError as error:
             if error.code != "invalid_atomicity_decision":
@@ -298,7 +437,7 @@ def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path 
     if verdict.decision == "accept":
         context.decision_path.write_text(json.dumps(decision), encoding="utf-8")
         return context.decision_path
-    forced = _attempt_plan(
+    forced, last_error = _attempt_plan(
         context,
         _with_correction(
             context.evidence,
@@ -311,7 +450,7 @@ def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path 
         raise AutommitError(
             "atomicity_split_required",
             "The atomicity critic required a split and no valid multi-commit "
-            "plan was produced.",
+            f"plan was produced. Last error: {_brief(last_error)}",
         )
     return None
 
@@ -386,13 +525,15 @@ def run_orchestrated(options: RunOptions) -> int:
             return 0
 
         brain = _brain(options)
+        moves = tuple(file.path for file in inventory if file.is_pure_rename)
+        planned_diff = planner_diff(str(prepared["diff"]), frozenset(moves))
         evidence = PlannerEvidence(
-            inventory=inventory,
-            staged_files=staged_files,
+            inventory=tuple(file for file in inventory if not file.is_pure_rename),
+            staged_files=tuple(path for path in staged_files if path not in moves),
             repository_context=repository_context,
             user_context=user_context,
             correction=None,
-            zero_diff=zero_diff,
+            diff=planned_diff,
         )
         with tempfile.TemporaryDirectory(prefix="autommit-run-") as run_dir:
             context = _PlanContext(
@@ -402,21 +543,21 @@ def run_orchestrated(options: RunOptions) -> int:
                 plan_path=Path(run_dir) / "plan.json",
                 decision_path=Path(run_dir) / "decision.json",
                 evidence=evidence,
-                staged_count=len(staged_files),
+                staged_count=len(evidence.staged_files),
                 hunk_count=hunk_count,
-                diff=str(prepared["diff"]),
+                diff=planned_diff,
+                move_commit=_move_commit(moves, repository_context),
+                whole_files=frozenset(
+                    file.path for file in evidence.inventory if file.whole_file_only
+                ),
             )
             _progress(options, "Planning...")
-            planned = _attempt_plan(
-                context,
-                evidence,
-                require_split=False,
-                attempts=MAX_PLAN_ATTEMPTS,
-            )
+            planned, last_error = _plan(context, evidence)
             if planned is None:
                 raise AutommitError(
                     "invalid_plan",
-                    f"Planner produced no valid plan after {MAX_PLAN_ATTEMPTS} attempts.",
+                    f"Planner produced no valid plan after {MAX_PLAN_ATTEMPTS} "
+                    f"attempts. Last error: {_brief(last_error)}",
                 )
             payload, review = planned
             decision_file = _review(context, payload) if review else None

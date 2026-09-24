@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, cast
 
@@ -22,11 +24,12 @@ from autommit.proposal import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 USER_AGENT: Final[str] = "autommit/1.0"
 MAX_ATTEMPTS: Final[int] = 3
 BACKOFF_SECONDS: Final[float] = 1.5
+HEARTBEAT_SECONDS: Final[float] = 30.0
 RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
 UNSUPPORTED_RUNG_STATUSES: Final[frozenset[int]] = frozenset({400, 422})
 OK_STATUS: Final[int] = 200
@@ -143,6 +146,8 @@ class ModelRequest:
     system: str
     user: str
     reasoning_effort: str | None = None
+    label: str = "Model call"
+    notify: Callable[[str], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,6 +328,36 @@ class _CallOptions:
     backoff: float
 
 
+@contextmanager
+def _heartbeat(
+    notify: Callable[[str], None] | None, label: str, interval: float
+) -> Iterator[None]:
+    """Report elapsed time while one request waits on the model."""
+    if notify is None:
+        yield
+        return
+    stop = threading.Event()
+    started = time.monotonic()
+
+    def beat() -> None:
+        while not stop.wait(interval):
+            notify(f"{label}: waiting on model ({time.monotonic() - started:.0f}s)")
+
+    thread = threading.Thread(target=beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join()
+
+
+def _timed_out(error: OSError) -> bool:
+    return isinstance(error, TimeoutError) or isinstance(
+        getattr(error, "reason", None), TimeoutError
+    )
+
+
 def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, object]:
     if not request.api_key:
         raise AutommitError(
@@ -343,9 +378,21 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
     last_invalid: AutommitError | None = None
     for rung in options.rungs:
         for attempt in range(attempts):
+            if request.notify is not None:
+                request.notify(f"{request.label}: sending ({rung.name})")
             try:
-                response = send(rung.decorate(dict(base_payload)))
+                with _heartbeat(request.notify, request.label, HEARTBEAT_SECONDS):
+                    response = send(rung.decorate(dict(base_payload)))
             except OSError as error:
+                if _timed_out(error):
+                    # the same prompt would time out again; never resend it
+                    raise AutommitError(
+                        "provider_error",
+                        f"{request.base_url} did not answer within "
+                        f"{request.timeout:.0f}s; raise --timeout or lower "
+                        "--reasoning-effort.",
+                        1,
+                    ) from error
                 if attempt + 1 < attempts:
                     time.sleep(options.backoff * (attempt + 1))
                     continue
@@ -375,15 +422,18 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
                 )
             try:
                 payload = _loads(rung.extract(response.body))
-                return _validate(payload, options.invalid_code)
-            except AutommitError as error:
-                last_invalid = AutommitError(options.invalid_code, error.message)
-                break
             except (KeyError, IndexError, TypeError, ValueError) as error:
                 last_invalid = AutommitError(
                     options.invalid_code, f"Unusable model response: {error}."
                 )
+                if request.notify is not None:
+                    request.notify(
+                        f"{request.label}: {rung.name} reply was not JSON; "
+                        "trying the next format"
+                    )
                 break
+            # parseable but invalid: the caller corrects the model with this error
+            return _validate(payload, options.invalid_code)
     if last_invalid is not None:
         raise last_invalid
     raise AutommitError(options.invalid_code, "Model returned no usable result.")

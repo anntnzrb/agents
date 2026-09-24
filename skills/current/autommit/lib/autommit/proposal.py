@@ -596,6 +596,10 @@ def validate_proposal_coverage(
             not isinstance(item, AllSelector) for item in selections
         ):
             errors.append(f"Binary file cannot be partially selected: {filename}")
+        if _is_rename(parsed) and any(
+            not isinstance(item, AllSelector) for item in selections
+        ):
+            errors.append(f"Renamed file cannot be partially selected: {filename}")
         if not parsed.hunks and any(
             not isinstance(item, AllSelector) for item in selections
         ):
@@ -696,16 +700,17 @@ def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
     return "\n".join((file_header, *selected_hunks))
 
 
+def _is_rename(file: ParsedFile) -> bool:
+    return "\nrename from " in file.content or file.content.startswith("rename from ")
+
+
 def select_patch(file: ParsedFile, selector: HunkSelector) -> str:
     """Select one whole file or a subset of its hunks."""
     if file.is_binary and not isinstance(selector, AllSelector):
         raise AutommitError(
             "invalid_plan", f"Cannot partially select binary file {file.filename}."
         )
-    is_rename = "\nrename from " in file.content or file.content.startswith(
-        "rename from "
-    )
-    if is_rename and not isinstance(selector, AllSelector):
+    if _is_rename(file) and not isinstance(selector, AllSelector):
         raise AutommitError(
             "invalid_plan",
             f"Cannot partially select renamed file {file.filename}; "

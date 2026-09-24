@@ -12,11 +12,11 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 
 Success is one JSON line on stdout. Expected failure is one JSON line on stderr. Every payload has `schema:"autommit/v1"`, `ok:true|false`, `command`, and either `result` or `error`.
 
-Human mode splits its streams: narrative lines such as `Prepared`, `Created`, and the final `Created N commit(s) on <ref>` go to stdout, while stage announcements (`Planning...`, `Reviewing atomicity...`, `Applying N commit(s)...`, and `Rebuilding N commit(s)...` for rewrite) go to stderr as they start. `--json` suppresses every narrative and stage line, so stdout stays exactly one payload, and `--dry-run` prints no stage announcement because no stage runs. Progress is always one static line per stage, never an animation, so it stays readable when piped.
+Human mode splits its streams: narrative lines such as `Prepared`, `Created`, and the final `Created N commit(s) on <ref>` go to stdout, while stage announcements (`Planning...`, `Reviewing atomicity...`, `Applying N commit(s)...`, and `Rebuilding N commit(s)...` for rewrite) go to stderr as they start. `--json` suppresses every narrative and stage line, so stdout stays exactly one payload, and `--dry-run` prints no stage announcement because no stage runs. Under each model stage, every request adds `<stage> (attempt n/N): sending (<format>)`, a `waiting on model (Ns)` line every 30 seconds while the model thinks, and a note when a format's reply is not JSON. Progress is always static lines, never an animation, so it stays readable when piped.
 
 `--repo PATH` defaults to the current directory. Git is the only external executable.
 
-Settings come from CLI flags and environment variables only, with flags winning. Autommit reads no configuration file and creates none. `--model`, `--base-url`, and an API key are required: autommit ships no model or endpoint default, so an unconfigured machine fails as `missing_model`, `missing_base_url`, or `missing_api_key`.
+Settings come from CLI flags, then environment variables, then the owner defaults in `lib/autommit/config.py`. Autommit reads no configuration file and creates none. Every setting has a default, so a run needs no flag or variable.
 
 ## Commands
 
@@ -29,14 +29,15 @@ uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|al
 `run` is the default command when no subcommand is given, and the only one that mutates anything. It owns the whole loop:
 
 1. Recover a prepared receipt, then re-prepare in the same invocation.
-2. Send the inventory, repository policy, and exact zero-context diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation.
-3. Validate each returned plan against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context.
-4. When the plan needs atomicity review, ask an independent critic, at most twice. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two commits.
-5. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
+2. Hold back pure renames: renamed files with identical content. They never reach the planner; autommit adds one move-only commit for them, applied before every model commit, (`refactor: move files without content changes` when most recent subjects are conventional, otherwise `Move files without content changes`). A snapshot of only pure renames needs no model call.
+3. Send the remaining inventory, repository policy, and the regular cached diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation. Only a reply that is not JSON moves to the next format; a JSON reply that fails the plan shape goes straight to the correction loop. The inventory hunk ids count the hunks of that same diff, a renamed file shows its source as `new <- old`, and a renamed file, a deleted file, or a file without hunks is marked `whole file only`; autommit selects such a file with `"all"` whatever selector the model returns, and validation rejects any other selector for a rename. A deleted file shows only its first 40 lines and the count of omitted lines.
+4. Validate each returned plan, with the move-only commit appended, against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context. When every attempt fails, the error ends with the last validation message.
+5. When the model's plan needs atomicity review, ask an independent critic, at most twice. The move-only commit never counts toward the review or the split requirement. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two model commits.
+6. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
 
-Provider failures are terminal and never count as plan rejections. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and creates nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
+Provider failures are terminal and never count as plan rejections. A request that exceeds `--timeout` fails at once instead of resending the same prompt; raise `--timeout` or lower `--reasoning-effort`. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and creates nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
 
-Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL` or `AUTOMMIT_REASONING_EFFORT` adds that field, and an unset level sends none. `--model` and `--base-url` are required: autommit ships no model or endpoint default. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
+Each request carries `model`, the system and user messages, and the response-format or tool field for the current rung. `--reasoning-effort LEVEL`, `AUTOMMIT_REASONING_EFFORT`, or `DEFAULT_REASONING_EFFORT` sets that field. No sampling or token parameter is sent: a provider that rejects `temperature` would fail every rung and hide the real cause, and a token cap would truncate a plan the CLI has already accepted.
 
 Plan files, decision files, and the snapshot token live in a private temporary directory. They are never caller-facing flags.
 

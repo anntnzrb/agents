@@ -9,12 +9,15 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
+from autommit import client
 from autommit.client import HttpResponse
 from autommit.errors import CancelledError
 from autommit.fallback import CommitWork, _rung_plumbing
@@ -23,11 +26,19 @@ from autommit.inventory import (
     CriticEvidence,
     PlannerEvidence,
     build_inventory,
+    planner_diff,
     render_critic_prompt,
     render_planner_prompt,
 )
 from autommit.orchestrate import RunOptions, run_orchestrated
-from autommit.proposal import AllSelector, CommitChange, CommitGroup
+from autommit.proposal import (
+    AllSelector,
+    CommitChange,
+    CommitGroup,
+    normalize_proposal,
+    parse_file_diffs,
+    validate_proposal_coverage,
+)
 from autommit.transaction import read_recovery_point
 
 PLAN = {
@@ -256,7 +267,7 @@ class InventoryTests(_Sandbox):
                 repository_context="# policy",
                 user_context=("keep it small",),
                 correction="previous rejection",
-                zero_diff="ZERO-DIFF-SENTINEL",
+                diff="ZERO-DIFF-SENTINEL",
             )
         )
         self.assertLess(
@@ -282,6 +293,256 @@ class InventoryTests(_Sandbox):
         )
         self.assertIn("truncated for this review", prompt)
         self.assertLess(len(prompt), 300_000)
+
+
+class LargeRefactorTests(_Sandbox):
+    """Cover move-only commits, rename rendering, and surfaced plan errors."""
+
+    def commit_file(self, name: str, content: str) -> None:
+        path = self.repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(content, encoding="utf-8")
+        self.git("add", name)
+        self.git("commit", "-m", f"add {name}")
+
+    def move(self, source: str, target: str) -> None:
+        (self.repo / target).parent.mkdir(parents=True, exist_ok=True)
+        self.git("mv", source, target)
+
+    def test_pure_renames_skip_the_model_and_commit_as_one_move(self) -> None:
+        self.commit_file("old/moved.txt", "same\n")
+        self.move("old/moved.txt", "new/moved.txt")
+        self.stage()
+        prompts: list[str] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            prompts.append(json.dumps(payload))
+            return _model_reply(PLAN)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(prompts), 1)
+        self.assertNotIn("new/moved.txt", prompts[0])
+        subjects = self.git("log", "-2", "--format=%s").splitlines()
+        self.assertEqual(
+            subjects, ["Update tracked value", "Move files without content changes"]
+        )
+        self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
+
+    def test_moves_only_snapshot_needs_no_model(self) -> None:
+        self.commit_file("old/moved.txt", "same\n")
+        self.move("old/moved.txt", "new/moved.txt")
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            raise AssertionError("a moves-only snapshot must not call the model")
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(),
+            "Move files without content changes",
+        )
+
+    def test_critic_still_judges_the_model_commit_next_to_moves(self) -> None:
+        self.commit_file("old/moved.txt", "same\n")
+        self.move("old/moved.txt", "new/moved.txt")
+        self.stage()
+        critic_calls: list[int] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            if "Independent atomicity critic" in _system_of(payload):
+                critic_calls.append(1)
+                return _model_reply(
+                    {"decision": "accept", "concerns": [], "rationale": "One."}
+                )
+            return _model_reply(BROAD_PLAN)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(critic_calls), 1)
+
+    def test_partial_rename_renders_its_source(self) -> None:
+        self.commit_file("original.txt", "".join(f"line {n}\n" for n in range(20)))
+        self.git("mv", "original.txt", "renamed.txt")
+        path = self.repo / "renamed.txt"
+        _ = path.write_text(
+            path.read_text(encoding="utf-8").replace("line 3\n", "line three\n"),
+            encoding="utf-8",
+        )
+        self.git("add", "renamed.txt")
+        prepared = self.prepare()
+        staged = tuple(cast("list[str]", prepared["staged_files"]))
+        inventory = build_inventory(self.repo, staged, str(prepared["diff"]))
+        prompt = render_planner_prompt(
+            PlannerEvidence(
+                inventory=inventory,
+                staged_files=staged,
+                repository_context="",
+                user_context=(),
+                correction=None,
+                diff=str(prepared["diff"]),
+            )
+        )
+        self.assertIn(
+            "- renamed.txt <- original.txt [R] (rename, whole file only)", prompt
+        )
+        self.assertFalse(inventory[0].is_pure_rename)
+
+    def test_hunkless_file_selector_is_coerced_to_all(self) -> None:
+        _ = (self.repo / "marker").write_text("", encoding="utf-8")
+        self.git("add", "marker")
+        partial = {
+            "commits": [
+                {
+                    "summary": "Add marker",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [
+                        {"path": "marker", "hunks": {"type": "indices", "indices": [1]}}
+                    ],
+                }
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(partial)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(self.git("log", "-1", "--format=%s").strip(), "Add marker")
+
+    def test_partial_selection_of_an_edited_rename_is_rejected(self) -> None:
+        self.commit_file("original.txt", "".join(f"line {n}\n" for n in range(20)))
+        self.move("original.txt", "renamed.txt")
+        path = self.repo / "renamed.txt"
+        _ = path.write_text(
+            path.read_text(encoding="utf-8").replace("line 3\n", "line three\n"),
+            encoding="utf-8",
+        )
+        self.git("add", "renamed.txt")
+        diff = self.git("diff", "--cached")
+        proposal = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Rename",
+                        "details": [],
+                        "dependencies": [],
+                        "changes": [
+                            {
+                                "path": "renamed.txt",
+                                "hunks": {"type": "indices", "indices": [1]},
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+        errors = validate_proposal_coverage(
+            proposal, ("renamed.txt",), parse_file_diffs(diff)
+        )
+        self.assertIn("Renamed file cannot be partially selected: renamed.txt", errors)
+
+    def test_exhausted_attempts_surface_the_last_error(self) -> None:
+        self.stage()
+        wrong = {
+            "commits": [
+                {
+                    "summary": "Wrong path",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "other.txt", "hunks": "all"}],
+                }
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(wrong)
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(post=post))
+        self.assertNotEqual(code, 0)
+        self.assertIn("Last error: Invalid split plan", err.getvalue())
+        self.assertIn("file is not staged: other.txt", err.getvalue())
+
+
+class ProgressAndEfficiencyTests(_Sandbox):
+    """Cover per-request progress, timeout fail-fast, and prompt trimming."""
+
+    def test_heartbeat_reports_while_the_model_is_slow(self) -> None:
+        self.stage()
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            time.sleep(0.2)
+            return _model_reply(PLAN)
+
+        err = io.StringIO()
+        with (
+            mock.patch.object(client, "HEARTBEAT_SECONDS", 0.05),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(err),
+        ):
+            code = run_orchestrated(self.options(post=post))
+        self.assertEqual(code, 0)
+        self.assertIn("Planning (attempt 1/3): sending (json_schema)", err.getvalue())
+        self.assertIn("Planning (attempt 1/3): waiting on model (", err.getvalue())
+
+    def test_timeout_fails_fast_without_resending(self) -> None:
+        self.stage()
+        calls: list[int] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            calls.append(1)
+            raise TimeoutError
+
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            code = run_orchestrated(self.options(post=post))
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 1)
+        self.assertIn("raise --timeout", err.getvalue())
+
+    def test_invalid_plan_shape_goes_to_correction_not_other_formats(self) -> None:
+        self.stage()
+        long_subject = {
+            "commits": [
+                {
+                    "summary": "x" * 80,
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                }
+            ]
+        }
+        seen: list[str] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            seen.append(json.dumps(payload))
+            return _model_reply(long_subject if len(seen) == 1 else PLAN)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(seen), 2)
+        self.assertIn("json_schema", seen[1])
+        self.assertIn("CORRECTION REQUIRED", seen[1])
+
+    def test_planner_diff_keeps_only_the_head_of_a_deleted_file(self) -> None:
+        lines = "".join(f"line {n}\n" for n in range(200))
+        _ = (self.repo / "gone.txt").write_text(lines, encoding="utf-8")
+        self.git("add", "gone.txt")
+        self.git("commit", "-m", "add gone")
+        self.git("rm", "-q", "gone.txt")
+        diff = self.git("diff", "--cached")
+        trimmed = planner_diff(diff, frozenset())
+        self.assertIn("-line 39\n", trimmed)
+        self.assertNotIn("-line 40\n", trimmed)
+        self.assertIn("[160 more deleted line(s) omitted]", trimmed)
 
 
 class PlumbingRungTests(_Sandbox):

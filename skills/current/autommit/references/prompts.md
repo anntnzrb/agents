@@ -53,9 +53,9 @@ Planning evidence, in order:
 1. Prior validation or critic correction, when present
 2. Additional user context
 3. Advisory repository policy and recent subject evidence
-4. Exact staged path list
-5. `STAGED INVENTORY (1-based hunk ids)`: one line per staged path with its status, followed by each hunk id, header, and changed-line count
-6. The exact zero-context staged diff between explicit begin/end delimiters
+4. Exact staged path list, without pure renames: autommit commits those itself as one move-only commit
+5. `STAGED INVENTORY (1-based hunk ids)`: one line per staged path with its status and, for a rename, its source as `new <- old`, followed by each hunk id, header, and changed-line count
+6. The regular staged diff, whose hunks the inventory ids count, between explicit begin/end delimiters
 
 When validation fails, preserve the original evidence and add only the exact rejection as correction context. Generate a complete replacement plan; never patch a rejected plan mentally and skip validation.
 

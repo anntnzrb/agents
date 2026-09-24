@@ -83,6 +83,8 @@ Choose "split" when:
 
 BEGIN_DIFF: Final[str] = "----- BEGIN CACHED DIFF -----"
 END_DIFF: Final[str] = "----- END CACHED DIFF -----"
+# a deleted file is selected whole; its head is enough to say what it was
+MAX_DELETED_LINES: Final[int] = 40
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,18 +105,33 @@ class FileInventory:
     is_binary: bool
     is_rename: bool
     hunks: tuple[HunkInventory, ...]
+    renamed_from: str | None = None
+
+    @property
+    def is_pure_rename(self) -> bool:
+        """A move with identical content: no hunks and no binary payload."""
+        return self.is_rename and not self.hunks and not self.is_binary
+
+    @property
+    def whole_file_only(self) -> bool:
+        """Renames, deletions, and hunkless files are selected with `"all"`."""
+        return self.is_rename or self.status == "D" or not self.hunks
 
 
 @dataclass(frozen=True, slots=True)
 class PlannerEvidence:
-    """Everything the planner sees for one attempt."""
+    """Everything the planner sees for one attempt.
+
+    `diff` is the context diff whose hunks the inventory ids and the plan
+    validator count, so the planner reads the same hunk boundaries.
+    """
 
     inventory: tuple[FileInventory, ...]
     staged_files: tuple[str, ...]
     repository_context: str
     user_context: tuple[str, ...]
     correction: str | None
-    zero_diff: str
+    diff: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,23 +145,24 @@ class CriticEvidence:
     diff: str
 
 
-def _statuses(cwd: Path) -> dict[str, str]:
-    """Map staged paths to their single-letter diff status."""
+def _statuses(cwd: Path) -> dict[str, tuple[str, str | None]]:
+    """Map staged paths to their single-letter diff status and rename source."""
     output = run_git(cwd, "diff", "--cached", "--name-status", "-z", "--")
     tokens = [token for token in output.split("\0") if token]
-    statuses: dict[str, str] = {}
+    statuses: dict[str, tuple[str, str | None]] = {}
     index = 0
     while index < len(tokens):
         status = tokens[index]
         if status[:1] in ("R", "C"):
             if index + 2 >= len(tokens):
                 break
-            statuses[tokens[index + 2]] = status[:1]
+            source = tokens[index + 1] if status[:1] == "R" else None
+            statuses[tokens[index + 2]] = (status[:1], source)
             index += 3
             continue
         if index + 1 >= len(tokens):
             break
-        statuses[tokens[index + 1]] = status[:1]
+        statuses[tokens[index + 1]] = (status[:1], None)
         index += 2
     return statuses
 
@@ -163,7 +181,10 @@ def _changed_line_count(hunk: DiffHunk) -> int:
     return sum(1 for line in body if line[:1] in ("+", "-"))
 
 
-def _file_inventory(path: str, status: str, parsed: ParsedFile | None) -> FileInventory:
+def _file_inventory(
+    path: str, status: tuple[str, str | None], parsed: ParsedFile | None
+) -> FileInventory:
+    letter, source = status
     hunks = (
         ()
         if parsed is None
@@ -178,10 +199,11 @@ def _file_inventory(path: str, status: str, parsed: ParsedFile | None) -> FileIn
     )
     return FileInventory(
         path=path,
-        status=status,
+        status=letter,
         is_binary=parsed is not None and parsed.is_binary,
-        is_rename=status == "R",
+        is_rename=letter == "R",
         hunks=hunks,
+        renamed_from=source,
     )
 
 
@@ -192,8 +214,29 @@ def build_inventory(
     statuses = _statuses(cwd)
     parsed = {file.filename: file for file in parse_file_diffs(diff)}
     return tuple(
-        _file_inventory(path, statuses.get(path, "M"), parsed.get(path))
+        _file_inventory(path, statuses.get(path, ("M", None)), parsed.get(path))
         for path in staged
+    )
+
+
+def _deleted_head(content: str) -> str:
+    lines = content.split("\n")
+    body = next((i for i, line in enumerate(lines) if line.startswith("@@")), None)
+    if body is None or len(lines) - body - 1 <= MAX_DELETED_LINES:
+        return content
+    kept = lines[: body + 1 + MAX_DELETED_LINES]
+    omitted = sum(1 for line in lines[len(kept) :] if line)
+    return "\n".join([*kept, f"[{omitted} more deleted line(s) omitted]"])
+
+
+def planner_diff(diff: str, drop: frozenset[str]) -> str:
+    """Render the model's diff: drop `drop` paths and keep only deletion heads."""
+    return "\n".join(
+        _deleted_head(file.content)
+        if "\ndeleted file mode " in file.content
+        else file.content
+        for file in parse_file_diffs(diff)
+        if file.filename not in drop
     )
 
 
@@ -238,14 +281,17 @@ def render_planner_prompt(evidence: PlannerEvidence) -> str:
             flags.append("binary")
         if file.is_rename:
             flags.append("rename")
+        if file.whole_file_only:
+            flags.append("whole file only")
         suffix = f" ({', '.join(flags)})" if flags else ""
-        lines.append(f"- {file.path} [{file.status}]{suffix}")
+        source = f" <- {file.renamed_from}" if file.renamed_from else ""
+        lines.append(f"- {file.path}{source} [{file.status}]{suffix}")
         lines.extend(
             f"  hunk {hunk.id}: {hunk.header} [{hunk.changed_lines} changed lines]"
             for hunk in file.hunks
         )
     sections.append("\n".join(lines))
-    sections.append(f"{BEGIN_DIFF}\n{evidence.zero_diff}\n{END_DIFF}")
+    sections.append(f"{BEGIN_DIFF}\n{evidence.diff}\n{END_DIFF}")
     return "\n\n".join(sections)
 
 
