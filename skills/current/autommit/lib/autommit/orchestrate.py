@@ -270,7 +270,9 @@ def _attempt_plan(
                 ),
                 post=context.options.post,
             )
-            planned = _whole_file_selectors(planned, context.whole_files)
+            planned = _dedupe_whole_files(
+                _whole_file_selectors(planned, context.whole_files)
+            )
             model_proposal = normalize_proposal(planned)
             if require_split and len(model_proposal.commits) < MIN_SPLIT_COMMITS:
                 raise AutommitError(
@@ -335,6 +337,53 @@ def _whole_file_selectors(
             if isinstance(commit, dict)
             else commit
             for commit in commits
+        ],
+    }
+
+
+def _dedupe_whole_files(planned: dict[str, object]) -> dict[str, object]:
+    """Keep a file selected whole only in its first whole-file commit.
+
+    Any other selection of that file is redundant, so it is dropped; a commit
+    left empty is removed and dependency indices are remapped.
+    """
+    commits = cast("list[dict[str, object]]", planned.get("commits", []))
+    owner: dict[str, int] = {}
+    for index, commit in enumerate(commits):
+        for change in cast("list[dict[str, object]]", commit.get("changes", [])):
+            path = str(change.get("path"))
+            if change.get("hunks") == "all" and path not in owner:
+                owner[path] = index
+    kept: list[dict[str, object]] = []
+    remap: dict[int, int] = {}
+    for index, commit in enumerate(commits):
+        changes = [
+            change
+            for change in cast("list[dict[str, object]]", commit.get("changes", []))
+            if owner.get(str(change.get("path")), index) == index
+            and not (change.get("hunks") != "all" and str(change.get("path")) in owner)
+        ]
+        if changes:
+            remap[index] = len(kept)
+            kept.append({**commit, "changes": changes})
+    if len(kept) == len(commits) and all(
+        len(cast("list[object]", a.get("changes", [])))
+        == len(cast("list[object]", b.get("changes", [])))
+        for a, b in zip(kept, commits, strict=True)
+    ):
+        return planned
+    return {
+        **planned,
+        "commits": [
+            {
+                **commit,
+                "dependencies": [
+                    remap[int(cast("int", dep))]
+                    for dep in cast("list[object]", commit.get("dependencies", []))
+                    if int(cast("int", dep)) in remap
+                ],
+            }
+            for commit in kept
         ],
     }
 

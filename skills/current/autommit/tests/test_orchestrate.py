@@ -557,6 +557,46 @@ class ProgressAndEfficiencyTests(_Sandbox):
             self.assertIn("UNIQUE-CONCERN-MARKER", body)
         self.assertIn("Your previous plan was rejected", replans[-1])
 
+    def test_whole_file_selected_twice_is_kept_once(self) -> None:
+        _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
+        self.git("add", "other.txt")
+        self.stage()
+        duplicated = {
+            "commits": [
+                {
+                    "summary": "Update tracked value",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                },
+                {
+                    "summary": "Add other file",
+                    "details": [],
+                    "dependencies": [0],
+                    "changes": [
+                        {"path": "other.txt", "hunks": "all"},
+                        {"path": "tracked.txt", "hunks": [1]},
+                    ],
+                },
+                {
+                    "summary": "Only a duplicate",
+                    "details": [],
+                    "dependencies": [],
+                    "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                },
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(duplicated)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        subjects = self.git("log", "-2", "--format=%s").splitlines()
+        self.assertEqual(subjects, ["Add other file", "Update tracked value"])
+        self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
+
     def test_planner_diff_keeps_only_the_head_of_a_deleted_file(self) -> None:
         lines = "".join(f"line {n}\n" for n in range(200))
         _ = (self.repo / "gone.txt").write_text(lines, encoding="utf-8")
