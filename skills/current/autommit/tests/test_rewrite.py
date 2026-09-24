@@ -273,40 +273,6 @@ class RewriteCliTests(_RewriteSandbox):
         self.assertIn("Dry run only: history was not rewritten.", completed.stdout)
         self.assertEqual(self.git("rev-parse", "HEAD").strip(), self.before)
 
-    def test_cli_missing_key_exits_two(self) -> None:
-        completed = self.cli(
-            "rewrite",
-            "--base",
-            self.base,
-            "--scope",
-            "staged",
-            "--model",
-            "test-model",
-            "--base-url",
-            "https://model.test/v1",
-        )
-        self.assertEqual(completed.returncode, 2, completed.stderr)
-        self.assertIn("missing_api_key", completed.stderr)
-
-    def test_cli_missing_model_or_endpoint_exits_two(self) -> None:
-        for absent in ("--model", "--base-url"):
-            args = [
-                "rewrite",
-                "--base",
-                self.base,
-                "--scope",
-                "staged",
-                "--model",
-                "test-model",
-                "--base-url",
-                "https://model.test/v1",
-            ]
-            index = args.index(absent)
-            del args[index : index + 2]
-            completed = self.cli(*args)
-            self.assertEqual(completed.returncode, 2, completed.stderr)
-            self.assertIn("missing_", completed.stderr)
-
 
 if __name__ == "__main__":
     _ = unittest.main()

@@ -22,6 +22,10 @@ from autommit.client import (
     list_models,
 )
 from autommit.config import (
+    DEFAULT_API_KEY,
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
+    DEFAULT_REASONING_EFFORT,
     DEFAULT_TIMEOUT,
     ConfigOverrides,
     load_config,
@@ -270,40 +274,30 @@ class ConfigResolutionTests(unittest.TestCase):
                 json.dumps({"model": "repo-model"}), encoding="utf-8"
             )
 
-            with self.assertRaises(AutommitError) as raised:
-                _ = load_config(
-                    environ={"XDG_CONFIG_HOME": str(config_home), "HOME": str(root)}
-                )
-            self.assertEqual(raised.exception.code, "missing_model")
+            config = load_config(
+                environ={"XDG_CONFIG_HOME": str(config_home), "HOME": str(root)}
+            )
+            self.assertEqual(config.model, DEFAULT_MODEL)
 
-    def test_model_endpoint_and_key_are_required(self) -> None:
-        with self.assertRaises(AutommitError) as missing_model:
-            _ = load_config(environ={})
-        self.assertEqual(missing_model.exception.code, "missing_model")
+    def test_unset_settings_fall_back_to_the_owner_defaults(self) -> None:
+        config = load_config(environ={})
+        self.assertEqual(config.model, DEFAULT_MODEL)
+        self.assertEqual(config.base_url, DEFAULT_BASE_URL)
+        self.assertEqual(config.api_key, DEFAULT_API_KEY)
+        self.assertEqual(config.reasoning_effort, DEFAULT_REASONING_EFFORT)
+        self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
 
-        with self.assertRaises(AutommitError) as missing_base_url:
-            _ = load_config(overrides=ConfigOverrides(model="chosen-model"), environ={})
-        self.assertEqual(missing_base_url.exception.code, "missing_base_url")
-
-        config = load_config(
+        chosen = load_config(
             overrides=ConfigOverrides(
                 model="chosen-model",
                 base_url="https://flag.test/v1/",
-                api_key="keyless",
+                api_key="flag-key",
             ),
             environ={},
         )
-        self.assertEqual(config.model, "chosen-model")
-        self.assertEqual(config.base_url, "https://flag.test/v1")
-        self.assertEqual(config.api_key, "keyless")
-        self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
-        self.assertIsNone(config.reasoning_effort)
-
-        unkeyed = load_config(
-            overrides=ConfigOverrides(model="m", base_url="https://e.test/v1"),
-            environ={},
-        )
-        self.assertIsNone(unkeyed.api_key)
+        self.assertEqual(chosen.model, "chosen-model")
+        self.assertEqual(chosen.base_url, "https://flag.test/v1")
+        self.assertEqual(chosen.api_key, "flag-key")
 
     def test_openai_environment_aliases_are_honored(self) -> None:
         config = load_config(
@@ -316,15 +310,18 @@ class ConfigResolutionTests(unittest.TestCase):
         self.assertEqual(config.api_key, "openai-key")
         self.assertEqual(config.base_url, "https://openai.test/v1")
 
-    def test_reasoning_effort_comes_only_from_the_caller(self) -> None:
+    def test_reasoning_effort_precedence(self) -> None:
         base = ConfigOverrides(model="m", base_url="https://e.test/v1")
 
-        self.assertIsNone(load_config(overrides=base, environ={}).reasoning_effort)
+        self.assertEqual(
+            load_config(overrides=base, environ={}).reasoning_effort,
+            DEFAULT_REASONING_EFFORT,
+        )
         self.assertEqual(
             load_config(
-                overrides=base, environ={"AUTOMMIT_REASONING_EFFORT": "high"}
+                overrides=base, environ={"AUTOMMIT_REASONING_EFFORT": "low"}
             ).reasoning_effort,
-            "high",
+            "low",
         )
         self.assertEqual(
             load_config(

@@ -11,6 +11,11 @@ from autommit.errors import AutommitError
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+# owner defaults; flags and environment variables override each one
+DEFAULT_MODEL: Final[str] = "gemini-3.8-flash-high"
+DEFAULT_BASE_URL: Final[str] = "http://munich.trex-gamut.ts.net:8317/v1"
+DEFAULT_API_KEY: Final[str] = "keyless"
+DEFAULT_REASONING_EFFORT: Final[str] = "high"
 DEFAULT_TIMEOUT: Final[float] = 300.0
 
 MODEL_ENV: Final[tuple[str, ...]] = ("AUTOMMIT_MODEL",)
@@ -26,9 +31,9 @@ class AutommitConfig:
 
     model: str
     base_url: str
-    api_key: str | None
+    api_key: str
     timeout: float
-    reasoning_effort: str | None = None
+    reasoning_effort: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,31 +89,21 @@ def load_config(
     overrides: ConfigOverrides | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> AutommitConfig:
-    """Resolve settings: explicit overrides beat the environment, which beats nothing."""
+    """Resolve settings: explicit overrides beat the environment, which beats defaults."""
     chosen = overrides or ConfigOverrides()
     resolved_env = os.environ if environ is None else environ
 
     model = _first_text(
         (chosen.model, _first_env(resolved_env, MODEL_ENV)),
-        "",
+        DEFAULT_MODEL,
     )
     base_url = _first_text(
         (chosen.base_url, _first_env(resolved_env, BASE_URL_ENV)),
-        "",
+        DEFAULT_BASE_URL,
     ).rstrip("/")
-    if not model:
-        raise AutommitError(
-            "missing_model",
-            "Set AUTOMMIT_MODEL or pass --model; autommit has no model default.",
-        )
-    if not base_url:
-        raise AutommitError(
-            "missing_base_url",
-            "Set AUTOMMIT_BASE_URL or pass --base-url; autommit has no endpoint default.",
-        )
     api_key = _first_text(
         (chosen.api_key, _first_env(resolved_env, API_KEY_ENV)),
-        "",
+        DEFAULT_API_KEY,
     )
     timeout = _first_timeout(
         (chosen.timeout, _first_env(resolved_env, TIMEOUT_ENV)),
@@ -116,13 +111,13 @@ def load_config(
     )
     reasoning_effort = _first_text(
         (chosen.reasoning_effort, _first_env(resolved_env, REASONING_EFFORT_ENV)),
-        "",
+        DEFAULT_REASONING_EFFORT,
     )
 
     return AutommitConfig(
         model=model,
         base_url=base_url,
-        api_key=api_key or None,
+        api_key=api_key,
         timeout=timeout,
-        reasoning_effort=reasoning_effort or None,
+        reasoning_effort=reasoning_effort,
     )
