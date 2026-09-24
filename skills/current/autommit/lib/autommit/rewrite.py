@@ -665,7 +665,8 @@ def _review(
         "The independent atomicity critic rejected the single-commit proposal.\n"
         f"Concerns:\n{listed}\n"
         f"Rationale: {verdict.rationale}\n"
-        "Split the changes into at least two commits, one per concern."
+        "Return at least two commits in `commits`: one commit per concern above. "
+        "A single commit is rejected."
     )
     if (
         _plan_loop(

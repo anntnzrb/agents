@@ -400,7 +400,8 @@ def _forced_split_correction(concerns: tuple[str, ...], rationale: str) -> str:
         "The independent atomicity critic rejected the single-commit proposal.\n"
         f"Concerns:\n{listed}\n"
         f"Rationale: {rationale}\n"
-        "Split the staged changes into at least two commits, one per concern."
+        "Return at least two commits in `commits`: one commit per concern above. "
+        "A single commit is rejected."
     )
 
 
