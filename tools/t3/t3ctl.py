@@ -45,14 +45,9 @@ BOOT_LOG = T3_HOME / "userdata" / "logs" / "boot-service.log"
 UNIT = "t3code.service"
 ENVIRONMENT_PATH = "/.well-known/t3/environment"
 
-# Sync's npm cache for each harness T3 drives, keyed by T3 provider instance.
-# `packages/<hash>/current` is a symlink sync flips on upgrade, so a path
-# through it survives harness updates.
-NPM_TOOLS = Path.home() / ".cache" / "npm-tools"
-HARNESS_BINARIES: dict[str, tuple[str, str]] = {
-    "codex": ("codex", "node_modules/@openai/codex-*/vendor/*/bin/codex"),
-    "claudeAgent": ("claude", "node_modules/@anthropic-ai/claude-code-*/claude"),
-}
+# Sync launch wrappers for the harnesses T3 drives, keyed by T3 provider instance.
+WRAPPER_DIR = Path.home() / ".local" / "bin"
+HARNESS_WRAPPERS: dict[str, str] = {"codex": "codex", "claudeAgent": "claude"}
 
 # launchd uses the same label the T3 installer writes into its plist.
 IS_MACOS = sys.platform == "darwin"
@@ -316,23 +311,12 @@ def cmd_restart(_args: argparse.Namespace) -> int:
     die("service restarted but the endpoint did not answer in time; try `doctor`")
 
 
-def refresh_harnesses() -> None:
-    """Let sync upgrade the harness packages T3 spawns directly.
-
-    T3 bypasses the sync wrappers, so launching each wrapper once is what
-    moves the cached `current` install forward.
-    """
-    for wrapper, _ in HARNESS_BINARIES.values():
-        _ = run([wrapper, "--version"])
-
-
 def cmd_update(args: argparse.Namespace) -> int:
     require_declared_host()
     # `service install` at the channel head reconciles the unit, launcher, and
     # pinned runtime; `service update` is a deprecated alias upstream.
     rc = run([*install_cli(), "service", "install"])
     if rc == 0:
-        refresh_harnesses()
         return cmd_apply_settings(args)
     return rc
 
@@ -350,7 +334,6 @@ def cmd_install(_args: argparse.Namespace) -> int:
         )
     if run([*install_cli(), "service", "install"]) != 0:
         return 1
-    refresh_harnesses()
     apply_settings()
     port = wait_for_endpoint()
     print(
@@ -363,41 +346,23 @@ def cmd_install(_args: argparse.Namespace) -> int:
     return 0
 
 
-def resolve_harness_binary(package: str, pattern: str) -> str | None:
-    """Real harness executable in sync's npm cache, not the ~/.local/bin wrapper.
-
-    The wrapper routes each spawn through `sync launch` (~3s), which overruns
-    T3's 4s Claude version probe. When several package hashes exist, the one
-    whose `current` symlink sync flipped last is live.
-    """
-    candidates = [
-        path
-        for path in (NPM_TOOLS / package / "packages").glob(f"*/current/{pattern}")
-        if "-baseline" not in str(path) and os.access(path, os.X_OK)
-    ]
-    if not candidates:
-        return None
-
-    def flipped_at(path: Path) -> float:
-        current = path.relative_to(NPM_TOOLS / package / "packages").parts[:2]
-        return (NPM_TOOLS / package / "packages").joinpath(*current).lstat().st_mtime
-
-    return str(max(candidates, key=flipped_at))
-
-
 def sync_binary_paths(live: JsonObject) -> None:
-    """Point each enabled harness driver at its cached executable."""
+    """Point each harness driver at its sync wrapper by absolute path.
+
+    The Claude driver spawns its binary without a shell, so a bare name is
+    not reliably resolved against ~/.local/bin.
+    """
     instances = live.get("providerInstances")
     if not isinstance(instances, dict):
         return
-    for instance_id, (package, pattern) in HARNESS_BINARIES.items():
+    for instance_id, bin_name in HARNESS_WRAPPERS.items():
         instance = instances.get(instance_id)
         if not isinstance(instance, dict):
             continue
-        binary = resolve_harness_binary(package, pattern)
-        if binary is None:
+        wrapper = WRAPPER_DIR / bin_name
+        if not os.access(wrapper, os.X_OK):
             print(
-                f"t3ctl: warning — no cached {package} install; run `{package} --version` once",
+                f"t3ctl: warning — {wrapper} missing; run sync on this host",
                 file=sys.stderr,
             )
             continue
@@ -405,8 +370,8 @@ def sync_binary_paths(live: JsonObject) -> None:
         if not isinstance(config, dict):
             config = cast(JsonObject, {})
             cast(JsonObject, instance)["config"] = config
-        cast(JsonObject, config)["binaryPath"] = binary
-        print(f"{instance_id} binaryPath -> {binary}")
+        cast(JsonObject, config)["binaryPath"] = str(wrapper)
+        print(f"{instance_id} binaryPath -> {wrapper}")
 
 
 def deep_merge(base: JsonObject, overlay: JsonObject) -> None:
