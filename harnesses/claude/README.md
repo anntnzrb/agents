@@ -6,30 +6,17 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 
 `settings.json` is the managed user settings file. Sync replaces it on every run, so make durable changes here rather than in the generated home. It is also a CLIProxyAPI endpoint template: sync renders `${CLIPROXY_CLIENT_ORIGIN}` from `tools/cliproxyapi/deployment.json` and publishes the file only while the gateway's `/models` endpoint is ready; otherwise the previous generated file stays in place.
 
-## Managed settings
+## Settings constraints
 
-| Setting | Reason |
-| --- | --- |
-| `env.ANTHROPIC_BASE_URL: "${CLIPROXY_CLIENT_ORIGIN}"` | Routes every model request through the CLIProxyAPI gateway's Anthropic Messages endpoint. Claude Code appends `/v1/messages`, so it takes the gateway origin, not the `/v1` base URL. Bare Anthropic model IDs such as `claude-opus-5-5` resolve only to the gateway's Claude OAuth credentials; Claude Code recognizes them natively, so pricing and capabilities need no overrides; the 1M context window comes from the `[1m]` model suffix, not from the gateway. Remote Control is unavailable while the base URL is not an Anthropic host. |
-| `env.ANTHROPIC_AUTH_TOKEN: "keyless"` | Makes the gateway the credential: the gateway holds the Claude login, so no machine needs `/login`, and a saved claude.ai login is ignored. The gateway accepts any client key; the value only satisfies Claude Code's credential check. Voice dictation is unavailable while it is set, and background tasks use the main model. |
-| `env.DISABLE_UPDATES: "1"` | Sync owns the installed version: it installs the newest npm release on every launch. Blocks Claude Code's background updater and the manual `claude update` and `claude install`, so nothing but sync replaces the install. Stricter than `DISABLE_AUTOUPDATER`. |
-| `env.CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL: "1"` | Stops Claude Code registering (cloning) the official plugin marketplace into `~/.claude/plugins/` on its own. Add marketplaces deliberately with `/plugin`. |
-| `env.CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL: "1"` | Stops Claude Code installing its extension into VS Code or JetBrains when launched from their terminals. |
-| `env.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1"` | Returns Bash to the project directory after every command, so a `cd` in one command cannot make later commands run in the wrong place. |
-| `env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: "20"` | Runs up to 20 read-only tools and subagents in parallel instead of 10. More throughput per turn at the same token cost; uses more local CPU and can reach rate limits sooner. |
-| `model: "opus[1m]"` | Default model for new sessions: Opus with the 1M context window. Plain `opus` through the gateway gets 200k. |
-| `modelSettings` | Per-model settings keyed by canonical model ID; `effortLevel` sets that model's default reasoning effort. |
-| `theme: "dark"` | Interface theme, tracked here rather than left to `/config`. |
-| `permissions.defaultMode: "bypassPermissions"` | Sessions start in bypass mode, the same as `--dangerously-skip-permissions`, but also for sessions not started through the wrapper (IDE, desktop). Honored only in user or managed settings since v2.1.257, never from a repository's `.claude/settings.json`. |
-| `skipDangerousModePermissionPrompt: true` | Skips the bypass-mode confirmation dialog. Claude Code writes this key itself after the dialog is accepted once; tracking it here keeps sync from resetting it. |
-| `syncClaudeAiSkills: false` | Stops Claude Code downloading the claude.ai account's skills into `~/.claude/skills/synced/`. Skills come only from `skills/current/` in this repository; sync prunes anything else under `~/.claude/skills/`. |
-| `syncClaudeAiPlugins: false` | Stops Claude Code downloading the claude.ai account's plugins into `~/.claude/plugins/synced/`. |
-| `allowedMcpServers: []` | Blocks every MCP server not listed here, wherever it is defined: `~/.claude.json`, a project's `.mcp.json`, plugins, `--mcp-config`, and claude.ai. Built-in servers (Claude in Chrome, the IDE server) are exempt. To use an MCP server, define it and allowlist it from this repository. This is a setting rather than the `--strict-mcp-config` flag because wrapper default arguments precede subcommands, and `claude --strict-mcp-config mcp list` runs `mcp list` as a prompt instead of the subcommand. Allowlist entries merge across settings files, so a repository's `.claude/settings.json` can still add to it. |
-| `disableClaudeAiConnectors: true` | Stops Claude Code fetching and connecting the MCP connectors configured on claude.ai. |
-| `autoMemoryEnabled: false` | Stops Claude writing its own memory files under `~/.claude/projects/<project>/memory/` and loading them into context. Instructions come from `HARNESS.md`, project files, and skills only. |
-| `attribution.commit: ""` | Keeps the `Co-Authored-By: Claude …` trailer out of commits so history follows this repository's `<harness>: ...` convention. |
-| `attribution.pr: ""` | Keeps the generated-by line out of pull request descriptions. |
-| `attribution.sessionUrl: false` | Drops the session link from commits and pull requests. |
+`settings.json` is the source of truth for what is set. These constraints are not visible from the file:
+
+- `env.ANTHROPIC_BASE_URL` takes the gateway origin, not the `/v1` base URL: Claude Code appends `/v1/messages`. Bare Anthropic model IDs resolve only to the gateway's Claude OAuth credentials and need no pricing or capability overrides. Remote Control is unavailable while the base URL is not an Anthropic host.
+- `env.ANTHROPIC_AUTH_TOKEN` only satisfies Claude Code's credential check; the gateway holds the Claude login and accepts any key, so no machine needs `/login`. While it is set, voice dictation is unavailable and background tasks use the main model.
+- `env.DISABLE_UPDATES` is used instead of `DISABLE_AUTOUPDATER` because it also blocks `claude update` and `claude install`, so nothing but sync replaces the install.
+- The 1M context window comes from the `[1m]` model suffix, not from the gateway; plain `opus` through the gateway gets 200k.
+- `permissions.defaultMode` is honored only in user or managed settings (v2.1.257+), never from a repository's `.claude/settings.json`.
+- `skipDangerousModePermissionPrompt` is written by Claude Code itself once the bypass dialog is accepted; tracking it keeps sync from resetting it.
+- `allowedMcpServers` is used instead of `--strict-mcp-config` because wrapper default arguments precede subcommands, so `claude --strict-mcp-config mcp list` would run `mcp list` as a prompt. Built-in servers are exempt, and allowlist entries merge across settings files, so a repository's `.claude/settings.json` can still add to it.
 
 ## Deliberately unset
 
@@ -40,11 +27,11 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 
 ## Model and effort
 
-`model` and `modelSettings` (per-model `effortLevel`) are managed here like every other key. Sync writes this file verbatim and keeps nothing from the generated one, so a `/model` or `/effort` choice lasts only until the next sync; change it here to make it stick.
+Sync writes `settings.json` verbatim and keeps nothing from the generated one, so a `/model` or `/effort` choice lasts only until the next sync; change `model` or `modelSettings` here to make it stick.
 
 ## Third-party content
 
-Nothing outside this repository should add skills, plugins, or MCP servers. The settings above cover what user settings can control. Two stronger locks exist only in machine-wide managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json` on macOS, root-owned) and are not set: `strictKnownMarketplaces: []` blocks adding any plugin marketplace, and `blockedMarketplaces` blocks specific ones.
+Nothing outside this repository should add skills, plugins, or MCP servers; `settings.json` covers what user settings can control. Two stronger locks exist only in machine-wide managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json` on macOS, root-owned) and are not set: `strictKnownMarketplaces: []` blocks adding any plugin marketplace, and `blockedMarketplaces` blocks specific ones.
 
 ## Unmanaged state
 
