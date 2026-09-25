@@ -2,7 +2,7 @@
 
 Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync/sync.md) for that path.
 
-Sync supports macOS and Linux. The managed CLIProxyAPI release supports macOS on ARM64 and Linux on x86_64.
+Sync supports macOS and Linux. `tools/cliproxyapi/release.json` lists the platforms the managed CLIProxyAPI release covers.
 
 ## Install the required commands
 

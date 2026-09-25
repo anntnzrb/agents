@@ -169,7 +169,7 @@ The script clones upstream (ref `main`; export `PANEL_REF` to pin a tag, branch,
 }
 ```
 
-The gateway substitutes the selected credential for `$TOKEN$` and routes the call through `/v0/management/api-call`. After editing cards:
+The gateway substitutes the selected credential for `$TOKEN$` and routes the call through `/v0/management/api-call`, so API keys never reach the browser. After editing cards:
 
 ```bash
 sh tools/cliproxyapi/panel.rebuild.sh
@@ -182,7 +182,7 @@ Sync deploys the built asset to `~/.cli-proxy-api/static/management.html` on the
 
 The template exposes upstream model names as-is. Aliases, forked model variants, and forced payload mappings are not used. Credentials without a `prefix` field share one pool per provider and expose upstream model names.
 
-`force-model-prefix` remains `true`: a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential.
+With `force-model-prefix`, a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential. A `prefix` belongs to the credential's generated auth file, so reauthentication removes it.
 
 Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role — same model through two pools are distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
 
@@ -228,7 +228,7 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 | OAuth files | `~/.cli-proxy-api/*.json` |
 | Managed command | `~/.local/bin/cli-proxy-api` |
 
-The release manifest lists macOS ARM64 and Linux x86_64 archives. Sync verifies the selected release's SHA-256 checksum and extracts only the manifest's executable.
+Sync verifies the selected release's SHA-256 checksum and extracts only the manifest's executable.
 
 Sync prepares the managed binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on their next sync.
 
@@ -282,53 +282,15 @@ The generated configuration includes the `remote-management.secret-key` value fr
 
 No harness reads `secrets.local.json`. The gateway accepts requests without a client key; a provider that requires a non-empty key uses a static placeholder.
 
-## Model prefixes
-
-The template sets `force-model-prefix: true`, so a prefixed credential or compatibility profile namespaces its models.
-
-A `prefix` belongs to the credential's generated auth file, so reauthentication removes it. Add one back only when you deliberately want to scope a credential to a separate model namespace.
-
 ## Routing settings
 
-The committed template sets these CLIProxyAPI values:
-
-| Setting | Value |
-| --- | --- |
-| `routing.strategy` | `weighted-round-robin` |
-| `routing.session-affinity` | `true` |
-| `routing.session-affinity-ttl` | `1h` |
-| `routing.session-affinity-subagents` | `true` |
-| `request-retry` | `3` |
-| `max-retry-credentials` | `0` |
-| `max-retry-interval` | `30` |
-| `disable-cooling` | `false` |
-| `save-cooldown-status` | `true` |
-| `transient-error-cooldown-seconds` | `-1` |
-| `quota-exceeded.switch-project` | `true` |
-| `quota-exceeded.switch-preview-model` | `true` |
-| `quota-exceeded.antigravity-credits` | `true` |
-| `streaming.keepalive-seconds` | `15` |
-| `streaming.bootstrap-retries` | `1` |
-| `nonstream-keepalive-interval` | `15` |
-| `antigravity.sensitive-words` | harness system-convention tags + RFC 2119 line |
-| `ws-auth` | `false` |
-
-`antigravity.sensitive-words` exists because Google's Cloud Code Assist WAF
-rejects requests whose `systemInstruction` carries the literal
-`<system-conventions>` / `<system-directive>` blocks that harness system
-prompts ship (OMP, and anything embedding the same conventions text), with a
-misleading `429 RESOURCE_EXHAUSTED` that is not quota exhaustion (upstream
-issue #5751). The proxy zero-width-obfuscates the listed tokens before the
-request leaves, which breaks the WAF's literal match while staying invisible
-to the model.
-
-Sync passes these values through to CLIProxyAPI. It does not derive or override them at runtime.
+`tools/cliproxyapi/config.yaml.tmpl` is the source of truth for routing, retry, cooldown, and streaming values; comments there explain the non-obvious ones. Sync passes them through to CLIProxyAPI and does not derive or override them at runtime.
 
 ### Claude subscriptions
 
 Anthropic's prompt cache is scoped per account, so a conversation must stay on one credential:
 
-- `session-affinity` pins each session to its first credential for `session-affinity-ttl`, matching the 1h cache lifetime; subagents inherit the parent's binding. `weighted-round-robin` only spreads new sessions. Fill-first would drain one account's 5h window while the others sit idle, with no cache benefit.
+- `session-affinity` pins each session to its first credential for `session-affinity-ttl`, which must cover the 1h cache lifetime; subagents inherit the parent's binding. `weighted-round-robin` only spreads new sessions. Fill-first would drain one account's 5h window while the others sit idle, with no cache benefit.
 - For every non-Claude-Code client (OMP, Pi, OpenCode), CLIProxyAPI places the cache breakpoints (last system block and last message) and upgrades them to the 1h TTL on OAuth credentials. No client or template setting is needed. Check it by sending the same request twice: the second response reports the prefix under `prompt_tokens_details.cached_tokens` (`cache_read_input_tokens` on `/v1/messages`), and `/v1/messages` usage reports writes under `cache_creation.ephemeral_1h_input_tokens`.
 - A 429 whose `anthropic-ratelimit-unified-5h/7d-status` is `rejected` cools the whole credential, and the session fails over. A model-only rejection (Fable or overage) cools only that model. Leave `claude.model-level-cooling` unset: setting it `true` downgrades shared 5h/7d rejections to model scope, so sibling models keep hitting an exhausted account.
 - CLIProxyAPI does not switch accounts at a soft utilization threshold. It records the unified headers but moves only on rejection.
@@ -340,11 +302,7 @@ When a setting's semantics look wrong or a flag seems off, read the pinned relea
 
 ## Control panel
 
-The control panel is available at `http://<listen-host>:<listen-port>/management.html`. Sync deploys the committed `tools/cliproxyapi/panel.html` only on the gateway host.
-
-The template sets `remote-management.disable-auto-update-panel` to `true`, so upstream never replaces the locally built asset.
-
-Custom quota cards request their endpoints through the gateway's `/v0/management/api-call` proxy. The gateway substitutes the selected credential, so API keys do not reach the browser. Card definitions live in `tools/cliproxyapi/quota-cards.ts`.
+Keep `remote-management.disable-auto-update-panel` enabled in the template; otherwise upstream replaces the locally built panel asset.
 
 ## Provider limits
 

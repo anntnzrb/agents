@@ -66,8 +66,9 @@ antigravity:
   connection-pool:
     enabled: true
   # Google's Cloud Code Assist WAF false-flags the literal "<system-conventions>"
-  # block that OMP's system prompt ships (upstream issue #5751): the gateway
-  # returns a bogus 429 RESOURCE_EXHAUSTED. Obfuscating these tokens with a
+  # and "<system-directive>" blocks that harness system prompts such as OMP's
+  # ship (upstream issue #5751): the gateway returns a bogus 429
+  # RESOURCE_EXHAUSTED that is not quota exhaustion. Obfuscating these tokens with a
   # zero-width space breaks the literal match while staying invisible to the model.
   sensitive-words:
     - "system-conventions"
