@@ -5,6 +5,7 @@
 	"channel": "nightly",
 	"exposure": {
 		"tailscaleServe": true,
+		"tailscaleServePort": 8443,
 		"connect": true,
 		"publishAgentActivity": true
 	}

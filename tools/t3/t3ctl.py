@@ -130,20 +130,12 @@ def resolved_version() -> str:
 
 
 def pinned_bin() -> Path | None:
+    """The active runtime's self-contained executable (release-archive layout)."""
     version = active_version()
     if not version:
         return None
-    path = (
-        T3_HOME
-        / "runtime"
-        / "versions"
-        / version
-        / "node_modules"
-        / "t3"
-        / "dist"
-        / "bin.mjs"
-    )
-    return path if path.exists() else None
+    path = T3_HOME / "runtime" / "versions" / version / "t3"
+    return path if os.access(path, os.X_OK) else None
 
 
 def package_runner(version: str, prefer_node: bool) -> list[str]:
@@ -164,25 +156,17 @@ def ops_cli() -> list[str]:
     """
     pinned = pinned_bin()
     if pinned:
-        for rt in ("node", "bun"):
-            if shutil.which(rt):
-                return [rt, str(pinned)]
+        return [str(pinned)]
     return package_runner(resolved_version(), prefer_node=True)
 
 
 def install_cli() -> list[str]:
-    """Argv for service install/update.
+    """Argv for service install at the channel head.
 
-    The generated unit inherits the invoking interpreter as its ExecStart
-    runtime, so node is preferred for the long-running server (node-pty).
+    Whichever runner fetches the CLI, the service pins a self-contained
+    release archive and never runs under the runner's interpreter.
     """
-    if shutil.which("npx") or shutil.which("node"):
-        return package_runner(channel(), prefer_node=True)
-    print(
-        "t3ctl: note — installing via bunx; the service will run under bun",
-        file=sys.stderr,
-    )
-    return package_runner(channel(), prefer_node=False)
+    return package_runner(channel(), prefer_node=True)
 
 
 def run(argv: list[str]) -> int:
@@ -410,7 +394,9 @@ def install_model_sync_schedule() -> None:
 
 def cmd_update(_args: argparse.Namespace) -> int:
     require_declared_host()
-    rc = run([*install_cli(), "service", "update"])
+    # `service install` at the channel head reconciles the unit, launcher, and
+    # pinned runtime; `service update` is a deprecated alias upstream.
+    rc = run([*install_cli(), "service", "install"])
     if rc == 0:
         install_model_sync_schedule()
     return rc
@@ -637,7 +623,9 @@ def cmd_sync_models(_args: argparse.Namespace) -> int:
 
 def cmd_pair(args: argparse.Namespace) -> int:
     require_declared_host()
-    return run([*ops_cli(), "pair", "--tailscale", *extra_args(args)])
+    port = field("exposure.tailscaleServePort")
+    serve_port = ["--tailscale-serve-port", str(port)] if isinstance(port, int) else []
+    return run([*ops_cli(), "pair", "--tailscale", *serve_port, *extra_args(args)])
 
 
 def cmd_connect(args: argparse.Namespace) -> int:
