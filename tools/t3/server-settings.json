@@ -10,13 +10,27 @@
       "pauseWhenHostLocked": false
     }
   },
+  "storageCleanup": {
+    "worktreeOnMerge": true,
+    "worktreeOnDelete": true,
+    "logsAfterDays": 14,
+    "browserArtifactsAfterDays": 14
+  },
   "pullRequestMergeMethod": "squash",
   "sourceControlWritingStyle": {
     "mode": "conventional_commits"
   },
+  "providers": {
+    "cursor": { "enabled": false },
+    "grok": { "enabled": false },
+    "opencode": { "enabled": false }
+  },
   "providerInstances": {
-    "codex": {
-      "enabled": true
-    }
+    "codex": { "driver": "codex", "enabled": true },
+    "claudeAgent": { "driver": "claudeAgent", "enabled": true },
+    "cursor": { "driver": "cursor", "enabled": false },
+    "grok": { "driver": "grok", "enabled": false },
+    "opencode": { "driver": "opencode", "enabled": false },
+    "antigravity": { "driver": "antigravity", "enabled": false }
   }
 }

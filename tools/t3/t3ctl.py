@@ -27,7 +27,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn, TypeAlias, cast
@@ -38,7 +37,6 @@ JsonObject: TypeAlias = "dict[str, Json]"
 TOOLS_DIR = Path(__file__).resolve().parent
 DEPLOYMENT_PATH = TOOLS_DIR / "deployment.json"
 SETTINGS_PATH = TOOLS_DIR / "server-settings.json"
-CLIPROXY_DEPLOYMENT_PATH = TOOLS_DIR.parent / "cliproxyapi" / "deployment.json"
 T3_HOME = Path(os.environ.get("T3CODE_HOME") or Path.home() / ".t3")
 STATE_FILE = T3_HOME / "runtime" / "service-state.json"
 RUNTIME_JSON = T3_HOME / "userdata" / "server-runtime.json"
@@ -47,11 +45,19 @@ BOOT_LOG = T3_HOME / "userdata" / "logs" / "boot-service.log"
 UNIT = "t3code.service"
 ENVIRONMENT_PATH = "/.well-known/t3/environment"
 
+# Sync's npm cache for each harness T3 drives, keyed by T3 provider instance.
+# `packages/<hash>/current` is a symlink sync flips on upgrade, so a path
+# through it survives harness updates.
+NPM_TOOLS = Path.home() / ".cache" / "npm-tools"
+HARNESS_BINARIES: dict[str, tuple[str, str]] = {
+    "codex": ("codex", "node_modules/@openai/codex-*/vendor/*/bin/codex"),
+    "claudeAgent": ("claude", "node_modules/@anthropic-ai/claude-code-*/claude"),
+}
+
 # launchd uses the same label the T3 installer writes into its plist.
 IS_MACOS = sys.platform == "darwin"
 LAUNCHD_LABEL = "com.t3tools.t3code.service"
 LAUNCHD_PLIST = Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
-MODEL_SYNC_LABEL = "dev.agents.t3-models-sync"
 
 
 def die(msg: str) -> NoReturn:
@@ -310,95 +316,24 @@ def cmd_restart(_args: argparse.Namespace) -> int:
     die("service restarted but the endpoint did not answer in time; try `doctor`")
 
 
-MODEL_SYNC_UNITS: dict[str, str] = {
-    "t3-models-sync.service": f"""\
-[Unit]
-Description=Refresh T3 codex customModels from the CLIProxyAPI catalog
-Wants=network-online.target
-After=network-online.target
+def refresh_harnesses() -> None:
+    """Let sync upgrade the harness packages T3 spawns directly.
 
-[Service]
-Type=oneshot
-ExecStart={Path(__file__).resolve()} sync-models
-NoNewPrivileges=true
-PrivateTmp=true
-""",
-    "t3-models-sync.timer": """\
-[Unit]
-Description=Periodic refresh of T3 codex customModels from the CLIProxyAPI catalog
-
-[Timer]
-OnCalendar=hourly
-RandomizedDelaySec=10m
-Persistent=true
-Unit=t3-models-sync.service
-
-[Install]
-WantedBy=timers.target
-""",
-}
-
-
-def install_model_sync_schedule() -> None:
-    """Reconcile the periodic customModels refresh job so the codex picker
-    tracks the gateway catalog without restarts.
-
-    systemd user timer on Linux, launchd agent on macOS; elsewhere we warn
-    and leave `sync-models` available as a manual command.
+    T3 bypasses the sync wrappers, so launching each wrapper once is what
+    moves the cached `current` install forward.
     """
-    script = str(Path(__file__).resolve())
-    if IS_MACOS:
-        plist_dir = Path.home() / "Library" / "LaunchAgents"
-        plist = plist_dir / f"{MODEL_SYNC_LABEL}.plist"
-        content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key><string>{MODEL_SYNC_LABEL}</string>
-    <key>ProgramArguments</key>
-    <array><string>{script}</string><string>sync-models</string></array>
-    <key>StartInterval</key><integer>3600</integer>
-    <key>RunAtLoad</key><true/>
-</dict>
-</plist>
-"""
-        plist_dir.mkdir(parents=True, exist_ok=True)
-        if not plist.exists() or plist.read_text() != content:
-            _ = plist.write_text(content)
-        target = f"{gui_target()}/{MODEL_SYNC_LABEL}"
-        _ = launchctl("bootout", "--wait", target)  # optional: may not be loaded
-        _ = launchctl("enable", target)
-        rc = launchctl("bootstrap", gui_target(), str(plist)).returncode
-        if rc == 0:
-            print(f"{MODEL_SYNC_LABEL} reconciled (hourly customModels refresh)")
-        else:
-            print(
-                "t3ctl: warning — could not bootstrap the model-sync agent",
-                file=sys.stderr,
-            )
-        return
-    if not shutil.which("systemctl"):
-        msg = "t3ctl: warning — no systemd or launchd; run `sync-models` manually or schedule it yourself"
-        print(msg, file=sys.stderr)
-        return
-    unit_dir = Path.home() / ".config" / "systemd" / "user"
-    unit_dir.mkdir(parents=True, exist_ok=True)
-    for name, content in MODEL_SYNC_UNITS.items():
-        unit = unit_dir / name
-        if not unit.exists() or unit.read_text() != content:
-            _ = unit.write_text(content)
-    _ = run(["systemctl", "--user", "daemon-reload"])
-    _ = run(["systemctl", "--user", "enable", "--now", "t3-models-sync.timer"])
-    print("t3-models-sync.timer reconciled (hourly customModels refresh)")
+    for wrapper, _ in HARNESS_BINARIES.values():
+        _ = run([wrapper, "--version"])
 
 
-def cmd_update(_args: argparse.Namespace) -> int:
+def cmd_update(args: argparse.Namespace) -> int:
     require_declared_host()
     # `service install` at the channel head reconciles the unit, launcher, and
     # pinned runtime; `service update` is a deprecated alias upstream.
     rc = run([*install_cli(), "service", "install"])
     if rc == 0:
-        install_model_sync_schedule()
+        refresh_harnesses()
+        return cmd_apply_settings(args)
     return rc
 
 
@@ -415,7 +350,7 @@ def cmd_install(_args: argparse.Namespace) -> int:
         )
     if run([*install_cli(), "service", "install"]) != 0:
         return 1
-    install_model_sync_schedule()
+    refresh_harnesses()
     apply_settings()
     port = wait_for_endpoint()
     print(
@@ -428,140 +363,50 @@ def cmd_install(_args: argparse.Namespace) -> int:
     return 0
 
 
-def fetch_json(url: str, timeout: float = 5.0) -> Json | None:
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+def resolve_harness_binary(package: str, pattern: str) -> str | None:
+    """Real harness executable in sync's npm cache, not the ~/.local/bin wrapper.
+
+    The wrapper routes each spawn through `sync launch` (~3s), which overruns
+    T3's 4s Claude version probe. When several package hashes exist, the one
+    whose `current` symlink sync flipped last is live.
+    """
+    candidates = [
+        path
+        for path in (NPM_TOOLS / package / "packages").glob(f"*/current/{pattern}")
+        if "-baseline" not in str(path) and os.access(path, os.X_OK)
+    ]
+    if not candidates:
         return None
-    conn_cls = (
-        http.client.HTTPSConnection
-        if parsed.scheme == "https"
-        else http.client.HTTPConnection
-    )
-    conn = conn_cls(parsed.hostname, parsed.port, timeout=timeout)
-    try:
-        conn.request("GET", parsed.path or "/")
-        resp = conn.getresponse()
-        if resp.status != 200:
-            return None
-        return cast(Json, json.loads(resp.read().decode()))
-    except (OSError, http.client.HTTPException, json.JSONDecodeError):
-        return None
-    finally:
-        conn.close()
+
+    def flipped_at(path: Path) -> float:
+        current = path.relative_to(NPM_TOOLS / package / "packages").parts[:2]
+        return (NPM_TOOLS / package / "packages").joinpath(*current).lstat().st_mtime
+
+    return str(max(candidates, key=flipped_at))
 
 
-def cliproxy_custom_models() -> list[Json]:
-    """Live picker entries served by the repo-declared CLIProxyAPI gateway.
-
-    Multi-segment ids stay bare slugs (the pool segment already names the
-    upstream); single-segment OAuth-pool ids get a display name carrying the
-    gateway-reported owner so the picker shows which pool serves them.
-    Entries are ordered singles-first because the web picker caps custom
-    models per instance — OAuth pools win the visible window.
-    """
-    deployment = load_json_object(CLIPROXY_DEPLOYMENT_PATH)
-    client = deployment.get("client") if deployment else None
-    base = cast(JsonObject, client).get("baseUrl") if isinstance(client, dict) else None
-    if not isinstance(base, str):
-        return []
-    data = fetch_json(base.rstrip("/") + "/models")
-    models = data.get("data") if isinstance(data, dict) else None
-    if not isinstance(models, list):
-        return []
-    singles: list[Json] = []
-    pooled: list[str] = []
-    for entry in cast(list[object], models):
-        if not isinstance(entry, dict):
-            continue
-        model_id = cast(JsonObject, entry).get("id")
-        if not isinstance(model_id, str) or not model_id:
-            continue
-        owner = cast(JsonObject, entry).get("owned_by")
-        if "/" in model_id or not isinstance(owner, str) or not owner:
-            pooled.append(model_id)
-        else:
-            singles.append({"slug": model_id, "name": f"{model_id} ({owner})"})
-    # The web picker renders at most 32 custom models per instance, first
-    # settings order wins — OAuth-pool ids go first so they win the window;
-    # pooled ids fill the rest and remain visible on mobile, which reads the
-    # uncapped server snapshot.
-    singles.sort(key=lambda e: str(cast(JsonObject, e).get("slug", "")))
-    return [*singles, *sorted(pooled)]
-
-
-def resolve_opencode_binary() -> str | None:
-    """Resolve the real opencode binary inside the sync npm cache.
-
-    `~/.local/bin/opencode` is a sync wrapper that routes every spawn through
-    `sync launch`, adding ~3s of Python startup — enough to overrun T3's 4s
-    OpenCode version probe. Pointing the driver at the cached binary directly
-    keeps probes under a second. Prefers the non-baseline build.
-    """
-    candidates = sorted(
-        Path.home().glob(
-            ".cache/npm-tools/opencode/packages/*/current/node_modules/opencode-*/bin/opencode"
-        )
-    )
-    for preferred in candidates:
-        if "-baseline" not in preferred.parent.parent.name and os.access(preferred, os.X_OK):
-            return str(preferred)
-    for fallback in candidates:
-        if os.access(fallback, os.X_OK):
-            return str(fallback)
-    return None
-
-
-def sync_opencode_binary_path(live: JsonObject) -> None:
-    """Point the OpenCode driver's binaryPath at the resolved cached binary.
-
-    The launcher wrapper still owns user-facing launches; this only affects
-    the binary T3 spawns for probes and sessions.
-    """
-    binary = resolve_opencode_binary()
-    if binary is None:
-        return
+def sync_binary_paths(live: JsonObject) -> None:
+    """Point each enabled harness driver at its cached executable."""
     instances = live.get("providerInstances")
     if not isinstance(instances, dict):
         return
-    opencode = instances.get("opencode")
-    if not isinstance(opencode, dict):
-        return
-    config = opencode.get("config")
-    if not isinstance(config, dict):
-        config = cast(JsonObject, {})
-        cast(JsonObject, opencode)["config"] = config
-    if config.get("binaryPath") != binary:
+    for instance_id, (package, pattern) in HARNESS_BINARIES.items():
+        instance = instances.get(instance_id)
+        if not isinstance(instance, dict):
+            continue
+        binary = resolve_harness_binary(package, pattern)
+        if binary is None:
+            print(
+                f"t3ctl: warning — no cached {package} install; run `{package} --version` once",
+                file=sys.stderr,
+            )
+            continue
+        config = instance.get("config")
+        if not isinstance(config, dict):
+            config = cast(JsonObject, {})
+            cast(JsonObject, instance)["config"] = config
         cast(JsonObject, config)["binaryPath"] = binary
-        print(f"opencode binaryPath -> {binary}")
-
-
-def sync_codex_custom_models(live: JsonObject) -> None:
-    """Refresh the Codex driver's customModels from the live gateway catalog.
-
-    T3's Codex picker lists `codex app-server model/list` plus this setting;
-    generating it at apply time keeps the tracked settings file free of a
-    stale model snapshot.
-    """
-    instances = live.get("providerInstances")
-    if not isinstance(instances, dict):
-        return
-    codex = instances.get("codex")
-    if not isinstance(codex, dict):
-        return
-    _ = codex.pop("customModels", None)
-    entries = cliproxy_custom_models()
-    if not entries:
-        print(
-            "t3ctl: warning — cliproxy catalog unreachable; keeping existing customModels",
-            file=sys.stderr,
-        )
-        return
-    config = codex.get("config")
-    if not isinstance(config, dict):
-        config = cast(JsonObject, {})
-        cast(JsonObject, codex)["config"] = config
-    cast(JsonObject, config)["customModels"] = entries
-    print(f"synced {len(entries)} cliproxy model ids into codex config.customModels")
+        print(f"{instance_id} binaryPath -> {binary}")
 
 
 def deep_merge(base: JsonObject, overlay: JsonObject) -> None:
@@ -589,8 +434,7 @@ def apply_settings() -> None:
     if desired is None or live is None:
         die("settings files must contain a JSON object")
     deep_merge(live, desired)
-    sync_opencode_binary_path(live)
-    sync_codex_custom_models(live)
+    sync_binary_paths(live)
     write_settings(live)
     print(f"applied {SETTINGS_PATH} -> {SETTINGS_TARGET}")
 
@@ -603,22 +447,6 @@ def cmd_apply_settings(_args: argparse.Namespace) -> int:
     finally:
         _ = service_start()
     return 0 if wait_for_endpoint() else die("endpoint did not come back; try `doctor`")
-
-
-def cmd_sync_models(_args: argparse.Namespace) -> int:
-    """Refresh codex customModels while the service runs.
-
-    The server watches settings.json and publishes the change to clients, so
-    the model picker repopulates without a restart.
-    """
-    require_declared_host()
-    live = load_json_object(SETTINGS_TARGET)
-    if live is None:
-        die(f"{SETTINGS_TARGET} missing or unreadable; is the service installed?")
-    sync_opencode_binary_path(live)
-    sync_codex_custom_models(live)
-    write_settings(live)
-    return 0
 
 
 def cmd_pair(args: argparse.Namespace) -> int:
@@ -665,7 +493,6 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "restart": cmd_restart,
     "update": cmd_update,
     "apply-settings": cmd_apply_settings,
-    "sync-models": cmd_sync_models,
     "pair": cmd_pair,
     "connect": cmd_connect,
     "logs": cmd_logs,
@@ -684,7 +511,6 @@ def main() -> int:
         ("restart", "restart the service and wait for the endpoint"),
         ("update", "install/update/repair the service on the declared channel"),
         ("apply-settings", "merge server-settings.json offline, then restart"),
-        ("sync-models", "refresh codex customModels from the live gateway catalog"),
         ("pair", "mint a tailnet pairing link (extra args forwarded)"),
         ("connect", "T3 Connect management (args forwarded: login/link/publish/…)"),
         ("logs", "recent service journal and boot log [-n LINES]"),
