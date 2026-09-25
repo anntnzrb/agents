@@ -12,7 +12,7 @@ contributes its source first; the later configuration supplies its name, runtime
 
 The plugin is referenced as a directory with options from `opencode.jsonc` and
 default-exports `Plugin.define({ id, setup })`. Runtime APIs come from `@opencode/plugin` and
-`@opencode/schema`, pinned to 2.0.7. Models use `Model.Info.default`, v2 capabilities, and tiered costs.
+`@opencode/schema`, pinned in `harnesses/opencode/package.json`. Models use `Model.Info.default`, v2 capabilities, and tiered costs.
 
 Discovery order per plugin load:
 
