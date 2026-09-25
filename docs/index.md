@@ -19,5 +19,5 @@ Choose a page by the task you need to complete. Sync application documentation l
 ## Reference
 
 - [Repository layout](repository-layout.md) maps committed sources, local inputs, generated targets, and runtime state.
-- [Sync reference](sync/sync.md) lists commands, reconciliation stages, caches, and failure behavior.
+- [Sync reference](sync/sync.md) lists commands, reconciliation stages, background updates, caches, and failure behavior.
 - [Harness adapter reference](sync/harnesses.md) defines adapter metadata, generated paths, model integration, and wrappers.

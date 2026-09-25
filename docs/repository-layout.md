@@ -52,6 +52,7 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
+| `~/.config/systemd/user/agents-update.{service,timer}` (Linux), `~/Library/LaunchAgents/dev.agents.update.plist` (macOS) | Background updater schedule; see [Background updates](sync/sync.md#background-updates) |
 
 Sync replaces managed content in these targets. Make durable changes in the matching committed source.
 

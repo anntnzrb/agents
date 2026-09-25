@@ -3,6 +3,7 @@ sync — Reconcile AI agent configurations, skills, and harness environments fro
 Usage:
   sync [sync]
   sync launch <name> [-- <args...>]
+  sync update
   sync -h | --help | help
 
 Commands:
@@ -13,6 +14,11 @@ Commands:
   launch <name> [-- <args...>]
     Runs best-effort reconciliation, prepares the harness or tool package,
     and executes it with any forwarded arguments.
+
+  update
+    Fast-forwards a clean main checkout of the SSOT from origin and
+    reconciles it when the commit is new. Run in the background by the
+    timer or launch agent that sync installs.
 
 Options:
   -h, --help, help    Show this help message.

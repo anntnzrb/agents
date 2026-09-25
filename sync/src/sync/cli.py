@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 
-from sync.core.index import launch_main
+from sync.core.index import launch_main, update_main
 from sync.core.index import main as run_main
 
 EXIT_OK = 0
@@ -25,6 +25,7 @@ _HELP_LINES = (
     "Usage:",
     "  sync [sync]",
     "  sync launch <name> [-- <args...>]",
+    "  sync update",
     "  sync -h | --help | help",
     "",
     "Commands:",
@@ -35,6 +36,11 @@ _HELP_LINES = (
     "  launch <name> [-- <args...>]",
     "    Runs best-effort reconciliation, prepares the harness or tool package,",
     "    and executes it with any forwarded arguments.",
+    "",
+    "  update",
+    "    Fast-forwards a clean main checkout of the SSOT from origin and",
+    "    reconciles it when the commit is new. Run in the background by the",
+    "    timer or launch agent that sync installs.",
     "",
     "Options:",
     "  -h, --help, help    Show this help message.",
@@ -107,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_launch(rest)
         case ["sync", *rest]:
             return _run_sync_command(rest)
+        case ["update"]:
+            return update_main()
         case []:
             return run_main()
         case _:

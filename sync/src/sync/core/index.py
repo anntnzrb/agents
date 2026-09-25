@@ -46,6 +46,12 @@ from sync.core.plan import (
     build_sync_plan,
 )
 from sync.core.tool_launchers import ToolLauncherSpec, tool_launcher
+from sync.core.update import (
+    fast_forward_ssot,
+    read_synced_commit,
+    reconcile_update_schedule,
+    record_synced_commit,
+)
 from sync.core.wrappers import (
     WrapperRuntime,
     managed_tool_wrapper_destination,
@@ -74,6 +80,7 @@ __all__ = [
     "launch_main",
     "main",
     "run_sync",
+    "update_main",
 ]
 
 DEFAULT_SYNC_TIMEOUT_SECONDS: int = 15 * 60
@@ -238,6 +245,7 @@ async def run_sync(
             str(Path(sync_env.runtime_home) / "sync-current"),
             sync_env.install_timeout_ms,
         )
+        await reconcile_update_schedule(sync_env)
 
     managed_state_success = (
         record_managed_entries(managed_plan)
@@ -330,6 +338,36 @@ async def _async_main() -> int:
         return EXIT_OK
     try:
         return await run_sync_with_deadline(sync_env)
+    finally:
+        release_sync_lock(lock)
+
+
+def update_main() -> int:
+    """CLI entrypoint for the background updater; returns exit code."""
+    return asyncio.run(_async_update_main())
+
+
+async def _async_update_main() -> int:
+    """Fast-forward the SSOT and reconcile a commit not yet synced.
+
+    Never waits: a sync already holding the lock means skip this round.
+    """
+    try:
+        sync_env = SyncEnv.from_system()
+        lock = try_acquire_sync_lock(sync_env)
+    except (OSError, RuntimeError, ValueError, TypeError) as error:
+        err(panic_message(error))
+        return EXIT_ERROR
+    if lock is None:
+        return EXIT_OK
+    try:
+        head = await fast_forward_ssot(sync_env.ssot_home)
+        if head is None or head == read_synced_commit(sync_env.managed_state_home):
+            return EXIT_OK
+        exit_code = await run_sync_with_deadline(sync_env)
+        if exit_code == EXIT_OK:
+            record_synced_commit(sync_env.managed_state_home, head)
+        return exit_code
     finally:
         release_sync_lock(lock)
 

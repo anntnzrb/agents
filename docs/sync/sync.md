@@ -11,6 +11,7 @@ A gateway host has an OS hostname that matches `server.hostname` in `tools/clipr
 | `uv run --project sync sync` | Runs a normal reconciliation |
 | `uv run --project sync sync sync` | Runs the same normal reconciliation |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -22,7 +23,7 @@ A manual sync runs these stages in order:
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, managed JSON configuration, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
-5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts.
+5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts. When the repository is a git checkout, install the [background updater](#background-updates) schedule.
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
 
@@ -110,6 +111,29 @@ Harness wrappers run a best-effort sync before launch. A failed sync, an active 
 The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
 A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
+
+## Background updates
+
+Every machine converges on `origin/main`: commit and push from any machine, and the others pick the change up on their own. Pushing stays manual; pulling and reconciling are automatic. The git hooks stay pure quality gates, so only commits that passed the `pre-push` tests reach `origin/main`.
+
+Sync installs a per-user schedule — a systemd timer on Linux, a launch agent on macOS — that runs `sync update` every few minutes at idle CPU and I/O priority. Each run:
+
+1. Skips the round if another sync holds the process lock; it never waits.
+2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout.
+3. Reconciles only when the checked-out commit differs from the last one it reconciled successfully (`sync-managed/update.json`). A failed reconcile is retried on the next run.
+
+The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled once by the previous runtime; the new runtime takes over from the next run or launch.
+
+Unit files change only when their rendered content changes, so a steady-state sync touches no service manager. The schedule needs no credentials because `origin` is public over HTTPS. macOS launch agents start with a bare `PATH`, so the agent declares one; systemd units inherit the user manager's `PATH`, which must include `uv`, `git`, and `node`.
+
+Inspect or trigger it:
+
+```sh
+systemctl --user start agents-update.service       # Linux: run now
+journalctl --user -u agents-update.service -n 50   # Linux: recent runs
+launchctl kickstart gui/$(id -u)/dev.agents.update # macOS: run now
+tail -n 50 ~/Library/Logs/agents-update.log        # macOS: recent runs
+```
 
 ## Tool launchers
 
