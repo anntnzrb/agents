@@ -39,6 +39,11 @@ Boundaries:
 - A skill change MUST NOT add tests under `sync/tests/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
 - A change under `harnesses/` MUST NOT update `docs/` or `sync/tests/`. Adapter-contract changes in `sync/src/sync/core/harness_adapters.py` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
 
+Configuration files are the source of truth for what is set:
+
+- Documentation MUST NOT mirror configuration: no per-key tables, current values, or enabled/disabled lists that a config file already states. Point to the file instead.
+- Document only what the file cannot express: procedures, architecture, constraints and traps, deliberately unset keys, ownership, and validation rules. Put one key's rationale in a comment beside it when the consumer accepts comments.
+
 For changes routed to `docs/`:
 
 1. Read `docs/index.md` and every related page completely; follow their cross-references before editing.
