@@ -99,7 +99,7 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 <cache-home>/github-tools/cliproxyapi/versions/<version>/<platform>-<architecture>/
 ```
 
-Sync verifies the release's SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper. The current manifest lists macOS ARM64 and Linux x86_64 assets.
+Sync verifies the release's SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper.
 
 Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on the next sync.
 

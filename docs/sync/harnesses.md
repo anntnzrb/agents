@@ -4,7 +4,7 @@
 
 Harness-specific values, such as package names, distribution tags, default launch arguments, environment variables, manager setting keys, install paths, and preserved JSON paths, live in the adapter definitions and in `harnesses/<id>/`. This page describes mechanisms only; read the harness source for the values it owns.
 
-Sync supports macOS and Linux. The current CLIProxyAPI release manifest supports macOS ARM64 and Linux x86_64.
+Sync supports macOS and Linux; `tools/cliproxyapi/release.json` lists the platforms the managed CLIProxyAPI release covers.
 
 ## Adapter fields
 
