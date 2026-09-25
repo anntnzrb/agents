@@ -17,6 +17,11 @@
     "browserArtifactsAfterDays": 14
   },
   "pullRequestMergeMethod": "squash",
+  "textGenerationModelSelection": {
+    "instanceId": "codex",
+    "model": "gemini-3.8-flash-high",
+    "options": [{ "id": "reasoningEffort", "value": "high" }]
+  },
   "sourceControlWritingStyle": {
     "mode": "conventional_commits"
   },
