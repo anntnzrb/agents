@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import configparser
 import contextlib
+import email.message
+import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
@@ -704,3 +710,1007 @@ class TestDbReplicaMaintenance:
         )
         with pytest.raises(odooctl.CliError, match="Unsupported dump format"):
             _ = odooctl.cmd_db_restore(args)
+
+
+class TestDatabaseResolution:
+    """Tests for database resolution precedence and missing database handling."""
+
+    def test_flag_precedence_over_all(self, tmp_path: Path) -> None:
+        """Verify --db CLI flag overrides environment, profile, and odoo.conf."""
+        conf = configparser.ConfigParser()
+        conf.add_section("options")
+        conf.set("options", "db_name", "conf_db")
+        args = argparse.Namespace(db="flag_db", profile="etech")
+        with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
+            db, source = odooctl._resolve_effective_database(  # pyright: ignore[reportPrivateUsage]
+                args, profile_name="etech", config=conf
+            )
+        assert db == "flag_db"
+        assert source == "flag"
+
+    def test_env_precedence_over_profile_and_conf(self) -> None:
+        """Verify POSTGRES_DB environment variable overrides profile and odoo.conf."""
+        conf = configparser.ConfigParser()
+        conf.add_section("options")
+        conf.set("options", "db_name", "conf_db")
+        args = argparse.Namespace(db=None, profile="etech")
+        with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
+            db, source = odooctl._resolve_effective_database(  # pyright: ignore[reportPrivateUsage]
+                args, profile_name="etech", config=conf
+            )
+        assert db == "env_db"
+        assert source == "env"
+
+    def test_profile_precedence_over_conf(self, tmp_path: Path) -> None:
+        """Verify profile default workflow database overrides odoo.conf."""
+        prof_file = tmp_path / "mockprof.json"
+        prof_file.write_text(
+            json.dumps({"workflows": {"crm": {"database": "profile_db"}}}),
+            encoding="utf-8",
+        )
+        conf = configparser.ConfigParser()
+        conf.add_section("options")
+        conf.set("options", "db_name", "conf_db")
+        args = argparse.Namespace(db=None, profile="mockprof")
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(odooctl, "PROFILE_DIR", tmp_path),
+        ):
+            db, source = odooctl._resolve_effective_database(  # pyright: ignore[reportPrivateUsage]
+                args, profile_name="mockprof", config=conf
+            )
+        assert db == "profile_db"
+        assert source == "profile"
+
+    def test_conf_precedence_when_no_flag_env_profile(self, tmp_path: Path) -> None:
+        """Verify odoo.conf db_name is used when flag, env, and profile are missing."""
+        conf = configparser.ConfigParser()
+        conf.add_section("options")
+        conf.set("options", "db_name", "conf_db")
+        args = argparse.Namespace(db=None, profile="missing")
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(odooctl, "PROFILE_DIR", tmp_path),
+        ):
+            db, source = odooctl._resolve_effective_database(  # pyright: ignore[reportPrivateUsage]
+                args, profile_name="missing", config=conf
+            )
+        assert db == "conf_db"
+        assert source == "odoo.conf"
+
+    def test_unresolved_database_raises_usage_error_code_2(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify missing database resolution raises CliError with exit code 2."""
+        conf = configparser.ConfigParser()
+        args = argparse.Namespace(db=None, profile="missing")
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(odooctl, "PROFILE_DIR", tmp_path),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl._resolve_effective_database(  # pyright: ignore[reportPrivateUsage]
+                args, profile_name="missing", config=conf, require=True
+            )
+        assert exc_info.value.code == 2
+        assert "please set the profile database" in str(exc_info.value)
+
+    def test_odoo_replica_never_appears(self) -> None:
+        """Verify 'odoo_replica' literal fallback is completely removed."""
+        source_code = Path(odooctl.__file__).read_text(encoding="utf-8")
+        assert "odoo_replica" not in source_code
+
+
+class TestDbQueryInputAndOutput:
+    """Tests for db-query file/stdin input, mutation formatting, and JSON contracts."""
+
+    def test_db_query_reads_from_file(self, tmp_path: Path) -> None:
+        """Verify db-query reads SQL from --file."""
+        sql_file = tmp_path / "test.sql"
+        sql_file.write_text("SELECT 42;", encoding="utf-8")
+        args = argparse.Namespace(
+            file=str(sql_file), sql=None, unsafe=False, json=False, db=None
+        )
+        ctx = make_workspace_context(tmp_path)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql", return_value="42") as exec_sql,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            assert odooctl.cmd_db_query(args) == 0
+        assert exec_sql.call_args[0][0] == "SELECT 42;"
+        assert "42" in stdout.getvalue()
+
+    def test_db_query_reads_from_stdin_via_dash(self, tmp_path: Path) -> None:
+        """Verify db-query reads SQL from stdin when '-' is passed."""
+        args = argparse.Namespace(file="-", sql=None, unsafe=False, json=False, db=None)
+        ctx = make_workspace_context(tmp_path)
+        with (
+            patch("sys.stdin", io.StringIO("SELECT 100;")),
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql", return_value="100"),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            assert odooctl.cmd_db_query(args) == 0
+        assert "100" in stdout.getvalue()
+
+    def test_db_query_mutation_without_returning_emits_status_rows(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify DML mutation without RETURNING is not wrapped in subselect."""
+        args = argparse.Namespace(
+            sql="UPDATE res_partner SET name = 'foo';",
+            file=None,
+            unsafe=True,
+            json=True,
+            db=None,
+        )
+        ctx = make_workspace_context(tmp_path)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql", return_value="UPDATE 1\n") as exec_sql,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            assert odooctl.cmd_db_query(args) == 0
+        executed_sql = exec_sql.call_args[0][0]
+        assert not executed_sql.startswith("SELECT COALESCE(json_agg")
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["ok"] is True
+        assert payload["status"] == "UPDATE 1"
+        assert payload["rows"] == []
+
+    def test_db_query_mutation_with_returning_emits_ok_and_rows(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify DML mutation with RETURNING wraps with CTE and returns rows."""
+        args = argparse.Namespace(
+            sql="INSERT INTO res_partner (name) VALUES ('bar') RETURNING id, name;",
+            file=None,
+            unsafe=True,
+            json=True,
+            db=None,
+        )
+        ctx = make_workspace_context(tmp_path)
+        mock_raw = '[{"id": 1, "name": "bar"}]'
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql", return_value=mock_raw) as exec_sql,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            assert odooctl.cmd_db_query(args) == 0
+        executed_sql = exec_sql.call_args[0][0]
+        assert executed_sql.startswith("WITH _r AS")
+        assert "RETURNING id, name" in executed_sql
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["ok"] is True
+        assert payload["status"] == "SUCCESS"
+        assert payload["rows"] == [{"id": 1, "name": "bar"}]
+
+    def test_db_query_error_in_json_mode_emits_ok_false(self, tmp_path: Path) -> None:
+        """Verify database errors in JSON mode emit ok: false and non-zero exit."""
+        args = argparse.Namespace(
+            sql="SELECT syntax error;",
+            file=None,
+            unsafe=False,
+            json=True,
+            db=None,
+        )
+        ctx = make_workspace_context(tmp_path)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(
+                odooctl,
+                "_exec_sql_json",
+                side_effect=odooctl.CliError("syntax error at or near 'error'", code=1),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_db_query(args)
+        assert code == 1
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["ok"] is False
+        assert "syntax error" in str(payload["error"])
+
+
+class TestCmdShell:
+    """Tests for the shell subcommand running Python ORM code."""
+
+    def test_shell_refuses_seed_db(self, tmp_path: Path) -> None:
+        """Verify shell refuses to run against a database containing '_seed_'."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_seed_20260908"
+        args = argparse.Namespace(
+            db="erptech_seed_20260908", file="test.py", rollback=False
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_shell(args)
+        assert exc_info.value.code == 2
+        assert "untouchable seed database" in str(exc_info.value)
+
+    def test_shell_appends_commit_by_default(self, tmp_path: Path) -> None:
+        """Verify shell appends env.cr.commit() by default."""
+        script_file = tmp_path / "script.py"
+        script_file.write_text("print(env.user.name)", encoding="utf-8")
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            db="erptech_work_20260908", file=str(script_file), rollback=False
+        )
+        mock_run_proc = subprocess.CompletedProcess([], 0, "odoo-web\n")
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", return_value=mock_run_proc),
+            patch(
+                "subprocess.run", return_value=MagicMock(returncode=0)
+            ) as mock_subproc,
+        ):
+            code = odooctl.cmd_shell(args)
+        assert code == 0
+        passed_input = mock_subproc.call_args.kwargs["input"]
+        assert "env.cr.commit()" in passed_input
+        assert "env.cr.rollback()" not in passed_input
+
+    def test_shell_appends_rollback_with_flag(self, tmp_path: Path) -> None:
+        """Verify shell appends env.cr.rollback() when --rollback is set."""
+        script_file = tmp_path / "script.py"
+        script_file.write_text("print(env.user.name)", encoding="utf-8")
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            db="erptech_work_20260908", file=str(script_file), rollback=True
+        )
+        mock_run_proc = subprocess.CompletedProcess([], 0, "odoo-web\n")
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", return_value=mock_run_proc),
+            patch(
+                "subprocess.run", return_value=MagicMock(returncode=0)
+            ) as mock_subproc,
+        ):
+            code = odooctl.cmd_shell(args)
+        assert code == 0
+        passed_input = mock_subproc.call_args.kwargs["input"]
+        assert "env.cr.rollback()" in passed_input
+        assert "env.cr.commit()" not in passed_input
+
+    def test_shell_fails_when_web_container_not_running(self, tmp_path: Path) -> None:
+        """Verify shell fails with code 1 if odoo-web container is not running."""
+        script_file = tmp_path / "script.py"
+        script_file.write_text("print(1)", encoding="utf-8")
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            db="erptech_work_20260908", file=str(script_file), rollback=False
+        )
+        mock_run_proc = subprocess.CompletedProcess([], 0, "")
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", return_value=mock_run_proc),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_shell(args)
+        assert exc_info.value.code == 1
+        assert "Please start the development server first" in str(exc_info.value)
+
+
+class TestCmdHealth:
+    """Tests for health probe command."""
+
+    def test_health_returns_0_when_status_200_and_uses_127_0_0_1(self) -> None:
+        """Verify health checks 127.0.0.1 and returns 0 when 200 OK."""
+        args = argparse.Namespace(port=8069, wait=0, json=False)
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__.return_value = mock_resp
+        with (
+            patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_health(args)
+        assert code == 0
+        req = mock_urlopen.call_args[0][0]
+        assert req.full_url == "http://127.0.0.1:8069/web/login"
+        assert "ready 200" in stdout.getvalue()
+
+    def test_health_returns_1_when_non_200(self) -> None:
+        """Verify health returns 1 when HTTP status is not 200."""
+        args = argparse.Namespace(port=8069, wait=0, json=False)
+        mock_err = urllib.error.HTTPError(
+            "http://127.0.0.1:8069/web/login",
+            500,
+            "Internal Server Error",
+            email.message.Message(),
+            None,
+        )
+        with (
+            patch("urllib.request.urlopen", side_effect=mock_err),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_health(args)
+        assert code == 1
+        assert "not ready: HTTP 500" in stdout.getvalue()
+
+    def test_health_json_output(self) -> None:
+        """Verify health emits structured JSON in --json mode."""
+        args = argparse.Namespace(port=8069, wait=0, json=True)
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__.return_value = mock_resp
+        with (
+            patch("urllib.request.urlopen", return_value=mock_resp),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_health(args)
+        assert code == 0
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["ready"] is True
+        assert payload["status"] == 200
+        assert payload["url"] == "http://127.0.0.1:8069/web/login"
+
+
+class TestCmdLogsAndPrune:
+    """Tests for logs container selection and test container pruning."""
+
+    def test_logs_container_test_picks_newest_odoo_test(self) -> None:
+        """Verify logs --container test selects the newest odoo-test container."""
+        json_output = json.dumps(
+            [
+                {"Names": ["/odoo-test-old"], "Created": 1000},
+                {"Names": ["/odoo-test-new"], "Created": 2000},
+            ]
+        )
+        mock_ps = subprocess.CompletedProcess([], 0, json_output)
+        args = argparse.Namespace(tail=50, follow=False, container="test")
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", return_value=mock_ps),
+            patch(
+                "subprocess.run", return_value=MagicMock(returncode=0)
+            ) as mock_subproc,
+        ):
+            code = odooctl.cmd_logs(args)
+        assert code == 0
+        cmd = mock_subproc.call_args[0][0]
+        assert "odoo-test-new" in cmd
+
+    def test_logs_container_test_error_when_no_containers(self) -> None:
+        """Verify logs --container test raises CliError when no test containers exist."""
+        mock_ps = subprocess.CompletedProcess([], 0, "[]")
+        args = argparse.Namespace(tail=50, follow=False, container="test")
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", return_value=mock_ps),
+            pytest.raises(odooctl.CliError, match="No test containers found"),
+        ):
+            _ = odooctl.cmd_logs(args)
+
+    def test_prune_removes_test_containers(self) -> None:
+        """Verify prune command removes all odoo-test-* containers."""
+        mock_ps = subprocess.CompletedProcess(
+            [], 0, "odoo-test-1\nodoo-test-2\nodoo-web\n"
+        )
+        args = argparse.Namespace(json=True)
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run") as mock_run,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            mock_run.side_effect = [mock_ps, subprocess.CompletedProcess([], 0, "")]
+            code = odooctl.cmd_prune(args)
+        assert code == 0
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["removed"] == ["odoo-test-1", "odoo-test-2"]
+        assert payload["count"] == 2
+
+
+class TestCmdDbListAndDrop:
+    """Tests for db-list and db-drop commands."""
+
+    def test_db_list_returns_databases(self, tmp_path: Path) -> None:
+        """Verify db-list queries databases and returns name and size."""
+        ctx = make_workspace_context(tmp_path)
+        mock_rows = [{"name": "espol_work", "size": "150 MB", "size_bytes": 157286400}]
+        args = argparse.Namespace(json=True)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_exec_sql_json", return_value=mock_rows),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_db_list(args)
+        assert code == 0
+        assert json.loads(stdout.getvalue()) == mock_rows
+
+    def test_db_drop_refuses_without_force(self) -> None:
+        """Verify db-drop refuses to drop a database without --force."""
+        args = argparse.Namespace(
+            name="my_database", force=False, allow_seed=False, json=False
+        )
+        with pytest.raises(odooctl.CliError) as exc_info:
+            _ = odooctl.cmd_db_drop(args)
+        assert exc_info.value.code == 2
+        assert "without --force" in str(exc_info.value)
+
+    def test_db_drop_refuses_seed_without_allow_seed(self) -> None:
+        """Verify db-drop refuses to drop a seed database without --allow-seed."""
+        args = argparse.Namespace(
+            name="prod_seed_20260908", force=True, allow_seed=False, json=False
+        )
+        with pytest.raises(odooctl.CliError) as exc_info:
+            _ = odooctl.cmd_db_drop(args)
+        assert exc_info.value.code == 2
+        assert "Seed databases are protected" in str(exc_info.value)
+
+    def test_db_drop_success_and_filestore_removal(self, tmp_path: Path) -> None:
+        """Verify db-drop terminates connections, drops DB, and removes filestore."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            name="work_db", force=True, allow_seed=False, json=False
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(
+                odooctl, "_exec_sql_json", return_value=[{"datname": "work_db"}]
+            ),
+            patch.object(odooctl, "_exec_sql") as mock_exec,
+            patch.object(odooctl, "_remove_filestore", return_value=True) as mock_rm_fs,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_db_drop(args)
+        assert code == 0
+        assert mock_exec.call_count == 2
+        mock_rm_fs.assert_called_once_with(ctx, "work_db")
+        assert "[OK] Database dropped: work_db" in stdout.getvalue()
+
+
+class TestOpLockReentrancy:
+    """Tests for the internal operation lock helper."""
+
+    def test_op_lock_reentrancy_within_same_process(self) -> None:
+        """Verify _op_lock is reentrant within the same process without deadlocking."""
+        assert odooctl._LOCK_STATE.depth == 0  # pyright: ignore[reportPrivateUsage]
+        with odooctl._op_lock():  # pyright: ignore[reportPrivateUsage]
+            assert odooctl._LOCK_STATE.depth == 1  # pyright: ignore[reportPrivateUsage]
+            with odooctl._op_lock():  # pyright: ignore[reportPrivateUsage]
+                assert odooctl._LOCK_STATE.depth == 2  # pyright: ignore[reportPrivateUsage]
+            assert odooctl._LOCK_STATE.depth == 1  # pyright: ignore[reportPrivateUsage]
+        assert odooctl._LOCK_STATE.depth == 0  # pyright: ignore[reportPrivateUsage]
+
+
+class TestStopWebOnly:
+    """Tests for stop --web option."""
+
+    def test_stop_web_only_does_not_remove_pod_or_db(self) -> None:
+        """Verify stop --web only stops and removes odoo-web."""
+        args = argparse.Namespace(web=True, json=True)
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run") as mock_run,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_stop(args)
+        assert code == 0
+        run_cmds = [call.args[0] for call in mock_run.call_args_list]
+        assert any("stop" in c and "odoo-web" in c for c in run_cmds)
+        assert any("rm" in c and "odoo-web" in c for c in run_cmds)
+        assert not any("pod" in c for c in run_cmds)
+        assert not any("odoo-db" in c for c in run_cmds)
+        payload = cast("dict[str, object]", json.loads(stdout.getvalue()))
+        assert payload["status"] == "stopped"
+        assert payload["container"] == "odoo-web"
+
+
+class TestSummaryLineParsing:
+    """Tests for test result count extraction."""
+
+    def test_extract_test_counts_from_result_line(self) -> None:
+        """Verify test counts are accurately extracted from Odoo result lines."""
+        output = (
+            "2026-09-05 03:28:50,481 1 INFO erptech "
+            "odoo.tests.result: 1 failed, 2 error(s) of 117 tests\n"
+        )
+        counts = odooctl._extract_test_counts(output)  # pyright: ignore[reportPrivateUsage]
+        assert counts == (117, 1, 2)
+
+
+class TestAuthTempAndRestore:
+    """Tests for auth-temp and auth-restore commands."""
+
+    def test_passlib_pbkdf2_sha512_known_vector_and_format(self) -> None:
+        """Verify _passlib_pbkdf2_sha512 matches direct derivation and format."""
+        password = "temp_pass_test_123"  # noqa: S105 - test fixture
+        salt = b"0123456789abcdef"
+        rounds = 600000
+        digest = hashlib.pbkdf2_hmac("sha512", password.encode("utf-8"), salt, rounds)
+        expected_salt = (
+            base64.b64encode(salt).decode("ascii").replace("+", ".").rstrip("=")
+        )
+        expected_checksum = (
+            base64.b64encode(digest).decode("ascii").replace("+", ".").rstrip("=")
+        )
+        expected = f"$pbkdf2-sha512${rounds}${expected_salt}${expected_checksum}"
+
+        computed = odooctl._passlib_pbkdf2_sha512(  # pyright: ignore[reportPrivateUsage]
+            password, salt, rounds
+        )
+        assert computed == expected
+        pattern = r"^\$pbkdf2-sha512\$600000\$[./A-Za-z0-9]+\$[./A-Za-z0-9]+$"
+        assert re.fullmatch(pattern, computed) is not None
+        assert "+" not in computed
+        assert "=" not in computed
+
+    def test_auth_commands_refuse_seed_db(self, tmp_path: Path) -> None:
+        """Verify auth-temp and auth-restore refuse untouchable seed databases."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_seed_20260908"
+        args_temp = argparse.Namespace(
+            db="erptech_seed_20260908", login=None, json=False
+        )
+        args_restore = argparse.Namespace(
+            db="erptech_seed_20260908", login=None, json=False
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            pytest.raises(odooctl.CliError) as exc_temp,
+        ):
+            _ = odooctl.cmd_auth_temp(args_temp)
+        assert exc_temp.value.code == 2
+        assert "untouchable seed database" in str(exc_temp.value)
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            pytest.raises(odooctl.CliError) as exc_restore,
+        ):
+            _ = odooctl.cmd_auth_restore(args_restore)
+        assert exc_restore.value.code == 2
+        assert "untouchable seed database" in str(exc_restore.value)
+
+    def test_auth_temp_backup_written_before_update(self, tmp_path: Path) -> None:
+        """Verify auth-temp writes backup JSON before executing UPDATE."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_work"
+        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        call_order: list[str] = []
+
+        def mock_write(path: Path, content: str) -> None:
+            call_order.append("write_backup")
+
+        def mock_exec(sql: str, **_kw: object) -> str:
+            if "UPDATE res_users" in sql:
+                call_order.append("exec_update")
+            return ""
+
+        fake_rows = [{"id": 2, "login": "admin", "password": "original_hash"}]
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_get_state_dir", return_value=tmp_path / "state"),
+            patch.object(odooctl, "_exec_sql_json", return_value=fake_rows),
+            patch.object(odooctl, "_write_file_0600", side_effect=mock_write),
+            patch.object(odooctl, "_exec_sql", side_effect=mock_exec),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_auth_temp(args)
+
+        assert code == 0
+        assert call_order == ["write_backup", "exec_update"]
+        out = stdout.getvalue()
+        assert "Login:    admin" in out
+        assert "restore with: cli.py auth-restore --db erptech_work" in out
+
+    def test_auth_temp_existing_backup_not_overwritten(self, tmp_path: Path) -> None:
+        """Verify auth-temp reuses existing backup without overwriting it."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_work"
+        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        state_dir = tmp_path / "state"
+        auth_dir = state_dir / "auth"
+        auth_dir.mkdir(parents=True)
+        backup_file = auth_dir / "erptech_work__2.json"
+        original_backup = {
+            "db": "erptech_work",
+            "user_id": 2,
+            "login": "admin",
+            "password_hash": "pre_existing_hash",
+            "created_at": "2026-09-26T00:00:00Z",
+        }
+        backup_file.write_text(json.dumps(original_backup), encoding="utf-8")
+
+        fake_rows = [{"id": 2, "login": "admin", "password": "current_temp_hash"}]
+        mock_write = MagicMock()
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_get_state_dir", return_value=state_dir),
+            patch.object(odooctl, "_exec_sql_json", return_value=fake_rows),
+            patch.object(odooctl, "_write_file_0600", mock_write),
+            patch.object(odooctl, "_exec_sql", return_value=""),
+        ):
+            code = odooctl.cmd_auth_temp(args)
+
+        assert code == 0
+        mock_write.assert_not_called()
+        assert json.loads(backup_file.read_text(encoding="utf-8")) == original_backup
+
+    def test_auth_restore_verifies_then_deletes_backup(self, tmp_path: Path) -> None:
+        """Verify auth-restore restores password, verifies it, then removes backup."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_work"
+        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        state_dir = tmp_path / "state"
+        auth_dir = state_dir / "auth"
+        auth_dir.mkdir(parents=True)
+        backup_file = auth_dir / "erptech_work__2.json"
+        backup_file.write_text(
+            json.dumps(
+                {
+                    "db": "erptech_work",
+                    "user_id": 2,
+                    "login": "admin",
+                    "password_hash": "original_secret_hash",
+                    "created_at": "2026-09-26T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        trace: list[str] = []
+
+        def mock_exec(sql: str, **_kw: object) -> str:
+            if "UPDATE res_users" in sql:
+                trace.append("update")
+            return ""
+
+        def mock_exec_json(sql: str, **_kw: object) -> list[dict[str, object]]:
+            if "SELECT password" in sql:
+                trace.append("verify_select")
+                return [{"password": "original_secret_hash"}]
+            return [{"id": 2, "login": "admin"}]
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_get_state_dir", return_value=state_dir),
+            patch.object(odooctl, "_exec_sql_json", side_effect=mock_exec_json),
+            patch.object(odooctl, "_exec_sql", side_effect=mock_exec),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_auth_restore(args)
+
+        assert code == 0
+        assert trace == ["update", "verify_select"]
+        assert not backup_file.exists()
+        assert "restored admin on erptech_work" in stdout.getvalue()
+
+    def test_auth_restore_without_backup_exits_1(self, tmp_path: Path) -> None:
+        """Verify auth-restore exits 1 when no backup exists."""
+        ctx = make_workspace_context(tmp_path)
+        ctx.effective_db_name = "erptech_work"
+        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        state_dir = tmp_path / "state"
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_get_state_dir", return_value=state_dir),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_auth_restore(args)
+
+        assert exc_info.value.code == 1
+        assert "No auth backup found" in str(exc_info.value)
+
+
+class TestBaselineComparison:
+    """Tests for test --baseline comparison feature."""
+
+    def test_parse_failed_tests_plain_and_timestamped_with_duplicates(
+        self,
+    ) -> None:
+        """Verify _parse_failed_tests handles FAIL/ERROR lines and duplicates."""
+        output = (
+            "2026-09-05 03:32:36,429 1 ERROR erptech: FAIL: test_x "
+            "(odoo.addons.crm.tests.test_crm.TestLead.test_x)\n"
+            "FAIL: test_y (odoo.addons.crm.tests.test_crm.TestLead.test_y)\n"
+            "2026-09-05 03:32:36,429 1 ERROR erptech: FAIL: TestShort.test_one\n"
+            "2026-09-05 03:32:37,100 1 ERROR erptech: ERROR: test_err "
+            "(odoo.addons.crm.tests.test_crm.TestLead.test_err)\n"
+            "ERROR: TestShort.test_two\n"
+            "2026-09-05 03:32:37,200 1 ERROR erptech: FAIL: TestShort.test_one\n"
+            "2026-09-05 03:28:49,475 1 ERROR erptech odoo.modules.registry: "
+            "Model budget has no table.\n"
+        )
+        parsed = (
+            odooctl._parse_failed_tests(output)  # pyright: ignore[reportPrivateUsage]
+        )
+        expected = {
+            "TestLead.test_x",
+            "TestLead.test_y",
+            "TestShort.test_one",
+            "TestLead.test_err",
+            "TestShort.test_two",
+        }
+        assert parsed == expected
+
+    def test_baseline_set_arithmetic_new_preexisting_fixed(self) -> None:
+        """Verify set arithmetic partitions test results correctly."""
+        baseline_failed = {"TestA.test_1", "TestB.test_2"}
+        current_failed = {"TestB.test_2", "TestC.test_3"}
+
+        new_failures = sorted(current_failed - baseline_failed)
+        preexisting = sorted(current_failed & baseline_failed)
+        fixed = sorted(baseline_failed - current_failed)
+
+        assert new_failures == ["TestC.test_3"]
+        assert preexisting == ["TestB.test_2"]
+        assert fixed == ["TestA.test_1"]
+
+    def test_baseline_worktree_removal_even_when_second_run_raises(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify git worktree is cleaned up even if second test run raises."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+        git_calls: list[list[str]] = []
+
+        def mock_subprocess_run(cmd: list[str], **_kw: object) -> MagicMock:
+            git_calls.append(cmd)
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stdout = ""
+            proc.stderr = ""
+            return proc
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            if "curr" in cname:
+                msg = "Crash during current test run"
+                raise RuntimeError(msg)
+            return 0, "odoo.tests.result: 0 failed, 0 error(s) of 5 tests\n"
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_cleanup_stale_test_containers"),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("test_db", ["/crm"], ["crm"]),
+            ),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+            pytest.raises(RuntimeError) as exc_info,
+        ):
+            _ = odooctl.cmd_test(args)
+
+        assert "Crash during current test run" in str(exc_info.value)
+        flat_cmds = [" ".join(c) for c in git_calls]
+        assert any("worktree remove --force" in c for c in flat_cmds)
+        assert any("worktree prune" in c for c in flat_cmds)
+
+    def test_baseline_runs_before_current_call_order(self, tmp_path: Path) -> None:
+        """Verify baseline tests execute before current workspace tests."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+        run_order: list[str] = []
+
+        def mock_subprocess_run(cmd: list[str], **_kw: object) -> MagicMock:
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stdout = ""
+            proc.stderr = ""
+            return proc
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            run_order.append(cname)
+            return 0, "odoo.tests.result: 0 failed, 0 error(s) of 5 tests\n"
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_cleanup_stale_test_containers"),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("test_db", ["/crm"], ["crm"]),
+            ),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+        ):
+            code = odooctl.cmd_test(args)
+
+        assert code == 0
+        assert len(run_order) == 2
+        assert run_order[0].startswith("odoo-test-base-")
+        assert run_order[1].startswith("odoo-test-curr-")
+
+    def test_baseline_exit_code_0_with_only_preexisting_failures(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify exit code 0 when all failures are pre-existing."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+
+        def mock_subprocess_run(cmd: list[str], **_kw: object) -> MagicMock:
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stdout = ""
+            proc.stderr = ""
+            return proc
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            fail_output = (
+                "FAIL: test_old (odoo.addons.crm.tests.test_crm.TestLead.test_old)\n"
+                "odoo.tests.result: 1 failed, 0 error(s) of 5 tests\n"
+            )
+            return 1, fail_output
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_cleanup_stale_test_containers"),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("test_db", ["/crm"], ["crm"]),
+            ),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_test(args)
+
+        assert code == 0
+        out = stdout.getvalue()
+        assert "new failures (0):" in out
+        assert "pre-existing (1):" in out
+        assert "TestLead.test_old" in out
+        assert "RESULT baseline=HEAD new=0 preexisting=1 fixed=0" in out
+
+    def test_baseline_exit_code_1_with_new_failure(self, tmp_path: Path) -> None:
+        """Verify exit code 1 when there is a new failure."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+
+        def mock_subprocess_run(cmd: list[str], **_kw: object) -> MagicMock:
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stdout = ""
+            proc.stderr = ""
+            return proc
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            if "base" in cname:
+                return 0, "odoo.tests.result: 0 failed, 0 error(s) of 5 tests\n"
+            fail_output = (
+                "FAIL: test_new (odoo.addons.crm.tests.test_crm.TestLead.test_new)\n"
+                "odoo.tests.result: 1 failed, 0 error(s) of 5 tests\n"
+            )
+            return 1, fail_output
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_cleanup_stale_test_containers"),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("test_db", ["/crm"], ["crm"]),
+            ),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            code = odooctl.cmd_test(args)
+
+        assert code == 1
+        out = stdout.getvalue()
+        assert "new failures (1):" in out
+        assert "TestLead.test_new" in out
+        assert "RESULT baseline=HEAD new=1 preexisting=0 fixed=0" in out
+
+    def test_baseline_bad_ref_exits_2(self, tmp_path: Path) -> None:
+        """Verify invalid git ref raises usage error with exit code 2."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="bad-ref-123",
+        )
+
+        def mock_subprocess_run(cmd: list[str], **_kw: object) -> MagicMock:
+            proc = MagicMock()
+            proc.returncode = 128
+            proc.stdout = ""
+            proc.stderr = "fatal: Not a valid object name"
+            return proc
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_test(args)
+
+        assert exc_info.value.code == 2
+        assert "Invalid baseline ref" in str(exc_info.value)
+
+    def test_cmd_test_refuses_seed_db(self, tmp_path: Path) -> None:
+        """Verify test command refuses untouchable seed database."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db="prod_seed_20260908",
+            parallel=False,
+            jobs=1,
+            baseline=None,
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_test(args)
+
+        assert exc_info.value.code == 2
+        assert "untouchable seed database" in str(exc_info.value)

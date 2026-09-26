@@ -1269,6 +1269,29 @@ def _evaluate_odoo_test_result(exit_code: int, output: str) -> tuple[bool, list[
     return has_passed, summary_lines
 
 
+def _extract_test_counts(output: str) -> tuple[int, int, int] | None:
+    """Extract (tests, failed, errors) from Odoo test runner output if present."""
+    pattern = re.compile(
+        r"(\d+)\s+fail(?:ed|ures?),?\s+(\d+)\s+errors?(?:\(s\))?\s+of\s+(\d+)\s+tests",
+        re.IGNORECASE,
+    )
+    for line in reversed(output.splitlines()):
+        if "odoo.tests.result:" in line or "odoo.modules.loading:" in line:
+            match = pattern.search(line)
+            if match:
+                f = int(match.group(1))
+                e = int(match.group(2))
+                t = int(match.group(3))
+                return t, f, e
+
+    for line in reversed(output.splitlines()):
+        match = pattern.search(line)
+        if match:
+            return int(match.group(3)), int(match.group(1)), int(match.group(2))
+
+    return None
+
+
 def _cleanup_stale_test_containers() -> None:
     """Clean up any leftover test containers from previously interrupted runs."""
     stale_check = _run(
@@ -1279,6 +1302,234 @@ def _cleanup_stale_test_containers() -> None:
         stale_name = stale.strip()
         if stale_name.startswith("odoo-test-"):
             _ = _run(["podman", "rm", "-f", stale_name], check=False)
+
+
+_FAILED_TEST_RE = re.compile(
+    r"\b(?:FAIL|ERROR):\s*"
+    r"(?:"
+    r"([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_.]+)\)"
+    r"|"
+    r"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"
+    r")"
+)
+
+
+def _parse_failed_tests(output: str) -> set[str]:
+    """Parse failing test identifiers from Odoo test runner output."""
+    failed: set[str] = set()
+    for line in output.splitlines():
+        match = _FAILED_TEST_RE.search(line)
+        if not match:
+            continue
+        method_name, inside_parens, dotted_id = match.groups()
+        if inside_parens:
+            parts = inside_parens.split(".")
+            if method_name and parts[-1] != method_name:
+                failed.add(f"{parts[-1]}.{method_name}")
+            elif len(parts) >= 2:
+                failed.add(f"{parts[-2]}.{parts[-1]}")
+            else:
+                failed.add(inside_parens)
+        elif dotted_id:
+            parts = dotted_id.split(".")
+            if len(parts) >= 2:
+                failed.add(f"{parts[-2]}.{parts[-1]}")
+            else:
+                failed.add(dotted_id)
+    return failed
+
+
+def _run_baseline_test_comparison(
+    ctx: WorkspaceContext,
+    target: str,
+    db_to_use: str,
+    *,
+    test_tags: list[str],
+    update_mods: list[str],
+    explicit_tags: str | None,
+    baseline_ref: str,
+    json_mode: bool,
+) -> int:
+    """Compare tests by running baseline ref first, then current workspace."""
+    rev_parse = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ctx.root),
+            "rev-parse",
+            "--verify",
+            f"{baseline_ref}^{{commit}}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if rev_parse.returncode != 0:
+        msg = f"Invalid baseline ref or not a git repository: {baseline_ref!r}"
+        raise CliError(msg, code=2)
+
+    _ensure_runtime_pod(ctx)
+    _cleanup_stale_test_containers()
+
+    tags_str = explicit_tags or ",".join(test_tags)
+    update_str = ",".join(update_mods)
+
+    tmpdir = tempfile.mkdtemp(prefix="odoo-baseline-")
+    worktree_path = Path(tmpdir)
+    with contextlib.suppress(OSError):
+        worktree_path.rmdir()
+
+    try:
+        add_res = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(ctx.root),
+                "worktree",
+                "add",
+                "--detach",
+                str(worktree_path),
+                baseline_ref,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if add_res.returncode != 0:
+            err_msg = add_res.stderr.strip() or "git worktree add failed"
+            msg = (
+                f"Failed to create git worktree for baseline {baseline_ref!r}: "
+                f"{err_msg}"
+            )
+            raise CliError(msg, code=2)
+
+        # Baseline suite runs FIRST so DB ends at current code schema
+        container_base_name = f"odoo-test-base-{int(time.time())}"
+        cmd_base = _build_test_cmd(
+            ctx,
+            container_base_name,
+            db_to_use,
+            tags_str,
+            update_str,
+            source_root=worktree_path,
+        )
+        header_base = (
+            f"Running baseline Odoo unit tests for {target} on ref {baseline_ref} "
+            f"(tags: {tags_str}, db: {db_to_use})...\n"
+        )
+        if json_mode:
+            _ = sys.stderr.write(header_base)
+            _ = sys.stderr.flush()
+        else:
+            _ = sys.stdout.write(header_base)
+            _ = sys.stdout.flush()
+
+        exit_base, output_base = _run_test_process(
+            cmd_base, container_base_name, json_mode=json_mode
+        )
+        is_success_base, summary_base = _evaluate_odoo_test_result(
+            exit_base, output_base
+        )
+        baseline_failures = _parse_failed_tests(output_base)
+
+        _cleanup_stale_test_containers()
+
+        # Current suite runs SECOND
+        container_curr_name = f"odoo-test-curr-{int(time.time())}"
+        cmd_curr = _build_test_cmd(
+            ctx,
+            container_curr_name,
+            db_to_use,
+            tags_str,
+            update_str,
+            source_root=ctx.root,
+        )
+        header_curr = (
+            f"Running current Odoo unit tests for {target} "
+            f"(tags: {tags_str}, db: {db_to_use})...\n"
+        )
+        if json_mode:
+            _ = sys.stderr.write(header_curr)
+            _ = sys.stderr.flush()
+        else:
+            _ = sys.stdout.write(header_curr)
+            _ = sys.stdout.flush()
+
+        exit_curr, output_curr = _run_test_process(
+            cmd_curr, container_curr_name, json_mode=json_mode
+        )
+        is_success_curr, summary_curr = _evaluate_odoo_test_result(
+            exit_curr, output_curr
+        )
+        current_failures = _parse_failed_tests(output_curr)
+    finally:
+        _ = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(ctx.root),
+                "worktree",
+                "remove",
+                "--force",
+                str(worktree_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        _ = subprocess.run(
+            ["git", "-C", str(ctx.root), "worktree", "prune"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        shutil.rmtree(worktree_path, ignore_errors=True)
+
+    new_failures = sorted(current_failures - baseline_failures)
+    preexisting = sorted(current_failures & baseline_failures)
+    fixed = sorted(baseline_failures - current_failures)
+
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "baseline_ref": baseline_ref,
+                    "new_failures": new_failures,
+                    "preexisting": preexisting,
+                    "fixed": fixed,
+                    "current": {
+                        "exit_code": exit_curr,
+                        "success": is_success_curr,
+                        "summary": summary_curr,
+                        "failures": sorted(current_failures),
+                    },
+                    "baseline": {
+                        "exit_code": exit_base,
+                        "success": is_success_base,
+                        "summary": summary_base,
+                        "failures": sorted(baseline_failures),
+                    },
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"\nnew failures ({len(new_failures)}):")
+        for fid in new_failures:
+            print(f"  {fid}")
+        print(f"\npre-existing ({len(preexisting)}):")
+        for fid in preexisting:
+            print(f"  {fid}")
+        print(f"\nfixed ({len(fixed)}):")
+        for fid in fixed:
+            print(f"  {fid}")
+
+        print(
+            f"\nRESULT baseline={baseline_ref} new={len(new_failures)} "
+            f"preexisting={len(preexisting)} fixed={len(fixed)}"
+        )
+
+    return 0 if len(new_failures) == 0 else 1
 
 
 def _resolve_test_targets(
@@ -1327,13 +1578,15 @@ def _build_test_cmd(
     db_to_use: str,
     tags_str: str,
     update_str: str,
+    *,
+    source_root: Path | None = None,
 ) -> list[str]:
     """Construct podman run command for unit test runner."""
     source_matches = list(ctx.runtime.glob("source/odoo-*"))
     source_dir = (
         source_matches[0] if source_matches else ctx.runtime / "source/odoo-17.0"
     )
-    addons_mount = ctx.root
+    addons_mount = source_root if source_root is not None else ctx.root
     config_mount = ctx.runtime / "config"
     data_web = ctx.runtime / "data/web"
     data_web.mkdir(parents=True, exist_ok=True)
@@ -1534,68 +1787,118 @@ def _run_parallel_tests(
     else:
         print("\n[FAIL] One or more module test suites failed.")
 
+    if not json_mode:
+        total_tests = 0
+        total_failed = 0
+        total_errors = 0
+        has_counts = False
+        for res_item in results:
+            c = _extract_test_counts(res_item[4])
+            if c is not None:
+                has_counts = True
+                total_tests += c[0]
+                total_failed += c[1]
+                total_errors += c[2]
+        if has_counts:
+            print(
+                f"RESULT tests={total_tests} failed={total_failed} errors={total_errors}"
+            )
+
     return 0 if all_ok else 1
 
 
 def cmd_test(args: argparse.Namespace) -> int:
     """Run isolated Odoo 17 unit tests for a module or workflow."""
-    ctx = _resolve_workspace()
-    target = _require_str(args, "target", "crm")
-    profile_name = _require_str(args, "profile", "etech")
-    json_mode = _require_bool(args, "json")
-    explicit_tags = _optional_str(args, "tags")
-    explicit_db = _optional_str(args, "db")
-    parallel = _require_bool(args, "parallel")
-    jobs_val = _optional_int(args, "jobs")
-    jobs = jobs_val if jobs_val is not None else (4 if parallel else 1)
+    with _op_lock():
+        ctx = _resolve_workspace(args)
+        target = _require_str(args, "target", "crm")
+        profile_name = _require_str(args, "profile", "etech")
+        json_mode = _require_bool(args, "json")
+        explicit_tags = _optional_str(args, "tags")
+        explicit_db = _optional_str(args, "db")
+        parallel = _require_bool(args, "parallel")
+        jobs_val = _optional_int(args, "jobs")
+        jobs = jobs_val if jobs_val is not None else (4 if parallel else 1)
 
-    db_to_use, test_tags, update_mods = _resolve_test_targets(ctx, target, profile_name)
-    if explicit_db:
-        db_to_use = explicit_db
-
-    if (parallel or jobs > 1) and len(update_mods) > 1 and not explicit_tags:
-        return _run_parallel_tests(ctx, args, db_to_use, update_mods)
-    tags_str = explicit_tags or ",".join(test_tags)
-    _ensure_runtime_pod(ctx)
-    _cleanup_stale_test_containers()
-
-    update_str = ",".join(update_mods)
-    container_test_name = f"odoo-test-{int(time.time())}"
-
-    cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, update_str)
-    header_msg = (
-        f"Running isolated Odoo unit tests for {target} "
-        f"(tags: {tags_str}, db: {db_to_use})...\n"
-    )
-    if json_mode:
-        _ = sys.stderr.write(header_msg)
-        _ = sys.stderr.flush()
-    else:
-        _ = sys.stdout.write(header_msg)
-        _ = sys.stdout.flush()
-
-    exit_code, output = _run_test_process(cmd, container_test_name, json_mode=json_mode)
-    is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
-
-    if json_mode:
-        print(
-            json.dumps(
-                {
-                    "target": target,
-                    "database": db_to_use,
-                    "exit_code": exit_code,
-                    "success": is_success,
-                    "summary": summary_lines,
-                    "output": output,
-                }
-            )
+        db_to_use, test_tags, update_mods = _resolve_test_targets(
+            ctx, target, profile_name
         )
-    elif is_success:
-        print("\n[OK] All Odoo unit tests passed successfully.")
-    else:
-        print("\n[FAIL] Test run failed.")
+        if explicit_db:
+            db_to_use = explicit_db
 
-    return 0 if is_success else (exit_code if exit_code != 0 else 1)
+        if "_seed_" in db_to_use:
+            msg = (
+                f"Refusing to execute tests on untouchable seed database "
+                f"{db_to_use!r}. Clone to a work database first (e.g., db-clone)."
+            )
+            raise CliError(msg, code=2)
+
+        baseline_ref = _optional_str(args, "baseline")
+        if baseline_ref:
+            return _run_baseline_test_comparison(
+                ctx,
+                target,
+                db_to_use,
+                test_tags=test_tags,
+                update_mods=update_mods,
+                explicit_tags=explicit_tags,
+                baseline_ref=baseline_ref,
+                json_mode=json_mode,
+            )
+
+        if (parallel or jobs > 1) and len(update_mods) > 1 and not explicit_tags:
+            return _run_parallel_tests(ctx, args, db_to_use, update_mods)
+        tags_str = explicit_tags or ",".join(test_tags)
+        _ensure_runtime_pod(ctx)
+        _cleanup_stale_test_containers()
+
+        update_str = ",".join(update_mods)
+        container_test_name = f"odoo-test-{int(time.time())}"
+
+        cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, update_str)
+        header_msg = (
+            f"Running isolated Odoo unit tests for {target} "
+            f"(tags: {tags_str}, db: {db_to_use})...\n"
+        )
+        if json_mode:
+            _ = sys.stderr.write(header_msg)
+            _ = sys.stderr.flush()
+        else:
+            _ = sys.stdout.write(header_msg)
+            _ = sys.stdout.flush()
+
+        exit_code, output = _run_test_process(
+            cmd, container_test_name, json_mode=json_mode
+        )
+        is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
+
+        if json_mode:
+            print(
+                json.dumps(
+                    {
+                        "target": target,
+                        "database": db_to_use,
+                        "exit_code": exit_code,
+                        "success": is_success,
+                        "summary": summary_lines,
+                        "output": output,
+                    }
+                )
+            )
+        elif is_success:
+            print("\n[OK] All Odoo unit tests passed successfully.")
+        else:
+            print("\n[FAIL] Test run failed.")
+
+        if not json_mode:
+            counts = _extract_test_counts(output)
+            if counts is not None:
+                tests_count, failed_count, errors_count = counts
+                print(
+                    f"RESULT tests={tests_count} failed={failed_count} errors={errors_count}"
+                )
+
+        return 0 if is_success else (exit_code if exit_code != 0 else 1)
 
 
 def cmd_lint(args: argparse.Namespace) -> int:
@@ -2909,6 +3212,18 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         dest="jobs",
         help="Number of concurrent test worker containers (default: 4 when --parallel)",
+    )
+    _ = p_test.add_argument(
+        "--baseline",
+        nargs="?",
+        const="HEAD",
+        default=None,
+        metavar="REF",
+        help=(
+            "Compare test results against a baseline git commit or ref "
+            "(default: HEAD). Baseline suite runs first so DB ends at "
+            "current code schema."
+        ),
     )
 
     # Lint Command
