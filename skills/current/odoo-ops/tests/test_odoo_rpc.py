@@ -4,10 +4,13 @@ import http.server
 import io
 import json
 import os
+import shutil
+import ssl
 import sys
 import tempfile
 import threading
 import unittest
+import urllib.error
 from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -22,6 +25,7 @@ from odoo_rpc import (
     json_rpc,
     load_env,
     main,
+    normalize_fields,
     parse_env_file,
 )
 
@@ -417,23 +421,24 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
             assert exit_code == 1
             assert request_count["count"] == 0
 
-            # 2. Denied mutation without --write
+            # 2. Denied mutation on production with --write
             argv_no_write = [
                 "--allow-rpc",
+                "--write",
                 "--url",
-                f"http://127.0.0.1:{server.port}/jsonrpc",
+                "https://remote.erp.com/jsonrpc",
                 "--db",
                 "testdb",
                 "--user",
                 "user@test.com",
                 "--token",
                 "secret",  # noqa: S106 - test fixture credential
-                "unlink",
+                "create",
                 "crm.lead",
-                "[1]",
+                '{"name": "Lead"}',
             ]
             exit_code = main(argv_no_write)
-            assert exit_code == 1
+            assert exit_code == 2
             assert request_count["count"] == 0
         finally:
             server.stop()
@@ -552,8 +557,9 @@ class TestOdooRpcCli(unittest.TestCase):
     def test_cli_mutation_blocked_before_config_without_write(self) -> None:
         argv = [
             "--allow-rpc",
+            "--write",
             "--url",
-            "http://127.0.0.1:8069/jsonrpc",
+            "https://remote.erp.com/jsonrpc",
             "--db",
             "testdb",
             "--user",
@@ -566,8 +572,631 @@ class TestOdooRpcCli(unittest.TestCase):
         ]
         with patch("sys.stderr", new=io.StringIO()) as fake_stderr:
             exit_code = main(argv)
+            assert exit_code == 2
+            assert (
+                "MUTATION BLOCKED: production writes must go through a plan"
+                in fake_stderr.getvalue()
+            )
+
+
+class TestOdooRpcNewFeatures(unittest.TestCase):
+    def test_prod_write_without_write_creates_plan_and_sends_no_write(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("odoo_rpc.json_rpc") as mock_rpc,
+                patch("sys.stdout", new=io.StringIO()) as fake_stdout,
+            ):
+                mock_rpc.side_effect = lambda *args, **kwargs: (
+                    1
+                    if args[2] == "authenticate"
+                    else [
+                        {
+                            "id": 1,
+                            "name": "Old",
+                            "write_date": "2026-09-01 10:00:00",
+                            "display_name": "Partner 1",
+                        }
+                    ]
+                )
+                argv = [
+                    "--allow-rpc",
+                    "--url",
+                    "https://prod.erp.com/jsonrpc",
+                    "--db",
+                    "proddb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "write",
+                    "res.partner",
+                    "[1]",
+                    '{"name": "New"}',
+                ]
+                exit_code = main(argv)
+                assert exit_code == 0
+                for call_args in mock_rpc.call_args_list:
+                    args = call_args[0]
+                    if len(args) > 4 and args[1] == "object":
+                        assert args[4] != "write"
+                plans = list((state_dir / "plans").glob("*.json"))
+                assert len(plans) == 1
+                plan_data = json.loads(plans[0].read_text(encoding="utf-8"))
+                assert plan_data["command"] == "write"
+                assert plan_data["model"] == "res.partner"
+                assert plan_data["ids"] == [1]
+                assert plan_data["values"] == {"name": "New"}
+                assert "plan " in fake_stdout.getvalue()
+                assert " saved." in fake_stdout.getvalue()
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_prod_write_with_write_refused(self) -> None:
+        argv = [
+            "--allow-rpc",
+            "--write",
+            "--url",
+            "https://prod.erp.com/jsonrpc",
+            "--db",
+            "proddb",
+            "--user",
+            "admin",
+            "--token",
+            "tok",  # noqa: S106 - test credential
+            "write",
+            "res.partner",
+            "[1]",
+            '{"name": "New"}',
+        ]
+        with patch("sys.stderr", new=io.StringIO()) as fake_stderr:
+            exit_code = main(argv)
+            assert exit_code == 2
+            assert (
+                "MUTATION BLOCKED: production writes must go through a plan"
+                in fake_stderr.getvalue()
+            )
+
+    def test_apply_aborts_on_write_date_drift_without_writing(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            plans_dir = state_dir / "plans"
+            plans_dir.mkdir(parents=True, exist_ok=True)
+            plan_id = "testplan01"
+            plan_file = plans_dir / f"{plan_id}.json"
+            plan_file.write_text(
+                json.dumps(
+                    {
+                        "id": plan_id,
+                        "created_at": "2026-09-01T10:00:00Z",
+                        "url": "https://prod.erp.com/jsonrpc",
+                        "db": "proddb",
+                        "user": "admin",
+                        "command": "write",
+                        "model": "res.partner",
+                        "ids": [1],
+                        "values": {"name": "New Name"},
+                        "preimage": [
+                            {
+                                "id": 1,
+                                "name": "Old Name",
+                                "write_date": "2026-09-01 10:00:00",
+                                "display_name": "Partner 1",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("odoo_rpc.json_rpc") as mock_rpc,
+                patch("sys.stderr", new=io.StringIO()) as fake_stderr,
+            ):
+                mock_rpc.side_effect = lambda *args, **kwargs: (
+                    1
+                    if args[2] == "authenticate"
+                    else [{"id": 1, "write_date": "2026-09-02 12:00:00"}]
+                )
+                argv = [
+                    "--allow-rpc",
+                    "--write",
+                    "--url",
+                    "https://prod.erp.com/jsonrpc",
+                    "--db",
+                    "proddb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "apply",
+                    plan_id,
+                ]
+                exit_code = main(argv)
+                assert exit_code == 1
+                assert "drift detected on res.partner ids [1]" in fake_stderr.getvalue()
+                for call_args in mock_rpc.call_args_list:
+                    args = call_args[0]
+                    if len(args) > 4 and args[1] == "object":
+                        assert args[4] != "write"
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_apply_refuses_applied_plan(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            plans_dir = state_dir / "plans"
+            plans_dir.mkdir(parents=True, exist_ok=True)
+            plan_id = "testplan02"
+            plan_file = plans_dir / f"{plan_id}.json"
+            plan_file.write_text(
+                json.dumps(
+                    {
+                        "id": plan_id,
+                        "created_at": "2026-09-01T10:00:00Z",
+                        "applied_at": "2026-09-01T11:00:00Z",
+                        "url": "https://prod.erp.com/jsonrpc",
+                        "db": "proddb",
+                        "user": "admin",
+                        "command": "write",
+                        "model": "res.partner",
+                        "ids": [1],
+                        "values": {"name": "New Name"},
+                        "preimage": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("sys.stderr", new=io.StringIO()) as fake_stderr,
+            ):
+                argv = [
+                    "--allow-rpc",
+                    "--write",
+                    "--url",
+                    "https://prod.erp.com/jsonrpc",
+                    "--db",
+                    "proddb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "apply",
+                    plan_id,
+                ]
+                exit_code = main(argv)
+                assert exit_code == 1
+                assert "already been applied" in fake_stderr.getvalue()
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_call_message_post_denied_on_prod_but_plannable_on_loopback(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            # 1. Denied on prod
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("sys.stderr", new=io.StringIO()) as fake_stderr,
+            ):
+                argv_prod = [
+                    "--allow-rpc",
+                    "--url",
+                    "https://prod.erp.com/jsonrpc",
+                    "--db",
+                    "proddb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "call",
+                    "res.partner",
+                    "message_post",
+                    "--ids",
+                    "[1]",
+                    "--kwargs",
+                    '{"body": "Hello"}',
+                ]
+                exit_code = main(argv_prod)
+                assert exit_code == 2
+                assert "DENIED on production" in fake_stderr.getvalue()
+                assert "message_post" in fake_stderr.getvalue()
+
+            # 2. Plannable on loopback
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("odoo_rpc.json_rpc") as mock_rpc,
+                patch("sys.stdout", new=io.StringIO()) as fake_stdout,
+            ):
+                mock_rpc.side_effect = lambda *args, **kwargs: (
+                    1
+                    if args[2] == "authenticate"
+                    else [
+                        {
+                            "id": 1,
+                            "display_name": "Partner 1",
+                            "write_date": "2026-09-01 10:00:00",
+                        }
+                    ]
+                )
+                argv_loopback = [
+                    "--allow-rpc",
+                    "--url",
+                    "http://127.0.0.1:8069/jsonrpc",
+                    "--db",
+                    "testdb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "call",
+                    "res.partner",
+                    "message_post",
+                    "--ids",
+                    "[1]",
+                    "--kwargs",
+                    '{"body": "Hello"}',
+                ]
+                exit_code = main(argv_loopback)
+                assert exit_code == 0
+                assert "plan " in fake_stdout.getvalue()
+                assert " saved." in fake_stdout.getvalue()
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_archive_ir_cron_allowed_write_ir_config_parameter_denied(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            with patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}):
+                # 1. archive on ir.cron: allowed on prod
+                with (
+                    patch("odoo_rpc.json_rpc") as mock_rpc,
+                    patch("sys.stdout", new=io.StringIO()) as fake_stdout,
+                ):
+                    mock_rpc.side_effect = lambda *args, **kwargs: (
+                        1
+                        if args[2] == "authenticate"
+                        else [
+                            {
+                                "id": 1,
+                                "active": True,
+                                "display_name": "Cron 1",
+                                "write_date": "2026-09-01 10:00:00",
+                            }
+                        ]
+                    )
+                    argv_archive = [
+                        "--allow-rpc",
+                        "--url",
+                        "https://prod.erp.com/jsonrpc",
+                        "--db",
+                        "proddb",
+                        "--user",
+                        "admin",
+                        "--token",
+                        "tok",  # noqa: S106 - test credential
+                        "archive",
+                        "ir.cron",
+                        "[1]",
+                    ]
+                    exit_code = main(argv_archive)
+                    assert exit_code == 0
+                    assert "plan " in fake_stdout.getvalue()
+
+                # 2. write on ir.config_parameter: denied on prod
+                with patch("sys.stderr", new=io.StringIO()) as fake_stderr:
+                    argv_write = [
+                        "--allow-rpc",
+                        "--url",
+                        "https://prod.erp.com/jsonrpc",
+                        "--db",
+                        "proddb",
+                        "--user",
+                        "admin",
+                        "--token",
+                        "tok",  # noqa: S106 - test credential
+                        "write",
+                        "ir.config_parameter",
+                        "[1]",
+                        '{"value": "bar"}',
+                    ]
+                    exit_code = main(argv_write)
+                    assert exit_code == 2
+                    assert "DENIED on production" in fake_stderr.getvalue()
+                    assert "ir.config_parameter" in fake_stderr.getvalue()
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_fields_normalization_three_forms(self) -> None:
+        assert normalize_fields(["name", "email"]) == ["name", "email"]
+        assert normalize_fields(["name,email"]) == ["name", "email"]
+        assert normalize_fields('["name", "email"]') == ["name", "email"]
+        assert normalize_fields("name email") == ["name", "email"]
+        assert normalize_fields(None) is None
+
+    @patch("urllib.request.OpenerDirector.open")
+    def test_error_text_contains_data_name_and_not_debug(
+        self, mock_open: MagicMock
+    ) -> None:
+        payload = json.dumps(
+            {
+                "error": {
+                    "code": 200,
+                    "message": "Odoo Server Error",
+                    "data": {
+                        "name": "odoo.exceptions.ValidationError",
+                        "message": "Field 'name' is required.\nExtra trace line",
+                        "debug": "Traceback:\nsecret_debug_trace",
+                    },
+                }
+            }
+        ).encode("utf-8")
+        mock_resp = MagicMock()
+        _stub(mock_resp, "read.return_value", payload)
+        _stub(mock_open, "return_value.__enter__.return_value", mock_resp)
+
+        with pytest.raises(RuntimeError) as exc_info:
+            _ = json_rpc(
+                "http://127.0.0.1:8069/jsonrpc",
+                "common",
+                "authenticate",
+                "testdb",
+                "user",
+                "token",  # noqa: S106 - test credential
+                {},
+                allow_rpc=True,
+            )
+        err_msg = str(exc_info.value)
+        assert "odoo.exceptions.ValidationError" in err_msg
+        assert "Field 'name' is required." in err_msg
+        assert "secret_debug_trace" not in err_msg
+        assert "Traceback" not in err_msg
+
+    def test_flags_after_op_parse(self) -> None:
+        with (
+            patch("odoo_rpc.json_rpc") as mock_rpc,
+            patch("sys.stdout", new=io.StringIO()) as fake_stdout,
+        ):
+            mock_rpc.side_effect = lambda *args, **kwargs: (
+                1 if args[2] == "authenticate" else [{"id": 1, "name": "Partner A"}]
+            )
+            argv = [
+                "search_read",
+                "res.partner",
+                "--allow-rpc",
+                "--url",
+                "http://127.0.0.1:8069/jsonrpc",
+                "--db",
+                "testdb",
+                "--user",
+                "user@test.com",
+                "--token",
+                "secret",  # noqa: S106 - test credential
+                "--json",
+            ]
+            exit_code = main(argv)
+            assert exit_code == 0
+            parsed_out = json.loads(fake_stdout.getvalue())
+            assert parsed_out == [{"id": 1, "name": "Partner A"}]
+
+    def test_search_read_truncation_warning(self) -> None:
+        # Case 1: len(result) == limit and total > limit -> warning
+        with (
+            patch("odoo_rpc.json_rpc") as mock_rpc,
+            patch("sys.stderr", new=io.StringIO()) as fake_stderr,
+            patch("sys.stdout", new=io.StringIO()),
+        ):
+            mock_rpc.side_effect = lambda *args, **kwargs: (
+                1
+                if args[2] == "authenticate"
+                else ([{"id": 1}, {"id": 2}] if args[7] == "search_read" else 5)
+            )
+            argv = [
+                "--allow-rpc",
+                "--url",
+                "http://127.0.0.1:8069/jsonrpc",
+                "--db",
+                "testdb",
+                "--user",
+                "user@test.com",
+                "--token",
+                "secret",  # noqa: S106 - test credential
+                "search_read",
+                "res.partner",
+                "[]",
+                "--limit",
+                "2",
+            ]
+            exit_code = main(argv)
+            assert exit_code == 0
+            assert (
+                "warning: truncated: showing 2 of 5 records (use --limit/--offset)"
+                in fake_stderr.getvalue()
+            )
+
+        # Case 2: len(result) == limit and total == limit -> no warning
+        with (
+            patch("odoo_rpc.json_rpc") as mock_rpc,
+            patch("sys.stderr", new=io.StringIO()) as fake_stderr,
+            patch("sys.stdout", new=io.StringIO()),
+        ):
+            mock_rpc.side_effect = lambda *args, **kwargs: (
+                1
+                if args[2] == "authenticate"
+                else ([{"id": 1}, {"id": 2}] if args[7] == "search_read" else 2)
+            )
+            argv = [
+                "--allow-rpc",
+                "--url",
+                "http://127.0.0.1:8069/jsonrpc",
+                "--db",
+                "testdb",
+                "--user",
+                "user@test.com",
+                "--token",
+                "secret",  # noqa: S106 - test credential
+                "search_read",
+                "res.partner",
+                "[]",
+                "--limit",
+                "2",
+            ]
+            exit_code = main(argv)
+            assert exit_code == 0
+            assert "warning: truncated" not in fake_stderr.getvalue()
+
+    def test_revert_of_write_yields_write_batch_with_preimage(self) -> None:
+        state_dir = Path(tempfile.mkdtemp())
+        try:
+            backups_dir = state_dir / "backups"
+            backups_dir.mkdir(parents=True, exist_ok=True)
+            plan_id = "planrev01"
+            backup_file = backups_dir / f"{plan_id}.json"
+            backup_file.write_text(
+                json.dumps(
+                    {
+                        "plan_id": plan_id,
+                        "created_at": "2026-09-01T10:00:00Z",
+                        "command": "write",
+                        "model": "res.partner",
+                        "ids": [1],
+                        "preimage": [
+                            {
+                                "id": 1,
+                                "name": "Original Partner Name",
+                                "write_date": "2026-09-01 10:00:00",
+                                "display_name": "Partner 1",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(state_dir)}),
+                patch("odoo_rpc.json_rpc") as mock_rpc,
+                patch("sys.stdout", new=io.StringIO()) as fake_stdout,
+            ):
+                mock_rpc.side_effect = lambda *args, **kwargs: (
+                    1
+                    if args[2] == "authenticate"
+                    else [
+                        {
+                            "id": 1,
+                            "name": "Current Mutated Name",
+                            "write_date": "2026-09-01 11:00:00",
+                            "display_name": "Partner 1",
+                        }
+                    ]
+                )
+                argv = [
+                    "--allow-rpc",
+                    "--url",
+                    "http://127.0.0.1:8069/jsonrpc",
+                    "--db",
+                    "testdb",
+                    "--user",
+                    "admin",
+                    "--token",
+                    "tok",  # noqa: S106 - test credential
+                    "revert",
+                    plan_id,
+                ]
+                exit_code = main(argv)
+                assert exit_code == 0
+                assert "plan " in fake_stdout.getvalue()
+                assert " saved." in fake_stdout.getvalue()
+
+                plans = [
+                    p
+                    for p in (state_dir / "plans").glob("*.json")
+                    if p.name != f"{plan_id}.json"
+                ]
+                assert len(plans) == 1
+                new_plan = json.loads(plans[0].read_text(encoding="utf-8"))
+                assert new_plan["command"] == "write-batch"
+                assert new_plan["model"] == "res.partner"
+                assert new_plan["values_by_id"] == {
+                    "1": {"name": "Original Partner Name"}
+                }
+        finally:
+            shutil.rmtree(state_dir, ignore_errors=True)
+
+    def test_env_default_auto_load_and_explicit_missing_file_error(self) -> None:
+        # 1. Explicit missing file fails closed
+        with pytest.raises(FileNotFoundError, match=r"Explicit \.env file not found"):
+            load_env("/nonexistent/explicit/path.env")
+
+        # 2. Default auto-load when SKILL_DIR/.env exists
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            _ = f.write("ODOO_RPC_USER=autoloaded_user\n")
+            temp_env = Path(f.name)
+        try:
+            with (
+                patch.dict(os.environ, {}, clear=True),
+                patch("odoo_rpc.default_env_file", return_value=temp_env),
+            ):
+                load_env()
+                assert os.environ.get("ODOO_RPC_USER") == "autoloaded_user"
+        finally:
+            temp_env.unlink(missing_ok=True)
+
+        # 3. Default auto-load silently skipped if default_env_file does not exist
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "odoo_rpc.default_env_file",
+                return_value=Path("/nonexistent/skill/.env"),
+            ),
+        ):
+            load_env()
+            assert os.environ.get("ODOO_RPC_USER") is None
+
+    @patch("urllib.request.OpenerDirector.open")
+    def test_ssl_cert_verification_error(self, mock_open: MagicMock) -> None:
+        mock_open.side_effect = urllib.error.URLError(
+            ssl.SSLCertVerificationError(
+                "CERTIFICATE_VERIFY_FAILED: certificate verify failed"
+            )
+        )
+        with pytest.raises(
+            ConnectionError,
+            match="SSL certificate verification failed; set SSL_CERT_FILE to a CA bundle",
+        ):
+            _ = json_rpc(
+                "https://remote.erp.com/jsonrpc",
+                "common",
+                "authenticate",
+                "testdb",
+                "user",
+                "token",  # noqa: S106 - test credential
+                {},
+                allow_rpc=True,
+            )
+
+    def test_domain_json_hint_on_error(self) -> None:
+        argv = [
+            "--allow-rpc",
+            "--url",
+            "http://127.0.0.1:8069/jsonrpc",
+            "--db",
+            "testdb",
+            "--user",
+            "user",
+            "--token",
+            "tok",  # noqa: S106 - test credential
+            "search_read",
+            "res.partner",
+            "[('name', '=', 'bad')]",
+        ]
+        with patch("sys.stderr", new=io.StringIO()) as fake_stderr:
+            exit_code = main(argv)
             assert exit_code == 1
-            assert "MUTATION BLOCKED" in fake_stderr.getvalue()
+            assert (
+                'expected JSON like \'[["field","=","value"]]\''
+                in fake_stderr.getvalue()
+            )
 
 
 if __name__ == "__main__":
