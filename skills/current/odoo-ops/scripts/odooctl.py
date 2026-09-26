@@ -8,27 +8,39 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
 import concurrent.futures
 import configparser
+import contextlib
 import gzip
+import hashlib
 import ipaddress
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from io import BufferedIOBase
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
+
 import xml_view_linter
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Generator, Iterable, Sequence
 
 # CONFIGURATION & CONSTANTS
 # ==============================================================================
@@ -42,16 +54,13 @@ RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
 
 # Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
-DEFAULT_HTTP_BIND = os.environ.get("ODOO_HTTP_BIND", "0.0.0.0")
+DEFAULT_HTTP_BIND = os.environ.get("ODOO_HTTP_BIND", "0.0.0.0")  # noqa: S104 - user-configurable pod bind
 DEFAULT_TEST_HTTP_PORT = int(os.environ.get("ODOO_TEST_HTTP_PORT", "8079"))
 DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
 DEFAULT_DB_USER = "odoo"
 DEFAULT_DB_PASS = "odoo"  # noqa: S105 - default dev password for local container
-# Fallback replica used when the runtime config leaves ``db_name`` unset. Follows
-# the ``<prod-name>_work_<YYYYMMDD>`` convention via POSTGRES_DB; override per
-# call with ``--db``.
-DEFAULT_DB_NAME = os.environ.get("POSTGRES_DB", "odoo_replica")
+DEFAULT_ADMIN_DB = "postgres"
 
 # Container Topology (Local Podman Pod)
 DEFAULT_POD_NAME = "odoo-pod"
@@ -150,6 +159,7 @@ class WorkspaceContext:
     addons_paths: list[Path]
     effective_db_name: str
     runtime: Path
+    database_source: str = ""
 
 
 class ActionInfo(TypedDict):
@@ -585,35 +595,6 @@ def _discover_all_modules(addons_dir: Path) -> dict[str, dict[str, object]]:
     return modules
 
 
-def _resolve_workspace() -> WorkspaceContext:
-    """Resolve current workspace context, config, and addons paths."""
-    runtime = _resolve_runtime()
-    addons = _resolve_addons()
-    config_path = runtime / ODOO_CONFIG_SUBPATH
-
-    config = configparser.ConfigParser()
-    if config_path.is_file():
-        _ = config.read(config_path)
-
-    raw_db = config.get("options", "db_name", fallback=DEFAULT_DB_NAME)
-    if raw_db in ("False", "None", ""):
-        raw_db = DEFAULT_DB_NAME
-
-    addons_paths = [addons]
-    for sa in _resolve_source_addons(runtime):
-        if sa not in addons_paths:
-            addons_paths.append(sa)
-
-    return WorkspaceContext(
-        root=addons,
-        config_path=config_path,
-        config=config,
-        addons_paths=addons_paths,
-        effective_db_name=raw_db,
-        runtime=runtime,
-    )
-
-
 _SAFE_IDENTIFIER_RE = re.compile(r"\A[a-zA-Z0-9_-]+\Z")
 
 
@@ -626,6 +607,108 @@ def _validate_db_name(name: str) -> str:
         )
         raise CliError(msg)
     return name
+
+
+def _resolve_effective_database(
+    args: argparse.Namespace | None = None,
+    *,
+    profile_name: str | None = None,
+    config: configparser.ConfigParser | None = None,
+    require: bool = True,
+) -> tuple[str, str]:
+    """Resolve the effective database name and its configuration source.
+
+    Precedence order:
+    1. --db CLI flag (source: 'flag')
+    2. POSTGRES_DB environment variable (source: 'env')
+    3. Profile default workflow database (source: 'profile')
+    4. db_name in odoo.conf (source: 'odoo.conf')
+
+    If none resolves and require is True, raises CliError with exit code 2.
+    """
+    flag_db = _optional_str(args, "db") if args is not None else None
+    if flag_db:
+        return _validate_db_name(flag_db), "flag"
+
+    env_db = os.environ.get("POSTGRES_DB", "").strip()
+    if env_db:
+        return _validate_db_name(env_db), "env"
+
+    prof = _optional_str(args, "profile") if args is not None else None
+    prof_name = prof or profile_name or "etech"
+    if prof_name and _SAFE_IDENTIFIER_RE.match(prof_name):
+        pfile = PROFILE_DIR / f"{prof_name}.json"
+        if pfile.is_file() and pfile.resolve().parent == PROFILE_DIR.resolve():
+            try:
+                data_raw: object = cast(
+                    "object", json.loads(pfile.read_text(encoding="utf-8"))
+                )
+                if isinstance(data_raw, dict):
+                    workflows_obj = data_raw.get("workflows")
+                    if isinstance(workflows_obj, dict):
+                        wf_key = (
+                            "crm"
+                            if "crm" in workflows_obj
+                            else next(iter(workflows_obj.keys()), None)
+                        )
+                        if wf_key and isinstance(workflows_obj[wf_key], dict):
+                            db_val = workflows_obj[wf_key].get("database")
+                            if db_val and str(db_val) not in ("False", "None", ""):
+                                return _validate_db_name(str(db_val)), "profile"
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    if config is not None:
+        raw_db = config.get("options", "db_name", fallback="").strip()
+        if raw_db and raw_db not in ("False", "None", ""):
+            return _validate_db_name(raw_db), "odoo.conf"
+
+    if require:
+        msg = (
+            "Could not resolve effective database: please set the profile database, "
+            "define POSTGRES_DB, or pass --db."
+        )
+        raise CliError(msg, code=2)
+
+    return "", ""
+
+
+def _resolve_workspace(
+    args: argparse.Namespace | None = None,
+    *,
+    profile_name: str | None = None,
+    require_db: bool = True,
+) -> WorkspaceContext:
+    """Resolve current workspace context, config, and addons paths."""
+    runtime = _resolve_runtime()
+    addons = _resolve_addons()
+    config_path = runtime / ODOO_CONFIG_SUBPATH
+
+    config = configparser.ConfigParser()
+    if config_path.is_file():
+        _ = config.read(config_path)
+
+    effective_db, db_source = _resolve_effective_database(
+        args,
+        profile_name=profile_name,
+        config=config,
+        require=require_db,
+    )
+
+    addons_paths = [addons]
+    for sa in _resolve_source_addons(runtime):
+        if sa not in addons_paths:
+            addons_paths.append(sa)
+
+    return WorkspaceContext(
+        root=addons,
+        config_path=config_path,
+        config=config,
+        addons_paths=addons_paths,
+        effective_db_name=effective_db,
+        runtime=runtime,
+        database_source=db_source,
+    )
 
 
 def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
@@ -656,7 +739,10 @@ def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
 
     wf = cast("dict[str, object]", wf_obj)
     db_val = wf.get("database")
-    db = str(db_val) if db_val and str(db_val) != "False" else DEFAULT_DB_NAME
+    if db_val and str(db_val) not in ("False", "None", ""):
+        db = _validate_db_name(str(db_val))
+    else:
+        db, _ = _resolve_effective_database(profile_name=profile, require=True)
 
     raw_mods: object = wf.get("modules")
     mods = (
@@ -735,7 +821,7 @@ def _resolve_target_paths(
 def _exec_sql(
     sql: str,
     *,
-    db: str = DEFAULT_DB_NAME,
+    db: str = DEFAULT_ADMIN_DB,
     readonly: bool = False,
     tuples_only: bool = False,
 ) -> str:
@@ -768,7 +854,7 @@ def _exec_sql(
 
 
 def _exec_sql_json(
-    sql: str, *, db: str = DEFAULT_DB_NAME, readonly: bool = False
+    sql: str, *, db: str = DEFAULT_ADMIN_DB, readonly: bool = False
 ) -> list[dict[str, object]]:
     """Execute SQL query returning rows as a JSON list of dictionaries."""
     clean_subquery = sql.strip().removesuffix(";").rstrip()
@@ -785,6 +871,51 @@ def _exec_sql_json(
     ):
         raise CliError("Database query did not return an array of records.")
     return cast("list[dict[str, object]]", parsed)
+
+
+def _quote_literal(val: str) -> str:
+    """Safely quote a SQL string literal by doubling single quotes."""
+    return "'" + val.replace("'", "''") + "'"
+
+
+def _get_state_dir() -> Path:
+    """Resolve odoo-ops state directory."""
+    if os.environ.get("ODOO_OPS_STATE_DIR"):
+        return Path(os.environ["ODOO_OPS_STATE_DIR"]).expanduser()
+    if os.environ.get("XDG_STATE_HOME"):
+        return Path(os.environ["XDG_STATE_HOME"]).expanduser() / "odoo-ops"
+    return Path.home() / ".local" / "state" / "odoo-ops"
+
+
+def _ensure_dir_0700(path: Path) -> None:
+    """Ensure directory exists with 0o700 permissions."""
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        path.chmod(0o700)
+
+
+def _write_file_0600(path: Path, content: str) -> None:
+    """Write text file with 0o600 permissions."""
+    _ensure_dir_0700(path.parent)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        _ = f.write(content)
+    with contextlib.suppress(OSError):
+        path.chmod(0o600)
+
+
+def _ab64_encode(data: bytes) -> str:
+    """Encode bytes in passlib ab64 (base64 with '+' as '.' and '=' stripped)."""
+    return base64.b64encode(data).decode("ascii").replace("+", ".").rstrip("=")
+
+
+def _passlib_pbkdf2_sha512(password: str, salt: bytes, rounds: int = 600000) -> str:
+    """Hash password in passlib pbkdf2-sha512 format compatible with Odoo 17."""
+    digest = hashlib.pbkdf2_hmac("sha512", password.encode("utf-8"), salt, rounds)
+    salt_ab64 = _ab64_encode(salt)
+    checksum_ab64 = _ab64_encode(digest)
+    return f"$pbkdf2-sha512${rounds}${salt_ab64}${checksum_ab64}"
 
 
 # ==============================================================================
@@ -852,72 +983,117 @@ def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
     return out or None
 
 
+@dataclass
+class _LockState:
+    depth: int = 0
+
+
+_LOCK_STATE = _LockState()
+
+
+@contextlib.contextmanager
+def _op_lock() -> Generator[None, None, None]:
+    """Exclusive file lock for pod creation and test execution."""
+    if fcntl is None:
+        yield
+        return
+
+    if _LOCK_STATE.depth > 0:
+        _LOCK_STATE.depth += 1
+        try:
+            yield
+        finally:
+            _LOCK_STATE.depth -= 1
+        return
+
+    lock_file = Path(tempfile.gettempdir()) / "odoo-ops.lock"
+    with lock_file.open("a+") as f:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, OSError):
+            print(
+                "waiting for odoo-ops lock (another test/pod operation is running)...",
+                file=sys.stderr,
+            )
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+
+        _LOCK_STATE.depth = 1
+        try:
+            yield
+        finally:
+            _LOCK_STATE.depth = 0
+            with contextlib.suppress(OSError):
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
 def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> None:
     """Ensure podman pod and postgres database container are initialized and running."""
-    _ensure_podman()
-    status = _get_pod_status()
-    if recreate and status:
-        _stop_all()
-        status = None
+    with _op_lock():
+        _ensure_podman()
+        status = _get_pod_status()
+        if recreate and status:
+            _stop_all()
+            status = None
 
-    if not status:
-        # Create shared network Pod
-        _ = _run(
+        if not status:
+            # Create shared network Pod
+            _ = _run(
+                [
+                    "podman",
+                    "pod",
+                    "create",
+                    "--name",
+                    DEFAULT_POD_NAME,
+                    "-p",
+                    f"{DEFAULT_HTTP_BIND}:{DEFAULT_HTTP_PORT}:8069",
+                    "-p",
+                    f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
+                ]
+            )
+
+        # Ensure Database Container
+        db_status = _run(
             [
                 "podman",
-                "pod",
-                "create",
-                "--name",
-                DEFAULT_POD_NAME,
-                "-p",
-                f"{DEFAULT_HTTP_BIND}:{DEFAULT_HTTP_PORT}:8069",
-                "-p",
-                f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
-            ]
-        )
-
-    # Ensure Database Container
-    db_status = _run(
-        [
-            "podman",
-            "ps",
-            "-a",
-            "--filter",
-            f"name={DEFAULT_DB_CONTAINER}",
-            "--format",
-            "{{.Status}}",
-        ],
-        check=False,
-    ).stdout.strip()
-    if not db_status:
-        db_dir = ctx.runtime / ODOO_DATA_DB_SUBPATH
-        db_dir.mkdir(parents=True, exist_ok=True)
-        _ = _run(
-            [
-                "podman",
-                "run",
-                "-d",
-                "--pod",
-                DEFAULT_POD_NAME,
-                "--name",
-                DEFAULT_DB_CONTAINER,
-                "-e",
-                f"POSTGRES_USER={DEFAULT_DB_USER}",
-                "-e",
-                f"POSTGRES_PASSWORD={DEFAULT_DB_PASS}",
-                "-e",
-                f"POSTGRES_DB={DEFAULT_DB_NAME}",
-                "-v",
-                f"{db_dir}:/var/lib/postgresql/data/pgdata:Z",
-                "-e",
-                "PGDATA=/var/lib/postgresql/data/pgdata/pgroot",
-                DEFAULT_POSTGRES_IMAGE,
-            ]
-        )
-        time.sleep(2)
-    elif "Up" not in db_status:
-        _ = _run(["podman", "start", DEFAULT_DB_CONTAINER])
-        time.sleep(1)
+                "ps",
+                "-a",
+                "--filter",
+                f"name={DEFAULT_DB_CONTAINER}",
+                "--format",
+                "{{.Status}}",
+            ],
+            check=False,
+        ).stdout.strip()
+        if not db_status:
+            db_dir = ctx.runtime / ODOO_DATA_DB_SUBPATH
+            db_dir.mkdir(parents=True, exist_ok=True)
+            init_db = ctx.effective_db_name or DEFAULT_DB_USER
+            _ = _run(
+                [
+                    "podman",
+                    "run",
+                    "-d",
+                    "--pod",
+                    DEFAULT_POD_NAME,
+                    "--name",
+                    DEFAULT_DB_CONTAINER,
+                    "-e",
+                    f"POSTGRES_USER={DEFAULT_DB_USER}",
+                    "-e",
+                    f"POSTGRES_PASSWORD={DEFAULT_DB_PASS}",
+                    "-e",
+                    f"POSTGRES_DB={init_db}",
+                    "-v",
+                    f"{db_dir}:/var/lib/postgresql/data/pgdata:Z",
+                    "-e",
+                    "PGDATA=/var/lib/postgresql/data/pgdata/pgroot",
+                    DEFAULT_POSTGRES_IMAGE,
+                ]
+            )
+            time.sleep(2)
+        elif "Up" not in db_status:
+            _ = _run(["podman", "start", DEFAULT_DB_CONTAINER])
+            time.sleep(1)
 
 
 def _stop_all() -> None:
@@ -929,10 +1105,28 @@ def _stop_all() -> None:
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
-    """Stop all running Odoo and Postgres containers and remove the pod."""
-    _ = _resolve_workspace()
-    _stop_all()
+    """Stop running Odoo containers."""
+    _ensure_podman()
+    only_web = _require_bool(args, "web")
     json_mode = _require_bool(args, "json")
+
+    if only_web:
+        _ = _run(["podman", "stop", DEFAULT_WEB_CONTAINER], check=False)
+        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+        if json_mode:
+            print(
+                json.dumps(
+                    {
+                        "status": "stopped",
+                        "container": DEFAULT_WEB_CONTAINER,
+                    }
+                )
+            )
+        else:
+            print(f"Container {DEFAULT_WEB_CONTAINER} stopped and removed.")
+        return 0
+
+    _stop_all()
     if json_mode:
         print(
             json.dumps(
@@ -950,10 +1144,11 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 def cmd_dev(args: argparse.Namespace) -> int:
     """Start Odoo 17 dev server in foreground with hot reload enabled."""
-    ctx = _resolve_workspace()
+    ctx = _resolve_workspace(args)
     profile_name = _require_str(args, "profile", "etech")
     workflow = _require_str(args, "workflow", "crm")
     profile = _load_workflow_profile(profile_name, workflow)
+    db_to_use = _optional_str(args, "db") or profile.database
 
     _ensure_runtime_pod(ctx)
 
@@ -1004,7 +1199,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         "-c",
         "/etc/odoo/odoo.conf",
         "-d",
-        profile.database,
+        db_to_use,
         "--db_host",
         DEFAULT_DB_HOST,
         "--db_port",
@@ -1021,7 +1216,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
     try:
         banner = (
             f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} "
-            f"(db: {profile.database})"
+            f"(db: {db_to_use})"
         )
         print(banner)
         print(f"Modules: {modules_str}")
@@ -1550,15 +1745,76 @@ def cmd_lint_views(args: argparse.Namespace) -> int:
     return 0
 
 
+def _get_latest_test_container() -> str | None:
+    """Find the most recently created odoo-test-* container."""
+    _ensure_podman()
+    res = _run(
+        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "json"],
+        check=False,
+    )
+    out = res.stdout.strip()
+    if out:
+        try:
+            parsed: object = json.loads(out)
+            if isinstance(parsed, list) and parsed:
+
+                def _created_ts(item: dict[str, object]) -> float:
+                    created = item.get("Created")
+                    if isinstance(created, (int, float)):
+                        return float(created)
+                    return 0.0
+
+                valid_items = [
+                    x for x in cast("list[object]", parsed) if isinstance(x, dict)
+                ]
+                sorted_items = sorted(valid_items, key=_created_ts, reverse=True)
+                for item in sorted_items:
+                    names: object = item.get("Names")
+                    if isinstance(names, list) and names:
+                        name = str(names[0]).lstrip("/")
+                        if name.startswith("odoo-test-"):
+                            return name
+                    elif isinstance(names, str) and names.startswith("odoo-test-"):
+                        return names.lstrip("/")
+        except json.JSONDecodeError:
+            pass
+
+    names_res = _run(
+        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        check=False,
+    )
+    names = [
+        n.strip().lstrip("/")
+        for n in names_res.stdout.splitlines()
+        if n.strip().lstrip("/").startswith("odoo-test-")
+    ]
+    return names[0] if names else None
+
+
 def cmd_logs(args: argparse.Namespace) -> int:
     """Tail logs of the active Odoo container."""
     _ensure_podman()
     tail = _require_int(args, "tail", 100)
     follow = _require_bool(args, "follow")
+    target_type = _require_str(args, "container", "web")
+
+    if target_type == "web":
+        target = DEFAULT_WEB_CONTAINER
+    elif target_type == "db":
+        target = DEFAULT_DB_CONTAINER
+    elif target_type == "test":
+        latest = _get_latest_test_container()
+        if not latest:
+            msg = "No test containers found (no odoo-test-* container exists)."
+            raise CliError(msg)
+        target = latest
+    else:
+        target = DEFAULT_WEB_CONTAINER
+
     cmd = ["podman", "logs", f"--tail={tail}"]
     if follow:
         cmd.append("-f")
-    cmd.append(DEFAULT_WEB_CONTAINER)
+    cmd.append(target)
     proc = subprocess.run(  # noqa: S603 - controlled podman logs execution
         cmd, check=False
     )
@@ -1570,31 +1826,80 @@ def cmd_logs(args: argparse.Namespace) -> int:
 # ==============================================================================
 
 
+def _is_db_container_running() -> bool:
+    """Check whether the database container is currently running."""
+    _ensure_podman()
+    res = _run(
+        [
+            "podman",
+            "ps",
+            "--filter",
+            f"name={DEFAULT_DB_CONTAINER}",
+            "--filter",
+            "status=running",
+            "--format",
+            "{{.Names}}",
+        ],
+        check=False,
+    )
+    return bool(res.stdout.strip())
+
+
 def cmd_env_inspect(args: argparse.Namespace) -> int:
     """Inspect workspace, runtime, and container environment."""
-    ctx = _resolve_workspace()
+    ctx = _resolve_workspace(args)
     local_mods = _discover_all_modules(ctx.root)
     json_mode = _require_bool(args, "json")
 
-    data = {
+    data: dict[str, object] = {
         "status": "ready",
         "runtime_path": str(ctx.runtime),
         "custom_addons_path": str(ctx.root),
         "config_path": str(ctx.config_path),
         "effective_database": ctx.effective_db_name,
+        "database_source": ctx.database_source,
         "addons_paths": [str(p) for p in ctx.addons_paths],
         "local_modules_count": len(local_mods),
         "podman_pod": DEFAULT_POD_NAME,
         "pod_status": _get_pod_status() or "stopped",
     }
+
+    if _is_db_container_running():
+        safe_db = _validate_db_name(ctx.effective_db_name)
+        check_sql = f"SELECT 1 FROM pg_database WHERE datname = '{safe_db}';"  # noqa: S608 - validated db name
+        try:
+            check_out = _exec_sql(check_sql, db="postgres", tuples_only=True).strip()
+            db_exists = check_out == "1"
+            data["database_exists"] = db_exists
+            if not db_exists:
+                list_sql = (
+                    "SELECT datname FROM pg_database "
+                    "WHERE NOT datistemplate AND datname <> 'postgres' "
+                    "ORDER BY datname;"
+                )
+                avail_out = _exec_sql(list_sql, db="postgres", tuples_only=True).strip()
+                avail_dbs = [d.strip() for d in avail_out.splitlines() if d.strip()]
+                data["available_databases"] = avail_dbs
+        except CliError:
+            pass
+
     if json_mode:
         print(json.dumps(data, indent=2))
     else:
         print(f"Odoo Runtime:        {data['runtime_path']}")
         print(f"Custom Addons:       {data['custom_addons_path']}")
-        print(f"Effective Database:  {data['effective_database']}")
+        print(
+            f"Effective Database:  {data['effective_database']} "
+            f"(source: {data['database_source']})"
+        )
         print(f"Pod Status:          {data['pod_status']}")
         print(f"Local Addons Count:  {data['local_modules_count']}")
+        if "database_exists" in data:
+            print(f"Database Exists:     {data['database_exists']}")
+            if not data["database_exists"] and "available_databases" in data:
+                avail_list = cast("list[str]", data["available_databases"])
+                avail_str = ", ".join(avail_list) or "none"
+                print(f"Available DBs:       {avail_str}")
     return 0
 
 
@@ -1712,8 +2017,8 @@ def cmd_route_list(args: argparse.Namespace) -> int:
 
 def cmd_db_summary(args: argparse.Namespace) -> int:
     """Show PostgreSQL database summary statistics and installed module count."""
-    ctx = _resolve_workspace()
-    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
+    ctx = _resolve_workspace(args)
+    db = ctx.effective_db_name
     json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
 
@@ -1740,8 +2045,8 @@ def cmd_db_summary(args: argparse.Namespace) -> int:
 
 def cmd_db_tables(args: argparse.Namespace) -> int:
     """List largest database tables by total relation size."""
-    ctx = _resolve_workspace()
-    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
+    ctx = _resolve_workspace(args)
+    db = ctx.effective_db_name
     limit = max(1, _require_int(args, "limit", 20))
     json_mode = _require_bool(args, "json")
     _ensure_runtime_pod(ctx)
@@ -1770,36 +2075,127 @@ def cmd_db_tables(args: argparse.Namespace) -> int:
     return 0
 
 
+def _strip_sql_comments(sql: str) -> str:
+    """Remove SQL comments (line and block) and leading/trailing whitespace."""
+    no_block = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+    no_line = re.sub(r"--[^\n]*", " ", no_block)
+    return no_line.strip()
+
+
+def _is_mutation_query(clean_sql: str) -> bool:
+    """Detect whether a query is a DDL/DML mutation rather than a plain SELECT."""
+    match = re.match(r"^([a-zA-Z]+)", clean_sql)
+    first_word = match.group(1).upper() if match else ""
+    if first_word in (
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "CREATE",
+        "ALTER",
+        "DROP",
+        "TRUNCATE",
+    ):
+        return True
+    if first_word == "WITH":
+        return bool(
+            re.search(
+                r"\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b",
+                clean_sql,
+                re.IGNORECASE,
+            )
+        )
+    return False
+
+
 def cmd_db_query(args: argparse.Namespace) -> int:
     """Execute arbitrary SQL query with read-only transaction safety check."""
-    raw_sql = _require_str(args, "sql").strip()
-    if not raw_sql:
-        msg = "SQL query string cannot be empty."
-        raise CliError(msg)
-
-    unsafe = _require_bool(args, "unsafe")
     json_mode = _require_bool(args, "json")
+    try:
+        raw_sql = ""
+        file_arg = _optional_str(args, "file")
+        sql_arg = _optional_str(args, "sql")
 
-    if not unsafe:
-        clean_sql = raw_sql.rstrip(";").strip()
-        if ";" in clean_sql:
-            msg = (
-                "Multi-statement queries are blocked without --unsafe. "
-                "Pass --unsafe to execute multi-statement SQL on local replica."
-            )
+        if file_arg:
+            if file_arg == "-":
+                raw_sql = sys.stdin.read()
+            else:
+                fpath = Path(file_arg)
+                if not fpath.is_file():
+                    msg = f"SQL file not found: {fpath}"
+                    raise CliError(msg)
+                raw_sql = fpath.read_text(encoding="utf-8")
+        elif sql_arg:
+            raw_sql = sys.stdin.read() if sql_arg == "-" else sql_arg
+
+        raw_sql = raw_sql.strip()
+        if not raw_sql:
+            msg = "SQL query string cannot be empty."
             raise CliError(msg)
 
-    ctx = _resolve_workspace()
-    db = _validate_db_name(_optional_str(args, "db") or ctx.effective_db_name)
-    _ensure_runtime_pod(ctx)
+        unsafe = _require_bool(args, "unsafe")
 
-    if json_mode:
-        rows = _exec_sql_json(raw_sql, db=db, readonly=not unsafe)
-        print(json.dumps(rows, indent=2))
+        if not unsafe:
+            clean_check = raw_sql.rstrip(";").strip()
+            if ";" in clean_check:
+                msg = (
+                    "Multi-statement queries are blocked without --unsafe. "
+                    "Pass --unsafe to execute multi-statement SQL on local replica."
+                )
+                raise CliError(msg)
+
+        ctx = _resolve_workspace(args)
+        db = ctx.effective_db_name
+        _ensure_runtime_pod(ctx)
+
+        clean_sql = _strip_sql_comments(raw_sql).rstrip(";").strip()
+
+        if json_mode:
+            if unsafe and _is_mutation_query(clean_sql):
+                has_returning = bool(
+                    re.search(r"\bRETURNING\b", clean_sql, re.IGNORECASE)
+                )
+                if has_returning:
+                    wrapped = (
+                        f"WITH _r AS ({clean_sql}) "  # noqa: S608 - user DML with returning
+                        "SELECT COALESCE(json_agg(_r), '[]'::json) FROM _r;"
+                    )
+                    raw_out = _exec_sql(
+                        wrapped, db=db, readonly=False, tuples_only=True
+                    ).strip()
+                    try:
+                        rows = json.loads(raw_out)
+                    except json.JSONDecodeError as exc:
+                        msg = "Failed to parse JSON result from RETURNING query."
+                        raise CliError(msg) from exc
+                    print(
+                        json.dumps(
+                            {"ok": True, "status": "SUCCESS", "rows": rows},
+                            indent=2,
+                        )
+                    )
+                else:
+                    out = _exec_sql(raw_sql, db=db, readonly=False)
+                    status_line = out.strip().splitlines()[-1] if out.strip() else ""
+                    print(
+                        json.dumps(
+                            {"ok": True, "status": status_line, "rows": []},
+                            indent=2,
+                        )
+                    )
+            else:
+                rows = _exec_sql_json(raw_sql, db=db, readonly=not unsafe)
+                print(json.dumps(rows, indent=2))
+        else:
+            out = _exec_sql(raw_sql, db=db, readonly=not unsafe)
+            print(out)
+
+    except CliError as err:
+        if json_mode:
+            print(json.dumps({"ok": False, "error": str(err)}))
+            return err.code if err.code != 0 else 1
+        raise
     else:
-        out = _exec_sql(raw_sql, db=db, readonly=not unsafe)
-        print(out)
-    return 0
+        return 0
 
 
 def _filestore_path(ctx: WorkspaceContext, db_name: str) -> Path:
@@ -1965,7 +2361,7 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
     force = _require_bool(args, "force")
     json_mode = _require_bool(args, "json")
 
-    ctx = _resolve_workspace()
+    ctx = _resolve_workspace(args, require_db=False)
     _ensure_runtime_pod(ctx)
 
     print(f"Cloning database {source!r} -> {target!r}...")
@@ -1994,6 +2390,453 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
         print(json.dumps({"status": "cloned", "source": source, "target": target}))
     else:
         print(f"[OK] Database successfully cloned: {target}")
+    return 0
+
+
+def _remove_filestore(ctx: WorkspaceContext, db_name: str) -> bool:
+    """Remove database filestore directory, handling UID permissions."""
+    fs_path = _filestore_path(ctx, db_name)
+    if not fs_path.exists():
+        return False
+    try:
+        shutil.rmtree(fs_path)
+    except OSError:
+        res = _run(["podman", "unshare", "rm", "-rf", str(fs_path)], check=False)
+        return res.returncode == 0 or not fs_path.exists()
+    else:
+        return True
+
+
+def cmd_db_list(args: argparse.Namespace) -> int:
+    """List local databases and their disk sizes (excluding templates/postgres)."""
+    ctx = _resolve_workspace(args, require_db=False)
+    json_mode = _require_bool(args, "json")
+    _ensure_runtime_pod(ctx)
+
+    sql = """
+    SELECT
+        datname AS name,
+        pg_size_pretty(pg_database_size(datname)) AS size,
+        pg_database_size(datname) AS size_bytes
+    FROM pg_database
+    WHERE NOT datistemplate AND datname <> 'postgres'
+    ORDER BY datname;
+    """
+    rows = _exec_sql_json(sql, db="postgres")
+    if json_mode:
+        print(json.dumps(rows, indent=2))
+    elif not rows:
+        print("No databases found.")
+    else:
+        for r in rows:
+            name = str(r.get("name", ""))
+            size = str(r.get("size", ""))
+            print(f"{name:40} {size}")
+    return 0
+
+
+def cmd_db_drop(args: argparse.Namespace) -> int:
+    """Drop a local PostgreSQL database and its filestore."""
+    name = _require_str(args, "name")
+    db_name = _validate_db_name(name)
+    force = _require_bool(args, "force")
+    allow_seed = _require_bool(args, "allow_seed")
+    json_mode = _require_bool(args, "json")
+
+    if not force:
+        msg = "Refusing to drop database without --force."
+        raise CliError(msg, code=2)
+
+    if "_seed_" in db_name and not allow_seed:
+        msg = (
+            f"Refusing to drop seed database {db_name!r}. "
+            "Seed databases are protected. Pass --allow-seed if you are certain."
+        )
+        raise CliError(msg, code=2)
+
+    ctx = _resolve_workspace(args, require_db=False)
+    _ensure_runtime_pod(ctx)
+
+    check_sql = f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"  # noqa: S608 - validated db name
+    exists_rows = _exec_sql_json(check_sql, db="postgres")
+    db_exists = bool(exists_rows)
+
+    if db_exists:
+        term_sql = (
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated db name
+            f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
+        )
+        _ = _exec_sql(term_sql, db="postgres")
+        drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'  # noqa: S608 - validated db name
+        _ = _exec_sql(drop_sql, db="postgres")
+        fs_removed = _remove_filestore(ctx, db_name)
+
+        if json_mode:
+            print(
+                json.dumps(
+                    {
+                        "status": "dropped",
+                        "database": db_name,
+                        "filestore_removed": fs_removed,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"[OK] Database dropped: {db_name}")
+    elif json_mode:
+        print(
+            json.dumps(
+                {
+                    "status": "not_found",
+                    "database": db_name,
+                    "message": f"Database {db_name!r} does not exist.",
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"[INFO] Database {db_name!r} does not exist (nothing to drop).")
+    return 0
+
+
+def cmd_shell(args: argparse.Namespace) -> int:
+    """Run Python ORM code against the local replica (local replica only; never production)."""
+    ctx = _resolve_workspace(args)
+    db = ctx.effective_db_name
+
+    if "_seed_" in db:
+        msg = (
+            f"Refusing to execute shell on untouchable seed database {db!r}. "
+            "Clone to a work database first (e.g., db-clone)."
+        )
+        raise CliError(msg, code=2)
+
+    script_source = _optional_str(args, "file") or _optional_str(args, "script")
+    if not script_source:
+        msg = "Script must be provided via --file PATH or '-' from stdin."
+        raise CliError(msg, code=2)
+
+    if script_source == "-":
+        script_code = sys.stdin.read()
+    else:
+        spath = Path(script_source)
+        if not spath.is_file():
+            msg = f"Script file not found: {spath}"
+            raise CliError(msg)
+        script_code = spath.read_text(encoding="utf-8")
+
+    rollback = _require_bool(args, "rollback")
+    suffix = "\nenv.cr.rollback()\n" if rollback else "\nenv.cr.commit()\n"
+    full_script = script_code.rstrip() + "\n" + suffix
+
+    _ensure_podman()
+    web_status = _run(
+        [
+            "podman",
+            "ps",
+            "--filter",
+            f"name={DEFAULT_WEB_CONTAINER}",
+            "--filter",
+            "status=running",
+            "--format",
+            "{{.Names}}",
+        ],
+        check=False,
+    ).stdout.strip()
+    if not web_status:
+        msg = (
+            f"Container {DEFAULT_WEB_CONTAINER!r} is not running. "
+            "Please start the development server first using 'dev'."
+        )
+        raise CliError(msg, code=1)
+
+    cmd = [
+        "podman",
+        "exec",
+        "-i",
+        DEFAULT_WEB_CONTAINER,
+        "odoo",
+        "shell",
+        "-c",
+        "/etc/odoo/odoo.conf",
+        "-d",
+        db,
+        "--no-http",
+    ]
+    proc = subprocess.run(  # noqa: S603 - controlled podman exec odoo shell execution
+        cmd,
+        input=full_script,
+        text=True,
+        check=False,
+    )
+    return proc.returncode
+
+
+def cmd_auth_temp(args: argparse.Namespace) -> int:
+    """Set temporary random password for user on local replica (local replica only)."""
+    ctx = _resolve_workspace(args)
+    db = ctx.effective_db_name
+
+    if "_seed_" in db:
+        msg = (
+            f"Refusing to execute auth-temp on untouchable seed database {db!r}. "
+            "Clone to a work database first (e.g., db-clone)."
+        )
+        raise CliError(msg, code=2)
+
+    _ensure_runtime_pod(ctx)
+
+    login_arg = _optional_str(args, "login")
+    if login_arg:
+        quoted_login = _quote_literal(login_arg)
+        find_sql = (
+            f"SELECT id, login, password FROM res_users "  # noqa: S608 - login quoted by _quote_literal
+            f"WHERE login = {quoted_login};"
+        )
+    else:
+        find_sql = "SELECT id, login, password FROM res_users WHERE id = 2;"
+
+    rows = _exec_sql_json(find_sql, db=db)
+    if not rows:
+        target_desc = f"with login {login_arg!r}" if login_arg else "with id 2"
+        msg = f"User {target_desc} not found in database {db!r}."
+        raise CliError(msg, code=1)
+
+    user_row = rows[0]
+    user_id = int(cast("int | str", user_row["id"]))
+    user_login = str(user_row["login"])
+    current_hash = str(user_row.get("password") or "")
+
+    state_dir = _get_state_dir()
+    auth_dir = state_dir / "auth"
+    backup_path = auth_dir / f"{db}__{user_id}.json"
+
+    if not backup_path.is_file():
+        backup_data = {
+            "db": db,
+            "user_id": user_id,
+            "login": user_login,
+            "password_hash": current_hash,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        _write_file_0600(
+            backup_path,
+            json.dumps(backup_data, indent=2, sort_keys=True, ensure_ascii=False),
+        )
+
+    temp_password = secrets.token_urlsafe(18)
+    salt = secrets.token_bytes(16)
+    new_hash = _passlib_pbkdf2_sha512(temp_password, salt)
+
+    update_sql = (
+        f"UPDATE res_users SET password = {_quote_literal(new_hash)} "  # noqa: S608 - hash quoted, user_id is int
+        f"WHERE id = {user_id};"
+    )
+    _ = _exec_sql(update_sql, db=db, readonly=False)
+
+    url = f"http://127.0.0.1:{DEFAULT_HTTP_PORT}/web/login?db={db}"
+    restore_cmd = (
+        f"cli.py auth-restore --db {db} --login {user_login}"
+        if login_arg
+        else f"cli.py auth-restore --db {db}"
+    )
+
+    json_mode = _require_bool(args, "json")
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "login": user_login,
+                    "password": temp_password,
+                    "url": url,
+                    "restore": restore_cmd,
+                    "restore_with": restore_cmd,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"Login:    {user_login}")
+        print(f"Password: {temp_password}")
+        print(f"URL:      {url}")
+        print(f"restore with: {restore_cmd}")
+
+    return 0
+
+
+def cmd_auth_restore(args: argparse.Namespace) -> int:
+    """Restore original password hash for user on local replica (local replica only)."""
+    ctx = _resolve_workspace(args)
+    db = ctx.effective_db_name
+
+    if "_seed_" in db:
+        msg = (
+            f"Refusing to execute auth-restore on untouchable seed database {db!r}. "
+            "Clone to a work database first (e.g., db-clone)."
+        )
+        raise CliError(msg, code=2)
+
+    _ensure_runtime_pod(ctx)
+
+    login_arg = _optional_str(args, "login")
+    state_dir = _get_state_dir()
+    auth_dir = state_dir / "auth"
+
+    if login_arg:
+        quoted_login = _quote_literal(login_arg)
+        find_sql = (
+            f"SELECT id, login FROM res_users "  # noqa: S608 - login quoted by _quote_literal
+            f"WHERE login = {quoted_login};"
+        )
+        rows = _exec_sql_json(find_sql, db=db)
+        if not rows:
+            msg = f"User with login {login_arg!r} not found in database {db!r}."
+            raise CliError(msg, code=1)
+        user_id = int(cast("int | str", rows[0]["id"]))
+        user_login = str(rows[0]["login"])
+        backup_path = auth_dir / f"{db}__{user_id}.json"
+    else:
+        backup_path = auth_dir / f"{db}__2.json"
+        if not backup_path.is_file() and auth_dir.is_dir():
+            candidates = sorted(auth_dir.glob(f"{db}__*.json"))
+            if len(candidates) == 1:
+                backup_path = candidates[0]
+
+    if not backup_path.is_file():
+        msg = f"No auth backup found for database {db!r}."
+        raise CliError(msg, code=1)
+
+    try:
+        backup_data = cast(
+            "dict[str, object]",
+            json.loads(backup_path.read_text(encoding="utf-8")),
+        )
+    except (json.JSONDecodeError, OSError) as exc:
+        msg = f"Failed to read auth backup file: {backup_path}"
+        raise CliError(msg, code=1) from exc
+
+    user_id = int(cast("int | str", backup_data["user_id"]))
+    user_login = str(backup_data.get("login") or login_arg or "admin")
+    original_hash = str(backup_data.get("password_hash") or "")
+
+    update_sql = (
+        f"UPDATE res_users SET password = {_quote_literal(original_hash)} "  # noqa: S608 - hash quoted, user_id is int
+        f"WHERE id = {user_id};"
+    )
+    _ = _exec_sql(update_sql, db=db, readonly=False)
+
+    verify_sql = f"SELECT password FROM res_users WHERE id = {user_id};"  # noqa: S608 - id
+    verify_rows = _exec_sql_json(verify_sql, db=db)
+    actual_hash = str(verify_rows[0].get("password") or "") if verify_rows else None
+    if actual_hash != original_hash:
+        msg = (
+            f"Verification failed: password hash in database does not match "
+            f"backup for {user_login!r}."
+        )
+        raise CliError(msg, code=1)
+
+    try:
+        backup_path.unlink()
+    except OSError as exc:
+        msg = f"Failed to delete backup file after verification: {backup_path}"
+        raise CliError(msg, code=1) from exc
+
+    json_mode = _require_bool(args, "json")
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "status": "restored",
+                    "login": user_login,
+                    "database": db,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"restored {user_login} on {db}")
+
+    return 0
+
+
+def cmd_health(args: argparse.Namespace) -> int:
+    """Probe health and readiness of the local Odoo web server."""
+    port = _require_int(args, "port", DEFAULT_HTTP_PORT)
+    wait_sec = max(0, _require_int(args, "wait", 0))
+    json_mode = _require_bool(args, "json")
+
+    url = f"http://127.0.0.1:{port}/web/login"
+    start_time = time.monotonic()
+
+    def _probe_once() -> tuple[bool, str]:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "odoo-ops-health"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=3.0) as resp:  # noqa: S310 - internal loopback readiness probe
+                status = resp.status
+                if status == 200:
+                    return True, str(status)
+                return False, f"HTTP {status}"
+        except urllib.error.HTTPError as err:
+            if err.code == 200:
+                return True, str(err.code)
+            return False, f"HTTP {err.code}"
+        except (urllib.error.URLError, TimeoutError, OSError) as err:
+            return False, str(err)
+
+    ready = False
+    reason_or_status = ""
+    while True:
+        ready, reason_or_status = _probe_once()
+        if ready:
+            break
+        if wait_sec <= 0 or (time.monotonic() - start_time) >= wait_sec:
+            break
+        time.sleep(min(2.0, max(0.1, wait_sec - (time.monotonic() - start_time))))
+
+    if ready:
+        if json_mode:
+            print(json.dumps({"ready": True, "status": 200, "url": url}))
+        else:
+            print(f"ready {reason_or_status}")
+        return 0
+
+    if json_mode:
+        print(json.dumps({"ready": False, "reason": reason_or_status, "url": url}))
+    else:
+        print(f"not ready: {reason_or_status}")
+    return 1
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    """Remove stale odoo-test-* containers."""
+    _ensure_podman()
+    json_mode = _require_bool(args, "json")
+
+    res = _run(
+        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        check=False,
+    )
+    containers = [
+        line.strip().lstrip("/")
+        for line in res.stdout.splitlines()
+        if line.strip().lstrip("/").startswith("odoo-test-")
+    ]
+
+    if containers:
+        _ = _run(["podman", "rm", "-f", *containers], check=False)
+
+    if json_mode:
+        print(json.dumps({"removed": containers, "count": len(containers)}, indent=2))
+    elif containers:
+        print(f"Removed {len(containers)} test container(s):")
+        for c in containers:
+            print(f"  - {c}")
+    else:
+        print("No test containers to prune.")
     return 0
 
 
@@ -2032,6 +2875,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = p_dev.add_argument(
         "workflow", default="crm", nargs="?", help="Workflow profile key (default: crm)"
     )
+    _ = p_dev.add_argument("--db", help="Target database name override")
 
     # Test Command
     p_test = subparsers.add_parser(
@@ -2132,10 +2976,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # Stop Command
-    _ = subparsers.add_parser(
+    p_stop = subparsers.add_parser(
         "stop",
         parents=[parent_parser],
         help="Stop and tear down the Odoo Podman pod and containers",
+    )
+    _ = p_stop.add_argument(
+        "--web",
+        action="store_true",
+        help="Stop only the odoo-web container (keep pod and postgres running)",
     )
 
     # Logs Command
@@ -2148,13 +2997,21 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = p_logs.add_argument(
         "-n", "--tail", default=100, type=int, help="Number of lines to show"
     )
+    _ = p_logs.add_argument(
+        "-c",
+        "--container",
+        choices=["web", "db", "test"],
+        default="web",
+        help="Target container to tail: web, db, or test (default: web)",
+    )
 
     # Env Inspect
-    _ = subparsers.add_parser(
+    p_env = subparsers.add_parser(
         "env",
         parents=[parent_parser],
         help="Inspect workspace, runtime, and container environment",
     )
+    _ = p_env.add_argument("--db", help="Target database name")
 
     # Addons
     _ = subparsers.add_parser(
@@ -2196,10 +3053,43 @@ def _build_parser() -> argparse.ArgumentParser:
     p_query = subparsers.add_parser(
         "db-query", parents=[parent_parser], help="Execute SQL query against PostgreSQL"
     )
-    _ = p_query.add_argument("sql", help="SQL query string")
+    _ = p_query.add_argument(
+        "sql",
+        nargs="?",
+        default=None,
+        help="SQL query string, or '-' to read from stdin (prefer --file for long queries)",
+    )
+    _ = p_query.add_argument(
+        "--file",
+        "-f",
+        help="Read SQL from file, or '-' to read from stdin (prefer temp file for long queries)",
+    )
     _ = p_query.add_argument("--db", help="Target database name")
     _ = p_query.add_argument(
         "--unsafe", action="store_true", help="Allow DDL/DML mutation queries"
+    )
+
+    # DB List
+    _ = subparsers.add_parser(
+        "db-list",
+        parents=[parent_parser],
+        help="List local databases and their disk sizes (excluding templates/postgres)",
+    )
+
+    # DB Drop
+    p_drop = subparsers.add_parser(
+        "db-drop",
+        parents=[parent_parser],
+        help="Drop a local PostgreSQL database and its filestore",
+    )
+    _ = p_drop.add_argument("name", help="Database name to drop")
+    _ = p_drop.add_argument(
+        "--force", action="store_true", help="Force drop of database (required)"
+    )
+    _ = p_drop.add_argument(
+        "--allow-seed",
+        action="store_true",
+        help="Allow dropping a seed database containing '_seed_'",
     )
 
     # DB Clone
@@ -2224,6 +3114,86 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = p_restore.add_argument("target", help="Target database name")
     _ = p_restore.add_argument(
         "--force", action="store_true", help="Drop target if already exists"
+    )
+
+    # Shell Command
+    p_shell = subparsers.add_parser(
+        "shell",
+        parents=[parent_parser],
+        help="Run Python ORM code against the local replica (local replica only; never production)",
+    )
+    _ = p_shell.add_argument(
+        "script",
+        nargs="?",
+        default=None,
+        help="Path to Python script or '-' from stdin (optional if --file given)",
+    )
+    _ = p_shell.add_argument(
+        "--file",
+        "-f",
+        help="Path to Python script, or '-' to read from stdin",
+    )
+    _ = p_shell.add_argument("--db", help="Target database name")
+    _ = p_shell.add_argument(
+        "--rollback",
+        action="store_true",
+        help="Rollback transaction at script end instead of committing",
+    )
+
+    # Health Command
+    p_health = subparsers.add_parser(
+        "health",
+        parents=[parent_parser],
+        help="Probe health and readiness of the local Odoo web server",
+    )
+    _ = p_health.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_HTTP_PORT,
+        help=f"Port of the Odoo web server (default: {DEFAULT_HTTP_PORT})",
+    )
+    _ = p_health.add_argument(
+        "--wait",
+        type=int,
+        default=0,
+        help="Wait/poll timeout in seconds until ready (default: 0)",
+    )
+
+    # Prune Command
+    _ = subparsers.add_parser(
+        "prune",
+        parents=[parent_parser],
+        help="Remove stale odoo-test-* containers",
+    )
+
+    # Auth-Temp Command
+    p_auth_temp = subparsers.add_parser(
+        "auth-temp",
+        parents=[parent_parser],
+        help="Set temporary random password on local replica (requires pod running)",
+        description=(
+            "Set temporary random password for user on local replica. "
+            "Requires the local pod running (same as db-query)."
+        ),
+    )
+    _ = p_auth_temp.add_argument("--db", help="Target database name override")
+    _ = p_auth_temp.add_argument(
+        "--login", help="User login (default: user id 2 / base.user_admin)"
+    )
+
+    # Auth-Restore Command
+    p_auth_restore = subparsers.add_parser(
+        "auth-restore",
+        parents=[parent_parser],
+        help="Restore original password hash on local replica (requires pod running)",
+        description=(
+            "Restore original password hash for user on local replica. "
+            "Requires the local pod running (same as db-query)."
+        ),
+    )
+    _ = p_auth_restore.add_argument("--db", help="Target database name override")
+    _ = p_auth_restore.add_argument(
+        "--login", help="User login (default: user id 2 / base.user_admin)"
     )
 
     return parser
@@ -2251,6 +3221,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "db-query": cmd_db_query,
         "db-clone": cmd_db_clone,
         "db-restore": cmd_db_restore,
+        "db-list": cmd_db_list,
+        "db-drop": cmd_db_drop,
+        "shell": cmd_shell,
+        "health": cmd_health,
+        "prune": cmd_prune,
+        "auth-temp": cmd_auth_temp,
+        "auth-restore": cmd_auth_restore,
     }
 
     command_name = _require_str(args, "command")
