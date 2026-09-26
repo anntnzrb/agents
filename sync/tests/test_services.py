@@ -274,6 +274,33 @@ def test_amp_runner_unit_only_on_declared_hosts(
     assert "[Install]" in runner
 
 
+def _declare_t3_host(home: Path, hostname: str) -> None:
+    deployment = home / ".config" / "agents" / "tools" / "t3"
+    deployment.mkdir(parents=True, exist_ok=True)
+    _ = (deployment / "deployment.json").write_text(
+        json.dumps({"server": {"hostname": hostname}})
+    )
+
+
+def test_t3_model_refresh_timer_only_on_declared_t3_host(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The T3 host refreshes Claude's gateway models on a timer, off the sync path."""
+    monkeypatch.setattr("socket.gethostname", lambda: "munich")
+    _declare_t3_host(home, "oulu")
+    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+
+    _declare_t3_host(home, "Munich")
+    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    assert set(units) == {"t3-refresh-models.service", "t3-refresh-models.timer"}
+    service = units["t3-refresh-models.service"].content
+    assert "Type=oneshot" in service
+    assert "sync-current/.venv/bin/python " in service
+    assert f"{home}/.config/agents/tools/t3/t3ctl.py refresh-models" in service
+    assert "[Install]" not in service
+    assert "OnUnitActiveSec=" in units["t3-refresh-models.timer"].content
+
+
 def test_darwin_declares_updater_and_runner_launch_agents(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -120,6 +120,7 @@ Sync installs and controls only the per-user services it declares: systemd user 
 
 - Every host with a git checkout of the repository runs the [background updater](#background-updates).
 - The CLIProxyAPI gateway host runs the gateway and, while its token is set, the [Funnel auth gateway](../cliproxyapi.md#expose-the-gateway-through-tailscale-funnel). Linux only.
+- The T3 host (`server.hostname` in `tools/t3/deployment.json`) runs `t3-refresh-models.timer`, which runs `tools/t3/t3ctl.py refresh-models` every 15 minutes with the installed runtime's Python. The gateway catalog changes with upstream discovery rather than with commits, so it runs on its own schedule instead of inside sync. Linux only. See [T3 Code providers](../t3.md#providers).
 - Hosts listed in `tools/amp-runner/deployment.json` run an Amp runner through the `amp` wrapper, identified by the short hostname. See the Amp harness README for why it starts from the home directory and serves the SSOT with an explicit `--dir`.
 
 Reconcile rules:

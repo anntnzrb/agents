@@ -49,6 +49,9 @@ SERVICE_TIMEOUT_MS = 30_000
 AMP_RUNNER_UNIT = "amp-runner-agents.service"
 AMP_RUNNER_LABEL = "com.amp.runner.agents"
 AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
+T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
+T3_REFRESH_UNIT = "t3-refresh-models"
+T3_REFRESH_INTERVAL_SECONDS = 900
 
 # Services start with a bare PATH; every unit declares one so it never depends
 # on hand-made service-manager environment. Missing directories are harmless.
@@ -243,6 +246,64 @@ WantedBy=default.target
     return UserUnit(AMP_RUNNER_UNIT, content)
 
 
+def _is_t3_host(sync_env: SyncEnv) -> bool:
+    """Return True if tools/t3/deployment.json declares this host."""
+    path = Path(sync_env.ssot_home).joinpath(*T3_DEPLOYMENT)
+    try:
+        data = cast("object", json.loads(path.read_text()))
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError) as error:
+        warn(f"services: unreadable {path} ({panic_message(error)})")
+        return False
+    server = (
+        cast("dict[str, object]", data).get("server")
+        if isinstance(data, dict)
+        else None
+    )
+    hostname = (
+        cast("dict[str, object]", server).get("hostname")
+        if isinstance(server, dict)
+        else None
+    )
+    return isinstance(hostname, str) and hostname.lower() == _short_hostname()
+
+
+def _t3_refresh_units(sync_env: SyncEnv) -> list[UserUnit]:
+    """Keep T3's Claude model list in step with the gateway catalog.
+
+    The catalog changes with upstream discovery, not with commits, so this
+    runs on its own timer instead of inside sync.
+    """
+    t3ctl = Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py"
+    service = f"""\
+[Unit]
+Description=Refresh T3 Code's Claude models from the gateway catalog
+
+[Service]
+Type=oneshot
+Environment=PATH={_service_path(sync_env.home)}
+ExecStart={_runtime_python(sync_env)} {t3ctl} refresh-models
+Nice=19
+IOSchedulingClass=idle
+"""
+    timer = f"""\
+[Unit]
+Description=Periodic T3 Code model refresh
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={T3_REFRESH_INTERVAL_SECONDS}s
+
+[Install]
+WantedBy=timers.target
+"""
+    return [
+        UserUnit(f"{T3_REFRESH_UNIT}.service", service),
+        UserUnit(f"{T3_REFRESH_UNIT}.timer", timer),
+    ]
+
+
 def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUnit]:
     """Return the systemd user units this host should run."""
     units = _updater_units(sync_env) if _is_git_checkout(sync_env) else []
@@ -250,6 +311,8 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
         units.extend(_gateway_units(sync_env))
     if _is_amp_runner_host(sync_env):
         units.append(_amp_runner_unit(sync_env))
+    if _is_t3_host(sync_env):
+        units.extend(_t3_refresh_units(sync_env))
     return units
 
 
