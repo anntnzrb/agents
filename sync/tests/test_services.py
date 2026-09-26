@@ -213,6 +213,25 @@ def test_auth_gateway_unit_changes_when_its_env_changes(home: Path) -> None:
     assert "GATEWAY_SECRET" not in auth_unit()
 
 
+def test_auth_gateway_unit_changes_when_its_script_changes(home: Path) -> None:
+    """New gateway code must restart the gateway, so the unit tracks its script."""
+    env_file = home / ".cli-proxy-api" / AUTH_GATEWAY_ENV
+    env_file.parent.mkdir(parents=True)
+    _ = env_file.write_text("GATEWAY_SECRET=x\n")
+    script = home / ".config" / "agents" / "tools" / "cliproxyapi" / "auth-gateway.py"
+    script.parent.mkdir(parents=True)
+
+    def auth_unit() -> str:
+        units = declared_user_units(_linux(home), gateway_host=True)
+        return next(u.content for u in units if u.name.startswith("cliproxy-auth"))
+
+    _ = script.write_text("old = 1\n")
+    before = auth_unit()
+    _ = script.write_text("new = 2\n")
+
+    assert auth_unit() != before
+
+
 def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> None:
     """On macOS the updater is a launch agent; no systemd units are written."""
     _git_checkout(home)

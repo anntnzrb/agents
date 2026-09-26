@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from sync.core.cliproxy_config import AUTH_GATEWAY_ENV
+from sync.core.cliproxy_deployment import CLI_PROXY_SOURCE_DIR
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.process import RunProcessOptions, command_exists, run_process
 
@@ -146,11 +147,19 @@ WantedBy=default.target
     units = [UserUnit("cliproxyapi.service", gateway)]
     env_file = state / AUTH_GATEWAY_ENV
     if env_file.is_file():
-        # The env file carries the token; its digest in the unit makes a
-        # rotation change the unit, which is what triggers a restart.
+        # The env file carries the token and the script is the gateway's code;
+        # their digests in the unit make a token rotation or a code change
+        # change the unit, which is what triggers a restart.
         env_digest = hashlib.sha256(env_file.read_bytes()).hexdigest()[:16]
+        script = Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / AUTH_GATEWAY_SCRIPT
+        script_digest = (
+            hashlib.sha256(script.read_bytes()).hexdigest()[:16]
+            if script.is_file()
+            else "none"
+        )
         auth = f"""\
 # env sha256 {env_digest}
+# script sha256 {script_digest}
 [Unit]
 Description=CLIProxyAPI public Funnel auth gateway
 After=cliproxyapi.service
