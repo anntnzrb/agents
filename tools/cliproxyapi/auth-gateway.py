@@ -54,9 +54,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
         )
         try:
             with urllib.request.urlopen(request) as response:
-                self.relay(response.status, response.headers, response.read())
+                self.relay(response.status, response.headers, response)
         except urllib.error.HTTPError as error:
-            self.relay(error.code, error.headers, error.read())
+            with error:
+                self.relay(error.code, error.headers, error)
         except OSError as error:
             payload = f'{{"error":{{"message":"Gateway Bad Gateway: {error}"}}}}'.encode()
             self.send_response(502)
@@ -64,14 +65,23 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
 
-    def relay(self, status, headers, payload):
+    def relay(self, status, headers, body):
+        # Stream the body as it arrives: SSE responses must reach the client
+        # token by token, not after generation ends. HTTP/1.0 (the handler's
+        # default) delimits the body by closing the connection.
         self.send_response(status)
         for key, value in headers.items():
-            if key.lower() not in ("transfer-encoding", "content-length"):
+            if key.lower() not in ("transfer-encoding", "content-length", "connection"):
                 self.send_header(key, value)
-        self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(payload)
+        try:
+            while chunk := body.read1(65536):
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except OSError:
+            # client went away or upstream dropped mid-stream; headers are
+            # already sent, so closing the connection is the only signal left
+            return
 
     def do_GET(self):
         self.forward("GET")
