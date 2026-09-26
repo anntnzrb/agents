@@ -254,28 +254,68 @@ async def _discard_and_reap_pipes(proc: asyncio.subprocess.Process) -> None:
             _ = tg.create_task(_reap_process(proc))
 
 
+# The child runs in its own session, so a supervisor's stop signal reaches
+# only this process; forward it so the launched harness is never orphaned.
+_FORWARDED_SIGNALS = (signal.SIGTERM, signal.SIGHUP)
+
+
+def _signal_group(proc: asyncio.subprocess.Process, signum: int) -> None:
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signum)
+
+
+def _forward_termination(proc: asyncio.subprocess.Process) -> list[int]:
+    """Relay stop signals to the child's process group while it runs."""
+    loop = asyncio.get_running_loop()
+    installed: list[int] = []
+    for signum in _FORWARDED_SIGNALS:
+        try:
+            loop.add_signal_handler(signum, _signal_group, proc, signum)
+        except (ValueError, RuntimeError, NotImplementedError):
+            continue  # not the main thread's loop: leave default handling
+        installed.append(signum)
+    return installed
+
+
+def _stop_forwarding(installed: list[int]) -> None:
+    loop = asyncio.get_running_loop()
+    for signum in installed:
+        _ = loop.remove_signal_handler(signum)
+
+
+async def _wait_inherited(
+    proc: asyncio.subprocess.Process,
+    timeout_ms: float | None,
+) -> tuple[bytes | None, bytes | None, bool, bool]:
+    """Wait for a child with inherited stdio, relaying stop signals to it."""
+    timeout_sec = (
+        max(timeout_ms / MILLISECONDS_PER_SECOND, TIMEOUT_MIN_SECONDS)
+        if timeout_ms is not None
+        else None
+    )
+    forwarded = _forward_termination(proc)
+    try:
+        async with asyncio.timeout(timeout_sec):
+            _ = await proc.wait()
+    except TimeoutError:
+        _kill_process_group(proc)
+        await _reap_process(proc)
+        return None, None, True, False
+    except asyncio.CancelledError:
+        _kill_process_group(proc)
+        await _reap_process(proc)
+        raise
+    finally:
+        _stop_forwarding(forwarded)
+    return None, None, False, False
+
+
 async def _communicate_subprocess(
     proc: asyncio.subprocess.Process,
     timeout_ms: float | None,
 ) -> tuple[bytes | None, bytes | None, bool, bool]:
     if proc.stdout is None or proc.stderr is None:
-        timeout_sec = (
-            max(timeout_ms / MILLISECONDS_PER_SECOND, TIMEOUT_MIN_SECONDS)
-            if timeout_ms is not None
-            else None
-        )
-        try:
-            async with asyncio.timeout(timeout_sec):
-                _ = await proc.wait()
-                return None, None, False, False
-        except TimeoutError:
-            _kill_process_group(proc)
-            await _reap_process(proc)
-            return None, None, True, False
-        except asyncio.CancelledError:
-            _kill_process_group(proc)
-            await _reap_process(proc)
-            raise
+        return await _wait_inherited(proc, timeout_ms)
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
     shared = _StreamDrainState()

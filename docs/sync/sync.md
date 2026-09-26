@@ -108,6 +108,8 @@ Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway hos
 
 Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
 
+The launched harness runs in its own session. A wrapper that receives `SIGTERM` or `SIGHUP` forwards it to the harness's process group and exits with the harness, so a service manager stopping a wrapper also stops the harness instead of orphaning it.
+
 The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
 A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.

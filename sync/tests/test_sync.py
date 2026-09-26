@@ -10,7 +10,9 @@ import json
 import os
 import platform
 import shutil
+import signal
 import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -2023,6 +2025,48 @@ def test_run_process_inherit_stdio() -> None:
     assert result.stderr == ""
     assert result.timed_out is False
     assert result.output_limited is False
+
+
+def test_run_process_inherit_forwards_termination_to_child(tmp_path: Path) -> None:
+    """A supervisor stopping the wrapper also stops the harness it launched.
+
+    The harness runs in its own session, so without forwarding a SIGTERM to the
+    wrapper orphans it; a runner orphaned this way keeps its directory lock.
+    """
+    ready = tmp_path / "ready"
+    received = tmp_path / "received"
+    child = (
+        "import pathlib, signal, sys, time\n"
+        "def stop(*_):\n"
+        f"    pathlib.Path({str(received)!r}).write_text('term')\n"
+        "    sys.exit(0)\n"
+        "signal.signal(signal.SIGTERM, stop)\n"
+        f"pathlib.Path({str(ready)!r}).write_text('ready')\n"
+        "time.sleep(30)\n"
+    )
+    wrapper = (
+        "import asyncio, sys\n"
+        "from sync.runtime.process import RunProcessOptions, run_process\n"
+        f"child = {child!r}\n"
+        "result = asyncio.run(run_process([sys.executable, '-c', child],"
+        " RunProcessOptions(stdio='inherit')))\n"
+        "sys.exit(result.exit_code)\n"
+    )
+    proc = subprocess.Popen([sys.executable, "-c", wrapper])  # noqa: S603
+    try:
+        deadline = time.monotonic() + 10
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert ready.exists()
+        proc.send_signal(signal.SIGTERM)
+        _ = proc.wait(timeout=10)
+        deadline = time.monotonic() + 5
+        while not received.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert received.read_text() == "term"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
 
 
 def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
