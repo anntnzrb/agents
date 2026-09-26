@@ -192,6 +192,24 @@ def test_gateway_units_only_on_gateway_host(home: Path) -> None:
     )
 
 
+def test_auth_gateway_unit_changes_when_its_env_changes(home: Path) -> None:
+    """A rotated token must restart the gateway, so the unit tracks its env."""
+    (home / ".config" / "agents").mkdir(parents=True)
+    env_file = home / ".cli-proxy-api" / AUTH_GATEWAY_ENV
+    env_file.parent.mkdir(parents=True)
+
+    def auth_unit() -> str:
+        units = declared_user_units(_linux(home), gateway_host=True)
+        return next(u.content for u in units if u.name.startswith("cliproxy-auth"))
+
+    _ = env_file.write_text("GATEWAY_SECRET=old\n")
+    before = auth_unit()
+    _ = env_file.write_text("GATEWAY_SECRET=new\n")
+
+    assert auth_unit() != before
+    assert "GATEWAY_SECRET" not in auth_unit()
+
+
 def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> None:
     """On macOS the updater is a launch agent; no systemd units are written."""
     _git_checkout(home)

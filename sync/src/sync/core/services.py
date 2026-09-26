@@ -9,6 +9,7 @@ units are never touched. System-level services are out of scope.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -136,7 +137,11 @@ WantedBy=default.target
     units = [UserUnit("cliproxyapi.service", gateway)]
     env_file = state / AUTH_GATEWAY_ENV
     if env_file.is_file():
+        # The env file carries the token; its digest in the unit makes a
+        # rotation change the unit, which is what triggers a restart.
+        env_digest = hashlib.sha256(env_file.read_bytes()).hexdigest()[:16]
         auth = f"""\
+# env sha256 {env_digest}
 [Unit]
 Description=CLIProxyAPI public Funnel auth gateway
 After=cliproxyapi.service

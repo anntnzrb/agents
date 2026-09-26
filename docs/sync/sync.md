@@ -122,7 +122,7 @@ Sync installs and controls only the per-user services it declares: systemd user 
 Reconcile rules:
 
 - A declared unit is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`.
-- Sync touches the service manager only when a unit's content changes: it reloads systemd, enables timers, and enables and restarts long-running services. A unit without an `[Install]` section is left to the timer that starts it.
+- Sync touches the service manager only when a unit's content changes: it reloads systemd, enables timers, and enables and restarts long-running services. A unit without an `[Install]` section is left to the timer that starts it. A unit that reads an env file embeds a digest of it, so changing only the env file (a token rotation) still restarts the service.
 - A unit sync owned but no longer declares is disabled, stopped, and deleted. Units sync never owned are left alone.
 - Every unit declares its own `PATH`, so services never depend on hand-made service-manager environment such as `~/.config/environment.d/`.
 - Service reconcile is best-effort: a host without a user service manager gets a warning, not a failed sync.
