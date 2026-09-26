@@ -495,6 +495,30 @@ def _discover_profile_models(
     return []
 
 
+def _label_prefixed_models(profile: dict[str, object]) -> dict[str, object]:
+    """Suffix each model display-name with the profile prefix.
+
+    Several upstreams serve the same model under the same display name; the
+    prefix is the only thing that tells them apart in client model pickers.
+    """
+    prefix = profile.get("prefix")
+    models = profile.get("models")
+    if not isinstance(prefix, str) or not prefix or not is_obj_list(models):
+        return profile
+    suffix = f" · {prefix}"
+    labeled: list[object] = []
+    for model in models:
+        if not is_obj_dict(model):
+            labeled.append(model)
+            continue
+        name = model.get("display-name") or model.get("name")
+        if not isinstance(name, str) or name.endswith(suffix):
+            labeled.append(model)
+            continue
+        labeled.append(model | {"display-name": f"{name}{suffix}"})
+    return profile | {"models": labeled}
+
+
 def _validate_pool_marker(value: object, label: str) -> str:
     if not isinstance(value, str) or len(value) == 0:
         msg = f"invalid {label}.{POOL_MARKER}: expected non-empty string"
@@ -539,7 +563,7 @@ def _expand_native_credential_section(
         if not is_obj_dict(raw_item):
             msg = f"invalid {label}: expected object"
             raise TypeError(msg)
-        profile: dict[str, object] = dict(raw_item)
+        profile: dict[str, object] = _label_prefixed_models(dict(raw_item))
         if POOL_MARKER not in profile:
             result.append(profile)
             continue
@@ -574,7 +598,7 @@ def _expand_compatibility_section(
                 if marker in profile:
                     msg = f"invalid {label}: {marker} requires {POOL_MARKER}"
                     raise ValueError(msg)
-            result.append(profile)
+            result.append(_label_prefixed_models(profile))
             continue
         pool_marker_val = profile[POOL_MARKER]
         pool_name = _validate_pool_marker(pool_marker_val, label)
@@ -601,7 +625,7 @@ def _expand_compatibility_section(
                 if model.get("name") not in excluded
             ]
         result.append(
-            shared_profile
+            _label_prefixed_models(shared_profile)
             | {
                 "api-key-entries": [credential_config(cred) for cred in credentials],
             }

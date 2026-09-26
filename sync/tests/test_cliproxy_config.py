@@ -40,6 +40,10 @@ def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
     return isinstance(val, dict)
 
 
+def _is_obj_list(val: object) -> TypeGuard[list[object]]:
+    return isinstance(val, list)
+
+
 def test_cliproxy_render_config_expands_native_and_compatibility_credential_pools() -> (
     None
 ):
@@ -610,6 +614,112 @@ openai-compatibility:
             "name": "discovered",
             "base-url": "https://upstream.example.test/v1",
             "models": [{"name": "stale-model"}],
+            "api-key-entries": [{"api-key": "key-1"}],
+        },
+    ]
+
+
+def test_cliproxy_render_config_labels_prefixed_models_with_their_prefix() -> None:
+    """Prefixed models carry their prefix in display-name to tell sources apart."""
+    template = """host: ignored
+port: 1
+codex-api-key:
+  - x-credential-pool: native-pool
+    prefix: native
+    models:
+      - name: shared-model
+        display-name: Shared Model
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    prefix: disco
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+  - name: static
+    prefix: stat
+    x-credential-pool: static-pool
+    models:
+      - name: bare-model
+  - name: unprefixed
+    x-credential-pool: plain-pool
+    models:
+      - name: plain-model
+        display-name: Plain Model
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {
+            "native-pool": [{"apiKey": "n1"}, {"apiKey": "n2"}],
+            "discovery-pool": [{"apiKey": "d1"}],
+            "static-pool": [{"apiKey": "s1"}],
+            "plain-pool": [{"apiKey": "p1"}],
+        },
+    }
+
+    def fake_fetch(_base_url: str, _api_key: str) -> list[UpstreamModelEntry] | None:
+        return [{"id": "vendor/shared-model", "name": "Shared Model"}]
+
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(fetch=fake_fetch, catalog=lambda _model_id: None),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert _is_obj_dict(parsed)
+    native = parsed["codex-api-key"]
+    compatibility = parsed["openai-compatibility"]
+    assert _is_obj_list(native)
+    assert _is_obj_list(compatibility)
+    native_models = [entry["models"] for entry in native if _is_obj_dict(entry)]
+    native_model = {"name": "shared-model", "display-name": "Shared Model · native"}
+    assert native_models == [[native_model], [native_model]]
+    models = {
+        str(entry["name"]): entry["models"]
+        for entry in compatibility
+        if _is_obj_dict(entry)
+    }
+    assert models == {
+        "discovered": [
+            {"name": "vendor/shared-model", "display-name": "Shared Model · disco"},
+        ],
+        "static": [{"name": "bare-model", "display-name": "bare-model · stat"}],
+        "unprefixed": [{"name": "plain-model", "display-name": "Plain Model"}],
+    }
+
+
+def test_cliproxy_render_config_does_not_relabel_reused_previous_models() -> None:
+    """Models reused from the previous render keep a single prefix label."""
+    template = """host: ignored
+port: 1
+openai-compatibility:
+  - name: discovered
+    base-url: https://upstream.example.test/v1
+    prefix: disco
+    x-credential-pool: discovery-pool
+    x-model-discovery: true
+"""
+    secrets = {
+        "CLIPROXY_CREDENTIAL_POOLS": {"discovery-pool": [{"apiKey": "key-1"}]},
+    }
+    rendered = render_cliproxy_config(
+        template,
+        secrets,
+        DEPLOYMENT,
+        discovery=DiscoveryOptions(
+            fetch=_unavailable_fetch,
+            previous={
+                "discovered": [{"name": "m", "display-name": "Model · disco"}],
+            },
+        ),
+    )
+    parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
+    assert isinstance(parsed, dict)
+    assert parsed["openai-compatibility"] == [
+        {
+            "name": "discovered",
+            "base-url": "https://upstream.example.test/v1",
+            "prefix": "disco",
+            "models": [{"name": "m", "display-name": "Model · disco"}],
             "api-key-entries": [{"api-key": "key-1"}],
         },
     ]
