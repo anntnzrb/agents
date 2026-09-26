@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn, TypeAlias, cast
@@ -44,6 +45,10 @@ SETTINGS_TARGET = T3_HOME / "userdata" / "settings.json"
 BOOT_LOG = T3_HOME / "userdata" / "logs" / "boot-service.log"
 UNIT = "t3code.service"
 ENVIRONMENT_PATH = "/.well-known/t3/environment"
+
+# The gateway both harnesses route through; its client base URL is the SSOT.
+CLIPROXY_DEPLOYMENT_PATH = TOOLS_DIR.parent / "cliproxyapi" / "deployment.json"
+CLAUDE_INSTANCE = "claudeAgent"
 
 # Sync launch wrappers for the harnesses T3 drives, keyed by T3 provider instance.
 WRAPPER_DIR = Path.home() / ".local" / "bin"
@@ -374,6 +379,67 @@ def sync_binary_paths(live: JsonObject) -> None:
         print(f"{instance_id} binaryPath -> {wrapper}")
 
 
+def gateway_claude_models() -> list[Json] | None:
+    """The gateway's catalog as Claude custom models, or None when unreachable.
+
+    Codex lists the gateway catalog itself; Claude Code cannot, so T3 only
+    offers what `customModels` declares. The Anthropic-format listing already
+    carries ids Claude Code accepts. Official Anthropic models are skipped:
+    T3's built-in Claude catalog covers them.
+    """
+    deployment = load_json_object(CLIPROXY_DEPLOYMENT_PATH) or {}
+    client = deployment.get("client")
+    base_url = client.get("baseUrl") if isinstance(client, dict) else None
+    if not isinstance(base_url, str):
+        return None
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/models",
+        headers={"x-api-key": "keyless", "anthropic-version": "2023-06-01"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:  # pyright: ignore[reportAny]
+            body = cast(bytes, response.read())  # pyright: ignore[reportAny]
+        payload = cast(Json, json.loads(body))
+    except (OSError, ValueError):
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        return None
+    models: list[Json] = []
+    for model in data:
+        if not isinstance(model, dict) or model.get("owned_by") == "anthropic":
+            continue
+        slug = model.get("id")
+        name = model.get("display_name")
+        if isinstance(slug, str) and slug:
+            entry: JsonObject = {"slug": slug}
+            if isinstance(name, str) and name:
+                entry["name"] = name
+            models.append(entry)
+    return models
+
+
+def sync_claude_models(live: JsonObject) -> bool:
+    """Replace the Claude instance's customModels with the gateway catalog."""
+    models = gateway_claude_models()
+    if models is None:
+        print(
+            "t3ctl: warning — gateway catalog unreachable; Claude models unchanged",
+            file=sys.stderr,
+        )
+        return False
+    instances = live.setdefault("providerInstances", {})
+    instance = instances.get(CLAUDE_INSTANCE) if isinstance(instances, dict) else None
+    if not isinstance(instance, dict):
+        return False
+    config = instance.setdefault("config", {})
+    if not isinstance(config, dict) or config.get("customModels") == models:
+        return False
+    config["customModels"] = models
+    print(f"{CLAUDE_INSTANCE} customModels -> {len(models)} gateway models")
+    return True
+
+
 def deep_merge(base: JsonObject, overlay: JsonObject) -> None:
     for key, value in overlay.items():
         existing = base.get(key)
@@ -400,6 +466,7 @@ def apply_settings() -> None:
         die("settings files must contain a JSON object")
     deep_merge(live, desired)
     sync_binary_paths(live)
+    _ = sync_claude_models(live)
     write_settings(live)
     print(f"applied {SETTINGS_PATH} -> {SETTINGS_TARGET}")
 
@@ -412,6 +479,17 @@ def cmd_apply_settings(_args: argparse.Namespace) -> int:
     finally:
         _ = service_start()
     return 0 if wait_for_endpoint() else die("endpoint did not come back; try `doctor`")
+
+
+def cmd_refresh_models(_args: argparse.Namespace) -> int:
+    """Refresh Claude's gateway models in place; T3 watches settings.json live."""
+    require_declared_host()
+    live = load_json_object(SETTINGS_TARGET)
+    if live is None:
+        die(f"{SETTINGS_TARGET} missing or not a JSON object")
+    if sync_claude_models(live):
+        write_settings(live)
+    return 0
 
 
 def cmd_pair(args: argparse.Namespace) -> int:
@@ -458,6 +536,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "restart": cmd_restart,
     "update": cmd_update,
     "apply-settings": cmd_apply_settings,
+    "refresh-models": cmd_refresh_models,
     "pair": cmd_pair,
     "connect": cmd_connect,
     "logs": cmd_logs,
@@ -476,6 +555,7 @@ def main() -> int:
         ("restart", "restart the service and wait for the endpoint"),
         ("update", "install/update/repair the service on the declared channel"),
         ("apply-settings", "merge server-settings.json offline, then restart"),
+        ("refresh-models", "reload Claude's model list from the gateway, live"),
         ("pair", "mint a tailnet pairing link (extra args forwarded)"),
         ("connect", "T3 Connect management (args forwarded: login/link/publish/…)"),
         ("logs", "recent service journal and boot log [-n LINES]"),
