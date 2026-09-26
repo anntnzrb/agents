@@ -1,0 +1,7 @@
+{
+  "amp.tools.disable": [
+    "web_search",
+    "read_web_page",
+    "painter"
+  ]
+}
