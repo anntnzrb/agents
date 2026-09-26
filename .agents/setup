@@ -17,3 +17,8 @@ git config --local core.hooksPath .githooks
 if [ ! -f .env ]; then
   install -m 600 .env.example .env
 fi
+
+# Amp workspace settings (gitignored): orbs do not read the user settings sync
+# publishes, so carry over the cost-control tool list
+mkdir -p .amp
+jq '{"amp.tools.disable": ."amp.tools.disable"}' harnesses/amp/settings.json >.amp/settings.json
