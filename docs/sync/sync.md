@@ -114,15 +114,16 @@ A static release launcher resolves the adapter's manifest, verifies the archive 
 
 ## User services
 
-Sync installs and controls only the per-user services it declares: systemd user units on Linux and the background updater's launch agent on macOS. It never touches system-level services. Declarations live in `sync/src/sync/core/services.py`; which ones apply depends on the host:
+Sync installs and controls only the per-user services it declares: systemd user units on Linux and launch agents on macOS. It never touches system-level services. Declarations live in `sync/src/sync/core/services.py`; which ones apply depends on the host:
 
 - Every host with a git checkout of the repository runs the [background updater](#background-updates).
-- The CLIProxyAPI gateway host runs the gateway and, while its token is set, the [Funnel auth gateway](../cliproxyapi.md#expose-the-gateway-through-tailscale-funnel).
+- The CLIProxyAPI gateway host runs the gateway and, while its token is set, the [Funnel auth gateway](../cliproxyapi.md#expose-the-gateway-through-tailscale-funnel). Linux only.
+- Hosts listed in `tools/amp-runner/deployment.json` run an Amp runner through the `amp` wrapper, identified by the short hostname. See the Amp harness README for why it starts from the home directory and serves the SSOT with an explicit `--dir`.
 
 Reconcile rules:
 
-- A declared unit is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`.
-- Sync touches the service manager only when a unit's content changes: it reloads systemd, enables timers, and enables and restarts long-running services. A unit without an `[Install]` section is left to the timer that starts it. A unit that reads an env file embeds a digest of it, so changing only the env file (a token rotation) still restarts the service.
+- A declared unit or launch agent is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`. Services keep their pre-existing names so adoption replaces a hand-made service in place instead of starting a duplicate.
+- Sync touches the service manager only when a unit's content changes: on Linux it reloads systemd, enables timers, and enables and restarts long-running services; on macOS it unloads and reloads the changed launch agent. A unit without an `[Install]` section is left to the timer that starts it. A unit that reads an env file embeds a digest of it, so changing only the env file (a token rotation) still restarts the service.
 - A unit sync owned but no longer declares is disabled, stopped, and deleted. Units sync never owned are left alone.
 - Every unit declares its own `PATH`, so services never depend on hand-made service-manager environment such as `~/.config/environment.d/`.
 - Service reconcile is best-effort: a host without a user service manager gets a warning, not a failed sync.

@@ -10,6 +10,7 @@ units are never touched.
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -17,9 +18,11 @@ import pytest
 
 from sync.core.harness import SyncEnv
 from sync.core.services import (
+    AMP_RUNNER_LABEL,
     AUTH_GATEWAY_ENV,
     LAUNCHD_LABEL,
     UserUnit,
+    declared_launch_agents,
     declared_user_units,
     reconcile_services,
     reconcile_user_units,
@@ -226,3 +229,76 @@ def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> 
     assert "<key>LowPriorityIO</key><true/>" in plist
     assert "/.nix-profile/bin" in plist
     assert any(call[:2] == ["launchctl", "bootstrap"] for call in calls)
+
+
+def _declare_runner_hosts(home: Path, hosts: Sequence[str]) -> None:
+    deployment = home / ".config" / "agents" / "tools" / "amp-runner"
+    deployment.mkdir(parents=True, exist_ok=True)
+    _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": list(hosts)}))
+
+
+def test_amp_runner_unit_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The runner serves repos and the SSOT from a neutral working directory."""
+    monkeypatch.setattr("socket.gethostname", lambda: "munich")
+    _declare_runner_hosts(home, ["oulu"])
+    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+
+    _declare_runner_hosts(home, ["oulu", "munich"])
+    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    runner = units["amp-runner-agents.service"].content
+    assert "WorkingDirectory=%h" in runner
+    assert f"ExecStart={home}/.local/bin/amp --no-tui --runner-id munich " in runner
+    assert f"--discover-dirs={home}/repos" in runner
+    assert f"--dir {home}/.config/agents" in runner
+    assert "[Install]" in runner
+
+
+def test_darwin_declares_updater_and_runner_launch_agents(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MacOS gets the same services as launch agents, keyed by label."""
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut.local")
+    _git_checkout(home)
+    _declare_runner_hosts(home, ["beirut"])
+    darwin = SyncEnv.from_home(str(home), platform="darwin")
+
+    agents = {a.name: a.content for a in declared_launch_agents(darwin)}
+
+    assert set(agents) == {LAUNCHD_LABEL, AMP_RUNNER_LABEL}
+    runner = agents[AMP_RUNNER_LABEL]
+    assert "<string>--runner-id</string><string>beirut</string>" in runner
+    assert "<key>KeepAlive</key><true/>" in runner
+    assert f"<key>WorkingDirectory</key><string>{home}</string>" in runner
+
+
+def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
+    home: Path, calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Changed agents are reloaded once; dropped owned agents are unloaded."""
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut")
+    _git_checkout(home)
+    _declare_runner_hosts(home, ["beirut"])
+    darwin = SyncEnv.from_home(str(home), platform="darwin")
+    agents_dir = home / "Library" / "LaunchAgents"
+    agents_dir.mkdir(parents=True)
+    _ = (agents_dir / "hand.made.plist").write_text("<plist/>")
+
+    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    bootstrapped = [c[3] for c in calls if c[:2] == ["launchctl", "bootstrap"]]
+    assert sorted(
+        p.rsplit("/", 1)[1].removesuffix(".plist") for p in bootstrapped
+    ) == sorted([LAUNCHD_LABEL, AMP_RUNNER_LABEL])
+
+    calls.clear()
+    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    assert calls == []
+
+    _declare_runner_hosts(home, [])
+    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    assert not (agents_dir / f"{AMP_RUNNER_LABEL}.plist").exists()
+    assert any(
+        c[:2] == ["launchctl", "bootout"] and AMP_RUNNER_LABEL in c[2] for c in calls
+    )
+    assert (agents_dir / "hand.made.plist").exists()
