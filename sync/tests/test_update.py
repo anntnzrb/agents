@@ -9,24 +9,17 @@ commit has not been synced yet.
 
 from __future__ import annotations
 
-import asyncio
 import subprocess
 from typing import TYPE_CHECKING
 
 import pytest
 
-from sync.core.harness import SyncEnv
 from sync.core.index import EXIT_ERROR, EXIT_OK, update_main
-from sync.core.update import (
-    LAUNCHD_LABEL,
-    UPDATE_UNIT,
-    reconcile_update_schedule,
-)
-from sync.runtime.process import ProcessResult
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from pathlib import Path
+
+    from sync.core.harness import SyncEnv
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -195,74 +188,3 @@ def test_update_skips_when_sync_lock_is_held(
     assert update_main() == EXIT_OK
     assert _git(ssot, "rev-parse", "HEAD") == before
     assert syncs == []
-
-
-@pytest.fixture
-def service_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """Record service-manager commands instead of running them."""
-    calls: list[list[str]] = []
-
-    async def _run(
-        argv: Sequence[str], *_args: object, **_kwargs: object
-    ) -> ProcessResult:
-        calls.append(list(argv))
-        return ProcessResult(exit_code=0, stdout="", stderr="", timed_out=False)
-
-    async def _exists(*_args: object, **_kwargs: object) -> bool:
-        return True
-
-    monkeypatch.setattr("sync.core.update.run_process", _run)
-    monkeypatch.setattr("sync.core.update.command_exists", _exists)
-    return calls
-
-
-@pytest.mark.usefixtures("repos")
-def test_schedule_installs_idle_priority_systemd_timer_once(
-    home: Path, service_calls: list[list[str]]
-) -> None:
-    """Linux gets a low-priority oneshot and a timer, enabled only on change."""
-    env = SyncEnv.from_home(str(home), platform="linux")
-
-    asyncio.run(reconcile_update_schedule(env))
-    units = home / ".config" / "systemd" / "user"
-    service = (units / f"{UPDATE_UNIT}.service").read_text()
-    timer = (units / f"{UPDATE_UNIT}.timer").read_text()
-    assert "sync-current/.venv/bin/python -m sync.cli update" in service
-    assert "Nice=19" in service
-    assert "IOSchedulingClass=idle" in service
-    assert "OnUnitActiveSec=300s" in timer
-    assert ["systemctl", "--user", "enable", "--now", f"{UPDATE_UNIT}.timer"] in (
-        service_calls
-    )
-
-    service_calls.clear()
-    asyncio.run(reconcile_update_schedule(env))
-    assert service_calls == []
-
-
-@pytest.mark.usefixtures("repos")
-def test_schedule_installs_background_launchd_agent(
-    home: Path, service_calls: list[list[str]]
-) -> None:
-    """The macOS agent is a background, low-IO launch agent with an explicit PATH."""
-    env = SyncEnv.from_home(str(home), platform="darwin")
-
-    asyncio.run(reconcile_update_schedule(env))
-    plist = (home / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist").read_text()
-    assert "<string>update</string>" in plist
-    assert "<key>ProcessType</key><string>Background</string>" in plist
-    assert "<key>LowPriorityIO</key><true/>" in plist
-    assert "/.nix-profile/bin" in plist
-    assert any(call[:2] == ["launchctl", "bootstrap"] for call in service_calls)
-
-
-def test_schedule_skipped_without_git_checkout(
-    home: Path, service_calls: list[list[str]]
-) -> None:
-    """Without a git checkout there is nothing to pull, so nothing is scheduled."""
-    (home / ".config" / "agents").mkdir(parents=True)
-    env = SyncEnv.from_home(str(home), platform="linux")
-
-    asyncio.run(reconcile_update_schedule(env))
-    assert not (home / ".config" / "systemd").exists()
-    assert service_calls == []

@@ -120,15 +120,32 @@ chmod 600 ~/.cli-proxy-api/claude-*.json
 
 Repeat per subscription. The gateway loads new files without a restart. To give a larger plan a bigger share of new sessions, add a top-level integer `"weight"` to its auth JSON; the default is `1`.
 
-## Start the gateway
+## Run the gateway
 
-On the configured gateway host, start CLIProxyAPI in the foreground:
+On the gateway host, sync runs CLIProxyAPI as the `cliproxyapi.service` systemd user unit and restarts it only when the unit changes (see [User services](sync/sync.md#user-services)). The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`; sync reads the listener and client endpoint from `tools/cliproxyapi/deployment.json`. User units survive logout only with lingering enabled on the host (`loginctl enable-linger`).
 
 ```bash
-cli-proxy-api
+systemctl --user status cliproxyapi.service
+journalctl --user -u cliproxyapi.service -n 50
 ```
 
-The managed wrapper supplies `--config ~/.cli-proxy-api/config.yaml`. Sync reads the listener and client endpoint from `tools/cliproxyapi/deployment.json`. Use a process manager when the gateway must survive logout or reboot.
+For a foreground debugging session, stop the unit first, then run `cli-proxy-api`.
+
+## Expose the gateway through Tailscale Funnel
+
+Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
+
+The Funnel mapping itself lives in Tailscale's state, not in this repository. Recreate it on a new gateway host:
+
+```bash
+tailscale funnel --bg 8318
+```
+
+Rotate the token:
+
+1. On the gateway host, generate a token into `secrets.local.json` without printing it: `python3 -c 'import json,secrets,pathlib; p=pathlib.Path.home()/".config/agents/secrets.local.json"; d=json.loads(p.read_text()); d["CLIPROXY_FUNNEL_TOKEN"]=secrets.token_hex(32); p.write_text(json.dumps(d, indent=2)+"\n")'`.
+2. Read it from your own terminal and paste it into the client's provider settings: `python3 -c 'import json,pathlib; print(json.loads((pathlib.Path.home()/".config/agents/secrets.local.json").read_text())["CLIPROXY_FUNNEL_TOKEN"])'`.
+3. Run `uv run --project sync sync` on the gateway host. The service restarts with the new token and the old one stops working. Any sync on that host, including the one each harness launch runs, applies the new token, so paste it promptly after step 1.
 
 ## Open the control panel
 
@@ -227,6 +244,8 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 | Deployed control panel | `~/.cli-proxy-api/static/management.html` |
 | OAuth files | `~/.cli-proxy-api/*.json` |
 | Managed command | `~/.local/bin/cli-proxy-api` |
+| Funnel auth gateway source | `tools/cliproxyapi/auth-gateway.py` |
+| Installed auth gateway and its env file | `~/.cli-proxy-api/auth-gateway.py`, `~/.cli-proxy-api/auth-gateway.env` |
 
 Sync verifies the selected release's SHA-256 checksum and extracts only the manifest's executable.
 
@@ -256,11 +275,12 @@ Endpoint publication is transactional. Publication preserves Codex-owned hook an
 
 ## Local secrets
 
-`secrets.local.json` contains one top-level field:
+`secrets.local.json` contains these top-level fields:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `CLIPROXY_CREDENTIAL_POOLS` | Non-empty object of account arrays | API-key accounts grouped by provider pool |
+| `CLIPROXY_CREDENTIAL_POOLS` | Object of account arrays | API-key accounts grouped by provider pool |
+| `CLIPROXY_FUNNEL_TOKEN` | Optional string, at least 32 characters | Bearer token the public Funnel auth gateway requires; unset disables the auth gateway. Never copy a placeholder here |
 
 Each credential account accepts these fields:
 

@@ -1,58 +1,30 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""Background SSOT updates: fast-forward the checkout and schedule the updater.
+"""Background SSOT updates: fast-forward the checkout, remember what was synced.
 
 Every machine converges on ``origin/main``. The updater only fast-forwards a
 clean ``main`` checkout; anything else means someone is working there, so the
-checkout is left untouched. A per-user timer (systemd) or launch agent
-(launchd) runs ``sync update`` at idle priority.
+checkout is left untouched. :mod:`sync.core.services` schedules it.
 """
 
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
-from sync.runtime.errors import panic_message, warn
-from sync.runtime.process import RunProcessOptions, command_exists, run_process
-
-if TYPE_CHECKING:
-    from sync.core.harness import SyncEnv
+from sync.runtime.errors import warn
+from sync.runtime.process import RunProcessOptions, run_process
 
 __all__ = [
-    "LAUNCHD_LABEL",
-    "UPDATE_UNIT",
     "fast_forward_ssot",
     "read_synced_commit",
-    "reconcile_update_schedule",
     "record_synced_commit",
 ]
 
 UPDATE_BRANCH = "main"
 UPDATE_REMOTE = "origin"
-UPDATE_INTERVAL_SECONDS = 300
-UPDATE_UNIT = "agents-update"
-LAUNCHD_LABEL = "dev.agents.update"
 SYNCED_STATE_FILE = "update.json"
 GIT_TIMEOUT_MS = 60_000
-SERVICE_TIMEOUT_MS = 30_000
-
-# launchd starts agents with a bare PATH; sync needs uv, git, and node from
-# these. systemd user units inherit the user manager's PATH instead.
-_DARWIN_PATH_DIRS = (
-    "{home}/.local/bin",
-    "{home}/.nix-profile/bin",
-    "/etc/profiles/per-user/{user}/bin",
-    "/run/current-system/sw/bin",
-    "/nix/var/nix/profiles/default/bin",
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/usr/sbin",
-    "/sbin",
-)
 
 
 async def _git(ssot_home: str, *args: str) -> tuple[bool, str]:
@@ -124,122 +96,3 @@ def record_synced_commit(managed_state_home: str, commit: str) -> None:
     tmp = path.with_suffix(".tmp")
     _ = tmp.write_text(json.dumps({"commit": commit}) + "\n")
     _ = tmp.replace(path)
-
-
-def _update_command(sync_env: SyncEnv) -> list[str]:
-    python = Path(sync_env.runtime_home) / "sync-current" / ".venv" / "bin" / "python"
-    return [str(python), "-m", "sync.cli", "update"]
-
-
-def _systemd_units(sync_env: SyncEnv) -> dict[Path, str]:
-    unit_dir = Path(sync_env.home) / ".config" / "systemd" / "user"
-    command = " ".join(_update_command(sync_env))
-    service = f"""\
-[Unit]
-Description=Fast-forward the agents SSOT and reconcile it
-
-[Service]
-Type=oneshot
-ExecStart={command}
-Nice=19
-IOSchedulingClass=idle
-"""
-    timer = f"""\
-[Unit]
-Description=Periodic agents SSOT update
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec={UPDATE_INTERVAL_SECONDS}s
-
-[Install]
-WantedBy=timers.target
-"""
-    return {
-        unit_dir / f"{UPDATE_UNIT}.service": service,
-        unit_dir / f"{UPDATE_UNIT}.timer": timer,
-    }
-
-
-def _launchd_plist(sync_env: SyncEnv) -> tuple[Path, str]:
-    home = sync_env.home
-    user = Path(home).name
-    path_value = ":".join(d.format(home=home, user=user) for d in _DARWIN_PATH_DIRS)
-    args = "".join(f"<string>{arg}</string>" for arg in _update_command(sync_env))
-    log = f"{home}/Library/Logs/{UPDATE_UNIT}.log"
-    plist = f"""\
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key><string>{LAUNCHD_LABEL}</string>
-    <key>ProgramArguments</key><array>{args}</array>
-    <key>EnvironmentVariables</key><dict><key>PATH</key><string>{path_value}</string></dict>
-    <key>StartInterval</key><integer>{UPDATE_INTERVAL_SECONDS}</integer>
-    <key>RunAtLoad</key><true/>
-    <key>ProcessType</key><string>Background</string>
-    <key>LowPriorityIO</key><true/>
-    <key>Nice</key><integer>19</integer>
-    <key>StandardOutPath</key><string>{log}</string>
-    <key>StandardErrorPath</key><string>{log}</string>
-</dict>
-</plist>
-"""
-    return Path(home) / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist", plist
-
-
-def _write_changed(files: dict[Path, str]) -> bool:
-    """Write files whose content differs; return True if any changed."""
-    changed = False
-    for path, content in files.items():
-        if path.is_file() and path.read_text() == content:
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _ = path.write_text(content)
-        changed = True
-    return changed
-
-
-async def _service(*argv: str) -> bool:
-    result = await run_process(
-        list(argv), RunProcessOptions(timeout_ms=SERVICE_TIMEOUT_MS)
-    )
-    if result.exit_code != 0 or result.timed_out:
-        warn(f"update schedule: {' '.join(argv)} failed ({result.stderr.strip()})")
-        return False
-    return True
-
-
-async def reconcile_update_schedule(sync_env: SyncEnv) -> None:
-    """Install the periodic updater when the SSOT is a git checkout.
-
-    Best-effort: a host without a user service manager only gets a warning.
-    Unit files are rewritten and the service manager is touched only when the
-    rendered content changes, so a steady-state sync costs no subprocess.
-    """
-    if not (Path(sync_env.ssot_home) / ".git").exists():
-        return
-    try:
-        if sync_env.platform == "darwin":
-            plist, content = _launchd_plist(sync_env)
-            if not _write_changed({plist: content}) or not await command_exists(
-                "launchctl"
-            ):
-                return
-            target = f"gui/{os.getuid()}"
-            _ = await run_process(
-                ["launchctl", "bootout", f"{target}/{LAUNCHD_LABEL}"],
-                RunProcessOptions(timeout_ms=SERVICE_TIMEOUT_MS),
-            )
-            _ = await _service("launchctl", "bootstrap", target, str(plist))
-            return
-        if not _write_changed(_systemd_units(sync_env)) or not await command_exists(
-            "systemctl"
-        ):
-            return
-        if await _service("systemctl", "--user", "daemon-reload"):
-            _ = await _service(
-                "systemctl", "--user", "enable", "--now", f"{UPDATE_UNIT}.timer"
-            )
-    except OSError as error:
-        warn(f"update schedule: {panic_message(error)}")

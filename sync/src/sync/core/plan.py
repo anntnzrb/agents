@@ -384,6 +384,12 @@ def _config_jobs(
                 dst=str(home / ".cli-proxy-api" / "static" / "management.html"),
             )
         )
+        jobs.append(
+            FileJob(
+                src=str(ssot / CLI_PROXY_SOURCE_DIR / "auth-gateway.py"),
+                dst=str(home / ".cli-proxy-api" / "auth-gateway.py"),
+            )
+        )
     jobs.append(
         CliProxyEndpointTemplatesJob(
             targets=tuple(endpoint_targets),

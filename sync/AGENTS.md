@@ -24,7 +24,7 @@ This is the isolated sync application.
 - Managed release manifests live under `../tools/cliproxyapi/` and pin every supported platform asset by SHA-256.
 - Sync downloads only pinned official release assets and caches verified executables under `~/.cache/github-tools` by default.
 - Managed tool wrappers use the upstream executable name and pass generated configuration explicitly.
-- Sync does not install or control system services.
+- Sync installs and controls only the per-user services it declares (systemd user units, the updater's launchd user agent), records them as owned, and prunes owned ones it no longer declares. It never touches system-level services or units it does not own.
 
 ## Model Catalog Contract
 

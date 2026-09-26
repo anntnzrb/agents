@@ -23,7 +23,7 @@ A manual sync runs these stages in order:
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, managed JSON configuration, shared assets, skills, and generated configuration.
 4. On the gateway host, prepare managed tools from the committed release manifest.
-5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts. When the repository is a git checkout, install the [background updater](#background-updates) schedule.
+5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts. Reconcile this host's [user services](#user-services).
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
 
@@ -112,11 +112,28 @@ The launcher resolves the adapter's npm dist-tag and installs the resolved versi
 
 A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
 
+## User services
+
+Sync installs and controls only the per-user services it declares: systemd user units on Linux and the background updater's launch agent on macOS. It never touches system-level services. Declarations live in `sync/src/sync/core/services.py`; which ones apply depends on the host:
+
+- Every host with a git checkout of the repository runs the [background updater](#background-updates).
+- The CLIProxyAPI gateway host runs the gateway and, while its token is set, the [Funnel auth gateway](../cliproxyapi.md#expose-the-gateway-through-tailscale-funnel).
+
+Reconcile rules:
+
+- A declared unit is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`.
+- Sync touches the service manager only when a unit's content changes: it reloads systemd, enables timers, and enables and restarts long-running services. A unit without an `[Install]` section is left to the timer that starts it.
+- A unit sync owned but no longer declares is disabled, stopped, and deleted. Units sync never owned are left alone.
+- Every unit declares its own `PATH`, so services never depend on hand-made service-manager environment such as `~/.config/environment.d/`.
+- Service reconcile is best-effort: a host without a user service manager gets a warning, not a failed sync.
+
+User units keep running after logout only when lingering is enabled for the user, which is a machine-level setting outside this repository.
+
 ## Background updates
 
 Every machine converges on `origin/main`: commit and push from any machine, and the others pick the change up on their own. Pushing stays manual; pulling and reconciling are automatic. The git hooks stay pure quality gates, so only commits that passed the `pre-push` tests reach `origin/main`.
 
-Sync installs a per-user schedule — a systemd timer on Linux, a launch agent on macOS — that runs `sync update` every few minutes at idle CPU and I/O priority. Each run:
+Sync installs a per-user schedule — a systemd timer on Linux, a launch agent on macOS (see [User services](#user-services)) — that runs `sync update` every few minutes at idle CPU and I/O priority. Each run:
 
 1. Skips the round if another sync holds the process lock; it never waits.
 2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout.
@@ -124,7 +141,7 @@ Sync installs a per-user schedule — a systemd timer on Linux, a launch agent o
 
 The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled once by the previous runtime; the new runtime takes over from the next run or launch.
 
-Unit files change only when their rendered content changes, so a steady-state sync touches no service manager. The schedule needs no credentials because `origin` is public over HTTPS. macOS launch agents start with a bare `PATH`, so the agent declares one; systemd units inherit the user manager's `PATH`, which must include `uv`, `git`, and `node`.
+The schedule needs no credentials because `origin` is public over HTTPS.
 
 Inspect or trigger it:
 

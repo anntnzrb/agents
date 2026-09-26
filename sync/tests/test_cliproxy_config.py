@@ -645,3 +645,67 @@ openai-compatibility:
     }
     with pytest.raises(ValueError, match="expected true"):
         _ = render_cliproxy_config(template, secrets, DEPLOYMENT)
+
+
+FUNNEL_TOKEN: Final[str] = "sk-funnel-" + "0" * 32
+
+
+def _write_minimal_gateway_inputs(tmp_path: Path, secrets: dict[str, object]) -> Path:
+    """Write a minimal template and the given secrets; return the config path."""
+    src = tmp_path / "config.yaml.tmpl"
+    _ = src.write_text(
+        "host: ${CLIPROXY_LISTEN_HOST}\nport: ${CLIPROXY_LISTEN_PORT}\n",
+        encoding="utf-8",
+    )
+    _ = (tmp_path / "secrets.json").write_text(json.dumps(secrets), encoding="utf-8")
+    return tmp_path / "runtime" / "config.yaml"
+
+
+def test_cliproxy_sync_writes_private_auth_gateway_env_with_funnel_token(
+    tmp_path: Path,
+) -> None:
+    """A Funnel token renders the auth gateway's private env file."""
+    dst = _write_minimal_gateway_inputs(
+        tmp_path,
+        {"CLIPROXY_CREDENTIAL_POOLS": {}, "CLIPROXY_FUNNEL_TOKEN": FUNNEL_TOKEN},
+    )
+
+    sync_cliproxy_config(
+        tmp_path / "config.yaml.tmpl", dst, tmp_path / "secrets.json", DEPLOYMENT
+    )
+
+    env_file = dst.parent / "auth-gateway.env"
+    assert env_file.stat().st_mode & 0o777 == PRIVATE_FILE_MODE
+    assert env_file.read_text(encoding="utf-8").splitlines() == [
+        f"GATEWAY_SECRET={FUNNEL_TOKEN}",
+        f"CLIPROXY_UPSTREAM=http://100.64.0.42:{EXPECTED_PORT}",
+    ]
+
+
+def test_cliproxy_sync_removes_auth_gateway_env_without_funnel_token(
+    tmp_path: Path,
+) -> None:
+    """Dropping the token removes the env file, so no stale secret stays behind."""
+    dst = _write_minimal_gateway_inputs(tmp_path, {"CLIPROXY_CREDENTIAL_POOLS": {}})
+    env_file = dst.parent / "auth-gateway.env"
+    env_file.parent.mkdir(parents=True)
+    _ = env_file.write_text("GATEWAY_SECRET=old\n", encoding="utf-8")
+
+    sync_cliproxy_config(
+        tmp_path / "config.yaml.tmpl", dst, tmp_path / "secrets.json", DEPLOYMENT
+    )
+
+    assert not env_file.exists()
+
+
+def test_cliproxy_secrets_reject_short_funnel_token(tmp_path: Path) -> None:
+    """A guessable Funnel token is rejected before anything is written."""
+    dst = _write_minimal_gateway_inputs(
+        tmp_path,
+        {"CLIPROXY_CREDENTIAL_POOLS": {}, "CLIPROXY_FUNNEL_TOKEN": "short"},
+    )
+
+    with pytest.raises(RuntimeError, match="invalid CLIProxyAPI secrets"):
+        sync_cliproxy_config(
+            tmp_path / "config.yaml.tmpl", dst, tmp_path / "secrets.json", DEPLOYMENT
+        )

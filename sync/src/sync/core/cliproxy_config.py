@@ -101,6 +101,10 @@ class Credential(BaseModel):
     proxy_url: str | None = Field(default=None, alias="proxyUrl", min_length=1)
 
 
+MIN_FUNNEL_TOKEN_LENGTH = 32
+AUTH_GATEWAY_ENV = "auth-gateway.env"
+
+
 class CliProxySecrets(BaseModel):
     """Collection of named credential pools for CLIProxyAPI."""
 
@@ -113,6 +117,12 @@ class CliProxySecrets(BaseModel):
 
     cliproxy_credential_pools: dict[str, list[Credential]] = Field(
         alias="CLIPROXY_CREDENTIAL_POOLS",
+    )
+    # Bearer token the public Funnel auth gateway requires; unset disables it.
+    funnel_token: str | None = Field(
+        default=None,
+        alias="CLIPROXY_FUNNEL_TOKEN",
+        min_length=MIN_FUNNEL_TOKEN_LENGTH,
     )
 
     @field_validator("cliproxy_credential_pools")
@@ -693,4 +703,23 @@ def sync_cliproxy_config(
         sync_text_file(dst_p, content)
     except (OSError, ValueError, RuntimeError) as error:
         msg = f"render CLIProxyAPI config {src_p} -> {dst_p} ({panic_message(error)})"
+        raise RuntimeError(msg) from error
+    sync_auth_gateway_env(dst_p.parent / AUTH_GATEWAY_ENV, secrets, deployment)
+
+
+def sync_auth_gateway_env(
+    dst: Path,
+    secrets: CliProxySecrets,
+    deployment: CliProxyDeployment,
+) -> None:
+    """Write the Funnel auth gateway's private env file, or remove a stale one."""
+    if secrets.funnel_token is None:
+        dst.unlink(missing_ok=True)
+        return
+    upstream = f"http://{deployment.listen.host}:{deployment.listen.port}"
+    content = f"GATEWAY_SECRET={secrets.funnel_token}\nCLIPROXY_UPSTREAM={upstream}\n"
+    try:
+        sync_text_file(dst, content)
+    except (OSError, ValueError, RuntimeError) as error:
+        msg = f"render auth gateway env {dst} ({panic_message(error)})"
         raise RuntimeError(msg) from error
