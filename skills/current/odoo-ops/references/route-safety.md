@@ -21,4 +21,4 @@ The scanner does not return a write-risk classification or parse-error inventory
 
 Read handler source and its callees before assessing effects. Look for ORM mutations, direct SQL, transaction control, external calls, and business methods such as `action_*`. Names and static signals are heuristics, not proof of read-only behavior.
 
-Keep source inspection, database inspection, and route invocation separate. Do not invoke a controller to test whether it writes. For production or RPC interaction, follow [Safety model](safety-model.md); local inspection does not grant that permission.
+Keep source inspection, database inspection, and route invocation separate. Do not invoke a controller to test whether it writes. For production or RPC interaction, use the CLI according to [Safety model](safety-model.md); production reads require no per-read approval, while writes require the dry-run plan and user approval workflow.

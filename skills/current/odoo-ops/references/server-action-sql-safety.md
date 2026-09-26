@@ -1,6 +1,6 @@
 # Server Action SQL safety
 
-Read [Safety model](safety-model.md) before production use. SQL bypasses ORM access rules, constraints, and tracking. Obtain explicit approval of that tradeoff and the exact targets and values.
+Read [Safety model](safety-model.md) before production use. Creating and executing Server Actions in production is performed by the user in the Odoo web UI because the CLI denies `run` on production. SQL bypasses ORM access rules, constraints, and tracking; ensure the user explicitly approves that tradeoff along with the exact target IDs and values before setting `WRITE_APPROVED = True`.
 
 Sources:
 

@@ -1,71 +1,69 @@
 # Use Odoo Ops with OMP Eval
 
-Read only when using this skill through Oh My Pi (OMP). This optional companion does not change the skill's CLI, dependencies, permissions, or behavior in other harnesses. Follow [Safety model](safety-model.md) first.
+Read only when using this skill through Oh My Pi (OMP). This companion does not change the skill's CLI, permissions, or behavior. Read [Safety model](safety-model.md) first.
 
-## Choose the execution environment
+## Local Analysis Workspace
 
-OMP Eval is a persistent Python workspace for analysis and orchestration. It is not Odoo's Server Action `safe_eval`. Imports, asynchronous code, and third-party libraries that work in Eval may be forbidden in a Server Action. Render deployment snippets separately and check them against the target Odoo and Python versions.
+OMP Eval is a persistent Python workspace for local data analysis, joins, and aggregations. It is not an alternative transport to Odoo.
 
-Follow the live Eval schema and active harness rules, not an older session's syntax. These examples use `language="py"`. Do not substitute JavaScript or an embedded shell when the active schema rejects it.
+Agents MUST NOT write custom HTTP, XML-RPC, or JSON-RPC clients, import the skill's Python modules or transports into notebook or eval kernels, or make network calls to Odoo from within Eval. All data acquisition and all mutations MUST go through the CLI via shell (`odoo-ops rpc ...`). If the CLI lacks a required operation, stop and report the capability gap.
 
-Use specialized tools for file reads, discovery, edits, commands, and supported database inspection. Use Eval to distill already acquired data, perform joins and aggregations, or expose narrow analysis tools. Eval is not an alternate transport around RPC permission checks.
+Production reads through the CLI need no per-read approval. Production writes strictly require the dry-run plan, user review, and `apply <plan-id>` workflow executed through the CLI.
 
-## Preserve useful state, not stale permission
+Follow this boundary:
+1. Acquire data using the CLI in shell, saving structured output to a file:
+   ```text
+   uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc search_read crm.lead '[["user_id", "=", 2]]' --fields 'name team_id expected_revenue' --limit 100 --json > <temp-dir>/leads.json
+   ```
+2. Load and analyze the saved JSON file inside Eval.
+3. If mutations are needed, generate a dry-run plan via the CLI, present the diff to the user, and run `apply <plan-id>` via the CLI upon approval.
 
-Work incrementally: import, define, validate on a small sample, then process the full approved input. Keep normalized tables and pure helpers in memory across cells. Print totals, schema, mismatches, and bounded examples instead of entire records.
+## Preserve Useful State
 
-Reuse a snapshot only while its database, acquisition time, domain, fields, context, and completeness remain suitable. Refresh preconditions before an approved write. A cached client, token, variable named `approved`, or result from another worker does not renew consent.
+Work incrementally: load the saved JSON file, normalize shapes, validate on a small sample, then process the full input. Keep normalized tables and pure helpers in memory across cells. Print totals, schemas, mismatches, and bounded summaries instead of raw dumps.
 
-Keep acquisition, analysis, and mutation in separate cells. After an analysis error, rerun only the failed transformation, not the cell that acquired data or wrote records. After a kernel restart, rebuild analysis from saved inputs. Never reconstruct progress by replaying writes.
+Keep analysis deterministic. After an analysis error, rerun only the failed transformation cell. After a kernel restart, reload inputs from the saved file.
 
-Use the bundled guarded RPC client or CLI for authorized acquisition. A read client uses `allow_rpc=True, allow_write=False` only after scoped permission. Do not leave a write-enabled client exposed to general worker callbacks. End its use when the approved operation ends.
+## Select Libraries by Workload
 
-## Select libraries by workload
-
-Reduce acquisition work before adding concurrency. For approved counts or distributions, prefer `search_count` or `read_group` over downloading every record. For record analysis, request explicit fields and bounded pages, then reuse the acquired snapshot for multiple questions.
-
-Use stable ID ordering and record page boundaries. For a changing dataset, offset pagination can skip or duplicate records; an ID cursor with an initial upper bound avoids shifting offsets but is still not a transactionally consistent snapshot. Reconcile completeness and refresh write preconditions separately.
-
-No third-party package is guaranteed by this skill. Prefer one suitable engine over converting the same data through every installed library.
+Process data locally with standard Python tools or installed data libraries:
 
 | Workload | Useful combination | Boundary |
 | --- | --- | --- |
-| Small audits | `json`, `collections.Counter`, sets, `decimal.Decimal` | No dependency needed for counts, exact ID comparisons, or small joins |
-| Tabular joins and distributions | Polars with explicit schemas | Normalize Odoo relation values before constructing a table |
-| SQL over large local snapshots | DuckDB over existing Parquet, CSV, or JSONL | Project and filter early; bound displayed results, not silently the analyzed dataset |
-| Reusing a columnar snapshot in SQL | Polars to Arrow to DuckDB | Reuse an Arrow table; conversion is not guaranteed zero-copy for every type |
-| Excel reconciliation | `fastexcel` with Polars | Preserve identifiers, blanks, date interpretation, and leading zeros |
-| Duplicate-name candidates | `rapidfuzz` after exact blocking | Similarity proposes candidates; it never authorizes a merge or deletion |
-| Dependency analysis | `networkx` over extracted edges | Useful for cycles and ordering, not a substitute for reading model constraints |
-| Independent local analysis | Pure functions or bounded asynchronous tasks | Avoid adding an outer worker pool around an already parallel dataframe engine without measurement |
+| Small audits | `json`, `collections.Counter`, sets, `decimal.Decimal` | No dependencies needed for counts, exact ID comparisons, or small joins. |
+| Tabular joins and distributions | Polars with explicit schemas | Normalize Odoo relation values before constructing a table. |
+| SQL over local snapshots | DuckDB over saved Parquet, CSV, or JSON | Filter early; bound displayed results. |
+| Reusing a columnar snapshot in SQL | Polars to Arrow to DuckDB | Reuse Arrow tables in memory without re-parsing files. |
+| Excel reconciliation | `fastexcel` with Polars | Preserve identifiers, blanks, and leading zeros. |
+| Duplicate-name candidates | `rapidfuzz` after exact blocking | Similarity proposes candidates; it never authorizes a merge or deletion. |
+| Dependency analysis | `networkx` over extracted edges | Detect cycles and ordering without guessing model constraints. |
 
-`httpx` can pool authorized HTTP connections, but it does not implement this skill's RPC guardrails. Do not replace the guarded Odoo client with a raw HTTP or XML-RPC loop for throughput.
+Normalize many-to-one fields: convert `False` to `None` and `[id, display_name]` to `id`. Keep Boolean fields Boolean. Use explicit timezones and decimal types for financial figures. Reject unexpected schemas instead of coercing them to empty values.
 
-Normalize many-to-one `false` to a null relation ID and `[id, display_name]` to the ID. Keep Boolean fields Boolean. Preserve many-to-many lists deliberately, use explicit timezones, and avoid binary floats for financial reconciliation. Reject unexpected shapes instead of coercing them to empty values.
+## Analyze a Saved Snapshot
 
-## Analyze one snapshot
-
-The following cells use synthetic data only. They make no RPC calls.
+The following cells load and analyze a local dataset in memory. They make zero network calls:
 
 First cell:
 
 ```python
-import polars as pl
+import json
 from decimal import Decimal
+from pathlib import Path
+import polars as pl
 
-rows = [
-    {"id": 101, "team_id": [7, "Example"], "amount": "10.20"},
-    {"id": 102, "team_id": False, "amount": "0.00"},
-    {"id": 103, "team_id": [7, "Example"], "amount": "2.30"},
-]
+# Load data saved from CLI output
+raw_data = json.loads(Path("<temp-dir>/leads.json").read_text(encoding="utf-8"))
+
 normalized = [
     {
         "id": row["id"],
         "team_id": None if row["team_id"] is False else row["team_id"][0],
-        "amount": Decimal(row["amount"]),
+        "amount": Decimal(str(row.get("expected_revenue") or "0.00")),
     }
-    for row in rows
+    for row in raw_data
 ]
+
 leads = pl.DataFrame(
     normalized,
     schema={
@@ -76,7 +74,7 @@ leads = pl.DataFrame(
 )
 ```
 
-Second cell, without re-importing or reacquiring rows:
+Second cell:
 
 ```python
 summary = (
@@ -91,9 +89,7 @@ print(summary)
 print({"rows": leads.height, "unique_ids": leads["id"].n_unique()})
 ```
 
-Expected: team 7 has two records totaling `12.50`; the unset team has one totaling `0.00`. Three rows have three unique IDs.
-
-If SQL is clearer for the next analysis, reuse the same table:
+SQL analysis via DuckDB:
 
 ```python
 import duckdb
@@ -101,25 +97,20 @@ import duckdb
 with duckdb.connect(":memory:") as analysis_db:
     analysis_db.register("lead_snapshot", leads.to_arrow())
     result = analysis_db.sql("""
-		SELECT team_id, count(*) AS records, sum(amount) AS amount
-		FROM lead_snapshot GROUP BY team_id ORDER BY team_id NULLS LAST
-	""").fetchall()
+        SELECT team_id, count(*) AS records, sum(amount) AS amount
+        FROM lead_snapshot GROUP BY team_id ORDER BY team_id NULLS LAST
+    """).fetchall()
 print(result)
 ```
 
-This path also needs Arrow support. `fetchall()` here returns two aggregate rows, not the source dataset. Avoid `.df()` merely to display results when pandas is not otherwise needed.
+## Orchestration for Independent Analysis
 
-## Use workflow orchestration for independent work
+Use harness orchestration only when supported in the active session. Orchestration steers concurrency; it does not bypass the CLI or make parallel writes safe.
 
-Use the harness workflow keyword only when it is available in the active session. The keyword steers orchestration. It does not grant RPC permission, create a transaction, enforce a deterministic result, or make parallel writes safe. A single query or small edit should remain direct.
-
-For multiple independent items, scope ownership and result contracts first. Prefer one named worker pool per phase when the harness provides one. Push known items together, continue useful local work, and consume every result. Use a new pool name for a later phase once the earlier job has fully drained. If blocked, wait outside Eval rather than polling continuously.
-
-Use individual agent handles for a small dependency graph or schema-returning results. Do not assume filesystem isolation implies kernel isolation. Avoid resetting a shared kernel or mutating shared globals while workers use it.
-
-Give workers disjoint analysis questions over the same approved snapshot, not duplicate acquisition jobs. Keep production writes with one owner and execute approved batches serially. Pass compact findings and artifact references instead of credentials or complete customer records.
-
-If the active session supports defining callable tools, expose narrow analysis-only functions over retained data:
+For independent analytical questions:
+- Give workers disjoint analytical questions over the same saved snapshot.
+- Never dispatch duplicate acquisition jobs or make concurrent network requests to Odoo.
+- If exposing tools to workers, provide pure functions operating over loaded in-memory data:
 
 ```python
 @tool
@@ -128,16 +119,10 @@ def snapshot_team_count(team_id: int) -> int:
     return leads.filter(pl.col("team_id") == team_id).height
 ```
 
-Pass only that tool's name when creating workers. Do not expose a generic SQL executor, arbitrary RPC method, or write-enabled client. Shared callbacks may execute in the parent kernel; keep shared data immutable or synchronize actual mutations.
+## Recovery
 
-## Recover without expanding scope
-
-- For `NameError`, inspect whether the definition cell succeeded or the kernel restarted. Restore only missing analysis state.
-- Distinguish the Eval kernel from an Odoo runtime or a child process. A subprocess does not inherit Python variables from the kernel. Missing `odoo` or `psycopg2` while importing the application into Eval does not establish a broken kernel. Run application validation through the configured local runtime rather than installing Odoo's dependency tree into Eval.
-- After a wrapper-signature `TypeError`, inspect its actual signature and correct that call. Do not rebuild the transport or repeat successful earlier RPC calls. A later non-error tool result proves neither complete retrieval nor a valid audit.
-- For `ImportError`, identify the failing interpreter and API first. Inspect `sys.executable` and package versions without printing environment secrets. A missing name can mean an incompatible API, not a missing package.
-- A dependency reminder is not an error and does not authorize installation. If a required package is genuinely absent and installation is authorized, install only that package for the failing interpreter. Do not upgrade unrelated packages or reset healthy state.
-- Use top-level `await` rather than `asyncio.run()` inside Eval. Bound independent I/O and own task cleanup. Cancellation of an awaiting coroutine does not prove a blocking worker thread or remote request stopped.
-- A cell timeout can leave earlier assignments intact or lead to kernel replacement. Inspect the actual outcome. Never assume cancellation rolled back Odoo or replay an ambiguous mutation.
-- Recover spilled output through the returned artifact reference. For `output()`, verify the actual returned structure before indexing it; `format="json"` is an output envelope, not a promise that its content is already decoded business JSON.
+- For `NameError`, check whether the definition cell succeeded or the kernel restarted. Reload only the missing local analysis state.
+- Distinguish the Eval kernel from the Odoo runtime container. Eval lacks Odoo application packages (`odoo`, `psycopg2`). Do not attempt to install Odoo dependencies into Eval.
+- For `ImportError`, inspect `sys.executable` and package availability. Do not install packages unless explicitly authorized.
+- For cell timeouts, inspect kernel state. Never assume a timeout rolled back server changes; check the server via CLI if a mutation was underway.
 

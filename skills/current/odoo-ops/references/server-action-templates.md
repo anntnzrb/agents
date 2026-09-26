@@ -2,7 +2,7 @@
 
 Templates are starting points: copy to `<temp-dir>/<task>.py`, edit there, then use the platform clipboard command.
 
-Read [Safety model](safety-model.md) before production use. Render every placeholder and review the full result locally. Preparing or copying code is not permission to save or run it in production. Do not use templates to bypass JSON-RPC consent.
+Read [Safety model](safety-model.md) before production use. Creating and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI denies `run` on production. Render every placeholder and review the full result locally. Templates provide the user's manual UI workflow; do not use them to bypass JSON-RPC rules.
 
 Both write templates default to `WRITE_APPROVED = False`. Set it to `True` only after explicit approval of the rendered action, exact target IDs, values, and expected effects. Never substitute a matching count for target identity. Rehearse on the disposable replica with outbound integrations disabled.
 

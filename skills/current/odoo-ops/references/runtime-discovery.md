@@ -1,32 +1,52 @@
-# Runtime discovery
+# Runtime Discovery
 
-Read before local development or database operations. Discovery finds paths; it does not certify a disposable database.
+Read before local development or database operations. Discovery identifies paths and configuration; it does not replace inspecting database contents.
 
-## Local paths
+## Local Paths
 
-- Runtime: existing `ODOO_RUNTIME_PATH`, then `/opt/odoo17`, then `~/.local/share/odoo17`. If none exists, the resolver returns `/opt/odoo17` as its fallback path.
-- Custom addons: existing `ODOO_ADDONS_PATH`, then `~/repos/etech/odoo/addons`, then `./addons`, then the current directory.
+- Runtime: existing `ODOO_RUNTIME_PATH`, then `/opt/odoo17`, then `~/.local/share/odoo17`. If none exists, the resolver returns `/opt/odoo17` as fallback path.
+- Custom addons: existing `ODOO_ADDONS_PATH`, then `./addons`, then the current repository root directory.
 - Config: `<runtime>/config/odoo.conf`.
-- Source addons: matching directories under `<runtime>/source`.
+- Source addons: matching directories under `<runtime>/source` (resolved via `addons_paths`).
 
-Use absolute environment paths. The CLI does not provide `--root` or `--runtime-dir` overrides.
+Use absolute environment paths when configuring overrides. The CLI does not provide `--root` or `--runtime-dir` command-line flags.
 
-## Database selection
-
-Database inspection commands use `--db` when supplied, otherwise the resolved config's `options.db_name`, falling back to `ODOO_DB_NAME` or the controller's default. Development and test commands select their database through the requested workflow or module resolution. Workflow settings live in `profiles/<profile>.json`.
+## Environment Inspection
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py env --json
 ```
 
-Inspect `runtime_path`, `config_path`, `custom_addons_path`, `effective_database`, and the requested workflow before destructive work. `env` reports configuration, not a proof that the database is connected or disposable.
+`env --json` outputs key environment and database facts:
+- `runtime_path`: location of installed Odoo core source.
+- `addons_paths`: array of all active addon directories (core and enterprise).
+- `custom_addons_path`: repository addons directory.
+- `config_path`: path to active `odoo.conf`.
+- `effective_database`: database resolved via precedence: `--db` CLI flag > `POSTGRES_DB` environment variable > profile default workflow database > `db_name` in `odoo.conf`.
+- `database_source`: configuration source that resolved `effective_database` (`flag`, `env`, `profile`, or `odoo.conf`).
+- `database_exists`: boolean indicating whether the effective database exists in PostgreSQL.
+- `available_databases`: list of local databases present in PostgreSQL.
 
-Keep the analysis interpreter, Odoo runtime interpreter, and subprocess environment distinct. A variable defined in an analysis session is not available inside a newly launched Odoo shell. Pass required inputs explicitly and check process exit status before parsing stdout.
+Always check `runtime_path` and `addons_paths` before designing new models or methods. Inspecting the installed source ensures your code builds upon native Odoo 17 conventions and primitives.
 
-After an unknown CLI argument or missing path, consult the installed command's `--help` or use directory discovery once. Correct the invocation rather than repeating a guessed command or hard-coding a versioned source directory.
+## Database Selection
 
-## Isolation
+Commands default to the database resolved by `env` (`effective_database`). You can override this default explicitly with `--db <database_name>`.
 
-Keep Podman pointed at the local host or local Podman machine. Never use production container connections for replica commands. Loopback connections can still be tunnels; verify their purpose locally.
+If the default database is missing, run `env --json` or `db-list` to locate available working replicas. Do not resort to raw psql or ad-hoc shell commands to guess database names.
 
-Disable copied production cron jobs and outbound integrations before running application code. Missing local data never authorizes JSON-RPC discovery; follow [Safety model](safety-model.md).
+## Container Health, Shell, and Lifecycle Management
+
+Use the CLI subcommands to inspect and manage container state:
+
+- `health [--port PORT] [--wait SECONDS]`: probes HTTP endpoint on `127.0.0.1` (never use `localhost` due to IPv6 binding conflicts). Use this command instead of invoking `curl` directly.
+- `logs [-c web|db|test] [-f] [-n LINES]`: displays or tails logs from specific containers in the pod.
+- `shell [script|-] [--file PATH] [--db DB] [--rollback]`: runs Python ORM code against the local replica (refuses `_seed_` and production). Requires `dev` to be running. Commits on exit unless `--rollback` is passed.
+- `prune`: removes orphaned test containers (`odoo-test-*`) left behind after aborted test runs.
+- `stop [--web]`: stops the pod or gracefully stops only the web container.
+
+## Isolation and Multi-Agent Concurrency
+
+The CLI manages container creation and unit test execution through an internal file lock (`odoo-ops.lock`). When multiple agents or tasks run tests concurrently, the CLI serializes execution automatically; external `flock` wrappers are unnecessary.
+
+The test runner executes inside its own transient container (`odoo-test-*`) within the pod. It does not restart the pod or stop `odoo-web`, but it updates modules (`-u`) on the same database, so a running `dev` server can drop sessions or reload; run `health --wait 60` before browser checks. Test runs report `RESULT tests= failed= errors=`. Do not execute `git stash` while `dev` is actively running, as filesystem changes during Python autoreload cause server crashes.

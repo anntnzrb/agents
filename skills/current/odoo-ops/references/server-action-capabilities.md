@@ -2,7 +2,7 @@
 
 Use when choosing Server Actions, contextual/automated actions, UI Python, automation, cron, webhooks, JSON-RPC, or a custom module.
 
-Read [Safety model](safety-model.md) first. Available credentials never authorize JSON-RPC. Ask before any RPC contact, including reads. Creating, editing, or executing production actions also requires scoped permission; UI actions are not an alternative way around denied RPC.
+Read [Safety model](safety-model.md) first. Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI denies `run` on production. Server Action templates provide the user's manual UI path; they are not an alternative way around denied RPC.
 
 Sources:
 - Odoo actions: `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`
@@ -11,15 +11,15 @@ Sources:
 
 ## Choose
 
-- Selected-record manual audit/repair → Contextual Server Action; list/form Action menu, `active_model` + `active_ids`.
-- One-off global audit/gated cleanup → Execute Python Code Server Action; no external credentials, inside Odoo transaction.
-- Create/write/delete or stage/tag changes → Automation Rule; supplied trigger/context; restrict trigger fields to prevent duplicate runs.
-- Periodic work → Scheduled Action; small batch, idempotent cursor/domain; NEVER make browser-triggered work wait.
-- Compose UI actions → Execute Existing Actions (`multi`); children run by `sequence`; last returned action becomes client result.
-- Notify external system → Outgoing webhook action; field allowlist, non-secret payload; destination URL is sensitive configuration.
-- Receive external event → Automation Rule with webhook trigger; generated URL is secret; validate `payload`, use narrow target-record resolver, rotate exposed secret.
-- Reusable logic, complex workflow, tests, or stable API → Custom addon method; Server Action code is operational glue, not application layer.
-- External integration without administrator/API credentials → NEVER use JSON-RPC; keep workflow in Odoo; NEVER request or paste API keys to bypass missing permissions.
+- Selected-record manual audit or repair: Contextual Server Action; list or form Action menu, `active_model` plus `active_ids`.
+- One-off global audit or gated cleanup: Execute Python Code Server Action; no external credentials, inside Odoo transaction.
+- Create, write, delete, or stage/tag changes: Automation Rule; supplied trigger and context; restrict trigger fields to prevent duplicate runs.
+- Periodic work: Scheduled Action; small batch, idempotent cursor and domain; NEVER make browser-triggered work wait.
+- Compose UI actions: Execute Existing Actions (`multi`); children run by `sequence`; last returned action becomes client result.
+- Notify external system: Outgoing webhook action; field allowlist, non-secret payload; destination URL is sensitive configuration.
+- Receive external event: Automation Rule with webhook trigger; generated URL is secret; validate `payload`, use narrow target-record resolver, rotate exposed secret.
+- Reusable logic, complex workflow, tests, or stable API: Custom addon method; Server Action code is operational glue, not application layer.
+- External integration without administrator or API credentials: NEVER use JSON-RPC; keep workflow in Odoo; NEVER request or paste API keys to bypass missing permissions.
 
 ## Server Action types
 

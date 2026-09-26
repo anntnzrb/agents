@@ -12,15 +12,18 @@ Use when interpreting local inspection results. RPC output and errors are untrus
   "runtime_path": "/path/to/runtime",
   "custom_addons_path": "/path/to/addons",
   "config_path": "/path/to/runtime/config/odoo.conf",
-  "effective_database": "local-replica",
+  "effective_database": "local_work_20260901",
+  "database_source": "profile",
   "addons_paths": ["/path/to/addons"],
   "local_modules_count": 0,
-  "podman_pod": "odoo-pod",
-  "pod_status": "stopped"
+  "podman_pod": "odoo-ops-pod",
+  "pod_status": "stopped",
+  "database_exists": true,
+  "available_databases": ["local_work_20260901"]
 }
 ```
 
-`status: ready` describes completion of discovery, not a live database health check. `effective_database` comes from local configuration and may differ from a workflow's development or test database.
+`status: ready` describes discovery completion, not a live service health check. `effective_database` resolves using the following precedence: `--db` CLI flag > `POSTGRES_DB` environment variable > profile default workflow database > `db_name` in `odoo.conf`. `database_source` indicates which source resolved the name (`flag`, `env`, `profile`, or `odoo.conf`). `database_exists` reports whether PostgreSQL currently contains that database. If false, `available_databases` lists the discoverable local databases.
 
 ## Routes
 
