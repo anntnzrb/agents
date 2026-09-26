@@ -77,6 +77,39 @@ antigravity:
     - "system_directive"
     - "RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL."
 
+# OpenCode Go serves the Muse Spark contributor models only through the OpenAI
+# Responses API; the openai-compatibility executor always posts to
+# /chat/completions, which Go rejects (ModelProtocolUnsupported). The codex
+# executor speaks /responses, and CLIProxyAPI still accepts every client
+# protocol for these ids.
+codex-api-key:
+  - x-credential-pool: "opencode-go"
+    base-url: "https://opencode.ai/zen/go/v1"
+    prefix: "opencode-go"
+    headers:
+      x-opencode-session: "$CPA-SESSION-ID"
+    models:
+      - name: "muse-spark-1.2-contributor"
+        display-name: "Muse Spark 1.2 Contributor"
+        max-context-length: 1048576
+        thinking:
+          levels:
+            - "minimal"
+            - "low"
+            - "medium"
+            - "high"
+            - "xhigh"
+      - name: "muse-spark-1.3-contributor"
+        display-name: "Muse Spark 1.3 Contributor"
+        max-context-length: 1048576
+        thinking:
+          levels:
+            - "minimal"
+            - "low"
+            - "medium"
+            - "high"
+            - "xhigh"
+
 openai-compatibility:
   - name: "opencode-go-custom"
     base-url: "https://opencode.ai/zen/go/v1"
@@ -90,6 +123,10 @@ openai-compatibility:
       x-opencode-session: "$CPA-SESSION-ID"
     # Sync derives the model list from {base-url}/models.
     x-model-discovery: true
+    # Served through codex-api-key below instead.
+    x-model-exclude:
+      - "muse-spark-1.2-contributor"
+      - "muse-spark-1.3-contributor"
   - name: "opencode-zen-custom"
     base-url: "https://opencode.ai/zen/v1"
     prefix: "opencode-zen"

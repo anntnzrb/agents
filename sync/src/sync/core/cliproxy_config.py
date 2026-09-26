@@ -25,6 +25,7 @@ from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 POOL_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9-]*$")
 POOL_MARKER: Final[str] = "x-credential-pool"
 DISCOVERY_MARKER: Final[str] = "x-model-discovery"
+EXCLUDE_MARKER: Final[str] = "x-model-exclude"
 DISCOVERY_TIMEOUT_SECONDS: Final[float] = 5.0
 MODELS_DEV_URL: Final[str] = "https://models.dev/api.json"
 MODELS_DEV_TTL_SECONDS: Final[float] = 24 * 60 * 60
@@ -398,6 +399,15 @@ def _validate_discovery(value: object, label: str) -> None:
         raise ValueError(msg)
 
 
+def _validate_exclude(value: object, label: str) -> frozenset[str]:
+    if not is_obj_list(value) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        msg = f"invalid {label}.{EXCLUDE_MARKER}: expected list of model ids"
+        raise ValueError(msg)
+    return frozenset(item for item in value if isinstance(item, str))
+
+
 def _read_previous_models(path: Path) -> dict[str, list[object]]:
     """Collect the previous rendered model lists keyed by compatibility profile name."""
     try:
@@ -560,9 +570,10 @@ def _expand_compatibility_section(
             raise TypeError(msg)
         profile: dict[str, object] = dict(raw_item)
         if POOL_MARKER not in profile:
-            if DISCOVERY_MARKER in profile:
-                msg = f"invalid {label}: {DISCOVERY_MARKER} requires {POOL_MARKER}"
-                raise ValueError(msg)
+            for marker in (DISCOVERY_MARKER, EXCLUDE_MARKER):
+                if marker in profile:
+                    msg = f"invalid {label}: {marker} requires {POOL_MARKER}"
+                    raise ValueError(msg)
             result.append(profile)
             continue
         pool_marker_val = profile[POOL_MARKER]
@@ -571,14 +582,24 @@ def _expand_compatibility_section(
         credentials = _require_pool(pool_name, pools)
         referenced_pools.add(pool_name)
         shared_profile = {k: v for k, v in profile.items() if k != POOL_MARKER}
+        excluded: frozenset[str] = frozenset()
+        if EXCLUDE_MARKER in shared_profile:
+            if DISCOVERY_MARKER not in shared_profile:
+                msg = f"invalid {label}: {EXCLUDE_MARKER} requires {DISCOVERY_MARKER}"
+                raise ValueError(msg)
+            excluded = _validate_exclude(shared_profile.pop(EXCLUDE_MARKER), label)
         if DISCOVERY_MARKER in shared_profile:
             _validate_discovery(shared_profile.pop(DISCOVERY_MARKER), label)
-            shared_profile["models"] = _discover_profile_models(
-                label,
-                shared_profile,
-                credentials[0],
-                discovery,
-            )
+            shared_profile["models"] = [
+                model
+                for model in _discover_profile_models(
+                    label,
+                    shared_profile,
+                    credentials[0],
+                    discovery,
+                )
+                if model.get("name") not in excluded
+            ]
         result.append(
             shared_profile
             | {
