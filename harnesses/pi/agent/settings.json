@@ -1,7 +1,7 @@
 {
   "cacheWarming": "idle",
   "collapseChangelog": true,
-  "defaultTools": ["bash", "edit", "write"],
+  "defaultTools": ["read", "bash", "edit", "write"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
   "followUpMode": "all",
