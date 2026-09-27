@@ -8,43 +8,50 @@ compatibility: Requires Firecrawl MCP server via MCPorter.
 
 # Firecrawl
 
-Web scraping, crawling, mapping, and structured data extraction via the dynamic MCP runner (`mcporter call firecrawl.<tool>`).
+Web scraping, crawling, mapping, search, and structured data extraction through the Firecrawl MCP server, called with `mcporter call firecrawl.<tool>`.
 
-Tool schemas are dynamic and authoritative. When discovering capabilities or parameter requirements, inspect the live server directly.
+The live server is the authority for tool names and schemas. Every tool name carries the `firecrawl_` prefix: call `firecrawl.firecrawl_scrape`, not `firecrawl.scrape`.
 
-## Discovery Workflow for Agents (Cold Start)
+## Discover tools
 
-1. **Roster of available tools (Short listing):**
+1. List the tools with compact signatures:
    ```sh
    mcporter list firecrawl --brief
    ```
-2. **Inspect exact parameters and schema for a specific tool:**
+2. Before a call with uncertain arguments, read the full schemas. The output is large (about 100 KB for the whole server), so search it for the tool you need:
    ```sh
-   mcporter list firecrawl.<tool_name> --schema
+   mcporter list firecrawl --schema
    ```
 
-## Common Operations
+## Common calls
 
-### 1. Scrape a URL (Markdown / Clean Content)
+Scrape one page as Markdown:
 ```sh
-mcporter call firecrawl.scrape --args '{"url": "https://example.com", "formats": ["markdown"]}' --output json
+mcporter call firecrawl.firecrawl_scrape --args '{"url": "https://example.com", "formats": ["markdown"], "onlyMainContent": true}' --output json
 ```
 
-### 2. Crawl a Website (Recursive Multi-Page)
+Extract structured data from a known page. Pass the schema in `jsonOptions`:
 ```sh
-mcporter call firecrawl.crawl --args '{"url": "https://docs.example.com", "limit": 20, "maxDepth": 2}' --output json
+mcporter call firecrawl.firecrawl_scrape --args '{"url": "https://example.com/pricing", "formats": ["json"], "jsonOptions": {"schema": {"type": "object", "properties": {"plan": {"type": "string"}, "price": {"type": "number"}}}}}' --output json
 ```
 
-### 3. Map Sitemaps and URLs
+List a site's URLs without fetching them:
 ```sh
-mcporter call firecrawl.map --args '{"url": "https://example.com", "search": "pricing"}' --output json
+mcporter call firecrawl.firecrawl_map --args '{"url": "https://docs.example.com", "search": "pricing", "limit": 50}' --output json
 ```
 
-### 4. Structured Data Extraction (JSON Schema)
+Crawl several pages. The call polls until the crawl finishes and can return a large result:
 ```sh
-mcporter call firecrawl.extract --args '{"urls": ["https://example.com/product/123"], "schema": {"type": "object", "properties": {"name": {"type": "string"}, "price": {"type": "number"}}}}' --output json
+mcporter call firecrawl.firecrawl_crawl --args '{"url": "https://docs.example.com", "includePaths": ["/docs/.*"], "limit": 20, "maxDiscoveryDepth": 2}' --output json
 ```
 
-## Execution Rules & Safety
-- **Dynamic Schema Inspection:** Run `mcporter list firecrawl.<tool> --schema` when parameters or required arguments are uncertain.
-- **Large payloads:** Route structured results to local files using `--output-file <path>` or inspect JSON directly.
+Search the web:
+```sh
+mcporter call firecrawl.firecrawl_search --args '{"query": "firecrawl mcp release notes", "limit": 5}' --output json
+```
+
+## Rules
+
+- Save large results with shell redirection: append `> <temp-dir>/page.json` to the call. `mcporter call` has no `--output-file` flag.
+- `firecrawl_extract` is a deprecated compatibility tool. Use `firecrawl_scrape` with `formats: ["json"]` for known URLs, and `firecrawl_agent` when the URLs are unknown or the data spans several sites.
+- Set `maxAge: 0` on `firecrawl_scrape` when the page must be fetched live. Firecrawl can otherwise serve recently indexed content.
