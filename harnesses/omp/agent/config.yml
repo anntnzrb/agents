@@ -98,7 +98,7 @@ magicKeywords:
 
 spelling:
   typoDetection: true
-  autocomplete: true
+  autocomplete: smollm
   autocorrect: false
 
 emojiAutocomplete: true
@@ -335,12 +335,15 @@ theme:
 
 composer:
   shape: pi
+  tokenRate: true
 
 symbolPreset: nerd
 colorBlindMode: false
 
 statusLine:
-  preset: default
+  preset: custom
+  leftSegments: [pi, vim, model, mode, collab, stream, path, git, pr, context_pct, cost]
+  rightSegments: [cache_hit, session_name]
   separator: ascii
   transparent: false
   compactThinkingLevel: false
@@ -385,7 +388,7 @@ dev:
 # ─────────────────────────────────────────────────────────────────────────────
 
 collab:
-  autoStart: control
+  autoStart: "off"
   relayUrl: wss://my.omp.sh
   webUrl: https://my.omp.sh
   displayName: джаг
