@@ -8,9 +8,10 @@ import contextlib
 import os
 import signal
 import stat
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, NoReturn
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -19,6 +20,7 @@ from sync.runtime.errors import err
 
 __all__ = [
     "CommandOutcome",
+    "ExecPlan",
     "Failure",
     "MissingCommand",
     "OutputLimit",
@@ -26,7 +28,9 @@ __all__ = [
     "RunProcessOptions",
     "Success",
     "TimedOut",
+    "build_process_env",
     "command_exists",
+    "exec_process",
     "log_command_failure",
     "resolve_executable",
     "run_command",
@@ -101,7 +105,33 @@ class RunProcessOptions:
     cwd: str | Path | None = None
     env: Mapping[str, str | None] | None = None
     timeout_ms: float | None = None
-    stdio: Literal["pipe", "inherit"] = "pipe"
+
+
+_PYTHON_IGNORED_SIGNALS = (signal.SIGPIPE, signal.SIGXFSZ)
+
+
+@dataclass(frozen=True, slots=True)
+class ExecPlan:
+    """An executable that replaces the current process; see ``exec_process``."""
+
+    executable: str
+    args: tuple[str, ...]
+    env: dict[str, str]
+
+
+def exec_process(plan: ExecPlan) -> NoReturn:
+    """Replace this process with the plan's executable; raises OSError on failure.
+
+    The executable keeps this PID, session, process group, and controlling
+    terminal, so terminal signals and supervisor stop signals reach it directly.
+    """
+    _ = sys.stdout.flush()
+    _ = sys.stderr.flush()
+    # Python ignores these at startup and ignored dispositions survive exec;
+    # restore defaults as subprocess's restore_signals does.
+    for signum in _PYTHON_IGNORED_SIGNALS:
+        _ = signal.signal(signum, signal.SIG_DFL)
+    os.execve(plan.executable, [plan.executable, *plan.args], plan.env)  # noqa: S606
 
 
 def _detail_from_output(stdout: str, stderr: str) -> str:
@@ -160,9 +190,10 @@ async def command_exists(
     return resolved is not None
 
 
-def _build_process_env(
+def build_process_env(
     effective_env: Mapping[str, str | None] | None,
 ) -> dict[str, str]:
+    """Overlay env onto the parent environment; a None value removes the key."""
     resolved_env = dict(os.environ)
     if effective_env is not None:
         for key, value in effective_env.items():
@@ -254,68 +285,13 @@ async def _discard_and_reap_pipes(proc: asyncio.subprocess.Process) -> None:
             _ = tg.create_task(_reap_process(proc))
 
 
-# The child runs in its own session, so a supervisor's stop signal reaches
-# only this process; forward it so the launched harness is never orphaned.
-_FORWARDED_SIGNALS = (signal.SIGTERM, signal.SIGHUP)
-
-
-def _signal_group(proc: asyncio.subprocess.Process, signum: int) -> None:
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        os.killpg(proc.pid, signum)
-
-
-def _forward_termination(proc: asyncio.subprocess.Process) -> list[int]:
-    """Relay stop signals to the child's process group while it runs."""
-    loop = asyncio.get_running_loop()
-    installed: list[int] = []
-    for signum in _FORWARDED_SIGNALS:
-        try:
-            loop.add_signal_handler(signum, _signal_group, proc, signum)
-        except (ValueError, RuntimeError, NotImplementedError):
-            continue  # not the main thread's loop: leave default handling
-        installed.append(signum)
-    return installed
-
-
-def _stop_forwarding(installed: list[int]) -> None:
-    loop = asyncio.get_running_loop()
-    for signum in installed:
-        _ = loop.remove_signal_handler(signum)
-
-
-async def _wait_inherited(
-    proc: asyncio.subprocess.Process,
-    timeout_ms: float | None,
-) -> tuple[bytes | None, bytes | None, bool, bool]:
-    """Wait for a child with inherited stdio, relaying stop signals to it."""
-    timeout_sec = (
-        max(timeout_ms / MILLISECONDS_PER_SECOND, TIMEOUT_MIN_SECONDS)
-        if timeout_ms is not None
-        else None
-    )
-    forwarded = _forward_termination(proc)
-    try:
-        async with asyncio.timeout(timeout_sec):
-            _ = await proc.wait()
-    except TimeoutError:
-        _kill_process_group(proc)
-        await _reap_process(proc)
-        return None, None, True, False
-    except asyncio.CancelledError:
-        _kill_process_group(proc)
-        await _reap_process(proc)
-        raise
-    finally:
-        _stop_forwarding(forwarded)
-    return None, None, False, False
-
-
 async def _communicate_subprocess(
     proc: asyncio.subprocess.Process,
     timeout_ms: float | None,
-) -> tuple[bytes | None, bytes | None, bool, bool]:
+) -> tuple[bytes, bytes, bool, bool]:
     if proc.stdout is None or proc.stderr is None:
-        return await _wait_inherited(proc, timeout_ms)
+        message = "captured subprocess is missing a pipe"
+        raise RuntimeError(message)
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
     shared = _StreamDrainState()
@@ -343,16 +319,15 @@ async def _communicate_subprocess(
     return b"".join(stdout_chunks), b"".join(stderr_chunks), False, overflow
 
 
-async def run_process(  # noqa: PLR0913
+async def run_process(
     command: Sequence[str],
     options: RunProcessOptions | None = None,
     *,
     cwd: str | Path | None = None,
     env: Mapping[str, str | None] | None = None,
     timeout_ms: float | None = None,
-    stdio: Literal["pipe", "inherit"] = "pipe",
 ) -> ProcessResult:
-    """Execute a command in a child process with optional timeout and I/O capturing."""
+    """Run a command in its own session with captured output and optional timeout."""
     if not command or not command[0]:
         return ProcessResult(
             exit_code=EXIT_MISSING_COMMAND,
@@ -368,10 +343,7 @@ async def run_process(  # noqa: PLR0913
         if options is not None and options.timeout_ms is not None
         else timeout_ms
     )
-    eff_stdio = (
-        options.stdio if options is not None and options.stdio != "pipe" else stdio
-    )
-    resolved_env = _build_process_env(eff_env)
+    resolved_env = build_process_env(eff_env)
     executable = await asyncio.to_thread(
         _resolve_executable, command[0], eff_cwd, resolved_env.get("PATH")
     )
@@ -383,15 +355,14 @@ async def run_process(  # noqa: PLR0913
             timed_out=False,
         )
 
-    is_inherit = eff_stdio == "inherit"
     proc = await asyncio.create_subprocess_exec(
         executable,
         *command[1:],
         cwd=str(eff_cwd) if eff_cwd is not None else None,
         env=resolved_env,
-        stdin=None if is_inherit else asyncio.subprocess.DEVNULL,
-        stdout=None if is_inherit else asyncio.subprocess.PIPE,
-        stderr=None if is_inherit else asyncio.subprocess.PIPE,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
         start_new_session=True,
     )
 
@@ -399,17 +370,10 @@ async def run_process(  # noqa: PLR0913
         proc, eff_timeout
     )
     exit_code = proc.returncode if proc.returncode is not None else EXIT_GENERAL_ERROR
-    stdout_text = (
-        stdout_raw.decode("utf-8", errors="replace") if stdout_raw is not None else ""
-    )
-    stderr_text = (
-        stderr_raw.decode("utf-8", errors="replace") if stderr_raw is not None else ""
-    )
-
     return ProcessResult(
         exit_code=exit_code,
-        stdout=stdout_text,
-        stderr=stderr_text,
+        stdout=stdout_raw.decode("utf-8", errors="replace"),
+        stderr=stderr_raw.decode("utf-8", errors="replace"),
         timed_out=timed_out,
         output_limited=output_limited,
     )
@@ -425,7 +389,6 @@ async def run_command_outcome(
         command,
         cwd=cwd,
         timeout_ms=timeout_ms if timeout_ms > 0 else None,
-        stdio="pipe",
     )
     if result.output_limited:
         return OutputLimit(

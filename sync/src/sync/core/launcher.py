@@ -1,5 +1,5 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""npm package caching, version resolution, and launcher subprocess execution."""
+"""npm package caching, version resolution, and launch exec planning."""
 
 from __future__ import annotations
 
@@ -29,13 +29,15 @@ from sync.core.managed_tools import (
     verify_checksum,
 )
 from sync.core.release_manifest import fetch_static_release_manifest
-from sync.runtime.errors import err, panic_message, warn
+from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import rm_entry
 from sync.runtime.lock import acquire_cache_lock, release_sync_lock
 from sync.runtime.process import (
     MAX_DETAIL_CHARS,
+    ExecPlan,
     ProcessResult,
     RunProcessOptions,
+    build_process_env,
     run_process,
 )
 
@@ -65,7 +67,6 @@ SEMVER_PATTERN: re.Pattern[str] = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+
 RELEASE_VERSION_PATTERN: re.Pattern[str] = re.compile(r"^\d+(?:\.\d+)*$")
 PACKAGE_KEY_LENGTH: int = 16
 EXEC_PERM_MASK: int = 0o111
-EXIT_TIMED_OUT: int = 124
 RELEASE_VERSIONS_SUBDIR: str = "_versions"
 RELEASE_CURRENT_LINK: str = "current"
 RELEASE_PREVIOUS_LINK: str = "previous"
@@ -110,7 +111,7 @@ class PreparedNpmPackage:
 
 @dataclass(frozen=True, slots=True)
 class LauncherRuntime:
-    """Optional pluggable callbacks for launcher resolution and execution."""
+    """Optional pluggable callbacks for npm version resolution and install commands."""
 
     resolve_version: Callable[[str, str, int], Awaitable[str]] | None = None
     run: (
@@ -173,7 +174,7 @@ async def _install_staged_package(
     ]
     install = await runner(
         install_cmd,
-        RunProcessOptions(timeout_ms=timeout_ms, stdio="pipe"),
+        RunProcessOptions(timeout_ms=timeout_ms),
     )
     if install.timed_out or install.output_limited or install.exit_code != 0:
         detail = _detail_from_result(install)
@@ -197,7 +198,6 @@ async def _install_staged_package(
             RunProcessOptions(
                 cwd=stage_dir,
                 timeout_ms=timeout_ms,
-                stdio="pipe",
             ),
         )
         if smoke.timed_out or smoke.output_limited or smoke.exit_code != 0:
@@ -322,8 +322,8 @@ async def launch_npm_package(
     spec: NpmPackageSpec,
     args: Sequence[str],
     runtime: LauncherRuntime | None = None,
-) -> int:
-    """Prepare and execute an npm tool package with forwarded arguments."""
+) -> ExecPlan:
+    """Prepare an npm tool package and plan its exec with forwarded arguments."""
     prepared = await prepare_npm_package(
         spec,
         PreparePackageOptions(
@@ -332,33 +332,22 @@ async def launch_npm_package(
             runtime=runtime,
         ),
     )
-    runner = runtime.run if runtime and runtime.run else run_process
-    cmd = [prepared.current_bin, *args]
-    result = await runner(
-        cmd,
-        RunProcessOptions(
-            stdio="inherit",
-            env=spec.env,
-        ),
+    return ExecPlan(
+        executable=prepared.current_bin,
+        args=tuple(args),
+        env=build_process_env(spec.env),
     )
-    if result.timed_out or result.output_limited:
-        err(f"{spec.tool} launch timed out")
-        return EXIT_TIMED_OUT
-    return result.exit_code
 
 
 @dataclass(frozen=True, slots=True)
 class ReleaseRuntime:
-    """Optional pluggable callbacks for static release resolution and execution."""
+    """Optional pluggable callbacks for static release resolution and install."""
 
     arch: str | None = None
     platform: str | None = None
     fetch_manifest: FetchManifestFn | None = None
     download: Callable[[str, str, int], None] | None = None
     extract: Callable[[str, str, int], None] | None = None
-    run: (
-        Callable[[Sequence[str], RunProcessOptions], Awaitable[ProcessResult]] | None
-    ) = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -592,23 +581,16 @@ async def launch_static_release(
     args: Sequence[str],
     env: dict[str, str] | None,
     runtime: ReleaseRuntime | None = None,
-) -> int:
-    """Prepare and execute a static release harness with forwarded arguments."""
+) -> ExecPlan:
+    """Prepare a static release harness and plan its exec with forwarded arguments."""
     prepared = await prepare_static_release(
         launcher.release, sync_env.home, sync_env.install_timeout_ms, runtime
     )
-    runner = runtime.run if runtime and runtime.run else run_process
-    result = await runner(
-        [prepared.executable, *args],
-        RunProcessOptions(
-            stdio="inherit",
-            env=env,
-        ),
+    return ExecPlan(
+        executable=prepared.executable,
+        args=tuple(args),
+        env=build_process_env(env),
     )
-    if result.timed_out or result.output_limited:
-        err(f"{launcher.bin} launch timed out")
-        return EXIT_TIMED_OUT
-    return result.exit_code
 
 
 async def launch_harness(
@@ -617,8 +599,8 @@ async def launch_harness(
     args: Sequence[str],
     runtime: LauncherRuntime | None = None,
     release_runtime: ReleaseRuntime | None = None,
-) -> int:
-    """Launch a harness executable, resolving environment variables and cache."""
+) -> ExecPlan:
+    """Prepare a harness executable and plan its exec with the resolved env."""
     # Parent environment beats .env defaults; explicit adapter values win over both.
     merged = {k: v for k, v in sync_env.root_env.items() if k not in os.environ}
     launcher = harness.launcher
@@ -651,7 +633,6 @@ async def resolve_version(
         ["npm", "view", f"{package_name}@{dist_tag}", "version"],
         RunProcessOptions(
             timeout_ms=timeout_ms,
-            stdio="pipe",
         ),
     )
     if result.timed_out or result.output_limited or result.exit_code != 0:

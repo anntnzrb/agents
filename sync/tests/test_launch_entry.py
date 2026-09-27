@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Final
 import pytest
 
 from sync.core.index import EXIT_ERROR, EXIT_OK, EXIT_UNSUPPORTED, launch_main
+from sync.runtime.process import ExecPlan
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -216,3 +217,21 @@ def test_launch_main_warns_when_pre_launch_sync_fails(
 
     assert launch_main("codex", []) == EXIT_OK
     assert "continuing launch without completed sync" in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("home")
+def test_launch_main_reports_exec_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A planned executable that cannot be executed is reported as an error."""
+    missing = str(tmp_path / "missing-harness")
+
+    async def _plan(*_args: object, **_kwargs: object) -> ExecPlan:
+        return ExecPlan(executable=missing, args=(), env={})
+
+    monkeypatch.setattr("sync.core.index.launch_harness", _plan)
+
+    assert launch_main("codex", []) == EXIT_ERROR
+    assert "launch failed" in capsys.readouterr().err

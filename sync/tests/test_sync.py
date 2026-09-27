@@ -10,9 +10,7 @@ import json
 import os
 import platform
 import shutil
-import signal
 import socket
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -592,20 +590,6 @@ def test_process_timeout_sleeping_fake_uv(
     assert elapsed_ms < TIMEOUT_ONE_SECOND_MS + TIMEOUT_ASSERT_GRACE_MS
 
 
-def test_process_inherit_preserves_terminal_stdin() -> None:
-    """Verify process with inherited stdio retains terminal standard input."""
-    if not sys.stdin.isatty():
-        return
-
-    result = asyncio.run(
-        run_process(
-            ["sh", "-c", "test -t 0"],
-            RunProcessOptions(stdio="inherit"),
-        )
-    )
-    assert result.exit_code == 0
-
-
 def test_process_timeout_kills_descendant_holding_stdout(
     tmp_path: Path,
 ) -> None:
@@ -627,7 +611,7 @@ sleep 10
     result = asyncio.run(
         run_process(
             [str(fixture)],
-            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS, stdio="pipe"),
+            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS),
         )
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
@@ -1954,7 +1938,7 @@ def test_run_process_output_limit_overflow() -> None:
     result = asyncio.run(
         run_process(
             [sys.executable, "-c", code],
-            RunProcessOptions(timeout_ms=10000, stdio="pipe"),
+            RunProcessOptions(timeout_ms=10000),
         )
     )
     assert result.output_limited is True
@@ -1975,7 +1959,7 @@ def test_run_process_exact_output_limit_allowed() -> None:
     result = asyncio.run(
         run_process(
             [sys.executable, "-c", code],
-            RunProcessOptions(timeout_ms=20000, stdio="pipe"),
+            RunProcessOptions(timeout_ms=20000),
         )
     )
     assert result.output_limited is False
@@ -1990,7 +1974,7 @@ def test_run_process_timeout_kills_process_group() -> None:
     result = asyncio.run(
         run_process(
             ["sh", "-c", "sleep 30 & echo $!; sleep 30"],
-            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS, stdio="pipe"),
+            RunProcessOptions(timeout_ms=TREE_STARTUP_TIMEOUT_MS),
         )
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
@@ -2012,63 +1996,6 @@ def test_run_process_timeout_kills_process_group() -> None:
         time.sleep(0.05)
 
 
-def test_run_process_inherit_stdio() -> None:
-    """Inherited stdio runs without capture and without overflow."""
-    result = asyncio.run(
-        run_process(
-            [sys.executable, "-c", "pass"],
-            RunProcessOptions(stdio="inherit"),
-        )
-    )
-    assert result.exit_code == 0
-    assert result.stdout == ""
-    assert result.stderr == ""
-    assert result.timed_out is False
-    assert result.output_limited is False
-
-
-def test_run_process_inherit_forwards_termination_to_child(tmp_path: Path) -> None:
-    """A supervisor stopping the wrapper also stops the harness it launched.
-
-    The harness runs in its own session, so without forwarding a SIGTERM to the
-    wrapper orphans it; a runner orphaned this way keeps its directory lock.
-    """
-    ready = tmp_path / "ready"
-    received = tmp_path / "received"
-    child = (
-        "import pathlib, signal, sys, time\n"
-        "def stop(*_):\n"
-        f"    pathlib.Path({str(received)!r}).write_text('term')\n"
-        "    sys.exit(0)\n"
-        "signal.signal(signal.SIGTERM, stop)\n"
-        f"pathlib.Path({str(ready)!r}).write_text('ready')\n"
-        "time.sleep(30)\n"
-    )
-    wrapper = (
-        "import asyncio, sys\n"
-        "from sync.runtime.process import RunProcessOptions, run_process\n"
-        f"child = {child!r}\n"
-        "result = asyncio.run(run_process([sys.executable, '-c', child],"
-        " RunProcessOptions(stdio='inherit')))\n"
-        "sys.exit(result.exit_code)\n"
-    )
-    proc = subprocess.Popen([sys.executable, "-c", wrapper])  # noqa: S603
-    try:
-        deadline = time.monotonic() + 10
-        while not ready.exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert ready.exists()
-        proc.send_signal(signal.SIGTERM)
-        _ = proc.wait(timeout=10)
-        deadline = time.monotonic() + 5
-        while not received.exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert received.read_text() == "term"
-    finally:
-        if proc.poll() is None:
-            proc.kill()
-
-
 def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
     """Outer cancellation terminates the owned group and reaps the child."""
     pid_file = tmp_path / "child.pid"
@@ -2083,7 +2010,7 @@ def test_run_process_cancellation_kills_process_group(tmp_path: Path) -> None:
         task = asyncio.create_task(
             run_process(
                 [sys.executable, "-c", code],
-                RunProcessOptions(timeout_ms=10000, stdio="pipe"),
+                RunProcessOptions(timeout_ms=10000),
             )
         )
         published = ""
