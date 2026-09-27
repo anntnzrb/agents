@@ -62,7 +62,7 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
      ```
 ## Invariants
 
-- Keep entries grouped by standard Keep a Changelog categories: `Breaking Changes`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+- Group entries under a leading `Breaking Changes` section (a local extension), then the Keep a Changelog categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 - Start each entry with a past-tense verb (Added, Fixed, Changed, Updated) and omit trailing periods.
 - Preserve deterministic community attribution format: `([#123](url) by @user)`.
 - Never duplicate entries already present under `## [Unreleased]`.
