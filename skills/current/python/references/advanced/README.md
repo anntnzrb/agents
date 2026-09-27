@@ -296,7 +296,6 @@ Use the repository's configured formatter, linter, type checker, and test suite 
 | `generic-exception` | `raise ValueError("...")` / `raise TypeError("...")` with bare string | `# noqa: GENERIC_ERR_OK` |
 | `no-object` | `object` used as type annotation (param, return, generic arg) | `# noqa: OBJECT_OK` |
 | `if-elif-on-variant` | `if isinstance()`/`if x == Enum.V` chain that should be `match/case` | `# noqa: IF_VARIANT_OK` |
-| `oversized-module` | File exceeds 250 pure LOC (non-blank, non-comment) | `# noqa: SIZE_OK` |
 | `broad-except` | `except Exception` / `except BaseException` (too broad) | `# noqa: BROAD_EXCEPT_OK` |
 
 Fix every violation before declaring work done. basedpyright + ruff strict config catches the rest.

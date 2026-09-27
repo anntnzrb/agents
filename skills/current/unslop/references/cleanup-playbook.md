@@ -111,12 +111,12 @@ deletion-only, tautological, implementation-mirroring, constant-pinning, or pros
 
 ### 10. Oversized modules
 
-Treat source files over 250 pure lines; non-blank, non-comment; as an architectural concern. Before
-splitting, identify distinct responsibilities and show the user a concept-based split plan. Name
-new modules for their responsibility, not `utils`, `helpers`, `common`, or numbered fragments.
-Keep package initializers as re-exports only. Then rerun size measurement, tests, type checks, and
-lint. A genuinely self-contained source file may opt out only with a first-five-lines `SIZE_OK`
-marker and a reason. Never game the count with comments, blanks, or build-output excuses.
+Treat a hand-written source file of about 1,000 or more pure lines (non-blank, non-comment) as a
+review trigger, not a violation. Split only for distinct responsibilities, never for size alone, and
+never as a side effect of unrelated cleanup. Before splitting, show the user a concept-based split
+plan. Name new modules for their responsibility, not `utils`, `helpers`, `common`, or numbered
+fragments. Keep package initializers as re-exports only. Then rerun tests, type checks, and lint.
+Generated code, pure data tables, and indivisible single-responsibility units are exempt.
 
 ## Quality gates and critical review
 

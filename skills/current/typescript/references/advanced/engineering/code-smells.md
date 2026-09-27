@@ -8,20 +8,21 @@ When any of these smells is detected, **stop and re-examine the design.** A code
 
 ---
 
-## Smell 1: File exceeds 250 pure LOC
+## Smell 1: Oversized module
 
-### Why 250
+### Why size matters
 
-At 250 pure LOC a file still fits in one screen on a 32-inch monitor with a 14pt font. A reviewer can hold the whole thing in working memory and spot a cross-cutting bug. At 500 LOC they cannot. At 1000 LOC they stop trying. The number is the cognitive ceiling of a single human reviewer who has not memorized the file.
+Line count is a proxy. For agents, a large file costs:
 
-A file past this line is telling you:
+- Parallelism: a file is one edit boundary. Two agents cannot safely edit it at once, so one large file serializes work that separate modules would let run concurrently.
+- Context: an open question ("where does X happen?") reads more of a large mixed file than of a module named for its responsibility.
+- Stale reads: every edit changes the file's snapshot. A large shared file forces more re-reads and more edits against stale content.
 
-- The module is doing more than one thing
-- Multiple cohesive units got merged "to save a file."
-- Re-exports, barrels, and orchestrators got fused into pure-logic units
-- Every future reader pays a tax to find what they need
+Over-splitting also costs: tracing one flow across many tiny files, wrappers, and re-exports takes more reads than one cohesive file. Size alone never justifies a split; mixed responsibilities do.
 
 ### Measuring pure LOC
+
+Pure LOC counts non-blank, non-comment lines.
 
 ```bash
 # Quick (line-comment + blank exclusion):
@@ -31,35 +32,31 @@ awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
 cloc --by-file <file>   # the "code" column is the number
 ```
 
-### Required behavior when detected
+### Thresholds
 
-**Creating a file that will exceed 250 pure LOC.** Split it before the first commit. Carve by responsibility, one cohesive unit per file. Use a barrel (`__init__.py`, `mod.rs`, `index.ts`) for re-exports ONLY; never for logic.
+Thresholds apply to hand-written production code:
 
-**Editing a file that already exceeds 250 pure LOC and your edit adds lines.** Refactor the unit you are touching into its own file BEFORE adding the new lines. The split is part of THIS task, not a follow-up someone will never do.
+- Under about 800 pure LOC: no action.
+- About 1,000 or more: review trigger. Check whether the file holds more than one responsibility.
+- About 2,000 or more: it almost certainly does. Name the responsibilities and propose a split.
 
-**Reading a file that exceeds 250 pure LOC while implementing a feature.** Surface the smell in your reply, propose a concrete split, and ask the user whether to split now or carry the smell.
+Tests may run longer because each case stands alone. Split a test file by subject under test or behavior cluster when it mixes unrelated subjects or several agents need to edit it at once.
 
-### Forbidden escapes
+### Required behavior
 
-- Counting comments and blank lines toward the budget. **Pure LOC means code lines.**
-- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). Split by what each file DOES
-- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`
-- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`
-- "It's a test file with many cases." Split by SUT or by behavior cluster
-- "230 pure LOC, close enough." A 230-LOC file about to grow is already at the limit. Split now
+- **Creating code.** Carve by responsibility from the start: one cohesive unit per file. Do not create a file that already holds two responsibilities.
+- **Editing a file past the review threshold.** Keep the change local. Do not split as a side effect of an unrelated task. Name the concrete split in your reply and ask whether to do it now.
+- **Splitting, when the task asks for it.** Split along responsibilities, never mid-responsibility or by count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). Name each module for its role. No catch-all logic dumps (`utils.py`, `helpers.ts`, `common.py`, `shared.ts`). A barrel (`__init__.py`, `mod.rs`, `index.ts`) re-exports only; it never holds logic. Rerun tests, type checks, and lint afterwards.
 
-### Acceptable exceptions (rare, require justification)
+### Exempt
 
-A file may legitimately exceed 250 pure LOC if **and only if** it is:
-
-- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark with `// allow: SIZE_OK; <reason>`
-- A pure data table (translation strings, error code lookup, brand color palette)
-
-`// allow: SIZE_OK` without a justifying comment is itself slop.
+- Generated code and build output
+- Pure data tables: translation strings, error-code lookups, protocol models
+- A truly indivisible single-responsibility unit, such as a parser table or a state machine whose states share one closure
 
 ### Concrete split examples
 
-#### Python: BEFORE (`user_service.py`, 412 pure LOC)
+#### Python: BEFORE (`user_service.py`, five responsibilities)
 
 ```python
 # user_service.py: DOES TOO MUCH
@@ -85,7 +82,7 @@ src/myapp/users/
 └── _queries.py              # _build_query (private)         (~30 LOC)
 ```
 
-#### Rust: BEFORE (`auth.rs`, 380 pure LOC)
+#### Rust: BEFORE (`auth.rs`, four responsibilities)
 
 ```rust
 // auth.rs: DOES TOO MUCH
@@ -109,7 +106,7 @@ src/auth/
 └── header.rs           # parse_authorization_header             (~35 LOC)
 ```
 
-#### TypeScript: BEFORE (`api/orders.ts`, 510 pure LOC)
+#### TypeScript: BEFORE (`api/orders.ts`, five responsibilities)
 
 ```typescript
 // api/orders.ts: DOES TOO MUCH
