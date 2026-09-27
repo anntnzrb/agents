@@ -303,9 +303,10 @@ speechgen:
 
 task:
   showResolvedModelBadge: true
-  eager: default
+  # always: director plans and fans out; workers (@task/@smol) do the implementation
+  eager: always
   batch: true
-  maxConcurrency: 8
+  maxConcurrency: 16
   enableEffort: false
   enableLsp: false
   prewalk: false
@@ -313,8 +314,8 @@ task:
     sonic: "@smol"              # Vibe 'fast' tier worker
     scout: "@smol"              # Fast read-only codebase explorer
     task: "@task"               # Vibe 'good' tier worker
-    reviewer: "@slow"           # Deep code review specialist
-    security-reviewer: "@slow"  # Security analysis specialist
+    reviewer: "@task"           # Code review on the worker model; the director judges findings
+    security-reviewer: "@task"  # Security review on the worker model
   isolation:
     enabled: true
     apply: true
