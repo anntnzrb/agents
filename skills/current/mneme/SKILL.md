@@ -47,15 +47,22 @@ uv run --script skills/current/mneme/scripts/cli.py synthesize clean_transcript.
 
 ### 3. Hybrid search over indexed meeting knowledge base
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "quarterly budget timeline"
+uv run --script skills/current/mneme/scripts/cli.py search "quarterly budget timeline" --json
 ```
 
 ### 4. Search exact terms via keyword search
 ```bash
 uv run --script skills/current/mneme/scripts/cli.py search "Project Delta" --exact
 ```
+
+### 5. Fetch a line-ranged transcript snippet
+```bash
+uv run --script skills/current/mneme/scripts/cli.py get "#<docid>:<line>:<count>"
+```
+
 ## Core Rules
 
-- **Lossless Invariance**: When cleaning transcripts, NEVER summarize, drop, or condense dialogue, metrics, dates, or tangents. Only remove verbal tics, stutter loops, and correct speaker labels.
-- **Actionable Synthesis**: Convert conversational agreements into unambiguous task items with clear owners, concrete scope, and explicit completion criteria.
-- **Targeted Retrieval**: Fetch exact line-ranged snippets (`#docid:line:count`) instead of reading whole transcript files into the context window.
+- **Lossless Invariance**: When cleaning transcripts, NEVER summarize, drop, or condense dialogue, metrics, dates, or tangents. Only remove verbal tics, stutter loops, and false starts.
+- **Strict Diarization**: Preserve every speaker change in chronological sequence. NEVER merge alternating dialogue turns into a single speaker block or insert artificial topic headings into a transcript.
+- **Actionable Synthesis**: Ground participant names against any available roster. Convert agreements into unambiguous tasks with clear owners, concrete scope, and explicit completion criteria.
+- **Targeted Retrieval**: Fetch exact line-ranged snippets (`#<docid>:<line>:<count>`) instead of reading whole transcript files into the context window.

@@ -54,3 +54,4 @@ When extracting actionable items for task managers, checklists, or issue tracker
 - **Capture actionable intent**: Identify what needs to be done, who owns it, and the deadline discussed.
 - **State clear completion conditions**: Frame completion criteria in testable or observable outcomes.
 - **Preserve accountability**: Link each action item directly to the discussion context that motivated it.
+- **Ground participant names**: Check any available participant roster (roles, areas, and common ASR name variants) before generating summaries or assigning task owners.
