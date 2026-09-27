@@ -105,16 +105,15 @@ Detailed workflow: `references/eval-workflow.md`.
 |Intent capture, research, authoring, and user communication|`references/authoring.md`|Creating or materially refactoring a skill|
 |Exact eval/benchmark JSON|`references/schemas.md`|Creating or validating artifacts|
 |Eval, timing, grading, viewer, iteration|`references/eval-workflow.md`|Running evaluations|
-|Trigger tuning and held-out scoring|`references/description-optimization.md`|Optimizing metadata descriptions|
+|Trigger writing and eval sets|`references/description-optimization.md`|Optimizing metadata descriptions|
 |Package validation and handoff|`references/packaging.md`|Packaging a skill|
-|Runtime-specific adaptations|`references/runtime-modes.md`|The default runner is unavailable|
 |Assertion grading|`agents/grader.md`|Grading an eval run|
 |Benchmark analysis|`agents/analyzer.md`|Comparing benchmark results|
 |Blind A/B comparison|`agents/comparator.md`|Comparing skill versions|
 
 ## Description Optimization
 
-Offer description optimization only after core behavior is in good shape. Read `references/description-optimization.md` for trigger-eval query generation/review, the `eval_review.html` workflow, `run_loop.py` and held-out scoring, or before/after description updates and score reporting.
+Offer description optimization only after core behavior is in good shape. Read `references/description-optimization.md` for trigger writing rules, eval-set design, and harness-agnostic checking.
 
 ## Packaging
 

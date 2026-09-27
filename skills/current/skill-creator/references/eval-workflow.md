@@ -95,7 +95,7 @@ After all runs finish:
 
    For iteration 2+, also pass `--previous-workspace <workspace>/iteration-<N-1>`.
 
-   **Cowork / headless environments:** If `webbrowser.open()` is unavailable or the environment has no display, use `--static <output_path>` to write standalone HTML instead of starting a server. Feedback downloads as `feedback.json` when the user clicks "Submit All Reviews". After download, copy `feedback.json` into the workspace directory for the next iteration.
+   **Headless environments:** If `webbrowser.open()` is unavailable or the environment has no display, use `--static <output_path>` to write standalone HTML instead of starting a server. Feedback downloads as `feedback.json` when the user clicks "Submit All Reviews". After download, copy `feedback.json` into the workspace directory for the next iteration.
 
 Use `uv run --script <skill-creator-path>/scripts/cli.py generate-review` to create the viewer. NEVER write custom HTML.
 

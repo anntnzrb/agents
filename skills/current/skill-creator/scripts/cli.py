@@ -21,10 +21,6 @@ COMMANDS = {
     "generate-review": SKILL_DIR / "eval-viewer" / "generate_review.py",
     "package": SCRIPTS_DIR / "package_skill.py",
     "quick-validate": SCRIPTS_DIR / "quick_validate.py",
-    "improve-description": SCRIPTS_DIR / "improve_description.py",
-    "run-eval": SCRIPTS_DIR / "run_eval.py",
-    "run-loop": SCRIPTS_DIR / "run_loop.py",
-    "generate-report": SCRIPTS_DIR / "generate_report.py",
 }
 
 # Example invocations shown by --help; the dispatcher prefix is added there.
