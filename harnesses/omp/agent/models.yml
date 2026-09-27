@@ -45,12 +45,8 @@ providers:
     modelOverrides:
       gemini-3.7-flash:
         contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits
-      gemini-3.7-flash:thinking:
-        contextWindow: 500000
       gemini-3.8-flash:
         contextWindow: 500000 # 500K * 85% = 425K trigger
-      gemini-3.8-flash:thinking:
-        contextWindow: 500000
   opencode-go:
     modelOverrides:
       glm-5.3-flash:
