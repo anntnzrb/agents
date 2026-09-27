@@ -1,8 +1,7 @@
 ---
 name: eval-packages
 condition:
-  - '\b(?:import\s+|from\s+[A-Za-z_][\w.]*\s+import\b|__import__\s*\(|importlib\.import_module\s*\()'
-  - '\buv\s+pip\s+(?:install|uninstall)\b[^\n]*--python\s+[^\n]*python-env'
+  - '\b(?:pip3?|uv\s+pip)\s+(?:install|uninstall)\b'
 scope:
   - tool:eval
   - tool:bash
