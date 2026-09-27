@@ -2,7 +2,7 @@
 name: eval-orchestration
 description: Prefer eval for in-memory data distillation, OLAP, and complex algorithms; never proxy specialized harness tools
 condition:
-  - '\b(?:python|node|bun)\s+-[ce]\b|(?:^|[|;&]\s*)(?:jq|awk)\s|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
+  - '\b(?:python|node|bun)\s+-[ce]\b|(?:^|[|;&"]\s*)(?:jq|awk)\s|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
   - '\b(?:subprocess\.(?:run|Popen|check_output|check_call)|os\.(?:system|popen|walk))\b|\.(?:read_text|write_text)\(|open\([^)\n]{0,40}[''"]'
 scope:
   - tool:eval

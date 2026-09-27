@@ -2,7 +2,7 @@
 name: web-ops
 description: Unified web router for external reading, deep scraping escalation, and live web search
 condition:
-  - '\bomp-search(?:/scripts/cli\.py)?\b|\bfirecrawl\.firecrawl_\w+|(?:^|[;&|]\s*)(?:curl|wget)\s'
+  - '\bomp-search(?:/scripts/cli\.py)?\b|\bfirecrawl\.firecrawl_\w+|(?:^|[;&|"]\s*)(?:curl|wget)\s'
 scope:
   - tool:bash
 interruptMode: never
