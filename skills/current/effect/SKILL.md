@@ -45,7 +45,7 @@ bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 - For library resolution or sub-packages, use `bun x ctx7@latest library "Effect" "<topic>"`.
 - For official guides and API reference, consult <https://www.effect.website/docs>.
 - For implementation patterns, inspect vendored `Effect-TS/effect` source or upstream repository (`LLMS.md`, `MIGRATION.md`, tests).
-- Missing or unclear coverage: fall back to matching vendored source, `gh`, or `research`.
+- Missing or unclear coverage: fall back to matching vendored source, `gh`, or `firecrawl`.
 
 ## Version safety
 

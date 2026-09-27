@@ -70,7 +70,7 @@ Match output to task size:
 
 - `.ts` / `.tsx` type-system design central → also load `typescript`
 - React / Next render or bundle work dominant → also load `react-best-practices`
-- Fresh external-library API docs more important than JS mechanics → load `research`, then `context7` or `grep-app`
+- Fresh external-library API docs more important than JS mechanics → load `context7` or `grep-app`
 
 ## Quick Start
 

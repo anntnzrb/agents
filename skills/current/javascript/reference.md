@@ -85,7 +85,7 @@ For a local, reversible change, do not default to watch mode, dev servers, or br
 
 - `typescript`: load alongside this skill when types, declarations, or `tsconfig` dominate.
 - `react-best-practices`: load alongside this skill for React/Next render and bundle performance.
-- `research` → `context7` / `grep-app`: load for library-specific API work, not language mechanics.
+- `context7` / `grep-app`: load for library-specific API work, not language mechanics.
 
 ## File map
 

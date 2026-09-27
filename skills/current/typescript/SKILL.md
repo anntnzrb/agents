@@ -68,7 +68,7 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 ## Related skills
 
 - Pure React/Next render or bundle performance with no TS design issue: also load `react-best-practices`
-- Fresh library/framework API docs: load `research`, then `context7` or `grep-app`
+- Fresh library/framework API docs: load `context7` or `grep-app`
 - Effect application architecture or APIs: also load `effect`
 
 ## Quick start

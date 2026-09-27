@@ -31,7 +31,7 @@
       "files": [],
       "expectations": [
         "The answer identifies when the package is outside immediate documentation coverage",
-        "The answer falls back to matching vendored source, context7, gh, or research",
+        "The answer falls back to matching vendored source, context7, gh, or firecrawl",
         "The answer avoids hallucinated `@effect/opentelemetry` APIs"
       ]
     },
