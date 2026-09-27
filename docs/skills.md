@@ -96,6 +96,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Standalone `pyproject.toml` per skill with pinned dev tools; see Validate Python files.
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
 - Declare inline dependencies in `scripts/cli.py` using PyPA inline script metadata (PEP 723 `# /// script` block).
+- Skills this gate requires (`skill-creator`, `technical-writing`, `pstack-principles`, `unslop`) MUST stay model-invocable; do not set `disable-model-invocation: true` on them, because harnesses that honor it hide the skill from the agent.
 
 ### Documentation structure
 - Keep `SKILL.md` focused on when/how to use the skill; move bulk docs to `references/`.
