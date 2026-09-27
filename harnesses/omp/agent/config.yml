@@ -65,7 +65,7 @@ providers:
   tinyModel: online
   autoThinkingModel: online
   unexpectedStopModel: online
-  autoThinkingMaxEffort: max
+  autoThinkingMaxEffort: high
   memoryModel: online
   webSearchTimeoutSeconds: 120
   webSearchOrder:
