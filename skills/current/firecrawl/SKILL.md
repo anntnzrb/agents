@@ -1,5 +1,4 @@
 ---
-disable-model-invocation: true
 name: firecrawl
 description: "Use when scraping, crawling, mapping, searching the web, or extracting structured data via Firecrawl."
 license: AGPL-3.0-or-later
