@@ -1,56 +1,61 @@
 ---
 name: firecrawl
-description: "Use when scraping, crawling, mapping, searching the web, or extracting structured data via Firecrawl."
+description: "Use when scraping, crawling, mapping URLs, parsing local documents, or querying developer and research paper indexes."
 license: AGPL-3.0-or-later
-compatibility: Requires Firecrawl MCP server via MCPorter.
+compatibility: Requires bun and FIRECRAWL_API_KEY.
 ---
 
 # Firecrawl
 
-Web scraping, crawling, mapping, search, and structured data extraction through the Firecrawl MCP server, called with `mcporter call firecrawl.<tool>`.
+Web scraping, crawling, mapping, document parsing, page interaction, monitoring, and developer/research index queries via Firecrawl CLI.
 
-The live server is the authority for tool names and schemas. Every tool name carries the `firecrawl_` prefix: call `firecrawl.firecrawl_scrape`, not `firecrawl.scrape`.
+## Invocation
 
-## Discover tools
+Call the CLI via bun:
+```sh
+bun x firecrawl-cli@latest <command> ...
+```
 
-1. List the tools with compact signatures:
+Requires `FIRECRAWL_API_KEY` set in the environment.
+
+## Discover
+
+Live `--help` is the single authority for commands, arguments, and flags:
+1. Discover top-level commands:
    ```sh
-   mcporter list firecrawl --brief
+   bun x firecrawl-cli@latest --help
    ```
-2. Before a call with uncertain arguments, read the full schemas. The output is large (about 100 KB for the whole server), so search it for the tool you need:
+2. Discover options, flags, and arguments before first use of a command in a session:
    ```sh
-   mcporter list firecrawl --schema
+   bun x firecrawl-cli@latest <command> --help
    ```
 
-## Common calls
+Do not guess flag names or rely on memorized schemas. Live help documents all supported parameters.
 
-Scrape one page as Markdown:
-```sh
-mcporter call firecrawl.firecrawl_scrape --args '{"url": "https://example.com", "formats": ["markdown"], "onlyMainContent": true}' --output json
-```
+## Jobs
 
-Extract structured data from a known page. Pass the schema in `jsonOptions`:
-```sh
-mcporter call firecrawl.firecrawl_scrape --args '{"url": "https://example.com/pricing", "formats": ["json"], "jsonOptions": {"schema": {"type": "object", "properties": {"plan": {"type": "string"}, "price": {"type": "number"}}}}}' --output json
-```
+Match the intent to a command listed by live `--help`:
 
-List a site's URLs without fetching them:
-```sh
-mcporter call firecrawl.firecrawl_map --args '{"url": "https://docs.example.com", "search": "pricing", "limit": 50}' --output json
-```
+- Fetch a known URL, especially JS-heavy pages that come back thin from a plain fetch.
+- Crawl a site or path subtree, or map a domain's URLs before crawling.
+- Mirror a docs site to local disk, then search it with local tools.
+- Parse local documents (PDF, Office, HTML).
+- Drive a live browser session: click, fill forms, paginate.
+- Track page changes on a schedule.
+- Look up error strings, GitHub issues and PRs, READMEs, or library docs in the developer index.
+- Search and read scientific papers in the research index.
+- Check credit balance; diagnose failed runs.
 
-Crawl several pages. The call polls until the crawl finishes and can return a large result:
-```sh
-mcporter call firecrawl.firecrawl_crawl --args '{"url": "https://docs.example.com", "includePaths": ["/docs/.*"], "limit": 20, "maxDiscoveryDepth": 2}' --output json
-```
+## Recipes
 
-Search the web:
-```sh
-mcporter call firecrawl.firecrawl_search --args '{"query": "firecrawl mcp release notes", "limit": 5}' --output json
-```
+| Need | Read | When |
+| --- | --- | --- |
+| Multi-step workflows | `references/recipes.md` | Debugging errors, mirroring doc trees, interactive scraping, or recurring monitors |
 
-## Rules
+## Durable Rules
 
-- Save large results with shell redirection: append `> <temp-dir>/page.json` to the call. `mcporter call` has no `--output-file` flag.
-- `firecrawl_extract` is a deprecated compatibility tool. Use `firecrawl_scrape` with `formats: ["json"]` for known URLs, and `firecrawl_agent` when the URLs are unknown or the data spans several sites.
-- Set `maxAge: 0` on `firecrawl_scrape` when the page must be fetched live. Firecrawl can otherwise serve recently indexed content.
+- Write results to files under `.firecrawl/` with the CLI's output option; inspect them with `jq` or `grep`. Never stream large payloads into context.
+- Check credit usage before large crawls or site downloads.
+- Let the CLI wait on async jobs with its own wait options; do not write polling loops.
+- When live page state matters, disable cached snapshots with the CLI's max-age option.
+- The developer command takes a free-form query. For strict filters (repositories, artifact types, doc sources, language, stars), call the REST developer search endpoint; read its current fields in the Firecrawl API reference before building the request.

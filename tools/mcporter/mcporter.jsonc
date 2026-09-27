@@ -20,14 +20,6 @@
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY:-}",
       },
     },
-    "firecrawl": {
-      "description": "Firecrawl MCP",
-      "command": "bun",
-      "args": ["x", "-y", "firecrawl-mcp"],
-      "env": {
-        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY:-}",
-      },
-    },
     "n8n": {
       "description": "n8n MCP",
       "command": "bun",

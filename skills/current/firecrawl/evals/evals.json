@@ -4,300 +4,273 @@
     {
       "id": 1,
       "prompt": "I need to scrape the main article content from https://example.com/blog/ai-trends as clean markdown and save it to a file without headers, navigation bars, or footer clutter.",
-      "expected_output": "Runs `firecrawl scrape` with `--only-main-content` and routes the output to a designated `.firecrawl/` file using `-o`.",
+      "expected_output": "Checks `scrape --help` for available options, runs `bun x firecrawl-cli@latest scrape` with main content extraction, and saves output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl scrape` or `bun x firecrawl-cli@latest scrape`",
-        "Includes the `--only-main-content` flag to strip navigation and footer boilerplate",
-        "Saves the output to a file using `-o` or `--output` under `.firecrawl/`",
+        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Extracts main content without navigation or footer clutter",
+        "Directs output to a file under `.firecrawl/` using `-o` or `--output`",
         "Quotes the URL to avoid shell expansion issues"
       ]
     },
     {
       "id": 2,
       "prompt": "Scrape https://app.example.com/dashboard which is a heavy Single Page Application that needs about 3.5 seconds to finish rendering its charts and tables client-side before content is ready.",
-      "expected_output": "Invokes `firecrawl scrape` specifying `--wait-for 3500` (or 4000) to allow client-side JavaScript execution and hydration.",
+      "expected_output": "Checks `scrape --help` for hydration options, invokes `scrape` specifying wait delay to allow client-side JavaScript rendering, and saves output to a file.",
       "files": [],
       "expectations": [
-        "Invokes `firecrawl scrape` with the target URL",
-        "Applies `--wait-for 3500` (or 4000) to allow client-side hydration",
-        "Outputs clean markdown or JSON to an isolated path under `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Applies wait delay to allow client-side hydration",
+        "Saves output to a file under `.firecrawl/` rather than streaming to stdout"
       ]
     },
     {
       "id": 3,
       "prompt": "I want to scrape https://example.com/items, but first I need to click a button with CSS selector 'button.load-more-items' and wait 2000ms for new content to append to the DOM.",
-      "expected_output": "Uses `firecrawl scrape` with `--actions` specifying click and wait operations in JSON before capturing content.",
+      "expected_output": "Checks `scrape --help` for action syntax, uses `scrape` with browser actions to click the selector and wait, saving output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl scrape` with `--actions`",
-        "Provides a valid JSON array of actions with `click` on `button.load-more-items` and `wait` for 2000 milliseconds",
-        "Routes output to `.firecrawl/` using `-o`"
+        "Checks `bun x firecrawl-cli@latest scrape --help` or uses `scrape` actions",
+        "Configures click on 'button.load-more-items' and wait delay",
+        "Routes output to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 4,
       "prompt": "Extract the pricing tiers from https://example.com/pricing into strict JSON matching a schema with an array of plans having name, monthly_price, and features.",
-      "expected_output": "Uses `firecrawl scrape` with `--format json` and `--schema` defining the JSON Schema structure.",
+      "expected_output": "Checks `scrape --help` for schema and format options, invokes `scrape` with structured JSON extraction, and writes output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Specifies `--format json` or includes `json` in formats",
-        "Provides `--schema` containing a valid JSON Schema with `name`, `monthly_price`, and `features` fields",
-        "Outputs JSON and saves to a destination file"
+        "Checks `bun x firecrawl-cli@latest scrape --help` or uses `scrape`",
+        "Specifies structured JSON output with schema containing name, monthly_price, and features",
+        "Saves structured JSON output to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 5,
-      "prompt": "I have three URLs: https://site.com/p1, https://site.com/p2, and https://site.com/p3. Scrape all three concurrently in one command.",
-      "expected_output": "Calls `firecrawl scrape` passing all three URLs as positional arguments.",
+      "prompt": "I have three URLs: https://site.com/p1, https://site.com/p2, and https://site.com/p3. Scrape all three in one command.",
+      "expected_output": "Invokes `scrape` passing all three URLs as positional arguments, noting that multi-URL scrape output is saved to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Calls `firecrawl scrape` passing the three URLs as positional arguments",
-        "Explains that multi-URL scrapes run concurrently and save Markdown outputs under `.firecrawl/`",
-        "Avoids relying on `-o` for multi-URL scrapes"
+        "Calls `scrape` passing the three URLs as positional arguments",
+        "Explains that multi-URL scrapes automatically save outputs under `.firecrawl/`"
       ]
     },
     {
       "id": 6,
       "prompt": "Take a full-page scrollable screenshot of https://stripe.com/pricing and capture the rendered HTML as well.",
-      "expected_output": "Runs `firecrawl scrape` with `--full-page-screenshot` and `--format html` or `-H`.",
+      "expected_output": "Checks `scrape --help` for screenshot and HTML options, runs `scrape`, and saves artifacts under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl scrape` targeting the URL",
-        "Applies `--full-page-screenshot` or `--screenshot`",
-        "Specifies `--format html,screenshot` or `-H`",
-        "Saves the resulting artifacts under `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Requests full-page screenshot and HTML format",
+        "Saves output to `.firecrawl/`"
       ]
     },
     {
       "id": 7,
-      "prompt": "Search the live web for 'Anthropic Claude 3.7 Sonnet benchmarks' published within the past week from news sources.",
-      "expected_output": "Uses `firecrawl search` with `--sources news` and time freshness filter `--tbs qdr:w`.",
+      "prompt": "Search the live web for 'Anthropic Claude 3.7 Sonnet benchmarks' published within the past week from news sources using Firecrawl.",
+      "expected_output": "Explains that Firecrawl is reserved for URL-rooted jobs, local parsing, and developer/paper indexes, not general open-web search.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl search`",
-        "Passes `--sources news` or `--sources web,news`",
-        "Passes `--tbs qdr:w` for past week filtering",
-        "Saves results to a JSON file under `.firecrawl/`"
+        "Identifies that general open-web search is not routed in the Firecrawl skill",
+        "Refrains from executing open-web queries with Firecrawl"
       ]
     },
     {
       "id": 8,
-      "prompt": "Search for 'Rust async runtime comparisons 2026' and scrape the full page Markdown content of the top results in the same call.",
-      "expected_output": "Uses `firecrawl search` with `--scrape` and `--scrape-formats markdown`.",
+      "prompt": "Search the open web for 'Rust async runtime comparisons 2026' and scrape the results using Firecrawl.",
+      "expected_output": "Explains that general web search is not routed in Firecrawl; once URLs are identified, Firecrawl handles scraping or crawling them.",
       "files": [],
       "expectations": [
-        "Calls `firecrawl search` with the query",
-        "Enables `--scrape` to extract full page content directly",
-        "Specifies `--scrape-formats markdown` or `--json` output",
-        "Reuses the scraped content rather than issuing secondary scrape requests"
+        "Identifies that open-web search is outside Firecrawl's routed jobs",
+        "Explains that Firecrawl takes known URLs for scraping and crawling"
       ]
     },
     {
       "id": 9,
-      "prompt": "After running a search for 'Effect TS schema decode', how do I submit feedback to get a 1 credit refund from Firecrawl?",
-      "expected_output": "Extracts the search ID from the search result and calls `firecrawl search-feedback <id>` with valid rating and substantive fields in the background.",
+      "prompt": "Before running a large batch scrape across hundreds of links, how do I check my remaining Firecrawl credits and team plan allowance?",
+      "expected_output": "Calls `bun x firecrawl-cli@latest credit-usage` (or `credits`) to inspect credit balance and billing period before executing large runs.",
       "files": [],
       "expectations": [
-        "Extracts search ID from output JSON (e.g. via `jq`)",
-        "Calls `firecrawl search-feedback <search-id>`",
-        "Provides `--rating` along with required substantive fields (`--valuable-sources` or `--missing-content`)",
-        "Runs the feedback call in the background with `--silent &` so it does not block the workflow"
+        "Uses `bun x firecrawl-cli@latest credit-usage` or `credits`",
+        "Explains checking credit usage prior to launching expensive crawl or batch jobs"
       ]
     },
     {
       "id": 10,
       "prompt": "I'm hitting a weird bug with Bun: 'TSError: Cannot find module @effect/schema'. Search GitHub issues, merged PRs, and developer docs to find where this was fixed or discussed.",
-      "expected_output": "Calls `firecrawl developer` with the invariant error string to search primary developer sources.",
+      "expected_output": "Checks `developer --help`, calls `bun x firecrawl-cli@latest developer` with the invariant error string, and saves output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl developer` instead of generic web search",
-        "Passes the invariant error message as the query",
-        "Explains that results return verbatim Markdown passages from issues, merged PRs, READMEs, or docs",
+        "Routes developer queries to `developer`",
+        "Checks `bun x firecrawl-cli@latest developer --help` or passes query to `developer`",
+        "Passes the invariant error message as query text",
         "Saves output to `.firecrawl/`"
       ]
     },
     {
       "id": 11,
       "prompt": "Find published research papers on CRISPR-Cas9 off-target cleavage prediction transformers using Firecrawl's paper corpus.",
-      "expected_output": "Uses `firecrawl research search-papers` to query semantic abstracts across PubMed, bioRxiv, medRxiv, and arXiv.",
+      "expected_output": "Checks `research --help`, uses `research search-papers` to query the research paper index, and saves results to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl research search-papers` rather than generic web search",
-        "Passes the domain query and sets `--k` limit",
-        "Explains that this queries the 43M+ research paper index",
-        "Saves candidate papers to `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest research --help` or `research search-papers --help`",
+        "Routes scientific literature queries to `research search-papers`",
+        "Saves output under `.firecrawl/`"
       ]
     },
     {
       "id": 12,
       "prompt": "I have seed paper IDs 'arxiv:2401.09876' and 'pubmed:38123456'. How do I expand this to find similar competing methods and citation-network neighbors?",
-      "expected_output": "Invokes `firecrawl research related-papers` with the seed IDs, an `--intent` description, and expansion mode.",
+      "expected_output": "Checks `research --help`, invokes `research related-papers` with seed IDs, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Calls `firecrawl research related-papers` with the seed paper IDs",
-        "Specifies `--intent` describing the research objective",
-        "Uses `--mode similar` (or `citers`/`references`)",
-        "Outputs candidate related papers to `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest research --help` or `research related-papers --help`",
+        "Routes citation and similarity expansion to `research related-papers`",
+        "Saves output under `.firecrawl/`"
       ]
     },
     {
       "id": 13,
       "prompt": "Verify the exact AUROC score reported in the body text of paper 'arxiv:2401.09876' for the GUIDE-seq benchmark.",
-      "expected_output": "Uses `firecrawl research read-paper` with `--question` to query in-body passages of the paper.",
+      "expected_output": "Checks `research --help`, uses `research read-paper` to query specific in-body passages, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl research read-paper <id>`",
-        "Passes `--question` targeting the specific AUROC benchmark score",
-        "Notes that `read-paper` checks full text passages rather than just abstract metadata"
+        "Checks `bun x firecrawl-cli@latest research --help` or `research read-paper --help`",
+        "Routes full-text passage reading to `research read-paper`",
+        "Saves output under `.firecrawl/`"
       ]
     },
     {
       "id": 14,
       "prompt": "Find all URLs and routes under https://docs.rs/tokio matching 'sync' or 'mutex' before doing any scraping.",
-      "expected_output": "Calls `firecrawl map` with `--search` to discover matching endpoints without pulling down full page bodies.",
+      "expected_output": "Checks `map --help`, calls `map` with search filter, and saves discovered URLs to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl map` on the domain",
-        "Applies `--search` to filter discovered URLs for 'sync' or 'mutex'",
-        "Saves the discovered URL list to a `.firecrawl/` file",
-        "Follows up with targeted `firecrawl scrape` only on selected URLs"
+        "Checks `bun x firecrawl-cli@latest map --help`",
+        "Routes URL discovery without content fetching to `map`",
+        "Saves discovered endpoints to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 15,
-      "prompt": "Recursively crawl https://hono.dev under the /docs section up to 2 link levels deep, capping at 50 pages, and wait for completion with a progress bar.",
-      "expected_output": "Invokes `firecrawl crawl` with `--include-paths /docs`, `--max-depth 2`, `--limit 50`, `--wait`, and `--progress`.",
+      "prompt": "Recursively crawl https://hono.dev under the /docs section up to 2 link levels deep, capping at 50 pages, and wait for completion.",
+      "expected_output": "Checks `crawl --help`, invokes `crawl` with path scoping, depth limits, and native wait flags, saving output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Calls `firecrawl crawl` with target URL",
-        "Uses `--include-paths /docs` to scope the crawl boundary",
-        "Sets `--max-depth 2` and `--limit 50`",
-        "Passes `--wait` and `--progress` for synchronous completion with progress tracking",
-        "Saves output to `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest crawl --help`",
+        "Routes recursive site crawling to `crawl`",
+        "Uses native wait flag instead of manual polling",
+        "Saves results to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 16,
       "prompt": "How do I check the status of a background crawl job '550e8400-e29b-41d4-a716-446655440000' and cancel it if it takes too long?",
-      "expected_output": "Uses `firecrawl crawl <jobId>` to inspect status and `firecrawl crawl <jobId> --cancel` to abort.",
+      "expected_output": "Checks `crawl --help` for job status and cancellation options, invoking `crawl <job-id>`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl crawl <job-id>` for status inspection",
-        "Uses `firecrawl crawl <job-id> --cancel` to terminate the active job",
-        "Shows polling pattern with `--wait` and `--timeout`"
+        "Checks `bun x firecrawl-cli@latest crawl --help`",
+        "Uses `crawl` with the job ID and status/cancel options"
       ]
     },
     {
       "id": 17,
       "prompt": "I need to scrape https://example.com/search-form, fill out an input with 'mechanical keyboards', click the submit button, and extract the resulting product listings.",
-      "expected_output": "Scrapes the URL first to initialize the session, then drives it using `firecrawl interact` before calling `firecrawl interact stop`.",
+      "expected_output": "Checks `interact --help` or `scrape --help`, scrapes URL to initialize session, then uses `interact` or scrape actions to drive the browser, saving results under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Runs `firecrawl scrape https://example.com/search-form` first to create the session",
-        "Uses `firecrawl interact` with natural language instructions to fill inputs and submit",
-        "Extracts the target content",
-        "Explicitly calls `firecrawl interact stop` to terminate the session"
+        "Checks `bun x firecrawl-cli@latest interact --help` or `scrape --help`",
+        "Routes interactive form filling and browser actions to `interact` or `scrape` actions",
+        "Saves output to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 18,
       "prompt": "Drive a live browser session on a previously scraped page using Node.js / Playwright code to click a complex shadow DOM element 'button#nested-toggle'.",
-      "expected_output": "Uses `firecrawl interact --code ... --node` to execute custom Playwright JavaScript in the active session.",
+      "expected_output": "Checks `interact --help`, uses `interact` with code execution, and saves output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl interact --code`",
-        "Passes `--node` (or defaults to Node execution)",
-        "Includes Playwright page interaction code (e.g. `await page.click(...)`)",
-        "Closes session with `firecrawl interact stop`"
+        "Checks `bun x firecrawl-cli@latest interact --help`",
+        "Routes browser sandbox execution to `interact`",
+        "Saves output to `.firecrawl/` and closes session when done"
       ]
     },
     {
       "id": 19,
       "prompt": "Log in to https://app.example.com/login and save the authenticated session profile 'my-workspace' so future scrape commands don't have to log in again.",
-      "expected_output": "Uses `firecrawl scrape` with `--profile my-workspace`, logs in via `firecrawl interact`, and reuses `--profile` in subsequent commands.",
+      "expected_output": "Checks `scrape --help` for profile options, uses `scrape` with persistent profile, and saves artifacts to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Scrapes with `--profile my-workspace`",
-        "Performs authentication via `firecrawl interact`",
-        "Demonstrates subsequent scrape calls reusing `--profile my-workspace`",
-        "Mentions `--no-save-changes` for read-only reconnection"
+        "Checks `bun x firecrawl-cli@latest scrape --help`",
+        "Uses persistent browser profile to preserve authentication across scrapes",
+        "Saves output to `.firecrawl/`"
       ]
     },
     {
       "id": 20,
       "prompt": "Set up an ongoing hourly monitor on https://example.com/pricing that alerts alerts@example.com when tier prices or limits change, ignoring marketing text.",
-      "expected_output": "Calls `firecrawl monitor create` with `--page`, `--schedule 'hourly'`, `--goal`, and `--email`.",
+      "expected_output": "Checks `monitor create --help`, creates a recurring URL monitor with schedule and alert goal, saving definition under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl monitor create`",
-        "Sets `--page https://example.com/pricing`",
-        "Specifies `--schedule 'hourly'` or cron schedule",
-        "Provides a clear 2-3 sentence `--goal` with trigger condition and `Ignore ...` exclusion",
-        "Sets `--email alerts@example.com`"
+        "Checks `bun x firecrawl-cli@latest monitor create --help`",
+        "Routes recurring page checks to `monitor create`",
+        "Saves monitor configuration or output under `.firecrawl/`"
       ]
     },
     {
       "id": 21,
-      "prompt": "Create a web-wide monitor that searches daily for 'new LLM architecture release' and sends webhook alerts to https://api.example.com/hooks when a major AI lab releases a new architecture.",
-      "expected_output": "Calls `firecrawl monitor create` with `--queries`, `--goal`, `--schedule 'daily'`, and `--webhook-url`.",
+      "prompt": "Create a recurring monitor on https://example.com/changelog to check for updates every 6 hours and trigger webhook alerts on new releases.",
+      "expected_output": "Checks `monitor create --help`, calls `monitor create` with schedule and webhook destination, saving output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl monitor create`",
-        "Passes `--queries` with search terms",
-        "Includes required `--goal` defining which results alert",
-        "Configures `--webhook-url`",
-        "Sets `--schedule` and `--search-window`"
+        "Checks `bun x firecrawl-cli@latest monitor create --help`",
+        "Configures scheduled monitor check with webhook notification",
+        "Saves output under `.firecrawl/`"
       ]
     },
     {
       "id": 22,
       "prompt": "How do I configure a Firecrawl monitor to track structured per-field JSON changes (e.g. price and plan name deltas) rather than plain text markdown diffs?",
-      "expected_output": "Creates a monitor JSON specification using `changeTracking` with `modes: ['json']` and a defined JSON schema.",
+      "expected_output": "Checks `monitor create --help`, creates monitor specification using change tracking mode with a structured schema.",
       "files": [],
       "expectations": [
-        "Explains that JSON-mode tracking requires passing a JSON specification to `firecrawl monitor create`",
-        "Specifies `formats` with `type: 'changeTracking'` and `modes: ['json']`",
-        "Defines a structured `schema` for per-field diffing",
-        "Notes that inspection results include `diff.json` and `snapshot.json`"
+        "Explains passing structured JSON configuration to `monitor create`",
+        "Uses change tracking mode with structured schema for field-level diffs"
       ]
     },
     {
       "id": 23,
       "prompt": "I have a local PDF document './financials-q4.pdf'. Convert it to clean Markdown and ask: 'What was the Q4 GAAP net income and operating margin?'",
-      "expected_output": "Uses `firecrawl parse` with `-Q` or `-o` to parse local document and perform question answering.",
+      "expected_output": "Checks `parse --help`, calls `parse` on local PDF with question answering, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl parse` with the local file path",
-        "Applies `-Q` or `--query` for analytical question answering",
-        "Saves parsed output to `.firecrawl/` using `-o`",
-        "Quotes the file path"
+        "Checks `bun x firecrawl-cli@latest parse --help`",
+        "Routes local PDF parsing to `parse`",
+        "Saves output to a file under `.firecrawl/`"
       ]
     },
     {
       "id": 24,
       "prompt": "Download an entire documentation site from https://docs.example.com/v2 into local Markdown files and screenshots, limiting to 25 pages in non-interactive mode.",
-      "expected_output": "Uses `firecrawl x download` with `--include-paths /v2`, `--screenshot`, `--limit 25`, and `-y`.",
+      "expected_output": "Checks `x download --help`, runs download with path scoping and non-interactive confirmation, saving to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Uses `firecrawl x download`",
-        "Passes `-y` or `--yes` to run non-interactively",
-        "Passes `--include-paths /v2` and `--limit 25`",
-        "Enables `--screenshot`",
-        "Notes that downloaded directory structure is saved under `.firecrawl/`"
+        "Checks `bun x firecrawl-cli@latest x download --help` or `experimental download --help`",
+        "Routes site mirroring to `experimental download` or `x download`",
+        "Passes non-interactive confirmation and path scoping",
+        "Saves directory structure under `.firecrawl/`"
       ]
     },
     {
       "id": 25,
-      "prompt": "Run an autonomous deep research agent to extract all AI hardware accelerator specifications across multiple vendor URLs into structured JSON using the spark-1-pro model.",
-      "expected_output": "Invokes `firecrawl agent` with `--urls`, `--model spark-1-pro`, `--schema`, and `--wait`.",
+      "prompt": "Run an autonomous deep research agent across multiple URLs to extract market data into structured JSON using Firecrawl.",
+      "expected_output": "Explains that autonomous multi-step deep research agents are not routed in Firecrawl; directs to use the appropriate deep research tool.",
       "files": [],
       "expectations": [
-        "Calls `firecrawl agent` with prompt",
-        "Passes comma-separated `--urls`",
-        "Sets `--model spark-1-pro`",
-        "Provides `--schema` for structured JSON return",
-        "Includes `--wait` for synchronous retrieval and saves output with `-o`"
+        "Identifies that autonomous deep research agents are not routed in Firecrawl",
+        "Refrains from calling unrouted agent commands in Firecrawl"
       ]
     }
   ]
