@@ -238,6 +238,8 @@ def telemetry() -> None:
                             "spairport_network_channel",
                             "spairport_signal_noise",
                             "spairport_network_rate",
+                            "spairport_network_mcs",
+                            "spairport_network_phymode",
                         )
                     },
                 )

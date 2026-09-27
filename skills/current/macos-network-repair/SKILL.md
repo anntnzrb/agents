@@ -48,7 +48,7 @@ fixnet diagnose --telemetry
 fixnet repair --service "Wi-Fi"
 ```
 
-For latency, RF interference, MTU stalls, or recurring drops, use `macos-wifi-network-diagnostics` when available.
+For latency, RF interference, MTU stalls, or recurring drops, see unresolved failure diagnostics in `references/repair.md`.
 This skill owns conservative repair, not router tuning or throughput benchmarking.
 
 ## Required follow-up reads

@@ -48,8 +48,16 @@ Do not run concurrent repairs or edit DNS settings during a trial.
 - If a captive portal is present, complete its login. Do not disable certificate verification.
 - If private names or VPN applications fail, inspect split DNS and VPN policy before changing resolvers.
 - If other devices also fail, inspect the router, upstream connection, and ISP status.
-- If small requests pass but TLS or large transfers stall, investigate MTU and packet loss before changing MTU.
-- If gateway latency spikes, inspect RF conditions and router channel width. Do not disable AWDL blindly.
+- If router DNS hangs while the gateway responds to ICMP, test port 53 directly with `dig @<gateway-ip> example.com +time=1 +tries=1` and compare against `dig @1.1.1.1 example.com +time=1 +tries=1`.
+- If small requests pass but TLS or large transfers stall, test MTU clamping with `networksetup -setMTU <device> 1420`.
+- If gateway latency spikes, inspect RF conditions and router channel width. On Apple Silicon, `awdl0` channel hopping for AirDrop or Continuity can cause periodic 200 to 800 ms ping spikes to the gateway on wide 160 MHz channels. Mitigate on the router by reducing 5 GHz channel width to 80 MHz. Do not disable AWDL blindly.
+- For recurring drops, data stalls, or RF interference, inspect CoreWiFi and symptoms logs:
+  `log show --last 1h --style compact --predicate 'process == "airportd" or subsystem contains "com.apple.wifi" or subsystem contains "symptoms"'`
+  Key indicators include:
+  - `rxCrsGlitch` or `rxBadPLCP` exceeding 10000: RF interference or DFS radar contention.
+  - `broken backhaul state` or `routability_timeout`: router upstream routing failure.
+  - `SYMPTOM_LIBNETCORE_DATA_STALL`: active TCP stall.
+  - `recvd wifi dns symptom, server not responding`: dead router DNS forwarder.
 
 Report exit status 0 as both direct HTTPS probes passing, not universal recovery.
 Status 1 means unhealthy, partial, interrupted, or a runtime failure. Status 2 means usage, platform, or configuration failure.
