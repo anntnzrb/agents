@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 DEFAULT_MODEL: Final[str] = "gemini-3.8-flash-high"
 DEFAULT_BASE_URL: Final[str] = "http://munich.trex-gamut.ts.net:8317/v1"
 DEFAULT_API_KEY: Final[str] = "keyless"
-DEFAULT_REASONING_EFFORT: Final[str] = "high"
+DEFAULT_REASONING_EFFORT: Final[str] = "medium"
 DEFAULT_TIMEOUT: Final[float] = 300.0
 
 MODEL_ENV: Final[tuple[str, ...]] = ("AUTOMMIT_MODEL",)
