@@ -1,0 +1,52 @@
+# Mirrors .githooks/pre-commit and .githooks/pre-push; see sync/AGENTS.md § Validation.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  whitespace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Like the pre-commit hook, check only what this change introduces, so
+      # commits made with --no-verify can't slip whitespace errors in.
+      - name: git diff --check
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)
+          fi
+          git diff --check "$(git merge-base "$BASE" HEAD 2>/dev/null || echo "$BASE")" HEAD
+
+  sync-gates:
+    # Sync supports macOS and Linux only; the launch PTY tests are OS-specific.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: sync
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: sync/uv.lock
+      - run: uv sync --frozen
+      - run: uv run --no-sync sync-gates --tests
