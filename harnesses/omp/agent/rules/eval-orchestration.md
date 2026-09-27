@@ -2,14 +2,14 @@
 name: eval-orchestration
 description: Prefer eval for in-memory data distillation, OLAP, and complex algorithms; never proxy specialized harness tools
 condition:
-  - '\b(?:python|node|bun)\s+-[ce]\b|\bjq\b|\bawk\b|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
+  - '\b(?:python|node|bun)\s+-[ce]\b|(?:^|[|;&]\s*)(?:jq|awk)\s|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
   - '\b(?:subprocess\.(?:run|Popen|check_output|check_call)|os\.(?:system|popen|walk))\b|\.(?:read_text|write_text)\(|open\([^)\n]{0,40}[''"]'
 scope:
   - tool:eval
   - tool:bash
 interruptMode: never
 ---
-Always load `skill://python` when working with `eval`. Use `eval` strictly for in-memory data distillation, OLAP queries, complex algorithms, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
+Load `skill://python` before writing nontrivial Python in `eval`; skip it for a short aggregation over data you already hold. Use `eval` for in-memory data distillation, OLAP queries, complex algorithms, API aggregation, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
 
 **Tool-First Boundary:** Never use `eval` as a proxy to circumvent specialized harness tools:
 - Use `read` with line selectors to inspect code or text, not `Path.read_text()` or `open().read()`.
@@ -17,7 +17,9 @@ Always load `skill://python` when working with `eval`. Use `eval` strictly for i
 - Use `bash` for toolchains, builds, tests, git, and CLIs, not `subprocess.run()` inside `eval`.
 - Use `edit` and `write` for file mutations, not Python file writes.
 
-Choose libraries for the analysis, not as substitutes for specialized tools. The table does not authorize HTTP fetching, document inspection, or filesystem discovery inside `eval`. Prefer `read` for supported document and database queries; use analytical engines only when the requested computation needs them.
+Choose libraries for the analysis, not as substitutes for specialized tools. Prefer `read` for supported document and database queries; use analytical engines only when the requested computation needs them.
+
+**Credentials:** When `eval` calls an authenticated API, read the credential from the environment (for example `os.environ["GH_TOKEN"]`, exported by the user or the harness). NEVER print, echo, or paste a token into a command, a cell, or a reply; never run `gh auth token` or similar to fetch one. If the credential is missing, use the CLI through `bash` (for GitHub, `gh api`) instead.
 
 | Domain / Workload | Preferred Tool | Key Use Case |
 |---|---|---|
