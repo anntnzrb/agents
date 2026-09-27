@@ -64,6 +64,6 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 ## Git Contract
 
-Commits: 
-- For harness-specific changes use `<harness>: ...`; that is `pi: configure fallback model`
-- For generic changes: `docs:`, `sync:`, `skills(<skill>):`
+Commits:
+- For harness-specific changes use `<harness>: ...`; for example `pi: configure fallback model`
+- For generic changes: `docs:`, `sync:`, `ci:`, `skills(<skill>):`, `tools(<tool>):`
