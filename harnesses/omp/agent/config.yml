@@ -355,7 +355,7 @@ terminal:
 
 display:
   hideToolActivity: false
-  showTokenUsage: true
+  showTokenUsage: false
   cacheMissMarker: true
 
 tui:
