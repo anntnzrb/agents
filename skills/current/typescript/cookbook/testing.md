@@ -127,3 +127,56 @@ node -e "import('./dist/index.js').then(() => console.log('ok'))"
 ```
 
 **Tip**: Essential for `NodeNext`, dual packages, and published libraries.
+
+---
+
+## Subprocess Test Isolation and Cache Forwarding
+
+**Problem**: Test suites isolating `HOME` or temporary directories run slowly because spawned tools re-download dependencies over the network on every test.
+
+**Solution**:
+
+When tests isolate filesystem writes by redirecting `HOME`, content-addressed package and toolchain caches are masked. Pass cache-bearing variables back into child process environments:
+
+```ts
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const realHome = homedir();
+
+export const sharedToolCacheEnv = {
+  BUN_INSTALL_CACHE_DIR:
+    process.env["BUN_INSTALL_CACHE_DIR"] ?? join(realHome, ".bun", "install", "cache"),
+  UV_CACHE_DIR:
+    process.env["UV_CACHE_DIR"] ?? join(realHome, ".cache", "uv"),
+  UV_PYTHON_INSTALL_DIR:
+    process.env["UV_PYTHON_INSTALL_DIR"] ?? join(realHome, ".local", "share", "uv", "python"),
+};
+```
+
+When tests share identical fixtures, build once per run and symlink large read-only directories (`node_modules`) instead of copying them.
+
+**Tip**: If `real >> user` time in `time <runner> test`, the suite is waiting on blocking I/O or network fetches rather than executing test logic.
+
+---
+
+## Bun Test Teardown and Environment Isolation
+
+**Problem**: Cleanup hooks fail to execute under `bun test`, or temporary environment modifications leak into concurrent tests.
+
+**Solution**:
+
+- `process.on("exit")` does not fire under `bun test`. Register teardown using `afterAll` or `afterEach` at module evaluation scope.
+- `Bun.env` reads live `process.env` and shares state across tests. When overriding `PATH` to stub a binary in a test, capture the pristine environment at module load and restore it in teardown:
+
+```ts
+import { afterAll, it } from "bun:test";
+
+const PRISTINE_PATH = process.env["PATH"] ?? "";
+
+afterAll(() => {
+  process.env["PATH"] = PRISTINE_PATH;
+});
+```
+
+**Tip**: To isolate a suspected slow binary without code changes, prepend a failing stub script via a temporary directory in `PATH`.
