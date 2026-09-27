@@ -344,8 +344,8 @@ memories:
 
 autolearn:
   enabled: true
-  # EXPERIMENTAL: Automatically triggers a post-turn capture pass to codify managed skills; consumes extra tokens.
-  autoContinue: true
+  # Off: an automatic capture turn would run on main agent after every task
+  autoContinue: false
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. APPEARANCE, DISPLAY & THEME (Tab: appearance)
