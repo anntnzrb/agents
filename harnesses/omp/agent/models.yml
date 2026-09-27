@@ -36,9 +36,8 @@ providers:
         thinking:
           mode: effort
           efforts:
-            - low
-            - max
-          defaultLevel: max
+            - xhigh
+          defaultLevel: xhigh
         input:
           - text
           - image
