@@ -249,7 +249,6 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
         [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
         RunProcessOptions(
             timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS)),
-            stdio="pipe",
         ),
         cwd=stage,
     )

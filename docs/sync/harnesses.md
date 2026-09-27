@@ -58,7 +58,7 @@ Harnesses use their native model discovery or configured model definitions again
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli` with `launch`, prepares the harness launcher, forwards all arguments, and returns the harness exit status.
+Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli` with `launch`, prepares the harness launcher, and replaces itself with the harness, forwarding all arguments. The harness exit status is the wrapper's exit status.
 
 When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127`.
 

@@ -71,8 +71,10 @@ from sync.runtime.lock import (
     try_acquire_sync_lock as try_acquire_sync_lock_impl,
 )
 from sync.runtime.process import (
+    ExecPlan,
     RunProcessOptions,
     command_exists,
+    exec_process,
     run_process,
 )
 
@@ -373,8 +375,19 @@ async def _async_update_main() -> int:
 
 
 def launch_main(source_name: str, args: Sequence[str]) -> int:
-    """CLI entrypoint for launching a harness or tool; returns exit code."""
-    return asyncio.run(_async_launch_main(source_name, args))
+    """CLI entrypoint for launching a harness or tool.
+
+    On success the prepared executable replaces this process, keeping its PID,
+    session, and controlling terminal; otherwise returns an error exit code.
+    """
+    outcome = asyncio.run(_async_launch_main(source_name, args))
+    if isinstance(outcome, int):
+        return outcome
+    try:
+        exec_process(outcome)
+    except OSError as error:
+        err(f"launch failed: {panic_message(error)}")
+        return EXIT_ERROR
 
 
 async def _sync_before_launch(sync_env: SyncEnv) -> None:
@@ -418,7 +431,7 @@ def _resolve_launch_target(
 async def _async_launch_main(
     source_name: str,
     args: Sequence[str],
-) -> int:
+) -> int | ExecPlan:
     try:
         sync_env = SyncEnv.from_system()
     except (OSError, RuntimeError, ValueError, TypeError) as error:

@@ -37,11 +37,9 @@ from sync.runtime.process import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
 EXPECTED_INSTALLS: Final[int] = 2
-EXPECTED_LAUNCH_EXIT_CODE: Final[int] = 7
-EXPECTED_TOOL_EXIT_CODE: Final[int] = 3
 DEFAULT_PREPARE_TIMEOUT_MS: Final[int] = 1000
 MODE_EXECUTABLE: Final[int] = 0o755
 RELEASE_VERSION: Final[str] = "9.9.9"
@@ -391,41 +389,27 @@ def test_npm_launcher_separates_cache_versions_when_a_harness_changes_package(
     assert restored.resolved_version == "1.0.0"
 
 
-def test_interactive_harness_launch_is_unbounded_and_keeps_arguments(
+def test_harness_launch_plans_exec_of_cached_binary_with_arguments(
     tmp_path: Path,
 ) -> None:
-    """Test interactive harness launch passes arguments with unbounded timeout."""
+    """Harness launch plans an exec of the prepared binary with forwarded args."""
     home = str(tmp_path)
     (tmp_path / ".config" / "agents" / "harnesses" / "codex").mkdir(
         parents=True, exist_ok=True
     )
-    calls: list[tuple[list[str], float | None, str]] = []
 
     async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
         return "1.0.0"
 
     async def mock_run(
         cmd: Sequence[str],
-        options: RunProcessOptions,
+        _options: RunProcessOptions,
     ) -> ProcessResult:
         command = list(cmd)
-        calls.append((command, options.timeout_ms, options.stdio))
         if command and command[0] == "npm":
             stage = command[3]
             await asyncio.to_thread(
                 _setup_stage_binary, stage, "codex", "@openai/codex", "1.0.0"
-            )
-        if (
-            command
-            and command[0].endswith("codex")
-            and len(command) > 1
-            and command[1] == "--help"
-        ):
-            return ProcessResult(
-                exit_code=EXPECTED_LAUNCH_EXIT_CODE,
-                stdout="",
-                stderr="",
-                timed_out=False,
             )
         return _success()
 
@@ -433,14 +417,11 @@ def test_interactive_harness_launch_is_unbounded_and_keeps_arguments(
     sync_env = SyncEnv.from_home(home, DEFAULT_PREPARE_TIMEOUT_MS, platform="linux")
     harness = next(c for c in sync_env.harnesses if c.source_name == "codex")
 
-    exit_code = asyncio.run(
-        launch_harness(sync_env, harness, ["--help", "hello"], runtime)
-    )
-    assert exit_code == EXPECTED_LAUNCH_EXIT_CODE
-    launch_call = calls[-1]
-    assert launch_call[0][-2:] == ["--help", "hello"]
-    assert launch_call[1] is None
-    assert launch_call[2] == "inherit"
+    plan = asyncio.run(launch_harness(sync_env, harness, ["--help", "hello"], runtime))
+
+    assert plan.executable.endswith("current/node_modules/.bin/codex")
+    assert plan.args == ("--help", "hello")
+    assert plan.env["PATH"] == os.environ["PATH"]
 
 
 def test_harness_launch_merges_root_env_parent_env_and_adapter_env_with_precedence(
@@ -472,17 +453,11 @@ from sync.core.harness import SyncEnv
 from sync.core.launcher import launch_harness, LauncherRuntime
 from sync.runtime.process import ProcessResult, RunProcessOptions
 
-captured_env = None
-
 async def main():
-    global captured_env
-
     async def mock_resolve(pkg, tag, timeout):
         return "1.0.0"
 
     async def mock_run(cmd, options):
-        global captured_env
-        captured_env = options.env
         command = list(cmd)
         if command and command[0] == "npm":
             stage = command[3]
@@ -509,11 +484,10 @@ async def main():
     )
     harness = replace(base_harness, launcher=launcher_with_env)
 
-    await launch_harness(sync_env, harness, [], runtime)
-    assert captured_env is not None
-    assert captured_env[{root_key_only!r}] == "root_default_val"
-    assert {parent_key_override!r} not in captured_env
-    assert captured_env[{adapter_collision_key!r}] == "adapter_wins"
+    plan = await launch_harness(sync_env, harness, [], runtime)
+    assert plan.env[{root_key_only!r}] == "root_default_val"
+    assert plan.env[{parent_key_override!r}] == "parent_value"
+    assert plan.env[{adapter_collision_key!r}] == "adapter_wins"
 
 asyncio.run(main())
 """
@@ -811,7 +785,6 @@ def test_static_release_harness_launch_dispatches_prepared_binary(
     """Verify launch_harness prepares and forwards arguments to the release binary."""
     bundle = tmp_path / "bundle.tar.gz"
     sha256 = _make_release_bundle(bundle, tmp_path / "stage")
-    calls: list[tuple[list[str], Mapping[str, str | None] | None]] = []
 
     def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
         return _release_manifest(sha256)
@@ -819,24 +792,11 @@ def test_static_release_harness_launch_dispatches_prepared_binary(
     def download(_url: str, destination: str, _timeout_ms: int) -> None:
         _ = shutil.copyfile(bundle, destination)
 
-    async def run(
-        cmd: Sequence[str],
-        options: RunProcessOptions,
-    ) -> ProcessResult:
-        calls.append((list(cmd), options.env))
-        return ProcessResult(
-            exit_code=EXPECTED_LAUNCH_EXIT_CODE,
-            stdout="",
-            stderr="",
-            timed_out=False,
-        )
-
     runtime = ReleaseRuntime(
         arch="x86_64",
         platform="linux",
         fetch_manifest=fetch_manifest,
         download=download,
-        run=run,
     )
 
     home = str(tmp_path)
@@ -847,12 +807,11 @@ def test_static_release_harness_launch_dispatches_prepared_binary(
     harness = next(c for c in sync_env.harnesses if c.source_name == "devin")
     assert isinstance(harness.launcher, StaticReleaseLauncher)
 
-    exit_code = asyncio.run(
+    plan = asyncio.run(
         launch_harness(sync_env, harness, ["--help"], release_runtime=runtime)
     )
-    assert exit_code == EXPECTED_LAUNCH_EXIT_CODE
-    assert calls[-1][0][-1] == "--help"
-    assert calls[-1][0][0].endswith("bin/devin")
+    assert plan.args == ("--help",)
+    assert plan.executable.endswith("bin/devin")
 
 
 def test_tool_launcher_launch_uses_the_registered_npm_spec(
@@ -862,33 +821,21 @@ def test_tool_launcher_launch_uses_the_registered_npm_spec(
     home = str(tmp_path)
     tool = tool_launcher("mcporter")
     assert tool is not None
-    calls: list[tuple[list[str], float | None, str]] = []
+    calls: list[list[str]] = []
 
     async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
         return "1.0.0"
 
     async def mock_run(
         cmd: Sequence[str],
-        options: RunProcessOptions,
+        _options: RunProcessOptions,
     ) -> ProcessResult:
         command = list(cmd)
-        calls.append((command, options.timeout_ms, options.stdio))
+        calls.append(command)
         if command and command[0] == "npm":
             stage = command[3]
             await asyncio.to_thread(
                 _setup_stage_binary, stage, "mcporter", "mcporter", "1.0.0"
-            )
-        if (
-            command
-            and command[0].endswith("mcporter")
-            and len(command) > 1
-            and command[1] == "list"
-        ):
-            return ProcessResult(
-                exit_code=EXPECTED_TOOL_EXIT_CODE,
-                stdout="",
-                stderr="",
-                timed_out=False,
             )
         return _success()
 
@@ -897,7 +844,7 @@ def test_tool_launcher_launch_uses_the_registered_npm_spec(
     assert tool.package == "mcporter"
     assert tool.bin == "mcporter"
 
-    exit_code = asyncio.run(
+    plan = asyncio.run(
         launch_npm_package(
             sync_env,
             NpmPackageSpec(tool=tool.id, package=tool.package, bin=tool.bin),
@@ -905,15 +852,10 @@ def test_tool_launcher_launch_uses_the_registered_npm_spec(
             runtime,
         )
     )
-    assert exit_code == EXPECTED_TOOL_EXIT_CODE
-    launch_call = calls[-1]
-    assert launch_call[0][-1:] == ["list"]
-    assert launch_call[1] is None
-    assert launch_call[2] == "inherit"
+    assert plan.executable.endswith("current/node_modules/.bin/mcporter")
+    assert plan.args == ("list",)
     assert any(
-        c[0] and c[0][0] == "npm" and "mcporter@1.0.0" in token
-        for c in calls
-        for token in c[0]
+        c and c[0] == "npm" and "mcporter@1.0.0" in token for c in calls for token in c
     )
 
     summarize = tool_launcher("summarize")

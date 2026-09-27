@@ -108,7 +108,7 @@ Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway hos
 
 Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
 
-The launched harness runs in its own session. A wrapper that receives `SIGTERM` or `SIGHUP` forwards it to the harness's process group and exits with the harness, so a service manager stopping a wrapper also stops the harness instead of orphaning it.
+After preparing the harness, the wrapper process is replaced by the harness executable (`execve`). The harness keeps the wrapper's PID, session, process group, and controlling terminal, so terminal resizes, `^C`, job control, and a service manager's `SIGTERM` reach the harness directly, and its exit status is the wrapper's exit status. Captured subprocesses that sync runs itself (npm installs, smoke checks, hooks) still run in their own session so timeouts can kill the whole process group.
 
 The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
