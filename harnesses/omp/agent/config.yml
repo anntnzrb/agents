@@ -306,7 +306,7 @@ task:
   # always: director plans and fans out; workers (@task/@smol) do the implementation
   eager: always
   batch: true
-  maxConcurrency: 16
+  maxConcurrency: 32
   enableEffort: false
   enableLsp: false
   prewalk: false
