@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: "Use when evaluating git diffs, commits, or pull requests for invariant violations, security bugs, or regressions."
+description: "Use when reviewing git diffs, commits, or pull requests for bugs, invariant violations, regressions, or security flaws."
 license: AGPL-3.0-or-later
 metadata:
   version: "1.0.0"

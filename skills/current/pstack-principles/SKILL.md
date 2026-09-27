@@ -1,6 +1,6 @@
 ---
 name: pstack-principles
-description: "Use before design, refactoring, debugging, delegation, or verification where smallest-change discipline matters."
+description: "Use before refactoring, debugging, or design to apply pstack engineering principles, not for post-commit code review."
 license: AGPL-3.0-or-later
 ---
 

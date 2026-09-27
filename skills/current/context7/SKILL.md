@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: context7
-description: "Fetch up-to-date documentation, API signatures, and verified code examples via Context7."
+description: "Use when fetching library or framework docs, API signatures, and examples via Context7, not for OpenAI OpenAPI specs."
 license: AGPL-3.0-or-later
 compatibility: Requires Context7 MCP server via MCPorter.
 ---

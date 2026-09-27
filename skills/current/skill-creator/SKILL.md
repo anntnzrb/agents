@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: "Use when creating, auditing, refactoring, validating, benchmarking, packaging, or tuning a skill and its triggers."
+description: "Use when creating, editing, validating, benchmarking, or packaging agent skills, SKILL.md files, or skill triggers."
 license: AGPL-3.0-or-later
 metadata:
   author: Anthropic

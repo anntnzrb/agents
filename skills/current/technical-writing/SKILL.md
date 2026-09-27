@@ -1,6 +1,6 @@
 ---
 name: technical-writing
-description: "Use for documentation, RFCs, READMEs, PR text, commit messages, or other developer-facing technical prose."
+description: "Use when writing developer docs, READMEs, RFCs, architecture guides, or PR descriptions, not for automated changelogs."
 license: AGPL-3.0-or-later
 ---
 

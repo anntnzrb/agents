@@ -1,6 +1,6 @@
 ---
 name: mk-changelog
-description: "Generate Keep a Changelog entries and release notes from Git commits, PRs, or staged diffs."
+description: "Use when generating or updating CHANGELOG.md entries and release notes from git commits, pull requests, or diffs."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: how
-description: "Use when the user asks how something works, wants a walkthrough before changes, or requests design critique."
+description: "Use when explaining how a subsystem works, tracing runtime code flow, or critiquing design, not for git history."
 license: AGPL-3.0-or-later
 ---
 

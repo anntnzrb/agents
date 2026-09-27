@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: mole
-description: "Use when the user asks to run Mole's mo CLI for macOS cleanup, analysis, history, status, or dry runs."
+description: "Use when the user asks to run Mole mo CLI commands to analyze macOS disk usage, clean caches, or purge build artifacts."
 license: AGPL-3.0-or-later
 ---
 

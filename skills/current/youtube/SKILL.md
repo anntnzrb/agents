@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: youtube
-description: "Use when a YouTube or media URL must be inspected, downloaded, converted, extracted, listed, or explored."
+description: "Use when downloading or extracting YouTube videos, audio, subtitles, or media URLs with yt-dlp, not for web scraping."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: deepswe-live
-description: "Use when the user asks about published DeepSWE scores, metrics, versions, or model efficiency."
+description: "Use when querying DeepSWE benchmark scores, leaderboards, pass@1 rates, model efficiency, or confidence intervals."
 license: AGPL-3.0-or-later
 compatibility: Requires uv; network is needed only for fetch.
 metadata:

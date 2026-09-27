@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: github
-description: "Use when GitHub CLI, repositories, issues, pull requests, Actions, releases, APIs, or stacked PRs are involved."
+description: "Use when managing GitHub via gh CLI, issues, PRs, Actions, releases, or stacked PRs; not for contribution guidelines."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

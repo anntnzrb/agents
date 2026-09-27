@@ -1,6 +1,6 @@
 ---
 name: macos-network-repair
-description: "Diagnose and repair broken macOS Wi-Fi, DNS failures, and no-internet connections with staged, consent-gated fixes."
+description: "Use when diagnosing or repairing macOS Wi-Fi, DNS failures, DHCP, or lost internet, not for router hardware tuning."
 license: AGPL-3.0-or-later
 ---
 

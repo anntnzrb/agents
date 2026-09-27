@@ -1,6 +1,6 @@
 ---
 name: amp
-description: "Use when working with Amp CLI modes, plugins, model routing, runners, orbs, or sync-managed Amp settings."
+description: "Use when configuring Amp CLI modes, plugins, model routing rules, runner processes, orbs, or sync-managed settings."
 license: AGPL-3.0-or-later
 ---
 

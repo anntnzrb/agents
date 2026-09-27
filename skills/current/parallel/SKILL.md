@@ -1,6 +1,6 @@
 ---
 name: parallel
-description: Use when searching the web, running cited deep research, discovering entity lists, enriching data, or monitoring topics.
+description: "Use when running Parallel web search, cited deep research, entity discovery, enrichment, or monitors, not for crawling."
 license: AGPL-3.0-or-later
 compatibility: Requires uv and PARALLEL_API_KEY in the environment.
 metadata:

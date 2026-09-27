@@ -1,6 +1,6 @@
 ---
 name: mneme
-description: "Use when processing meeting transcripts, audio notes, synthesizing action items/summaries, or querying notes."
+description: "Use when denoising meeting transcripts, extracting action items, or searching audio notes, not for coding sessions."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

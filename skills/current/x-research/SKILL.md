@@ -1,6 +1,6 @@
 ---
 name: x-research
-description: "Use when public X or Twitter posts, timelines, searches, or conversations require bounded evidence."
+description: "Use when inspecting public X or Twitter posts, x.com URLs, @handle timelines, searches, or threads, not for web search."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

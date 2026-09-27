@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: ast-grep
-description: "Use when code search needs AST structure, ast-grep, sg, structural matching, or read-only find-usages."
+description: "Use when searching code with ast-grep or sg, matching AST structural syntax patterns, not for plain regex search."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: amz-live
-description: "Use when the user asks to search, compare, price, or recommend Amazon products from live catalog data."
+description: "Use when searching Amazon products, comparing live prices, filtering ratings, finding deals, or shortlisting items."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv`. Uses bundled skill-local `scripts/cli.py`. Network access required for live mode.
 metadata:

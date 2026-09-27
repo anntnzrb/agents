@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: agent-browser
-description: "Use when a task needs website browsing, login, forms, clicks, scraping, screenshots, or web-app testing."
+description: "Use when automating a live browser or agent-browser for login, forms, clicks, screenshots, or UI tests, not for crawls."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

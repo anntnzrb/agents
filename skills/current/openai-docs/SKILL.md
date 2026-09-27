@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: openai-docs
-description: "Search and fetch official OpenAI API reference, endpoints, OpenAPI specs, and developer docs via MCPorter."
+description: "Use when querying official OpenAI API docs, endpoints, or OpenAPI specs, not for other libraries or model benchmarks."
 license: AGPL-3.0-or-later
 compatibility: Requires openai-docs remote MCP server via MCPorter.
 ---

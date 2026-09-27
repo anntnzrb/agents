@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: herdr
-description: "Use only when the user explicitly asks Herdr to control panes, tabs, workspaces, commands, agents, or sessions."
+description: "Use when explicitly asked to control Herdr terminal workspaces, tabs, panes, background commands, or coding agents."
 license: AGPL-3.0-or-later
 ---
 

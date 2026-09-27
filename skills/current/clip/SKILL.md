@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: clip
-description: "Use to copy terminal output, files, or stdin to the clipboard via OSC 52 across macOS, Linux, Windows, and SSH/tmux."
+description: "Use when copying terminal output, files, or stdin to the system clipboard via OSC 52; not for web pastebin uploads."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

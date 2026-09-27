@@ -1,6 +1,6 @@
 ---
 name: firecrawl
-description: "Use when scraping, crawling, mapping URLs, parsing local documents, or querying developer and research paper indexes."
+description: "Use when scraping URLs, crawling or mapping sites, parsing docs, or querying Firecrawl indexes, not for deep research."
 license: AGPL-3.0-or-later
 compatibility: Requires bun and FIRECRAWL_API_KEY.
 ---

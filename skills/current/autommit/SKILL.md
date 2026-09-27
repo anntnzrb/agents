@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: autommit
-description: "Use when the user asks for autommit, unattended commits, atomic commit splitting, or recovery."
+description: "Use when asked to autommit, split changes into atomic commits, or create unattended git commits from local diffs."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

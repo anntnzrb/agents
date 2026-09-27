@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: git-worktrees
-description: "Use when Git worktrees must be created, consumed, removed, leased, or routed through a worktree manager."
+description: "Use when creating, removing, or managing Git worktrees for isolated branch development, parallel tasks, or testing."
 license: AGPL-3.0-or-later
 ---
 

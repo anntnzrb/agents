@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: typescript
-description: "Use whenever TypeScript, TS, .ts files, tsconfig, Bun, Node.js, ESM, type errors, or TS tooling are involved."
+description: "Use when writing TypeScript, editing .ts/.tsx files, resolving type errors, tsconfig, or Bun/tsc tooling."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

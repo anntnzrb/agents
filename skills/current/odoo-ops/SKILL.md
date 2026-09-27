@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: odoo-ops
-description: "Odoo 17 local replica development, database inspection, Server Actions, and explicitly authorized JSON-RPC."
+description: "Use when developing or testing Odoo 17 modules, replica databases, XML views, Server Actions, or safe JSON-RPC calls."
 license: AGPL-3.0-or-later
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: webpaste
-description: "Use to upload code, diffs, logs, or text to pastes.dev via CLI or stdin with automatic syntax highlighting."
+description: "Use when sharing, uploading, or fetching code, diffs, or logs via pastes.dev; not for local clipboard copying."
 license: AGPL-3.0-or-later
 metadata:
   author: anonymous

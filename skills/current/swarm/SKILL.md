@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: swarm
-description: "Use when a task should fan out across parallel workers, independent slices, races, or best-of attempts."
+description: "Use when fanning out parallel subagents across task slices, races, or best-of attempts, not for live web search."
 license: AGPL-3.0-or-later
 ---
 

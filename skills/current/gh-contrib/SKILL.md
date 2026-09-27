@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: gh-contrib
-description: "Use when creating an upstream GitHub issue or pull request under a repository's contribution rules."
+description: "Use when contributing to upstream repositories following CONTRIBUTING.md, issue templates, or PR guidelines."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

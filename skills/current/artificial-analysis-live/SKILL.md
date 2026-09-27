@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: artificial-analysis-live
-description: "Use when comparing current AI models or providers by benchmarks, speed, latency, quality, or price."
+description: "Use when querying Artificial Analysis or comparing AI model speed, latency, throughput, or provider token pricing."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv` and network access.
 metadata:

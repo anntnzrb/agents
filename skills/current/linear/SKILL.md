@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: linear
-description: "Use when working with Linear to manage issues, projects, documents, or team workflows."
+description: "Use when creating, querying, or updating Linear issues, projects, cycles, documents, or teams via Linear MCP tools."
 license: AGPL-3.0-or-later
 compatibility: Requires Linear authentication via MCPorter.
 ---

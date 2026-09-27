@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: nix
-description: "Use when Nix, nixpkgs, flakes, NixOS, derivations, shells, or Home Manager are involved."
+description: "Use when writing Nix flakes, derivations, nixpkgs packages, devShells, NixOS, or Home Manager, not for Clan deployment."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

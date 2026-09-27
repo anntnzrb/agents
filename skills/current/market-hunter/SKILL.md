@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: market-hunter
-description: "Search, compare, verify, and score AI subscriptions, licenses, and digital accounts across deal marketplaces."
+description: "Use when searching G2A, Kinguin, or Plati for discounted AI subscriptions, software keys, accounts, or seller trust."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

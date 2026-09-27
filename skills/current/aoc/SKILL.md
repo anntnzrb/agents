@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: aoc
-description: "Use for Advent of Code, algorithm puzzles, competitive programming, or puzzle-solution optimization."
+description: "Use for Advent of Code (AoC), competitive programming, 2D grid/graph puzzles, or two-part input-parsing challenges."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: recall
-description: "Use when the user says recall my work, catch me up, or asks to reconstruct recent work from sessions and Git state."
+description: "Use when asked to recall my work, catch up, or reconstruct context from agent sessions and git, not for code history."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

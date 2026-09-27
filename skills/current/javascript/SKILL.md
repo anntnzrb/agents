@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: javascript
-description: "Use when JavaScript, Node.js, browser JS, modules, async behavior, APIs, tests, or performance are involved."
+description: "Use when writing JavaScript, .js/.mjs files, Node.js runtime APIs, ESM/CJS interop, or async; not for static types."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

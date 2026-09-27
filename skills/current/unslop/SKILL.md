@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: "Use when asked to deslop, remove AI writing patterns, clean prose, or perform bounded behavior-preserving code cleanup."
+description: "Use when asked to deslop text, remove AI writing patterns, or clean AI-generated code, not for general refactoring."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

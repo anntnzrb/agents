@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: reddit
-description: "Use when Reddit posts, comments, subreddits, users, or community discussion must be searched or retrieved."
+description: "Use when browsing or searching Reddit, r/ subreddits, thread comments, or u/ user activity, not for general web search."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

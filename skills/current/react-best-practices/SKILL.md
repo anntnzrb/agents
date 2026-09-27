@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: react-best-practices
-description: "Use when React or Next.js performance, data fetching, bundles, rendering, or Server Actions security are involved."
+description: "Use when optimizing React or Next.js performance, waterfalls, bundle sizes, or Server Actions; not for visual styling."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
