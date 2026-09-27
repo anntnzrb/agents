@@ -1,5 +1,4 @@
 ---
-disable-model-invocation: true
 name: python
 description: "Use when Python, .py files, uv, typing, validation, APIs, async code, tests, or packaging are involved."
 license: AGPL-3.0-or-later
