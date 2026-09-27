@@ -54,6 +54,8 @@ Route each request to the right source class; return a source-backed answer with
 - Follow each owning skill for commands, credentials, extraction, and cache recovery. Never substitute a remembered workaround or silently fall back to stale data.
 - Preserve model, reasoning effort, provider, harness, configuration, benchmark version, task population, metric units, and freshness wherever published. Mark unknown fields and mismatches before comparing rows.
 - Separate published values from derived deltas, ratios, or rankings. Compare costs only when their units and workload assumptions align. Missing observations remain missing, not zero or proof of non-evaluation.
+- For cost-versus-quality comparisons, identify the Pareto frontier (cheapest model at each quality tier) and quantify the premium (quality gain per cost multiple) rather than ranking solely by a composite ratio.
+- Filter or flag runs with elevated failure rates before recommending low-cost models; high failure rates inflate effective task cost.
 - Do not deduplicate provider measurements solely by model or endpoint name. Do not average unrelated benchmark scales or declare a winner by source-count majority.
 - Report confidence intervals and sample limits. Interval overlap alone is not a significance test; agreement across boards does not establish independent evidence.
 - Explain disagreements using task relevance, configuration, methodology, and source quality. Preserve unresolved differences instead of forcing one ranking.
