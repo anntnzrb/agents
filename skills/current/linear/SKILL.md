@@ -55,16 +55,19 @@ mcporter call linear.list_teams --output json
   ```
 
 ### 3. Documents (Meeting Notes & Specs)
-- **List documents:**
+- **List documents (by team or project):**
   ```sh
   mcporter call linear.list_documents teamId="<team_id>" --output json
+  mcporter call linear.list_documents projectId="<project_id>" --output json
   ```
-- **Create a document:**
+- **Create or update a document:**
   ```sh
   mcporter call linear.save_document \
     title="<Title>" \
     content=@path/to/content.md \
     team="<Team>" \
+    project="<Project>" \
+    color="<#HEX>" \
     --output json
   ```
 - **Get a document:**
@@ -86,3 +89,5 @@ mcporter call linear.list_teams --output json
 - **Inspect schema before mutation:** Run `mcporter list linear.<tool> --schema` when parameters or required arguments are uncertain.
 - **Passing multiline content or files:** Use `--args '{"key": "value"}'` for JSON or `content=@file.md` for Markdown payloads.
 - **Authentication recovery:** If a 401/403 error occurs, execute `mcporter auth linear`.
+- **Avoid duplicate document headers:** Linear renders a document's `title` property as the page header. Do not repeat the title as a leading `# H1` in `content`.
+- **Meeting notes & transcripts:** When logging recurring meetings in a project, maintain a pinned index document that links each session's summary and transcript. Include a `## Key People` roster (names, roles, and ASR variants) in the index to ground speaker attribution.
