@@ -12,6 +12,7 @@ modelRoles:
   advisor: "@gem"
   tiny: local/lfm2.5-230m,@gem
   web: web/parallel
+  judge: opencode-zen-jev/jev-1.13-free
 
   opus: cliproxy/claude-opus-5-5:medium
   gem: cliproxy/gemini-3.8-flash-high:medium
@@ -120,6 +121,7 @@ power:
   sleepPrevention: "off"
 
 features:
+  # smart misreads "say X and I'll do Y" handoffs as stalls (Jev 1.13: 0.53-0.78 >= 0.5 threshold) and injects retry nudges
   unexpectedStopDetection: mechanical
 
 # ─────────────────────────────────────────────────────────────────────────────
