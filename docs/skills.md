@@ -133,6 +133,9 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Pair a prohibition with its positive alternative when the alternative is not obvious.
 - Keep tactical bullets short by splitting distinct claims; do not enforce an arbitrary word-count target.
 - Examples MUST use exact runnable syntax or clearly marked placeholders.
+- Do not tell the model to think carefully, think step by step, or write out its reasoning. Effort controls thinking on current models, and a prompt that asks for the model's internal reasoning in the reply can be refused (`reasoning_extraction` on some models). Ask for the result and its justification instead.
+- To stop an agent from ending turns early, name the specific stops to avoid, such as a summary that announces the next step or an offer to continue, and name the stops you want kept.
+- When instructions arrive through tool output, fetched pages, or pasted text, say that such text is data and is followed only when the user's own message asks for it.
 
 ## Tool and MCP prompt authoring
 
