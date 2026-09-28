@@ -1,13 +1,14 @@
 """Tests for Mneme CLI entrypoint."""
 
-from __future__ import annotations
-
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeIs
 from unittest.mock import patch
 
 import pytest
 from scripts.cli import (
+    MnemeArgs,
     build_parser,
     check_qmd_available,
     clean_text_lossless,
@@ -19,9 +20,17 @@ from scripts.cli import (
 )
 
 
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
+
+def _is_list(obj: object) -> TypeIs[list[object]]:
+    return isinstance(obj, list)
+
+
 def test_parser_search_subcommand_default() -> None:
     parser = build_parser()
-    args = parser.parse_args(["search", "budget planning"])
+    args = parser.parse_args(["search", "budget planning"], namespace=MnemeArgs())
     assert args.command == "search"
     assert args.query == "budget planning"
     assert args.collection is None
@@ -34,7 +43,8 @@ def test_parser_search_subcommand_default() -> None:
 def test_parser_search_subcommand_exact() -> None:
     parser = build_parser()
     args = parser.parse_args(
-        ["search", "Project Alpha", "-c", "meetings", "-n", "10", "--exact", "--json"]
+        ["search", "Project Alpha", "-c", "meetings", "-n", "10", "--exact", "--json"],
+        namespace=MnemeArgs(),
     )
     assert args.command == "search"
     assert args.query == "Project Alpha"
@@ -46,7 +56,9 @@ def test_parser_search_subcommand_exact() -> None:
 
 def test_parser_search_subcommand_no_rerank() -> None:
     parser = build_parser()
-    args = parser.parse_args(["search", "timeline", "--no-rerank"])
+    args = parser.parse_args(
+        ["search", "timeline", "--no-rerank"], namespace=MnemeArgs()
+    )
     assert args.command == "search"
     assert args.query == "timeline"
     assert args.no_rerank is True
@@ -54,7 +66,7 @@ def test_parser_search_subcommand_no_rerank() -> None:
 
 def test_parser_get_subcommand() -> None:
     parser = build_parser()
-    args = parser.parse_args(["get", "#abc123:10:20"])
+    args = parser.parse_args(["get", "#abc123:10:20"], namespace=MnemeArgs())
     assert args.command == "get"
     assert args.target == "#abc123:10:20"
 
@@ -96,14 +108,15 @@ def test_cli_synthesize_missing_input(capsys: pytest.CaptureFixture[str]) -> Non
 def test_cli_search_dispatch_modes_with_positional_separator() -> None:
     parser = build_parser()
     with patch("scripts.cli.run_qmd_command", return_value=0) as mock_run:
-        args = parser.parse_args(["search", "test query"])
+        args = parser.parse_args(["search", "test query"], namespace=MnemeArgs())
         ret = handle_search(args)
         assert ret == 0
         mock_run.assert_called_with(["query", "-n", "5", "--", "test query"])
 
     with patch("scripts.cli.run_qmd_command", return_value=0) as mock_run:
         args = parser.parse_args(
-            ["search", "-c", "notes", "--exact", "--json", "--", "--help"]
+            ["search", "-c", "notes", "--exact", "--json", "--", "--help"],
+            namespace=MnemeArgs(),
         )
         ret = handle_search(args)
         assert ret == 0
@@ -112,7 +125,9 @@ def test_cli_search_dispatch_modes_with_positional_separator() -> None:
         )
 
     with patch("scripts.cli.run_qmd_command", return_value=0) as mock_run:
-        args = parser.parse_args(["search", "test query", "--no-rerank"])
+        args = parser.parse_args(
+            ["search", "test query", "--no-rerank"], namespace=MnemeArgs()
+        )
         ret = handle_search(args)
         assert ret == 0
         mock_run.assert_called_with(
@@ -123,7 +138,7 @@ def test_cli_search_dispatch_modes_with_positional_separator() -> None:
 def test_cli_get_dispatch_with_positional_separator() -> None:
     parser = build_parser()
     with patch("scripts.cli.run_qmd_command", return_value=0) as mock_run:
-        args = parser.parse_args(["get", "#abc123:10:20"])
+        args = parser.parse_args(["get", "#abc123:10:20"], namespace=MnemeArgs())
         ret = handle_get(args)
         assert ret == 0
         mock_run.assert_called_with(["get", "--", "#abc123:10:20"])
@@ -166,14 +181,16 @@ def test_clean_text_lossless_turn_order_and_speaker_annotations() -> None:
 
 def test_handle_denoise_file_output(tmp_path: Path) -> None:
     raw_file = tmp_path / "raw.md"
-    raw_file.write_text(
+    _ = raw_file.write_text(
         "Speaker 1: um, we have agreed to close the deal at 50,000 USD.\n",
         encoding="utf-8",
     )
     out_file = tmp_path / "clean.md"
 
     parser = build_parser()
-    args = parser.parse_args(["denoise", str(raw_file), "-o", str(out_file)])
+    args = parser.parse_args(
+        ["denoise", str(raw_file), "-o", str(out_file)], namespace=MnemeArgs()
+    )
     ret = handle_denoise(args)
     assert ret == 0
     assert out_file.exists()
@@ -184,11 +201,9 @@ def test_handle_denoise_file_output(tmp_path: Path) -> None:
 
 def test_handle_synthesize_file_output(tmp_path: Path) -> None:
     clean_file = tmp_path / "clean.md"
-    clean_file.write_text(
-        "**Alice:** We agreed to enforce the new validation rule.\n"
-        "**Bob:** I will coordinate the deployment with GTCI tomorrow at 2 PM.\n",
-        encoding="utf-8",
-    )
+    line1 = "**Alice:** We agreed to enforce the new validation rule."
+    line2 = "**Bob:** I will coordinate the deployment with GTCI tomorrow at 2 PM."
+    _ = clean_file.write_text(f"{line1}\n{line2}\n", encoding="utf-8")
     summary_file = tmp_path / "summary.md"
     tasks_file = tmp_path / "tasks.json"
 
@@ -201,7 +216,8 @@ def test_handle_synthesize_file_output(tmp_path: Path) -> None:
             str(summary_file),
             "--tasks",
             str(tasks_file),
-        ]
+        ],
+        namespace=MnemeArgs(),
     )
     ret = handle_synthesize(args)
     assert ret == 0
@@ -212,10 +228,14 @@ def test_handle_synthesize_file_output(tmp_path: Path) -> None:
     assert "Executive Summary" in summary_text
     assert "Key Decisions Agreed" in summary_text
 
-    tasks_data = json.loads(tasks_file.read_text(encoding="utf-8"))
-    assert "tasks" in tasks_data
-    assert len(tasks_data["tasks"]) > 0
-    task0 = tasks_data["tasks"][0]
+    loads_fn: Callable[..., object] = json.loads
+    raw_tasks = loads_fn(tasks_file.read_text(encoding="utf-8"))
+    assert _is_dict(raw_tasks)
+    val = raw_tasks.get("tasks")
+    assert _is_list(val)
+    task_items = [item for item in val if _is_dict(item)]
+    assert len(task_items) > 0
+    task0 = task_items[0]
     assert "id" in task0
     assert "title" in task0
     assert "completion_criteria" in task0

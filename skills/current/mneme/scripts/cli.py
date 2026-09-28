@@ -1,10 +1,8 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """CLI entrypoint for Mneme meeting intelligence skill."""
-
-from __future__ import annotations
 
 import argparse
 import datetime
@@ -14,7 +12,45 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
+
+
+class ActionTask(TypedDict):
+    """Individual action item or engineering task."""
+
+    id: str
+    title: str
+    owner: str
+    priority: str
+    context: str
+    scope: list[str]
+    completion_criteria: list[str]
+
+
+class ActionItemsReport(TypedDict):
+    """Report containing synthesized meeting action items."""
+
+    meeting_id: str
+    generated_at: str
+    tasks: list[ActionTask]
+
+
+class MnemeArgs(argparse.Namespace):
+    """Parsed command-line arguments for Mneme."""
+
+    command: str | None = None
+    query: str = ""
+    collection: str | None = None
+    limit: int = 5
+    exact: bool = False
+    no_rerank: bool = False
+    json: bool = False
+    target: str = ""
+    input_file: str = ""
+    output: str | None = None
+    summary: str | None = None
+    tasks: str | None = None
+
 
 _MIN_DECISION_LEN = 20
 _MIN_TASK_LEN = 25
@@ -47,18 +83,18 @@ def check_qmd_available() -> bool:
 def run_qmd_command(args: list[str]) -> int:
     """Execute a qmd command directly via subprocess."""
     if not check_qmd_available():
-        sys.stderr.write("Error: 'qmd' binary not found on PATH.\n")
+        _ = sys.stderr.write("Error: 'qmd' binary not found on PATH.\n")
         return 127
     cmd = ["qmd", *args]
     try:
-        proc = subprocess.run(cmd, check=False)  # noqa: S603
+        proc = subprocess.run(cmd, check=False)
     except OSError as exc:
-        sys.stderr.write(f"Error executing qmd: {exc}\n")
+        _ = sys.stderr.write(f"Error executing qmd: {exc}\n")
         return 1
     return proc.returncode
 
 
-def handle_search(args: argparse.Namespace) -> int:
+def handle_search(args: MnemeArgs) -> int:
     """Handle search via qmd (hybrid or exact BM25) preserving literal queries."""
     if args.exact:
         cmd_args = ["search"]
@@ -84,7 +120,7 @@ def handle_search(args: argparse.Namespace) -> int:
     return run_qmd_command(cmd_args)
 
 
-def handle_get(args: argparse.Namespace) -> int:
+def handle_get(args: MnemeArgs) -> int:
     """Handle snippet retrieval via qmd get preserving literal target."""
     cmd_args = ["get", "--", args.target]
     return run_qmd_command(cmd_args)
@@ -135,17 +171,17 @@ def clean_text_lossless(raw_text: str) -> str:
     return "\n\n".join(cleaned_blocks).strip() + "\n"
 
 
-def handle_denoise(args: argparse.Namespace) -> int:
+def handle_denoise(args: MnemeArgs) -> int:
     """Clean raw transcript losslessly and write to output file or stdout."""
     input_path = Path(args.input_file)
     if not input_path.exists():
-        sys.stderr.write(f"Error: Input file not found: {input_path}\n")
+        _ = sys.stderr.write(f"Error: Input file not found: {input_path}\n")
         return 2
 
     try:
         raw_text = input_path.read_text(encoding="utf-8")
     except OSError as exc:
-        sys.stderr.write(f"Error reading '{input_path}': {exc}\n")
+        _ = sys.stderr.write(f"Error reading '{input_path}': {exc}\n")
         return 1
 
     cleaned_text = clean_text_lossless(raw_text)
@@ -154,12 +190,12 @@ def handle_denoise(args: argparse.Namespace) -> int:
         out_path = Path(args.output)
         try:
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(cleaned_text, encoding="utf-8")
+            _ = out_path.write_text(cleaned_text, encoding="utf-8")
         except OSError as exc:
-            sys.stderr.write(f"Error writing '{out_path}': {exc}\n")
+            _ = sys.stderr.write(f"Error writing '{out_path}': {exc}\n")
             return 1
     else:
-        sys.stdout.write(cleaned_text)
+        _ = sys.stdout.write(cleaned_text)
 
     return 0
 
@@ -213,10 +249,10 @@ def extract_executive_summary(transcript_text: str, title: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def extract_action_items(transcript_text: str, meeting_id: str) -> dict[str, Any]:
+def extract_action_items(transcript_text: str, meeting_id: str) -> ActionItemsReport:
     """Extract structured JSON action items and engineering tasks."""
     now_utc = datetime.datetime.now(datetime.UTC).isoformat()
-    tasks: list[dict[str, Any]] = []
+    tasks: list[ActionTask] = []
 
     task_keywords = (
         "need to",
@@ -272,17 +308,17 @@ def extract_action_items(transcript_text: str, meeting_id: str) -> dict[str, Any
     }
 
 
-def handle_synthesize(args: argparse.Namespace) -> int:
+def handle_synthesize(args: MnemeArgs) -> int:
     """Synthesize executive summary and structured tasks from cleaned transcript."""
     input_path = Path(args.input_file)
     if not input_path.exists():
-        sys.stderr.write(f"Error: Input file not found: {input_path}\n")
+        _ = sys.stderr.write(f"Error: Input file not found: {input_path}\n")
         return 2
 
     try:
         transcript_text = input_path.read_text(encoding="utf-8")
     except OSError as exc:
-        sys.stderr.write(f"Error reading '{input_path}': {exc}\n")
+        _ = sys.stderr.write(f"Error reading '{input_path}': {exc}\n")
         return 1
 
     title = input_path.stem
@@ -293,9 +329,9 @@ def handle_synthesize(args: argparse.Namespace) -> int:
         summary_path = Path(args.summary)
         try:
             summary_path.parent.mkdir(parents=True, exist_ok=True)
-            summary_path.write_text(summary_md, encoding="utf-8")
+            _ = summary_path.write_text(summary_md, encoding="utf-8")
         except OSError as exc:
-            sys.stderr.write(f"Error writing summary '{summary_path}': {exc}\n")
+            _ = sys.stderr.write(f"Error writing summary '{summary_path}': {exc}\n")
             return 1
 
     if args.tasks:
@@ -303,16 +339,16 @@ def handle_synthesize(args: argparse.Namespace) -> int:
         tasks_path = Path(args.tasks)
         try:
             tasks_path.parent.mkdir(parents=True, exist_ok=True)
-            tasks_path.write_text(
+            _ = tasks_path.write_text(
                 json.dumps(tasks_data, indent=2) + "\n", encoding="utf-8"
             )
         except OSError as exc:
-            sys.stderr.write(f"Error writing tasks '{tasks_path}': {exc}\n")
+            _ = sys.stderr.write(f"Error writing tasks '{tasks_path}': {exc}\n")
             return 1
 
     if not args.summary and not args.tasks:
         summary_md = extract_executive_summary(transcript_text, title)
-        sys.stdout.write(summary_md)
+        _ = sys.stdout.write(summary_md)
 
     return 0
 
@@ -328,20 +364,20 @@ def build_parser() -> argparse.ArgumentParser:
     search_p = subparsers.add_parser(
         "search", help="Execute search across knowledge base (hybrid or exact)"
     )
-    search_p.add_argument("query", help="Search query string")
-    search_p.add_argument("-c", "--collection", help="Collection name")
-    search_p.add_argument("-n", "--limit", type=int, default=5, help="Result limit")
-    search_p.add_argument(
+    _ = search_p.add_argument("query", help="Search query string")
+    _ = search_p.add_argument("-c", "--collection", help="Collection name")
+    _ = search_p.add_argument("-n", "--limit", type=int, default=5, help="Result limit")
+    _ = search_p.add_argument(
         "--exact",
         action="store_true",
         help="Execute exact BM25 keyword search instead of hybrid search",
     )
-    search_p.add_argument(
+    _ = search_p.add_argument(
         "--no-rerank",
         action="store_true",
         help="Disable LLM reranking in hybrid search",
     )
-    search_p.add_argument(
+    _ = search_p.add_argument(
         "--json",
         action="store_true",
         help="Output results in JSON format",
@@ -349,31 +385,29 @@ def build_parser() -> argparse.ArgumentParser:
     get_p = subparsers.add_parser(
         "get", help="Retrieve line-ranged snippet by docid or path"
     )
-    get_p.add_argument(
+    _ = get_p.add_argument(
         "target", help="Document target (e.g. #docid:line:count or path)"
     )
 
     denoise_p = subparsers.add_parser(
         "denoise", help="Execute lossless transcript denoising"
     )
-    denoise_p.add_argument("input_file", help="Path to raw transcript file")
-    denoise_p.add_argument("-o", "--output", help="Path for cleaned output file")
+    _ = denoise_p.add_argument("input_file", help="Path to raw transcript file")
+    _ = denoise_p.add_argument("-o", "--output", help="Path for cleaned output file")
 
     synth_p = subparsers.add_parser(
         "synthesize", help="Synthesize executive summary and engineering tasks"
     )
-    synth_p.add_argument("input_file", help="Path to cleaned transcript file")
-    synth_p.add_argument("--summary", help="Path to save summary markdown")
-    synth_p.add_argument("--tasks", help="Path to save tasks JSON")
-
+    _ = synth_p.add_argument("input_file", help="Path to cleaned transcript file")
+    _ = synth_p.add_argument("--summary", help="Path to save summary markdown")
+    _ = synth_p.add_argument("--tasks", help="Path to save tasks JSON")
     return parser
 
 
 def main() -> int:
     """Execute main entrypoint."""
     parser = build_parser()
-    args = parser.parse_args()
-
+    args = parser.parse_args(namespace=MnemeArgs())
     if args.command == "search":
         return handle_search(args)
     if args.command == "get":

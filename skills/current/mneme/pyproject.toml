@@ -3,26 +3,37 @@ name = "mneme"
 version = "0.1.0"
 description = "Process transcripts losslessly, synthesize specs, and query meeting history"
 readme = "SKILL.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-  "COM812",
-  "CPY001",
-  "D203",
-  "D213",
-  "ISC001",
-  "ISC003",
+    "A002",
+    "COM812",
+    "CPY001",  # repo policy: no license or copyright headers in code files
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TRY301",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -47,8 +58,8 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "tests"]
 extraPaths = ["scripts"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
