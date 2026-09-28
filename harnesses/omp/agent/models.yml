@@ -10,9 +10,19 @@ providers:
         contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits; matches the google-antigravity profile
       gemini-3.8-flash-high:
         contextWindow: 500000 # 500K * 85% = 425K trigger; matches the google-antigravity profile
+        cost:
+          input: 0.75
+          output: 3.75
+          cacheRead: 0.075
+          cacheWrite: 0
       gpt-6-astra:
         contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
       claude-opus-5-5:
+        cost:
+          input: 4
+          output: 20
+          cacheRead: 0.2
+          cacheWrite: 5
         # Director always thinks at medium: auto thinking and ultrathink resolve to it; ultrathink keeps its notice.
         thinking:
           mode: effort
