@@ -3,7 +3,14 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-import { findBuiltinMetadata } from "./metadata.js";
+import {
+	findBuiltinMetadata,
+	findStaticCatalogModel,
+	STATIC_CATALOG_MODELS,
+	stripQualifier,
+	type CatalogModel,
+	type ReasoningOption,
+} from "./metadata.js";
 
 // Sync replaces this placeholder with the deployment endpoint.
 const BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
@@ -18,29 +25,11 @@ const CATALOG_VERSION = 2;
 const FALLBACK_CONTEXT_WINDOW = 128000;
 const FALLBACK_MAX_TOKENS = 16384;
 
-// Gateway ids may carry a thinking-level qualifier the catalog does not use.
-const QUALIFIER_PATTERN = /-(minimal|low|medium|high|max|thinking)$/i;
-
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 interface GatewayModelsResponse {
 	data?: Array<{ id?: unknown; owned_by?: unknown }>;
 }
-
-interface ReasoningOption {
-	type?: string;
-	values?: string[];
-}
-
-interface CatalogModel {
-	name?: string;
-	reasoning?: boolean;
-	reasoning_options?: ReasoningOption[];
-	limit?: { context?: number; output?: number };
-	modalities?: { input?: string[] };
-	cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number } | null;
-}
-
 interface CatalogCache {
 	version: number;
 	fetchedAt: number;
@@ -129,10 +118,6 @@ function segment(id: string): string {
 	return id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
 }
 
-function stripQualifier(id: string): string {
-	return id.replace(QUALIFIER_PATTERN, "");
-}
-
 async function readCachedCatalog(): Promise<CatalogCache | undefined> {
 	if (memoryCatalog) return memoryCatalog;
 	try {
@@ -183,6 +168,8 @@ async function loadCatalog(): Promise<CatalogCache | undefined> {
 }
 
 function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogModel | undefined {
+	const staticEntry = findStaticCatalogModel(STATIC_CATALOG_MODELS, id);
+	if (staticEntry) return staticEntry;
 	if (!catalog) return undefined;
 	return (
 		catalog.models[id] ??
@@ -241,12 +228,13 @@ async function discover(signal: AbortSignal): Promise<ProviderModelConfig[]> {
 }
 
 export default function cliproxy(pi: ExtensionAPI): void {
+	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel(id, undefined, undefined));
 	pi.registerProvider("cliproxy", {
 		name: "CLIProxyAPI",
 		baseUrl: BASE_URL,
 		apiKey: "keyless",
 		api: "openai-completions",
-		models: [],
+		models: staticModels,
 		refreshModels: async (context) => {
 			// The gateway is a LAN endpoint; only explicit offline mode skips discovery.
 			if (process.env.PI_OFFLINE !== undefined || context.signal.aborted) return lastKnown;

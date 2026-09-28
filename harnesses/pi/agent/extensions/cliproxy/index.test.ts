@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { findBuiltinMetadata, type BuiltinMetadataEntry } from "./metadata.ts";
+import {
+  findBuiltinMetadata,
+  findStaticCatalogModel,
+  STATIC_CATALOG_MODELS,
+  type BuiltinMetadataEntry,
+} from "./metadata.ts";
 
 const maxMap = {
   off: null,
@@ -44,5 +49,21 @@ describe("findBuiltinMetadata", () => {
       ["deepseek-v4-flash", [entry("deepseek", { max: "max" })]],
     ]);
     expect(findBuiltinMetadata(index, "command-code/deepseek/deepseek-v4.1-flash")).toBeUndefined();
+  });
+});
+
+describe("findStaticCatalogModel", () => {
+  test("resolves through leading pool segments", () => {
+    const resolved = findStaticCatalogModel(STATIC_CATALOG_MODELS, "custom-pool/devin/swe-2");
+    expect(resolved?.limit?.context).toBe(262000);
+  });
+
+  test("resolves with trailing qualifier stripped", () => {
+    const resolved = findStaticCatalogModel(STATIC_CATALOG_MODELS, "devin/swe-2-max");
+    expect(resolved?.limit?.context).toBe(262000);
+  });
+
+  test("returns undefined for unknown models", () => {
+    expect(findStaticCatalogModel(STATIC_CATALOG_MODELS, "unknown/model")).toBeUndefined();
   });
 });

@@ -14,7 +14,9 @@ Discovery order per refresh:
    thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-max`, `-thinking`) removed, so
    `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash` row. When several catalog rows
    share a key, the row with the widest context window wins.
-3. Unknown ids fall back to `FALLBACK_CONTEXT_WINDOW` (128K) and `FALLBACK_MAX_TOKENS` (16.4K), which
+3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
+   overrides before falling back to metadata-free defaults.
+4. Unknown ids fall back to `FALLBACK_CONTEXT_WINDOW` (128K) and `FALLBACK_MAX_TOKENS` (16.4K), which
    are pi defaults for metadata-free models.
 
 Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
