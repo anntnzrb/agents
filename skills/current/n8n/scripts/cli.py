@@ -1,12 +1,10 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # dependencies = [
-#   "httpx>=0.27",
+#   "httpx2>=2.13.1",
 # ]
 # ///
 """Cross-platform public entrypoint for n8nctl."""
-
-from __future__ import annotations
 
 import runpy
 import sys

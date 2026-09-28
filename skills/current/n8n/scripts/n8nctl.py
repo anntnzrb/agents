@@ -1,7 +1,7 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # dependencies = [
-#     "httpx>=0.27",
+#     "httpx2>=2.13.1",
 # ]
 # ///
 """n8nctl - Minimal REST CLI for n8n workflow authoring.
@@ -23,8 +23,6 @@ Environment:
   N8N_ENV_FILE   Optional env file override
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -32,29 +30,44 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# typing.Union is deprecated in favor of X | Y, but a recursive alias needs
-# quoted forward references while X | "Y" is a runtime TypeError (TC010);
-# the type statement needs Python 3.12+ and this skill supports 3.10.
-from typing import (
-    TYPE_CHECKING,
-    NoReturn,
-    TypeAlias,
-    Union,  # pyright: ignore[reportDeprecated] - see note above
-    cast,
-)
+from typing import TYPE_CHECKING, NoReturn, TypeIs
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-import httpx
+import httpx2
 
-JsonValue: TypeAlias = Union[  # pyright: ignore[reportDeprecated] - see note above
-    bool, int, float, str, "list[JsonValue]", "dict[str, JsonValue]", None
-]
-JsonObject: TypeAlias = dict[str, JsonValue]
+type JsonValue = (
+    bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
+)
+type JsonObject = dict[str, JsonValue]
 
 
-@dataclass(frozen=True)
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_object_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_json_value(val: object) -> TypeIs[JsonValue]:
+    if isinstance(val, (bool, int, float, str)) or val is None:
+        return True
+    if _is_object_list(val):
+        return all(_is_json_value(item) for item in val)
+    if _is_object_dict(val):
+        return all(isinstance(k, str) and _is_json_value(v) for k, v in val.items())
+    return False
+
+
+def _is_json_object(val: object) -> TypeIs[JsonObject]:
+    if not _is_object_dict(val):
+        return False
+    return all(isinstance(k, str) and _is_json_value(v) for k, v in val.items())
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """Connection settings for the n8n REST API."""
 
@@ -135,19 +148,19 @@ def _headers(cfg: Config) -> dict[str, str]:
 
 def _optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Narrow an optional string flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, str) else None
 
 
 def _optional_int(args: argparse.Namespace, field: str) -> int | None:
     """Narrow an optional integer flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, int) else None
 
 
 def _required_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     if not isinstance(value, str):
         _fail(f"missing required argument: {field}")
     return value
@@ -155,7 +168,7 @@ def _required_str(args: argparse.Namespace, field: str) -> str:
 
 def _required_path(args: argparse.Namespace, field: str) -> Path:
     """Narrow a required path argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     if not isinstance(value, Path):
         _fail(f"missing required argument: {field}")
     return value
@@ -173,7 +186,7 @@ def _request(
     headers = _headers(cfg)
     if body is not None:
         headers["Content-Type"] = "application/json"
-    with httpx.Client(timeout=30.0) as client:
+    with httpx2.Client(timeout=30.0) as client:
         try:
             resp = client.request(
                 method,
@@ -182,24 +195,29 @@ def _request(
                 json=body,
                 headers=headers,
             )
-        except httpx.HTTPError as exc:
+        except httpx2.HTTPError as exc:
             _fail(f"request failed: {exc}")
     if resp.is_error:
         _fail(f"HTTP {resp.status_code} {resp.reason_phrase}: {resp.text}")
-    return cast("JsonObject", resp.json())
+    decode_json: Callable[..., object] = resp.json
+    raw = decode_json()
+    if not _is_json_object(raw):
+        _fail(f"expected JSON object from {path}")
+    return raw
 
 
 def _load_json(path: Path) -> JsonObject:
     """Load a JSON object file or exit with a CLI error."""
     try:
-        data = cast("object", json.loads(path.read_text(encoding="utf-8")))
+        loads_fn: Callable[..., object] = json.loads
+        data = loads_fn(path.read_text(encoding="utf-8"))
     except OSError as exc:
         _fail(f"failed to read {path}: {exc}")
     except json.JSONDecodeError as exc:
         _fail(f"invalid JSON in {path}: {exc}")
-    if not isinstance(data, dict):
+    if not _is_json_object(data):
         _fail(f"expected JSON object in {path}")
-    return cast("JsonObject", data)
+    return data
 
 
 def _require_workflow_fields(data: JsonObject, path: Path) -> JsonObject:
@@ -385,10 +403,8 @@ def cmd_mcp_enable(cfg: Config, args: argparse.Namespace) -> JsonObject:
     wf = _request(cfg, "GET", f"/api/v1/workflows/{workflow_id}")
     settings: JsonObject = {}
     raw_settings = wf.get("settings")
-    if isinstance(raw_settings, dict):
-        for key, value in cast("dict[object, object]", raw_settings).items():
-            if isinstance(key, str):
-                settings[key] = cast("JsonValue", value)
+    if _is_json_object(raw_settings):
+        settings.update(raw_settings)
     settings["availableInMCP"] = True
     payload = _workflow_payload(
         {

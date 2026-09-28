@@ -1,13 +1,13 @@
 # Copyright (c) 2026
 """Executable contracts for the n8nctl offline validate command."""
 
-from __future__ import annotations
-
 import json
 import subprocess
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, TypeIs
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 SKILL: Path = Path(__file__).resolve().parents[1]
 VALIDATE: Path = SKILL / "scripts" / "n8nctl.py"
 
@@ -24,23 +24,39 @@ def run_validate(target: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 def validate_payload(tmp_path: Path, name: str, payload: object) -> dict[str, object]:
     """Write payload JSON, validate it, and decode a successful report."""
     target = tmp_path / name
     _ = target.write_text(json.dumps(payload), encoding="utf-8")
     result = run_validate(target)
     assert result.returncode == 0, result.stderr
-    return cast("dict[str, object]", json.loads(result.stdout))
+    loads_fn: Callable[..., object] = json.loads
+    raw = loads_fn(result.stdout)
+    assert _is_str_dict(raw)
+    return raw
 
 
 def errors_of(report: dict[str, object]) -> list[str]:
     """Project the report error list to strings."""
-    return [str(item) for item in cast("list[object]", report["errors"])]
+    errors = report.get("errors")
+    if not _is_object_list(errors):
+        return []
+    return [str(item) for item in errors]
 
 
 def warnings_of(report: dict[str, object]) -> list[str]:
-    """Project the report warning list to strings."""
-    return [str(item) for item in cast("list[object]", report["warnings"])]
+    warnings = report.get("warnings")
+    if not _is_object_list(warnings):
+        return []
+    return [str(item) for item in warnings]
 
 
 def test_valid_workflow_passes(tmp_path: Path) -> None:
