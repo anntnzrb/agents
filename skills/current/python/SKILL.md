@@ -79,7 +79,7 @@ uv run --with httpx2 python script.py
 uv add httpx2
 uv add --dev pytest anyio basedpyright ruff
 uv venv
-uv init --script example.py --python 3.12
+uv init --script example.py --python 3.14
 uv add --script example.py httpx2 rich
 uv lock --script example.py
 ```
@@ -88,7 +88,7 @@ Use inline script metadata for standalone scripts that need dependencies:
 
 ```python
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = ["httpx2"]
 # ///
 ```

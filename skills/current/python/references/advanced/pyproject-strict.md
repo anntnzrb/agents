@@ -27,7 +27,7 @@ name = "myproject"
 version = "0.1.0"
 description = "..."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
@@ -44,7 +44,7 @@ dev = [
 # ─────────────────────────────────────────────────────────────────
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 pythonPlatform = "All"          # default in basedpyright; explicit for clarity
 include = ["src", "tests"]
 exclude = ["**/__pycache__", "**/.venv", "**/build", "**/dist"]
@@ -67,7 +67,7 @@ reportPrivateUsage = "error"             # respect _private convention
 # Source: https://docs.astral.sh/ruff/linter/#rule-selection
 # ─────────────────────────────────────────────────────────────────
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88                # ruff/black default; 100 or 120 also fine
 src = ["src", "tests"]
 

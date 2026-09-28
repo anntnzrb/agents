@@ -25,7 +25,7 @@ Terminal one-shot; do not save. Repeat `--with PKG` as needed.
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "httpx2[http2,brotli,zstd]",
 #     "rich",
@@ -40,8 +40,6 @@ Terminal one-shot; do not save. Repeat `--with PKG` as needed.
 # 3. Or make executable and run:
 #      chmod +x my_script.py && ./my_script.py
 # ──────────────────
-
-from __future__ import annotations
 
 import httpx2
 from rich import print as rprint
@@ -63,10 +61,9 @@ if __name__ == "__main__":
 Every PEP 723 script MUST contain:
 
 1. `#!/usr/bin/env -S uv run --script`
-2. `# /// script` … `# ///`, containing `requires-python` and `dependencies`
+2. `# /// script` … `# ///`, containing `requires-python = ">=3.14"` and `dependencies`
 3. The usage comment block: uv installation plus script execution; use the exact template below
-4. `from __future__ import annotations` as the first import when `requires-python` < 3.14 (omit on 3.14+ targets where annotations need no deferral)
-5. `if __name__ == "__main__": main()` entry-point guard
+4. `if __name__ == "__main__": main()` entry-point guard
 
 ### Required usage comment block
 
@@ -106,7 +103,7 @@ Copy the metadata and usage-comment pattern; declare only dependencies the scrip
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "httpx2[http2,brotli,zstd]",
 #     "rich",
@@ -117,8 +114,6 @@ Copy the metadata and usage-comment pattern; declare only dependencies the scrip
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Run: uv run fetch_json.py https://api.github.com/repos/pydantic/httpx2
 # ──────────────────
-
-from __future__ import annotations
 
 import sys
 
@@ -143,7 +138,7 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "polars",
 #     "typer",
@@ -155,8 +150,6 @@ if __name__ == "__main__":
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Run: uv run csv2parquet.py input.csv output.parquet
 # ──────────────────
-
-from __future__ import annotations
 
 from pathlib import Path
 
@@ -182,7 +175,7 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "httpx2[http2,brotli,zstd]",
 #     "rich",
@@ -194,8 +187,6 @@ if __name__ == "__main__":
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Run: uv run bench.py https://api.example.com/health 50
 # ──────────────────
-
-from __future__ import annotations
 
 import socket
 import sys

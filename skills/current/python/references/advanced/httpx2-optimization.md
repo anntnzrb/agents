@@ -56,8 +56,6 @@ Copy this into the project and always use `create_client()` / `create_async_clie
 ```python
 """httpx2 client factory. Always use create_client() / create_async_client()."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Mapping
 import socket
 import httpx2
@@ -224,8 +222,6 @@ Run this against the target endpoint to **verify**, not decide, that optimizatio
 
 ```python
 """Verify httpx2 is fully optimized against a target endpoint."""
-
-from __future__ import annotations
 
 import socket
 import time
