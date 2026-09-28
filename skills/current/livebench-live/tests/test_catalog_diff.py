@@ -1,6 +1,4 @@
 # Copyright (c) 2026
-from __future__ import annotations
-
 from tests._path import SKILL_DIR
 
 from livebench.catalog_diff import diff_catalog, load_snapshot_catalog

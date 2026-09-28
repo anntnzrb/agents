@@ -1,13 +1,13 @@
 # Copyright (c) 2026
 """Stable diagnostics and redaction helpers."""
 
-from __future__ import annotations
-
 import re
-from collections.abc import Iterable, Mapping
-from typing import cast
+from typing import TYPE_CHECKING
 
-from .contracts import Diagnostic
+from .contracts import Diagnostic, is_list, is_mapping, is_tuple
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 CODES = frozenset(
     {
@@ -64,16 +64,18 @@ def redact(value: object, *, key: str | None = None) -> object:
         return "<redacted>"
     if isinstance(value, str):
         return redact_text(value)
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        return {str(k): redact(v, key=str(k)) for k, v in mapping.items()}
-    if isinstance(value, list):
-        items = cast("list[object]", cast("object", value))
-        return [redact(item) for item in items]
-    if isinstance(value, tuple):
-        entries = cast("tuple[object, ...]", cast("object", value))
-        return [redact(item) for item in entries]
+    if is_mapping(value):
+        return {str(k): redact(v, key=str(k)) for k, v in value.items()}
+    if is_list(value):
+        return [redact(item) for item in value]
+    if is_tuple(value):
+        return [redact(item) for item in value]
     return value
+
+
+def redact_dict(mapping: Mapping[str, object]) -> dict[str, object]:
+    """Redact a string-keyed mapping and return a new dictionary."""
+    return {str(k): redact(v, key=str(k)) for k, v in mapping.items()}
 
 
 def make_diagnostic(  # noqa: PLR0913
@@ -91,9 +93,7 @@ def make_diagnostic(  # noqa: PLR0913
     if code not in CODES:
         # Unknown upstream signals are still visible but remain uppercase and stable.
         code = code.upper().replace("-", "_")
-    source_details: dict[str, object] = dict(details) if details is not None else {}
-    safe = redact(source_details)
-    safe_details = cast("dict[str, object]", safe) if isinstance(safe, dict) else {}
+    safe_details = redact_dict(details) if details is not None else {}
     return Diagnostic(
         code,
         severity,

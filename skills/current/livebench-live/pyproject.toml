@@ -3,27 +3,51 @@ name = "livebench-live"
 version = "0.1.0"
 description = "Live LiveBench benchmark data via CLI"
 readme = "SKILL.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+    "A002",
+    "COM812",
+    "CPY001",  # docs/skills.md forbids license headers in non-Markdown files
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
-  "PLR2004", "PLR0913", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
-"scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
+"scripts/**/*.py" = [
+    "T201",
+    "INP001",  # scripts/ is a standalone PEP 723 entrypoint directory, not a package
+    "E402",    # sys.path must be updated before importing livebench from lib/
+]
+"tests/**/*.py" = [
+    "S101",
+    "D",        # test modules and test methods do not require docstrings
+    "INP001",   # tests/ is a pytest test root, not an installed package
+    "PLR2004",  # deterministic fixture tests assert concrete expected constants
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -36,7 +60,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["lib", "scripts", "tests"]
 extraPaths = ["lib", "scripts"]

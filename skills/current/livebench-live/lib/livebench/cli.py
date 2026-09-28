@@ -1,16 +1,11 @@
 # Copyright (c) 2026
 """One-shot LiveBench CLI with a compact JSON success/failure envelope."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, TextIO, cast, override
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, NoReturn, TextIO, override
 
 from .cache import CacheStore
 from .catalog_diff import diff_catalog, load_snapshot_catalog
@@ -27,13 +22,18 @@ from .contracts import (
     SkillError,
     compact_json,
     failure,
+    is_dict,
+    is_list,
     raise_expected,
     success,
 )
-from .diagnostics import redact
+from .diagnostics import redact_dict
 from .discovery import discover_releases
 from .identity import canonical_token
 from .semantics import OVERALL_DEFINITION, OVERALL_FORMULA
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
 
 COMMANDS = (
     "releases",
@@ -179,10 +179,7 @@ def _bool_arg(args: argparse.Namespace, name: str) -> bool:
 
 
 def _redact_details(data: Mapping[str, object]) -> dict[str, object]:
-    redacted = redact(data)
-    if isinstance(redacted, dict):
-        return cast("dict[str, object]", redacted)
-    return {}
+    return redact_dict(data)
 
 
 def main(
@@ -240,7 +237,7 @@ def main(
         )
         _ = out.write(compact_json(failure(command, error)) + "\n")
         return 1
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - CLI entrypoint boundary maps unexpected adapter drift to contractual JSON error envelope
         # Keep stdout contractual even for unexpected adapter drift.
         drift_details: dict[str, object] = {"error": str(exc)}
         safe_details = _redact_details(drift_details)
@@ -397,12 +394,13 @@ def _filter_subtasks(
     subtasks_raw: object, category_key: str
 ) -> list[dict[str, object]]:
     subtasks_list: list[dict[str, object]] = []
-    if isinstance(subtasks_raw, list):
-        for item in cast("list[object]", subtasks_raw):
-            if isinstance(item, dict):
-                item_dict = cast("dict[str, object]", item)
-                if item_dict.get("category_id") == f"livebench:category:{category_key}":
-                    subtasks_list.append(item_dict)
+    if is_list(subtasks_raw):
+        for item in subtasks_raw:
+            if (
+                is_dict(item)
+                and item.get("category_id") == f"livebench:category:{category_key}"
+            ):
+                subtasks_list.append(item)
     return subtasks_list
 
 
@@ -419,14 +417,11 @@ def _subtasks(
     )
     category_key = canonical_category(category_str)
     rows = data.get("rows")
-    if isinstance(rows, list):
-        for row in cast("list[object]", rows):
-            if isinstance(row, dict):
-                row_dict = cast("dict[str, object]", row)
-                row_dict["subtasks"] = _filter_subtasks(
-                    row_dict.get("subtasks"), category_key
-                )
-                row_dict["selected_category"] = category_key
+    if is_list(rows):
+        for row in rows:
+            if is_dict(row):
+                row["subtasks"] = _filter_subtasks(row.get("subtasks"), category_key)
+                row["selected_category"] = category_key
     return success(command, data)
 
 
@@ -438,10 +433,10 @@ def canonical_category(value: str) -> str:
 def _extract_release_ids(rows: list[object]) -> set[str]:
     release_ids: set[str] = set()
     for row in rows:
-        if isinstance(row, dict):
-            rel = cast("dict[str, object]", row).get("release")
-            if isinstance(rel, dict):
-                rel_id = cast("dict[str, object]", rel).get("id")
+        if is_dict(row):
+            rel = row.get("release")
+            if is_dict(rel):
+                rel_id = rel.get("id")
                 if rel_id is not None:
                     release_ids.add(str(rel_id))
     return release_ids
@@ -449,26 +444,22 @@ def _extract_release_ids(rows: list[object]) -> set[str]:
 
 def _check_row_blocked(row_dict: dict[str, object], blocked: list[str]) -> None:
     overall = row_dict.get("overall")
-    if (
-        not isinstance(overall, dict)
-        or cast("dict[str, object]", overall).get("normalized_value") is None
-    ):
+    if not is_dict(overall) or overall.get("normalized_value") is None:
         blocked.append("missing_overall")
     if row_dict.get("_duplicate_conflict"):
         blocked.append("duplicate_identity")
 
 
 def _comparison(rows: object) -> dict[str, object]:
-    if not isinstance(rows, list):
+    if not is_list(rows):
         return {"status": "blocked", "blocked_reasons": ["rows_unavailable"]}
-    rows_list = cast("list[object]", rows)
-    release_ids = _extract_release_ids(rows_list)
+    release_ids = _extract_release_ids(rows)
     blocked: list[str] = []
     if len(release_ids) != 1:
         blocked.append("release_identity_mismatch")
-    for row in rows_list:
-        if isinstance(row, dict):
-            _check_row_blocked(cast("dict[str, object]", row), blocked)
+    for row in rows:
+        if is_dict(row):
+            _check_row_blocked(row, blocked)
     return {
         "status": "eligible" if not blocked else "blocked",
         "comparison_key": {

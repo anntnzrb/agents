@@ -1,6 +1,4 @@
 # Copyright (c) 2026
-from __future__ import annotations
-
 from livebench.contracts import RawArtifact
 from livebench.normalization import numeric_value
 

@@ -1,13 +1,9 @@
 # Copyright (c) 2026
-from __future__ import annotations
-
-import json
 import tempfile
 import unittest
 from hashlib import sha256
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 from urllib.error import URLError
 
 import pytest
@@ -19,13 +15,19 @@ from livebench.cache import CacheStore
 from livebench.catalog_diff import diff_catalog, load_snapshot_catalog
 from livebench.cli import main
 from livebench.commands import load_context
-from livebench.contracts import RawArtifact, SkillError, SourceTarget
+from livebench.contracts import (
+    RawArtifact,
+    SkillError,
+    SourceTarget,
+    as_dict,
+    as_dict_list,
+    as_int,
+    as_list,
+    load_json,
+)
 from livebench.extraction import extract_artifact
 from livebench.normalization import numeric_value
 from livebench.transport import FetchError, fetch_target
-
-if TYPE_CHECKING:
-    from urllib.request import Request
 
 FIXTURES = SKILL_DIR / "tests" / "fixtures"
 
@@ -35,25 +37,25 @@ def fixture(name: str) -> Path:
 
 
 def _load_json(content: str | bytes) -> object:
-    return cast("object", json.loads(content))
+    return load_json(content)
 
 
 def _as_dict(value: object) -> dict[str, object]:
-    return cast("dict[str, object]", value)
+    return as_dict(value)
 
 
 def _as_dict_list(value: object) -> list[dict[str, object]]:
-    return cast("list[dict[str, object]]", value)
+    return as_dict_list(value)
 
 
 def transport_response(name: str) -> Response:
     payload = _as_dict(
         _load_json(fixture(f"transport/{name}.json").read_text(encoding="utf-8"))
     )
-    raw_headers = cast("dict[object, object]", payload.get("headers", {}))
+    raw_headers = _as_dict(payload.get("headers", {}))
     return Response(
         str(payload.get("body", "")),
-        status=int(cast("int | str", payload.get("status", 200))),
+        status=as_int(payload.get("status", 200), 200),
         headers={str(key): str(value) for key, value in raw_headers.items()},
         final_url=str(payload["url"]),
     )
@@ -85,7 +87,7 @@ class LiveBenchFixtures(unittest.TestCase):
         categories = _as_dict(context.catalog["categories"])
         assert "new-benchmark-category" in categories
         columns = _as_dict(context.catalog["columns"])
-        score_table = _as_dict(columns["score_table"])
+        score_table = as_list(columns["score_table"])
         assert "novel_task" in score_table
 
     def test_03_dynamic_category_normalization(self) -> None:
@@ -276,7 +278,7 @@ class LiveBenchFixtures(unittest.TestCase):
             second = fetch_target(target, CacheStore(Path(directory)), opener=opener)
             assert first.body == second.body
             assert second.cache_reused
-            request = cast("Request", opener.requests[1])
+            request = opener.requests[1]
             assert request.headers.get("If-none-match") == '"fixture-etag-1"'
             assert (
                 request.headers.get("If-modified-since")
@@ -418,6 +420,7 @@ class LiveBenchFixtures(unittest.TestCase):
         assert releases_disc.releases[-1]["new_field"] == "retained"
 
     def test_27_dynamic_bundle_selector_and_templates_are_source_backed(self) -> None:
+        shell = '<script src="/static/js/main.js"></script>'
         bundle = (
             'const releases=["2025-01-01","2025-02-02"];'
             "const latest=releases[releases.length-1];"
@@ -426,14 +429,21 @@ class LiveBenchFixtures(unittest.TestCase):
             "fetch(`./cost_${latest}.csv`);"
             'const variants=[{date:"2025-03-03"},{date:"2025-03-03"}];'
         )
-        release_ids = discovery._release_ids(  # pyright: ignore[reportPrivateUsage]
-            bundle
-        )
-        assert release_ids == ["2025-01-01", "2025-02-02"]
-        templates = discovery._asset_templates(  # pyright: ignore[reportPrivateUsage]
-            bundle, "https://livebench.ai/"
-        )
-        assert templates == {
+        with tempfile.TemporaryDirectory() as directory:
+            discovered = discovery.discover_releases(
+                cache=CacheStore(Path(directory)),
+                opener=QueueOpener(
+                    Response(shell, final_url="https://livebench.ai/"),
+                    Response(
+                        bundle, final_url="https://livebench.ai/static/js/main.js"
+                    ),
+                ),
+            )
+        assert [entry["id"] for entry in discovered.releases] == [
+            "2025-01-01",
+            "2025-02-02",
+        ]
+        assert discovered.asset_templates == {
             "table": "https://livebench.ai/table_{release}.csv",
             "category": "https://livebench.ai/categories_{release}.json",
             "cost": "https://livebench.ai/cost_{release}.csv",

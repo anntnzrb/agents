@@ -1,20 +1,22 @@
 # Copyright (c) 2026
 """Immutable, content-addressed artifact cache with validator sidecars."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import os
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-from .contracts import RawArtifact, SourceTarget, utc_now
-from .diagnostics import redact
+from .contracts import (
+    RawArtifact,
+    SourceTarget,
+    as_int,
+    is_dict,
+    is_mapping,
+    load_json,
+    utc_now,
+)
+from .diagnostics import redact_dict
 
 CACHE_VERSION = "1"
 
@@ -69,39 +71,37 @@ class CacheStore:
     def _index_path(self, target: SourceTarget) -> Path:
         return self._target_dir(target) / f"{target_key(target)}.index.json"
 
-    def load(self, target: SourceTarget) -> tuple[bytes, dict[str, object]] | None:  # noqa: PLR0911
+    def load(self, target: SourceTarget) -> tuple[bytes, dict[str, object]] | None:
         """Load for the LiveBench adapter."""
         index_path = self._index_path(target)
         try:
-            index = cast("object", json.loads(index_path.read_text(encoding="utf-8")))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            index = load_json(index_path.read_text(encoding="utf-8"))
+        except FileNotFoundError, OSError, json.JSONDecodeError:
             return None
-        if not isinstance(index, dict):
+        if not is_dict(index):
             return None
-        index_map = cast("dict[str, object]", index)
-        body_path = Path(str(index_map.get("raw_bytes_ref", "")))
-        meta_path = Path(str(index_map.get("metadata_path", "")))
+        body_path = Path(str(index.get("raw_bytes_ref", "")))
+        meta_path = Path(str(index.get("metadata_path", "")))
         if not body_path.is_absolute():
             body_path = self.root / body_path
         if not meta_path.is_absolute():
             meta_path = self.root / meta_path
         try:
             body = body_path.read_bytes()
-            metadata = cast("object", json.loads(meta_path.read_text(encoding="utf-8")))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            metadata = load_json(meta_path.read_text(encoding="utf-8"))
+        except FileNotFoundError, OSError, json.JSONDecodeError:
             return None
-        if not isinstance(metadata, dict):
+        if not is_dict(metadata):
             return None
-        meta_map = cast("dict[str, object]", metadata)
         if (
-            meta_map.get("source_url") != target.url
-            or meta_map.get("release_id") != target.release_id
+            metadata.get("source_url") != target.url
+            or metadata.get("release_id") != target.release_id
         ):
             return None
-        expected_hash = str(meta_map.get("sha256", ""))
+        expected_hash = str(metadata.get("sha256", ""))
         if not expected_hash or sha256_bytes(body) != expected_hash:
             return None
-        return body, meta_map
+        return body, metadata
 
     def save(
         self, target: SourceTarget, body: bytes, metadata: dict[str, object]
@@ -115,7 +115,7 @@ class CacheStore:
         meta_path = artifacts_dir / f"{target.artifact_kind}-{digest}.meta.json"
         if not body_path.exists():
             _atomic_write_bytes(body_path, body)
-        safe_meta = dict(cast("Mapping[str, object]", redact(metadata)))
+        safe_meta = redact_dict(metadata)
         safe_meta.update(
             {
                 "sha256": digest,
@@ -160,6 +160,12 @@ class CacheStore:
             return None
         raw_body, meta = loaded
         digest = sha256_bytes(raw_body)
+        raw_headers = meta.get("headers")
+        headers = (
+            {str(k): str(v) for k, v in raw_headers.items()}
+            if is_mapping(raw_headers)
+            else {}
+        )
         return RawArtifact(
             artifact_id=f"livebench:{target.release_id}:{target.artifact_kind}:sha256:{digest}",
             source="livebench",
@@ -168,18 +174,11 @@ class CacheStore:
             source_url=target.url,
             discovered_from=target.discovered_from,
             body=raw_body,
-            status_code=int(cast("int", meta.get("status_code", 200))),
+            status_code=as_int(meta.get("status_code", 200), 200),
             content_type=str(meta.get("content_type"))
             if meta.get("content_type")
             else None,
-            headers={
-                str(k): str(v)
-                for k, v in cast(
-                    "Mapping[str, object]", meta.get("headers", {})
-                ).items()
-            }
-            if isinstance(meta.get("headers"), dict)
-            else {},
+            headers=headers,
             fetched_at=str(meta.get("fetched_at", utc_now())),
             observed_at=str(meta.get("observed_at", meta.get("fetched_at", utc_now()))),
             sha256=digest,

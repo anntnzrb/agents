@@ -1,10 +1,9 @@
 # Copyright (c) 2026
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Self, final
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from urllib.request import Request
 
 
 @final
@@ -46,13 +45,14 @@ class Response:
 @final
 class QueueOpener:
     responses: list[Response | BaseException]
-    requests: list[object]
+    requests: list[Request]
 
     def __init__(self, *responses: Response | BaseException) -> None:
         self.responses = list(responses)
         self.requests = []
 
-    def __call__(self, request: object, timeout: float = 0.0) -> Response:
+    def __call__(self, request: Request, timeout: float = 0.0) -> Response:
+        _ = timeout
         self.requests.append(request)
         if not self.responses:
             message = "real or unexpected network request"

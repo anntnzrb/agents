@@ -1,23 +1,29 @@
 # Copyright (c) 2026
 """LiveBench application/bundle discovery with explicit authority limitation."""
 
-from __future__ import annotations
-
 import json
 import re
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from .cache import CacheStore, sha256_bytes
-from .contracts import Diagnostic, RawArtifact, SourceTarget, raise_expected, utc_now
+from .contracts import (
+    Diagnostic,
+    RawArtifact,
+    SourceTarget,
+    is_mapping,
+    load_json,
+    raise_expected,
+    utc_now,
+)
 from .diagnostics import make_diagnostic
 from .parsing import parse_release_list
 from .transport import fetch_target
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from pathlib import Path
 
 APP_URL = "https://livebench.ai/"
 _DATE_RE = re.compile(r"(?<!\d)(20\d{2}-\d{2}-\d{2})(?!\d)")
@@ -26,7 +32,7 @@ _SCRIPT_RE = re.compile(
 )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ReleaseDiscovery:
     """Represent ReleaseDiscovery in the LiveBench adapter."""
 
@@ -151,30 +157,25 @@ def _discover_snapshot(path: Path) -> ReleaseDiscovery:
         )
     digest = sha256_bytes(body)
     try:
-        parsed = cast("object", json.loads(body.decode("utf-8")))
+        parsed = load_json(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise_expected(
             "SNAPSHOT_INVALID",
             "Release snapshot must be valid JSON.",
             {"path": str(path), "error": str(exc)},
         )
-    parsed_map: Mapping[str, object] | None = (
-        cast("Mapping[str, object]", parsed) if isinstance(parsed, Mapping) else None
-    )
+    parsed_map = parsed if is_mapping(parsed) else None
     if parsed_map is not None and parsed_map.get("releases") is not None:
         raw_entries: object = parsed_map
         authority_url = str(parsed_map.get("authority_url") or f"fixture://{path}")
         templates_value = parsed_map.get("asset_templates", {})
         templates = (
-            {
-                str(k): str(v)
-                for k, v in cast("Mapping[str, object]", templates_value).items()
-            }
-            if isinstance(templates_value, Mapping)
+            {str(k): str(v) for k, v in templates_value.items()}
+            if is_mapping(templates_value)
             else {}
         )
     else:
-        raw_entries = {"releases": cast("object", parsed)}
+        raw_entries = {"releases": parsed}
         authority_url = f"fixture://{path}"
         templates = {}
     entries = parse_release_list(raw_entries)
@@ -220,8 +221,7 @@ def _release_ids(bundle: str) -> list[str]:
     # later in the source.
     candidates: list[tuple[int, int, list[str]]] = []
     assignment = re.compile(
-        r"\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*="
-        + r"\s*(\[[^\]]{0,1200}\])",
+        r"\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(\[[^\]]{0,1200}\])",
         re.DOTALL,
     )
     for match in assignment.finditer(bundle):

@@ -1,7 +1,6 @@
 # Copyright (c) 2026
-from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from tests.fakes.transport import QueueOpener, Response
@@ -12,7 +11,6 @@ from livebench.transport import FetchError, fetch_target
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from urllib.request import Request
 
 
 def test_200_then_304_reuses_exact_cache(tmp_path: Path) -> None:
@@ -34,7 +32,7 @@ def test_200_then_304_reuses_exact_cache(tmp_path: Path) -> None:
     second = fetch_target(target, CacheStore(tmp_path), opener=opener)
     assert first.body == second.body
     assert second.cache_reused
-    request = cast("Request", opener.requests[1])
+    request = opener.requests[1]
     assert request.headers["If-none-match"] == '"e1"'
     assert request.headers["If-modified-since"] == "Sun, 09 Aug 2026 00:00:00 GMT"
 

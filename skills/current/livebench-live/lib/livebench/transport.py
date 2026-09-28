@@ -1,21 +1,29 @@
 # Copyright (c) 2026
 """Injectable HTTP/file transport with strict freshness and conditional caching."""
 
-from __future__ import annotations
-
 import mimetypes
-from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import NoReturn, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, NoReturn, Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlsplit
 from urllib.request import Request
 from urllib.request import urlopen as _stdlib_urlopen
 
 from .cache import CacheStore, sha256_bytes
-from .contracts import RawArtifact, SkillError, SourceTarget, utc_now
+from .contracts import (
+    RawArtifact,
+    SkillError,
+    SourceTarget,
+    as_int,
+    is_dict,
+    is_mapping,
+    utc_now,
+)
 from .diagnostics import redact
 from .identity import canonical_url
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping
 
 # Kept as a module-level seam for deterministic tests; no browser/runtime dependency.
 
@@ -24,7 +32,7 @@ HTTP_NOT_MODIFIED = 304
 HTTP_MULTIPLE_CHOICES = 300
 HTTP_UNAUTHORIZED = 401
 HTTP_FORBIDDEN = 403
-urlopen = _stdlib_urlopen
+urlopen: Callable[..., object] = _stdlib_urlopen
 
 
 class FetchError(SkillError):
@@ -45,24 +53,42 @@ def _raise_fetch(
 class _HttpResponse(Protocol):
     """Minimal readable HTTP response surface."""
 
-    status: int
-
     def read(self) -> bytes: ...
     def __enter__(self) -> object: ...
-    def __exit__(self, *args: object) -> bool | None: ...
+    def __exit__(self, *args: object) -> object: ...
 
 
 @runtime_checkable
 class _HeadersLike(Protocol):
-    """Headers-like object exposing string pairs via items()."""
+    """Headers-like object exposing key/value pairs via items()."""
 
-    def items(self) -> Iterable[tuple[str, str]]: ...
+    def items(self) -> Iterable[tuple[object, object]]: ...
+
+
+@runtime_checkable
+class _HasHeaders(Protocol):
+    headers: object
+
+
+@runtime_checkable
+class _HasStatus(Protocol):
+    status: object
+
+
+@runtime_checkable
+class _HasGetCode(Protocol):
+    def getcode(self) -> object: ...
+
+
+@runtime_checkable
+class _HasGetUrl(Protocol):
+    def geturl(self) -> object: ...
 
 
 def _headers(response: object) -> dict[str, str]:
-    raw = cast("object", getattr(response, "headers", None))
-    if raw is None:
+    if not isinstance(response, _HasHeaders):
         return {}
+    raw = response.headers
     if not isinstance(raw, _HeadersLike):
         return {}
     result: dict[str, str] = {}
@@ -80,17 +106,19 @@ def _headers(response: object) -> dict[str, str]:
 
 
 def _status(response: object) -> int:
-    value = cast("object", getattr(response, "status", None))
-    if value is None:
-        getter = cast("object", getattr(response, "getcode", None))
-        value = getter() if callable(getter) else 200
-    return int(cast("int | str", value))
+    if isinstance(response, _HasStatus) and response.status is not None:
+        return as_int(response.status, 200)
+    if isinstance(response, _HasGetCode):
+        return as_int(response.getcode(), 200)
+    return 200
 
 
 def _final_url(response: object, requested: str) -> str:
-    getter = cast("object", getattr(response, "geturl", None))
-    value = getter() if callable(getter) else requested
-    return str(value)
+    if isinstance(response, _HasGetUrl):
+        value = response.geturl()
+        if value:
+            return str(value)
+    return requested
 
 
 def _is_local(url: str) -> bool:
@@ -106,7 +134,7 @@ def _local_path(url: str) -> Path:
     return Path(url).expanduser()
 
 
-def fetch_target(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+def fetch_target(  # noqa: C901, PLR0913, PLR0915
     target: SourceTarget,
     cache: CacheStore,
     *,
@@ -168,17 +196,18 @@ def fetch_target(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     request = Request(target.url, headers=request_headers)  # noqa: S310
     open_fn = opener or urlopen
     try:
-        response = cast("_HttpResponse", open_fn(request, timeout=timeout))
-        with response:
-            status = _status(response)
-            response_headers = _headers(response)
-            final_url = _final_url(response, target.url)
-            body = response.read()
+        raw_response = open_fn(request, timeout=timeout)
+        if not isinstance(raw_response, _HttpResponse):
+            msg = "transport opener did not return a readable HTTP response"
+            raise OSError(msg)
+        with raw_response:
+            status = _status(raw_response)
+            response_headers = _headers(raw_response)
+            final_url = _final_url(raw_response, target.url)
+            body = raw_response.read()
     except HTTPError as exc:
         status = exc.code
-        geturl = cast("object", getattr(exc, "geturl", None))
-        raw_url = geturl() if callable(geturl) else None
-        final_url = str(raw_url) if raw_url else target.url
+        final_url = _final_url(exc, target.url)
         response_headers = _headers(exc)
         body = b""
         if status in {HTTP_UNAUTHORIZED, HTTP_FORBIDDEN}:
@@ -275,9 +304,8 @@ def _header_value(metadata: Mapping[str, object], name: str) -> str | None:
     if isinstance(direct, str) and direct:
         return direct
     headers = metadata.get("headers")
-    if isinstance(headers, Mapping):
-        header_map = cast("Mapping[str, object]", headers)
-        value = header_map.get(name) or header_map.get(name.casefold())
+    if is_mapping(headers):
+        value = headers.get(name) or headers.get(name.casefold())
         if isinstance(value, str) and value:
             return value
     return None
@@ -314,8 +342,8 @@ def _reuse_304(
         )
     prior_headers = prior.get("headers", {})
     merged_headers: dict[str, object] = dict(response_headers)
-    if isinstance(prior_headers, dict):
-        merged_headers.update(cast("dict[str, object]", prior_headers))
+    if is_dict(prior_headers):
+        merged_headers.update(prior_headers)
     metadata = dict(prior)
     metadata.update(
         {
@@ -343,7 +371,7 @@ def _stale_artifact(
     metadata = dict(prior)
     metadata.update(
         {
-            "status_code": status or int(cast("int", prior.get("status_code", 200))),
+            "status_code": status or as_int(prior.get("status_code", 200), 200),
             "fetched_at": observed,
             "observed_at": observed,
             "freshness_mode": "stale-cache",
@@ -361,9 +389,8 @@ def _artifact_from_metadata(
 ) -> RawArtifact:
     digest = sha256_bytes(body)
     raw_headers = metadata.get("headers")
-    if isinstance(raw_headers, Mapping):
-        header_map = cast("Mapping[str, object]", raw_headers)
-        headers = {str(key): str(value) for key, value in header_map.items()}
+    if is_mapping(raw_headers):
+        headers = {str(key): str(value) for key, value in raw_headers.items()}
     else:
         headers = {}
     return RawArtifact(
@@ -374,7 +401,7 @@ def _artifact_from_metadata(
         source_url=target.url,
         discovered_from=target.discovered_from,
         body=body,
-        status_code=int(cast("int", metadata.get("status_code", 200))),
+        status_code=as_int(metadata.get("status_code", 200), 200),
         content_type=str(metadata.get("content_type"))
         if metadata.get("content_type")
         else None,

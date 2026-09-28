@@ -1,12 +1,11 @@
 # Copyright (c) 2026
 """Stable contracts for the LiveBench source adapter and JSON wire format."""
 
-from __future__ import annotations
-
 import json
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import NoReturn, cast
+from typing import NoReturn, TypeIs
 
 SCHEMA_VERSION = "1"
 SOURCE = "livebench"
@@ -18,7 +17,7 @@ def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Diagnostic:
     """Represent Diagnostic in the LiveBench adapter."""
 
@@ -33,19 +32,24 @@ class Diagnostic:
 
     def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
-        value = cast("dict[str, object]", asdict(self))
-        if self.source is None:
-            _ = value.pop("source", None)
-        if self.artifact is None:
-            _ = value.pop("artifact", None)
-        if self.path is None:
-            _ = value.pop("path", None)
-        if not self.details:
-            _ = value.pop("details", None)
+        value: dict[str, object] = {
+            "code": self.code,
+            "severity": self.severity,
+            "stage": self.stage,
+            "message": self.message,
+        }
+        if self.source is not None:
+            value["source"] = self.source
+        if self.artifact is not None:
+            value["artifact"] = self.artifact
+        if self.path is not None:
+            value["path"] = self.path
+        if self.details:
+            value["details"] = dict(self.details)
         return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceTarget:
     """Represent SourceTarget in the LiveBench adapter."""
 
@@ -68,7 +72,7 @@ class SourceTarget:
         }
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RawArtifact:
     """Represent RawArtifact in the LiveBench adapter."""
 
@@ -128,7 +132,7 @@ class RawArtifact:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NumericValue:
     """Represent NumericValue in the LiveBench adapter."""
 
@@ -145,13 +149,23 @@ class NumericValue:
 
     def as_dict(self) -> dict[str, object]:
         """As dict for the LiveBench adapter."""
-        result = cast("dict[str, object]", asdict(self))
-        if not self.source_evidence:
-            _ = result.pop("source_evidence", None)
+        result: dict[str, object] = {
+            "raw_value": self.raw_value,
+            "normalized_value": self.normalized_value,
+            "unit": self.unit,
+            "normalization": self.normalization,
+            "source_path": self.source_path,
+            "value_status": self.value_status,
+            "metric_semantics_status": self.metric_semantics_status,
+            "missing_reason": self.missing_reason,
+            "comparison_eligibility": self.comparison_eligibility,
+        }
+        if self.source_evidence:
+            result["source_evidence"] = dict(self.source_evidence)
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedRelease:
     """Represent ResolvedRelease in the LiveBench adapter."""
 
@@ -268,3 +282,75 @@ def ensure_status(status: str) -> str:
         message = f"unsupported value status: {status}"
         raise ValueError(message)
     return status
+
+
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
+
+
+def load_json(source: str | bytes | bytearray) -> object:
+    """Decode JSON source into an untyped object."""
+    return _json_loads(source)
+
+
+def is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    """Return True when value is a mapping with string keys."""
+    return isinstance(value, Mapping)
+
+
+def is_dict(value: object) -> TypeIs[dict[str, object]]:
+    """Return True when value is a dict with string keys."""
+    return isinstance(value, dict)
+
+
+def is_list(value: object) -> TypeIs[list[object]]:
+    """Return True when value is a list."""
+    return isinstance(value, list)
+
+
+def is_tuple(value: object) -> TypeIs[tuple[object, ...]]:
+    """Return True when value is a tuple."""
+    return isinstance(value, tuple)
+
+
+def is_sequence(value: object) -> TypeIs[Sequence[object]]:
+    """Return True when value is a non-string, non-bytes sequence."""
+    return isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    )
+
+
+def as_int(value: object, default: int = 0) -> int:
+    """Convert a JSON-decoded scalar to int or return default."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (float, str)):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def as_dict(value: object) -> dict[str, object]:
+    """Return value as a string-keyed dict or raise TypeError."""
+    if is_dict(value):
+        return value
+    if is_mapping(value):
+        return dict(value)
+    msg = f"expected mapping, got {type(value).__name__}"
+    raise TypeError(msg)
+
+
+def as_list(value: object) -> list[object]:
+    """Return value as a list or raise TypeError."""
+    if is_list(value):
+        return value
+    msg = f"expected list, got {type(value).__name__}"
+    raise TypeError(msg)
+
+
+def as_dict_list(value: object) -> list[dict[str, object]]:
+    """Return value as a list of string-keyed dicts or raise TypeError."""
+    return [as_dict(item) for item in as_list(value)]

@@ -1,18 +1,22 @@
 # Copyright (c) 2026
 """Strict source-local parsers for LiveBench release assets."""
 
-from __future__ import annotations
-
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import cast
 
-from .contracts import Diagnostic, RawArtifact, SkillError, raise_expected
+from .contracts import (
+    Diagnostic,
+    RawArtifact,
+    SkillError,
+    is_list,
+    is_mapping,
+    is_sequence,
+    raise_expected,
+)
 from .diagnostics import make_diagnostic
 from .extraction import ParsedDocument, extract_artifact
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ParsedReleaseAssets:
     """Represent ParsedReleaseAssets in the LiveBench adapter."""
 
@@ -152,31 +156,26 @@ def _rows_from_document(  # noqa: C901
     document: ParsedDocument, identity_field: str, artifact: RawArtifact
 ) -> tuple[list[dict[str, object]], list[str], dict[str, object]]:
     root = document.root
-    if isinstance(root, Mapping):
-        root_map = cast("Mapping[str, object]", root)
-        candidate = (
-            root_map.get("rows") or root_map.get("data") or root_map.get("models")
-        )
-        if isinstance(candidate, list):
-            root = cast("list[object]", cast("object", candidate))
-    if not isinstance(root, list):
+    if is_mapping(root):
+        candidate = root.get("rows") or root.get("data") or root.get("models")
+        if is_list(candidate):
+            root = candidate
+    if not is_list(root):
         raise_expected(
             "MALFORMED_PAYLOAD",
             "Tabular payload must contain a list of rows.",
             {"artifact_kind": artifact.artifact_kind},
         )
-    entries = cast("list[object]", cast("object", root))
     rows: list[dict[str, object]] = []
     headers: list[str] = []
-    for index, row in enumerate(entries):
-        if not isinstance(row, Mapping):
+    for index, row in enumerate(root):
+        if not is_mapping(row):
             raise_expected(
                 "MALFORMED_PAYLOAD",
                 "Tabular payload contains a non-object row.",
                 {"row_index": index, "artifact_kind": artifact.artifact_kind},
             )
-        row_map = cast("Mapping[str, object]", row)
-        normalized = {str(key): value for key, value in row_map.items()}
+        normalized = {str(key): value for key, value in row.items()}
         if not headers:
             headers = list(normalized)
         for key in normalized:
@@ -200,24 +199,20 @@ def _rows_from_document(  # noqa: C901
 
 
 def _category_map(root: object, artifact: RawArtifact) -> dict[str, list[str]]:
-    if isinstance(root, Mapping):
-        root_map = cast("Mapping[str, object]", root)
-        candidate = root_map.get("categories")
-        if isinstance(candidate, Mapping):
-            root = cast("Mapping[str, object]", candidate)
-    if not isinstance(root, Mapping):
+    if is_mapping(root):
+        candidate = root.get("categories")
+        if is_mapping(candidate):
+            root = candidate
+    if not is_mapping(root):
         raise_expected(
             "MALFORMED_PAYLOAD",
             "Category payload must be an object mapping labels to task arrays.",
             {"source_url": artifact.source_url},
         )
-    root_map = cast("Mapping[str, object]", root)
     result: dict[str, list[str]] = {}
-    for raw_label, task_values in root_map.items():
+    for raw_label, task_values in root.items():
         label = str(raw_label)
-        if not isinstance(task_values, Sequence) or isinstance(
-            task_values, (str, bytes)
-        ):
+        if not is_sequence(task_values):
             raise_expected(
                 "MALFORMED_PAYLOAD",
                 "Category task entries must be arrays.",
@@ -240,12 +235,9 @@ def _category_map(root: object, artifact: RawArtifact) -> dict[str, list[str]]:
 def parse_release_list(document: object) -> list[dict[str, object]]:
     """Parse a fixture or discovered bundle release list without an allow-list."""
     root = document
-    if isinstance(root, Mapping):
-        root_map = cast("Mapping[str, object]", root)
-        root = (
-            root_map.get("releases") or root_map.get("data") or root_map.get("entries")
-        )
-    if not isinstance(root, Sequence) or isinstance(root, (str, bytes)):
+    if is_mapping(root):
+        root = root.get("releases") or root.get("data") or root.get("entries")
+    if not is_sequence(root):
         raise_expected(
             "MALFORMED_PAYLOAD",
             "Release catalog must contain an array of entries.",
@@ -255,11 +247,8 @@ def parse_release_list(document: object) -> list[dict[str, object]]:
     for index, item in enumerate(root):
         if isinstance(item, str):
             entries.append({"id": item, "date": item, "index": index})
-        elif isinstance(item, Mapping):
-            release = {
-                str(key): value
-                for key, value in cast("Mapping[str, object]", item).items()
-            }
+        elif is_mapping(item):
+            release = {str(key): value for key, value in item.items()}
             identifier = (
                 release.get("id") or release.get("release") or release.get("date")
             )

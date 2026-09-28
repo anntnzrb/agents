@@ -1,35 +1,42 @@
 # Copyright (c) 2026
 """Order-independent release/category/subtask/model/schema diffing."""
 
-from __future__ import annotations
-
 import json
-from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
 
 from .cache import sha256_bytes
-from .contracts import raise_expected, utc_now
+from .contracts import (
+    is_list,
+    is_mapping,
+    is_sequence,
+    load_json,
+    raise_expected,
+    utc_now,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def load_snapshot_catalog(path: str) -> tuple[dict[str, object], dict[str, object]]:
     """Load snapshot catalog for the LiveBench adapter."""
     source = Path(path)
     try:
-        payload = cast("object", json.loads(source.read_text(encoding="utf-8")))
+        payload = load_json(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise_expected(
             "SNAPSHOT_INVALID",
             "Catalog snapshot is not valid JSON.",
             {"path": path, "error": str(exc)},
         )
-    if not isinstance(payload, Mapping):
+    if not is_mapping(payload):
         raise_expected(
             "SNAPSHOT_INVALID",
             "Catalog snapshot root must be an object.",
             {"path": path},
         )
-    catalog_payload = cast("Mapping[str, object]", payload)
+    catalog_payload = payload
     schema_version = catalog_payload.get("schema_version")
     if schema_version is not None and str(schema_version) != "1":
         raise_expected(
@@ -38,9 +45,7 @@ def load_snapshot_catalog(path: str) -> tuple[dict[str, object], dict[str, objec
             {"path": path, "schema_version": schema_version},
         )
     catalog = catalog_payload.get("catalog")
-    if not isinstance(catalog, Mapping):
-        catalog = catalog_payload
-    catalog_map = cast("Mapping[str, object]", catalog)
+    catalog_map = catalog if is_mapping(catalog) else catalog_payload
     return {str(key): value for key, value in catalog_map.items()}, {
         "source_url": catalog_payload.get("source_url") or f"fixture://{source}",
         "fetched_at": catalog_payload.get("fetched_at") or utc_now(),
@@ -111,36 +116,30 @@ def _entries(catalog: Mapping[str, object]) -> dict[str, dict[str, object]]:
         ("subtasks", "subtask"),
     ):
         value = catalog.get(field)
-        if isinstance(value, Mapping):
-            mapping = cast("Mapping[str, object]", value)
-            for key, item in mapping.items():
-                if isinstance(item, Mapping):
-                    item_map = cast("Mapping[str, object]", item)
+        if is_mapping(value):
+            for key, item in value.items():
+                if is_mapping(item):
                     identifier = str(
-                        item_map.get(f"{prefix}_id")
-                        or item_map.get("model_id")
-                        or item_map.get("subtask_id")
+                        item.get(f"{prefix}_id")
+                        or item.get("model_id")
+                        or item.get("subtask_id")
                         or key
                     )
                     entries[f"{field}:{identifier}"] = {
-                        str(k): v for k, v in item_map.items()
+                        str(k): v for k, v in item.items()
                     }
-        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-            items = cast("list[object]", cast("object", value))
-            for index, item in enumerate(items):
-                if not isinstance(item, Mapping):
+        elif is_sequence(value):
+            for index, item in enumerate(value):
+                if not is_mapping(item):
                     continue
-                item_map = cast("Mapping[str, object]", item)
                 identifier = str(
-                    item_map.get(f"{prefix}_id")
-                    or item_map.get("model_id")
-                    or item_map.get("subtask_id")
-                    or item_map.get("id")
+                    item.get(f"{prefix}_id")
+                    or item.get("model_id")
+                    or item.get("subtask_id")
+                    or item.get("id")
                     or index
                 )
-                entries[f"{field}:{identifier}"] = {
-                    str(k): v for k, v in item_map.items()
-                }
+                entries[f"{field}:{identifier}"] = {str(k): v for k, v in item.items()}
     if not entries:
         release = catalog.get("release") or catalog.get("release_id")
         if release is not None:
@@ -159,12 +158,10 @@ def _changed_paths(
             continue
         left = before[key]
         right = after[key]
-        if isinstance(left, Mapping) and isinstance(right, Mapping):
-            left_map = cast("Mapping[str, object]", left)
-            right_map = cast("Mapping[str, object]", right)
-            changes.extend(_changed_paths(left_map, right_map, path))
+        if is_mapping(left) and is_mapping(right):
+            changes.extend(_changed_paths(left, right, path))
         elif left != right:
-            changes.append((path, cast("object", left), right))
+            changes.append((path, left, right))
     return changes
 
 
@@ -175,25 +172,20 @@ def _schema_changes(
 
     def walk(a: object, b: object, path: str) -> None:
         """Walk for the LiveBench adapter."""
-        if isinstance(a, Mapping) and isinstance(b, Mapping):
-            left_map = cast("Mapping[str, object]", a)
-            right_map = cast("Mapping[str, object]", b)
-            for key in sorted(set(left_map) | set(right_map)):
+        if is_mapping(a) and is_mapping(b):
+            for key in sorted(set(a) | set(b)):
                 child = f"{path}.{key}" if path else str(key)
                 if key not in a:
                     changes.append(f"added:{child}")
                 elif key not in b:
                     changes.append(f"removed:{child}")
                 else:
-                    walk(left_map[key], right_map[key], child)
-        elif isinstance(a, list) and isinstance(b, list):
-            if a and b and type(cast("object", a[0])) is not type(cast("object", b[0])):
+                    walk(a[key], b[key], child)
+        elif is_list(a) and is_list(b):
+            if a and b and type(a[0]) is not type(b[0]):
                 changes.append(f"type:{path}")
-        else:
-            left_type = type(cast("object", a))
-            right_type = type(b)
-            if left_type is not right_type:
-                changes.append(f"type:{path}")
+        elif type(a) is not type(b):
+            changes.append(f"type:{path}")
 
     walk(left, right, "")
     return changes

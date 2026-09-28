@@ -1,11 +1,9 @@
 # Copyright (c) 2026
 """Per-artifact and per-value provenance helpers."""
 
-from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from typing import TYPE_CHECKING, cast
-
-from .diagnostics import redact
+from .diagnostics import redact_dict
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -34,27 +32,24 @@ def value_evidence(  # noqa: PLR0913
     confidence: str = "high",
 ) -> dict[str, object]:
     """Value evidence for the LiveBench adapter."""
-    return cast(
-        "dict[str, object]",
-        redact(
-            {
-                "source_url": artifact.source_url,
-                "discovered_from": artifact.discovered_from,
-                "extraction_method": extraction_method,
-                "source_path": source_path,
-                "parser": "livebench.provenance",
-                "parser_version": "1",
-                "fetched_at": artifact.fetched_at,
-                "observed_at": artifact.observed_at,
-                "source_release": artifact.release_id,
-                "raw_value": raw_value,
-                "normalized_value": normalized_value,
-                "unit": unit,
-                "value_status": value_status,
-                "confidence": confidence,
-                "artifact_sha256": artifact.sha256,
-            },
-        ),
+    return redact_dict(
+        {
+            "source_url": artifact.source_url,
+            "discovered_from": artifact.discovered_from,
+            "extraction_method": extraction_method,
+            "source_path": source_path,
+            "parser": "livebench.provenance",
+            "parser_version": "1",
+            "fetched_at": artifact.fetched_at,
+            "observed_at": artifact.observed_at,
+            "source_release": artifact.release_id,
+            "raw_value": raw_value,
+            "normalized_value": normalized_value,
+            "unit": unit,
+            "value_status": value_status,
+            "confidence": confidence,
+            "artifact_sha256": artifact.sha256,
+        },
     )
 
 

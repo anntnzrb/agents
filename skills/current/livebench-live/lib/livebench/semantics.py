@@ -1,8 +1,6 @@
 # Copyright (c) 2026
 """Source-published formulas and comparison semantics for LiveBench."""
 
-from __future__ import annotations
-
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
@@ -118,7 +116,7 @@ def derive_selected_cost(
         try:
             cost = Decimal(str(cost_raw))
             questions = Decimal(str(questions_raw))
-        except (InvalidOperation, TypeError, ValueError):
+        except InvalidOperation, TypeError, ValueError:
             continue
         if not cost.is_finite() or not questions.is_finite() or questions <= 0:
             continue

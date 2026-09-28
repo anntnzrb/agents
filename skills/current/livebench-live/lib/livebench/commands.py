@@ -1,24 +1,22 @@
 # Copyright (c) 2026
 """Command projections over the LiveBench discovery/transport/parser pipeline."""
 
-from __future__ import annotations
-
 import csv
 import io
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 from .cache import CacheStore, sha256_bytes
 from .contracts import (
     Diagnostic,
     RawArtifact,
     ResolvedRelease,
+    is_list,
+    is_mapping,
+    is_sequence,
+    load_json,
     raise_expected,
     utc_now,
 )
@@ -39,7 +37,7 @@ from .transport import FetchError, fetch_target
 from .validation import DuplicateReport, duplicate_groups, validate_assets
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ReleaseContext:
     """Represent ReleaseContext in the LiveBench adapter."""
 
@@ -561,18 +559,14 @@ def _filter_category(
     key = canonical_token(category)
     categories_obj = catalog.get("categories")
     categories_map: Mapping[str, object] = (
-        cast("Mapping[str, object]", categories_obj)
-        if isinstance(categories_obj, Mapping)
-        else {}
+        categories_obj if is_mapping(categories_obj) else {}
     )
     matches: list[str] = []
     for name, metadata in categories_map.items():
-        if name == key:
+        if name == key or (
+            is_mapping(metadata) and metadata.get("raw_label") == category
+        ):
             matches.append(name)
-        elif isinstance(metadata, Mapping):
-            meta_dict = cast("Mapping[str, object]", metadata)
-            if meta_dict.get("raw_label") == category:
-                matches.append(name)
     if not matches:
         raise_expected(
             "UNKNOWN_CATEGORY",
@@ -595,17 +589,15 @@ def _build_projection_scope(
     category_count_pop: object = None
     category_count_kind: object = None
     tc_entry = context.catalog.get("task_count")
-    if isinstance(tc_entry, Mapping):
-        tc_map = cast("Mapping[str, object]", tc_entry)
-        task_count_val = tc_map.get("value")
-        task_count_pop = tc_map.get("population")
-        task_count_kind = tc_map.get("kind")
+    if is_mapping(tc_entry):
+        task_count_val = tc_entry.get("value")
+        task_count_pop = tc_entry.get("population")
+        task_count_kind = tc_entry.get("kind")
     cc_entry = context.catalog.get("category_count")
-    if isinstance(cc_entry, Mapping):
-        cc_map = cast("Mapping[str, object]", cc_entry)
-        category_count_val = cc_map.get("value")
-        category_count_pop = cc_map.get("population")
-        category_count_kind = cc_map.get("kind")
+    if is_mapping(cc_entry):
+        category_count_val = cc_entry.get("value")
+        category_count_pop = cc_entry.get("population")
+        category_count_kind = cc_entry.get("kind")
     return {
         "source": "livebench",
         "release": context.release.as_dict(),
@@ -685,10 +677,9 @@ def project_category(row: dict[str, object], key: str) -> dict[str, object]:
     """Project category for the LiveBench adapter."""
     projected = dict(row)
     categories = row.get("categories")
-    if isinstance(categories, Mapping):
-        cat_map = cast("Mapping[str, object]", categories)
-        projected["selected_category"] = cat_map.get(key)
-        projected["categories"] = {key: cat_map[key]} if key in cat_map else {}
+    if is_mapping(categories):
+        projected["selected_category"] = categories.get(key)
+        projected["categories"] = {key: categories[key]} if key in categories else {}
     else:
         projected["selected_category"] = None
         projected["categories"] = {}
@@ -701,9 +692,8 @@ def rank_rows(rows: list[dict[str, object]]) -> None:
     for row in rows:
         overall = row.get("overall")
         value: object = None
-        if isinstance(overall, Mapping):
-            overall_map = cast("Mapping[str, object]", overall)
-            value = overall_map.get("normalized_value")
+        if is_mapping(overall):
+            value = overall.get("normalized_value")
         blocked = row.get("comparison_eligibility") == "blocked" or bool(
             row.get("_duplicate_conflict")
         )
@@ -768,21 +758,20 @@ def _numeric_diagnostics(
     diagnostics: list[Diagnostic] = []
     for row in rows:
         subtasks = row.get("subtasks")
-        if not isinstance(subtasks, list):
+        if not is_list(subtasks):
             continue
-        for subtask in cast("list[object]", subtasks):
-            if not isinstance(subtask, Mapping):
+        for subtask in subtasks:
+            if not is_mapping(subtask):
                 continue
-            subtask_map = cast("Mapping[str, object]", subtask)
             path = (
-                str(subtask_map.get("source_path"))
-                if subtask_map.get("source_path") is not None
+                str(subtask.get("source_path"))
+                if subtask.get("source_path") is not None
                 else None
             )
-            codes = subtask_map.get("diagnostic_codes")
-            if not isinstance(codes, list):
+            codes = subtask.get("diagnostic_codes")
+            if not is_list(codes):
                 continue
-            for raw_code in cast("list[object]", codes):
+            for raw_code in codes:
                 code = str(raw_code)
                 key = (code, path)
                 if code not in known_codes or key in seen_values:
@@ -923,13 +912,11 @@ def _score_semantics(
     raw_fields: Mapping[str, object], task: str
 ) -> tuple[str | None, str | None]:
     definitions = raw_fields.get("definitions")
-    if isinstance(definitions, Mapping) and task in definitions:
-        definitions_map = cast("Mapping[str, object]", definitions)
-        definition = definitions_map.get(task)
-        if isinstance(definition, Mapping):
-            def_map = cast("Mapping[str, object]", definition)
-            unit = def_map.get("unit")
-            description = def_map.get("definition")
+    if is_mapping(definitions) and task in definitions:
+        definition = definitions.get(task)
+        if is_mapping(definition):
+            unit = definition.get("unit")
+            description = definition.get("definition")
             return (
                 str(unit) if unit is not None else None,
                 str(description) if description is not None else None,
@@ -944,27 +931,24 @@ def _attach_snapshot_metadata(
 ) -> None:
     for key in ("source_metadata", "definitions", "raw_metadata"):
         value = payload.get(key)
-        if isinstance(value, Mapping):
-            parsed_assets.raw_fields[key] = {
-                str(k): v for k, v in cast("Mapping[object, object]", value).items()
-            }
+        if is_mapping(value):
+            parsed_assets.raw_fields[key] = dict(value)
 
 
 def _extract_snapshot_identity(
     parsed: Mapping[str, object], requested_release: str | None
 ) -> tuple[str, str]:
     release_obj = parsed.get("release") or parsed.get("resolved_release")
-    if isinstance(release_obj, Mapping):
-        release_map = cast("Mapping[str, object]", release_obj)
+    if is_mapping(release_obj):
         release_id = str(
-            release_map.get("id")
-            or release_map.get("release_id")
+            release_obj.get("id")
+            or release_obj.get("release_id")
             or parsed.get("release_id")
             or "fixture-release"
         )
         release_date = (
-            str(release_map.get("date"))
-            if release_map.get("date") is not None
+            str(release_obj.get("date"))
+            if release_obj.get("date") is not None
             else release_id
         )
     else:
@@ -991,32 +975,24 @@ def _load_direct_fixture(
 ) -> ReleaseContext:
     score_rows_raw = parsed.get("score_rows")
     score_rows: list[dict[str, object]] = (
-        [
-            {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
-            for row in cast("list[object]", score_rows_raw)
-            if isinstance(row, Mapping)
-        ]
-        if isinstance(score_rows_raw, list)
+        [dict(row) for row in score_rows_raw if is_mapping(row)]
+        if is_list(score_rows_raw)
         else []
     )
     cost_rows_raw = parsed.get("cost_rows")
     cost_rows: list[dict[str, object]] = (
-        [
-            {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
-            for row in cast("list[object]", cost_rows_raw)
-            if isinstance(row, Mapping)
-        ]
-        if isinstance(cost_rows_raw, list)
+        [dict(row) for row in cost_rows_raw if is_mapping(row)]
+        if is_list(cost_rows_raw)
         else []
     )
     categories_raw = parsed.get("categories")
     categories: dict[str, list[str]] = (
         {
             str(cat_k): [str(task) for task in cat_v]
-            for cat_k, cat_v in cast("Mapping[object, object]", categories_raw).items()
-            if isinstance(cat_v, Sequence) and not isinstance(cat_v, (str, bytes))
+            for cat_k, cat_v in categories_raw.items()
+            if is_sequence(cat_v)
         }
-        if isinstance(categories_raw, Mapping)
+        if is_mapping(categories_raw)
         else {}
     )
     assets = _fixture_artifacts(path, release_id, score_rows, cost_rows, categories)
@@ -1115,20 +1091,19 @@ def _load_ref_fixture(
 def _load_snapshot(path: Path, requested_release: str | None) -> ReleaseContext | None:
     try:
         body = path.read_bytes()
-        parsed_obj: object = cast("object", json.loads(body.decode("utf-8")))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        parsed = load_json(body.decode("utf-8"))
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
         return None
-    if not isinstance(parsed_obj, Mapping):
+    if not is_mapping(parsed):
         return None
-    parsed = cast("Mapping[str, object]", parsed_obj)
     release_id, release_date = _extract_snapshot_identity(parsed, requested_release)
     score_rows_raw = parsed.get("score_rows")
     categories_raw = parsed.get("categories")
     artifacts_raw = parsed.get("artifacts") or parsed.get("assets")
     if (
-        isinstance(score_rows_raw, list)
-        and isinstance(categories_raw, Mapping)
-        and not isinstance(artifacts_raw, Mapping)
+        is_list(score_rows_raw)
+        and is_mapping(categories_raw)
+        and not is_mapping(artifacts_raw)
     ):
         return _load_direct_fixture(
             path,
@@ -1136,13 +1111,13 @@ def _load_snapshot(path: Path, requested_release: str | None) -> ReleaseContext 
             release_date,
             parsed,
         )
-    if isinstance(artifacts_raw, Mapping):
+    if is_mapping(artifacts_raw):
         return _load_ref_fixture(
             path,
             release_id,
             release_date,
             parsed,
-            cast("Mapping[str, object]", artifacts_raw),
+            artifacts_raw,
         )
     return None
 
@@ -1167,12 +1142,8 @@ def _fixture_discovery(
 ) -> ReleaseDiscovery:
     entries = payload.get("releases")
     releases: list[dict[str, object]] = (
-        [
-            {str(k): v for k, v in cast("Mapping[object, object]", item).items()}
-            for item in cast("list[object]", entries)
-            if isinstance(item, Mapping)
-        ]
-        if isinstance(entries, list)
+        [dict(item) for item in entries if is_mapping(item)]
+        if is_list(entries)
         else [{"id": release_id, "date": release_id}]
     )
     if not any(str(item.get("id")) == release_id for item in releases):
@@ -1287,15 +1258,11 @@ def _fixture_artifacts_from_refs(
         body: bytes | None = None
         content_type = "application/json" if kind == "category_map" else "text/csv"
         source_url = f"fixture://{path}#{kind}"
-        if isinstance(ref, Mapping):
-            ref_map = cast("Mapping[str, object]", ref)
-            if ref_map.get("body") is not None:
-                body = str(ref_map["body"]).encode("utf-8")
-            elif (
-                ref_map.get("path") is not None
-                or ref_map.get("raw_bytes_ref") is not None
-            ):
-                raw_path = ref_map.get("path") or ref_map.get("raw_bytes_ref")
+        if is_mapping(ref):
+            if ref.get("body") is not None:
+                body = str(ref["body"]).encode("utf-8")
+            elif ref.get("path") is not None or ref.get("raw_bytes_ref") is not None:
+                raw_path = ref.get("path") or ref.get("raw_bytes_ref")
                 ref_path = Path(str(raw_path))
                 try:
                     body = (
@@ -1305,10 +1272,8 @@ def _fixture_artifacts_from_refs(
                     )
                 except OSError:
                     body = None
-            source_url = str(
-                ref_map.get("url") or ref_map.get("source_url") or source_url
-            )
-            content_type = str(ref_map.get("content_type") or content_type)
+            source_url = str(ref.get("url") or ref.get("source_url") or source_url)
+            content_type = str(ref.get("content_type") or content_type)
         elif isinstance(ref, str):
             ref_path = Path(ref)
             try:
@@ -1326,9 +1291,7 @@ def _fixture_artifacts_from_refs(
         if body is None:
             continue
         ref_release = (
-            str(cast("Mapping[str, object]", ref).get("release_id") or release_id)
-            if isinstance(ref, Mapping)
-            else release_id
+            str(ref.get("release_id") or release_id) if is_mapping(ref) else release_id
         )
         result[kind] = _fixture_artifact(path, ref_release, kind, body, content_type)
     return result

@@ -1,8 +1,6 @@
 # Copyright (c) 2026
 """Independent LiveBench release/leaderboard skill."""
 
-from __future__ import annotations
-
 from .cli import build_parser, main
 from .contracts import SCHEMA_VERSION
 

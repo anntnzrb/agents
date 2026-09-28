@@ -1,23 +1,20 @@
 # Copyright (c) 2026
 """Strict release joins, identity checks, and duplicate-row classification."""
 
-from __future__ import annotations
-
 import json
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .contracts import raise_expected
+from .contracts import Diagnostic, raise_expected
 from .diagnostics import make_diagnostic
 from .identity import canonical_token, identity_tuple
 
 if TYPE_CHECKING:
-    from .contracts import Diagnostic
     from .parsing import ParsedReleaseAssets
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class DuplicateReport:
     """Represent DuplicateReport in the LiveBench adapter."""
 

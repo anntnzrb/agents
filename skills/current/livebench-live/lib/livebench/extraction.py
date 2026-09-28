@@ -1,23 +1,19 @@
 # Copyright (c) 2026
 """Ordered extraction helpers for official JSON/CSV/HTML/RSC fallback sources."""
 
-from __future__ import annotations
-
 import csv
 import io
 import json
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING, cast, override
+from typing import override
 
-if TYPE_CHECKING:
-    from .contracts import Diagnostic, RawArtifact
-
+from .contracts import Diagnostic, RawArtifact, is_dict, is_list, load_json
 from .diagnostics import make_diagnostic
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourcePath:
     """Represent SourcePath in the LiveBench adapter."""
 
@@ -26,7 +22,7 @@ class SourcePath:
     raw: object
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ParsedDocument:
     """Represent ParsedDocument in the LiveBench adapter."""
 
@@ -79,7 +75,7 @@ class _TableParser(HTMLParser):
             self._current = None
 
 
-def extract_artifact(  # noqa: C901, PLR0911, PLR0912
+def extract_artifact(  # noqa: C901
     artifact: RawArtifact,
 ) -> tuple[ParsedDocument | None, list[Diagnostic]]:
     """Apply the required extraction precedence and preserve the selected path."""
@@ -91,8 +87,8 @@ def extract_artifact(  # noqa: C901, PLR0911, PLR0912
         or "json" in content_type
     ):
         try:
-            root = cast("object", json.loads(body.decode("utf-8")))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            root = load_json(body.decode("utf-8"))
+        except UnicodeDecodeError, json.JSONDecodeError:
             root = None
         if root is not None:
             return ParsedDocument(
@@ -236,7 +232,7 @@ def _embedded_json(text: str) -> tuple[object, str] | None:
     for index, match in enumerate(pattern.finditer(text)):
         payload = match.group(1).strip()
         try:
-            return json.loads(payload), f"script[type=application/json][{index}]"
+            return load_json(payload), f"script[type=application/json][{index}]"
         except json.JSONDecodeError:
             continue
     return None
@@ -256,13 +252,11 @@ def _rsc_frames(text: str) -> tuple[object, str] | None:
         for index, match in enumerate(pattern.finditer(text)):
             encoded = match.group(1)
             try:
-                decoded = cast("object", json.loads(encoded))
+                decoded = load_json(encoded)
             except json.JSONDecodeError:
                 continue
-            if isinstance(decoded, list):
-                entries = cast("list[object]", cast("object", decoded))
-                if len(entries) == 2:  # noqa: PLR2004
-                    decoded = entries[1]
+            if is_list(decoded) and len(decoded) == 2:  # noqa: PLR2004
+                decoded = decoded[1]
             if isinstance(decoded, str):
                 candidate = decoded.strip()
                 start = min(
@@ -275,13 +269,11 @@ def _rsc_frames(text: str) -> tuple[object, str] | None:
                 )
                 if start >= 0:
                     try:
-                        return cast(
-                            "object", json.loads(candidate[start:])
-                        ), f"rsc-frame[{index}]"
+                        return load_json(candidate[start:]), f"rsc-frame[{index}]"
                     except json.JSONDecodeError:
                         continue
-            elif isinstance(decoded, (dict, list)):
-                return cast("object", decoded), f"rsc-frame[{index}]"
+            elif is_dict(decoded) or is_list(decoded):
+                return decoded, f"rsc-frame[{index}]"
     return None
 
 
@@ -292,7 +284,7 @@ def _json_ld(text: str) -> tuple[object, str] | None:
     )
     for index, match in enumerate(pattern.finditer(text)):
         try:
-            return json.loads(
+            return load_json(
                 match.group(1).strip()
             ), f"script[type=application/ld+json][{index}]"
         except json.JSONDecodeError:

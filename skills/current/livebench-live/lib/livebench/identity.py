@@ -1,11 +1,13 @@
 # Copyright (c) 2026
 """Deterministic, source-namespaced identities for dynamic LiveBench rows."""
 
-from __future__ import annotations
-
 import re
 import unicodedata
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _TRACKING = frozenset(
     {
@@ -74,7 +76,7 @@ def variant_id(slug: object, provider: object = None, variant: object = None) ->
     )
 
 
-def identity_tuple(row: dict[str, object]) -> tuple[str, str | None, str | None]:
+def identity_tuple(row: Mapping[str, object]) -> tuple[str, str | None, str | None]:
     """Identity tuple for the LiveBench adapter."""
     model = str(row.get("model_slug") or row.get("model") or "")
     provider = row.get("provider")

@@ -1,15 +1,14 @@
 # Copyright (c) 2026
 """Exact release resolution and atomic table/category/cost target planning."""
 
-from __future__ import annotations
-
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-from .contracts import ResolvedRelease, SourceTarget, raise_expected
+from .contracts import ResolvedRelease, SourceTarget, is_mapping, raise_expected
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from .discovery import ReleaseDiscovery
 
 _ALLOWED_HOSTS = {
@@ -108,10 +107,10 @@ def plan_targets(  # noqa: PLR0913
         None,
     )
     assets: Mapping[str, object] = {}
-    if isinstance(entry, Mapping):
+    if is_mapping(entry):
         assets_value = entry.get("assets", {})
-        if isinstance(assets_value, Mapping):
-            assets = cast("Mapping[str, object]", assets_value)
+        if is_mapping(assets_value):
+            assets = assets_value
     table = table_url or _asset(assets, "table")
     category = (
         categories_url or _asset(assets, "category") or _asset(assets, "categories")

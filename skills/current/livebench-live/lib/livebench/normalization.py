@@ -1,14 +1,10 @@
 # Copyright (c) 2026
 """Lossless LiveBench value normalization and release-record projection."""
 
-from __future__ import annotations
-
 import math
-from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import cast
 
-from .contracts import Diagnostic, NumericValue, RawArtifact
+from .contracts import Diagnostic, NumericValue, RawArtifact, is_mapping
 from .diagnostics import make_diagnostic
 
 _SENTINELS = frozenset(
@@ -19,7 +15,7 @@ _SENTINELS = frozenset(
 def _finite_decimal(raw: str) -> Decimal | None:
     try:
         value = Decimal(raw)
-    except (InvalidOperation, ValueError):
+    except InvalidOperation, ValueError:
         return None
     if not value.is_finite():
         return None
@@ -36,7 +32,7 @@ def _number(value: Decimal) -> float | int:
     return as_float
 
 
-def numeric_value(  # noqa: PLR0911, PLR0913
+def numeric_value(  # noqa: PLR0913
     raw: object,
     *,
     path: str,
@@ -243,11 +239,7 @@ def attach_artifact_evidence(
     """Attach artifact evidence for the LiveBench adapter."""
     result = dict(value)
     raw_evidence = result.get("source_evidence")
-    evidence = (
-        dict(cast("Mapping[str, object]", raw_evidence))
-        if isinstance(raw_evidence, Mapping)
-        else {}
-    )
+    evidence = dict(raw_evidence) if is_mapping(raw_evidence) else {}
     evidence.update(artifact.provenance(parser=parser))
     evidence["source_path"] = result.get("source_path")
     evidence["raw_value"] = result.get("raw_value")

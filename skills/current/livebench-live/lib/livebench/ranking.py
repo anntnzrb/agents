@@ -1,10 +1,12 @@
 # Copyright (c) 2026
 """Comparability gates for release-pinned LiveBench rows."""
 
-from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from collections.abc import Mapping, Sequence
-from typing import cast
+from .contracts import is_mapping
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 def comparison_gate(
@@ -15,23 +17,22 @@ def comparison_gate(
     releases: set[str] = set()
     for row in rows:
         release = row.get("release")
-        if isinstance(release, Mapping):
-            mapping = cast("Mapping[str, object]", release)
-            releases.add(str(mapping.get("id")))
+        if is_mapping(release):
+            releases.add(str(release.get("id")))
     if len(releases) != 1:
         blocked.append("release_identity_mismatch")
     values: list[float] = []
     for row in rows:
         value = row.get(metric)
-        if not isinstance(value, Mapping):
+        if not is_mapping(value):
             blocked.append(f"missing_{metric}")
             continue
-        normalized = cast("Mapping[str, object]", value).get("normalized_value")
+        normalized = value.get("normalized_value")
         if not isinstance(normalized, (int, float)) or isinstance(normalized, bool):
             blocked.append(f"unparsed_{metric}")
             continue
-        status = cast("Mapping[str, object]", value).get("metric_semantics_status")
-        eligibility = cast("Mapping[str, object]", value).get("comparison_eligibility")
+        status = value.get("metric_semantics_status")
+        eligibility = value.get("comparison_eligibility")
         if status not in {"known", None} or eligibility == "blocked":
             blocked.append(f"unknown_{metric}_semantics")
             continue
@@ -54,6 +55,15 @@ def comparison_gate(
     }
 
 
+def _metric_sort_value(row: Mapping[str, object], metric: str) -> float:
+    value = row.get(metric)
+    if is_mapping(value):
+        normalized = value.get("normalized_value")
+        if isinstance(normalized, (int, float)) and not isinstance(normalized, bool):
+            return -float(normalized)
+    return 0.0
+
+
 def rank(
     rows: list[dict[str, object]], *, metric: str = "overall"
 ) -> dict[str, object]:
@@ -66,14 +76,7 @@ def rank(
         return gate
     ordered = sorted(
         rows,
-        key=lambda row: (
-            -float(
-                cast(
-                    "int | float",
-                    cast("Mapping[str, object]", row[metric])["normalized_value"],
-                )
-            )
-        ),
+        key=lambda row: _metric_sort_value(row, metric),
     )
     for index, row in enumerate(ordered, 1):
         row["rank"] = index

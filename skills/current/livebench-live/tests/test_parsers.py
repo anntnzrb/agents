@@ -1,15 +1,14 @@
 # Copyright (c) 2026
-from __future__ import annotations
-
 from hashlib import sha256
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pathlib import Path
 from tests._path import SKILL_DIR
 
 from livebench.contracts import RawArtifact
 from livebench.extraction import extract_artifact
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 FIXTURES = SKILL_DIR / "tests" / "fixtures" / "pages"
 
