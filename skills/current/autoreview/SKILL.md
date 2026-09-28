@@ -86,3 +86,12 @@ When invoked with `--json-output <path>`, the tool emits a structured payload:
 - **Sanitized Git Environment**: Runs with `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL=/dev/null` to prevent configuration injection.
 - **Sensitive Path Redaction**: Automatically suppresses credential files (`.env`, `id_rsa`, `*.pem`, `*.key`) from the diff payload.
 - **Physical Line Verification**: Rejects any LLM finding whose referenced line or code excerpt does not physically exist in the target snapshot.
+
+## Review Engine Compatibility & Failure Handling
+
+AutoReview requires a review engine to evaluate diffs; currently the `omp` CLI is used for inference dispatch.
+
+When reviewing non-empty diffs:
+- If no review engine is available on PATH or the engine call fails, the CLI fails loudly with a non-zero exit code and descriptive error message.
+- AutoReview never reports a synthetic pass when inference fails.
+- Empty diffs are short-circuited safely as clean passes without invoking the review engine.

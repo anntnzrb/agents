@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -169,6 +170,100 @@ def test_invoke_engine_review_empty_diff() -> None:
     report = invoke_engine_review(bundle)
     assert report["overall_correctness"] == "patch is correct"
     assert report["findings"] == []
+
+
+def test_invoke_engine_review_missing_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that a missing review engine raises SystemExit with clear error instructions."""
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    bundle = ReviewBundle(
+        mode="local",
+        base_ref=None,
+        commit_sha=None,
+        changed_files=["src/foo.py"],
+        redacted_files=[],
+        diff_text="diff --git a/src/foo.py b/src/foo.py\n+new_code()",
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        invoke_engine_review(bundle)
+    err_msg = str(exc_info.value)
+    assert "review engine not available" in err_msg
+    assert "omp" in err_msg
+
+
+def test_invoke_engine_review_engine_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that a failing engine execution raises SystemExit instead of fabricating a pass."""
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/omp")
+
+    def mock_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["omp"],
+            returncode=1,
+            stdout="",
+            stderr="fatal: remote server unreachable",
+        )
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+    bundle = ReviewBundle(
+        mode="local",
+        base_ref=None,
+        commit_sha=None,
+        changed_files=["src/foo.py"],
+        redacted_files=[],
+        diff_text="diff --git a/src/foo.py b/src/foo.py\n+new_code()",
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        invoke_engine_review(bundle)
+    assert "review engine failed" in str(exc_info.value)
+
+
+def test_cli_execution_fails_when_engine_missing(tmp_path: Path) -> None:
+    """Verify that CLI execution fails loudly when no review engine is available."""
+    env = dict(os.environ)
+    env["PATH"] = "/usr/bin:/bin"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.name", "Tester"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "tester@example.com"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    (repo / "test.txt").write_text("hello world\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "test.txt"], cwd=repo, check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    (repo / "test.txt").write_text("hello world\nnew change\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "commit", "-am", "Second commit"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    proc = subprocess.run(
+        [sys.executable, str(CLI_SCRIPT), "--mode", "commit", "--commit", "HEAD"],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode != 0
+    assert "review engine not available" in proc.stderr
+    assert "omp" in proc.stderr
+    assert "Verdict: patch is correct" not in proc.stdout
 
 
 def test_format_human_report() -> None:

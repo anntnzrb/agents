@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-import sys
 from typing import Any
 
 from autoreview.targets import ReviewBundle
@@ -61,39 +60,41 @@ Diff Payload:
 
     # Check for omp binary in PATH
     omp_bin = shutil.which("omp")
-    if omp_bin is not None:
-        try:
-            cmd = [
-                omp_bin,
-                "--mode=json",
-                "--no-session",
-                "-p",
-                f"{REVIEW_SYSTEM_PROMPT}\n\n{user_prompt}",
-            ]
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=180,
-                check=False,
-            )
-            if proc.returncode == 0 and proc.stdout:
-                # Parse lines looking for the JSON payload or completion output
-                for line in proc.stdout.splitlines():
-                    if line.strip().startswith("{") and line.strip().endswith("}"):
-                        try:
-                            parsed = json.loads(line.strip())
-                            if "findings" in parsed or "overall_correctness" in parsed:
-                                return parsed
-                        except json.JSONDecodeError:
-                            continue
-        except (subprocess.TimeoutExpired, OSError) as err:
-            sys.stderr.write(f"Warning: OMP inference engine failed: {err}\n")
+    if omp_bin is None:
+        raise SystemExit(
+            "review engine not available: 'omp' executable not found on PATH. "
+            "AutoReview requires a review engine (currently the 'omp' CLI); ensure 'omp' is installed and available on PATH."
+        )
 
-    # Fallback to deterministic static review report if no engine responded
-    return {
-        "overall_correctness": "patch is correct",
-        "overall_explanation": f"Static preflight passed for {bundle.mode} bundle ({len(bundle.changed_files)} files).",
-        "overall_confidence": 0.95,
-        "findings": [],
-    }
+    try:
+        cmd = [
+            omp_bin,
+            "--mode=json",
+            "--no-session",
+            "-p",
+            f"{REVIEW_SYSTEM_PROMPT}\n\n{user_prompt}",
+        ]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+        if proc.returncode == 0 and proc.stdout:
+            # Parse lines looking for the JSON payload or completion output
+            for line in proc.stdout.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("{") and stripped.endswith("}"):
+                    try:
+                        parsed = json.loads(stripped)
+                        if "findings" in parsed or "overall_correctness" in parsed:
+                            return parsed
+                    except json.JSONDecodeError:
+                        continue
+        error_msg = (
+            proc.stderr.strip() or proc.stdout.strip() or f"exit code {proc.returncode}"
+        )
+        raise SystemExit(f"review engine failed: {error_msg}")
+    except (subprocess.TimeoutExpired, OSError) as err:
+        raise SystemExit(f"review engine failed: {err}") from err
