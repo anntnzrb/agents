@@ -2,14 +2,23 @@
 
 import json
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypeIs
 
 from scripts.cli import main
 
 
-@dataclass(slots=True)
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
+
+def _is_list(obj: object) -> TypeIs[list[object]]:
+    return isinstance(obj, list)
+
+
+@dataclass(frozen=True, slots=True)
 class CapturedOutput:
     """Captured stdout and stderr streams."""
 
@@ -46,7 +55,7 @@ def test_cli_format(capsys: CaptureFixture):
 
 def test_cli_patch_dry_run(tmp_path: Path, capsys: CaptureFixture):
     cl = tmp_path / "CHANGELOG.md"
-    cl.write_text("# Changelog\n\n## [1.0.0]\n- Old\n", encoding="utf-8")
+    _ = cl.write_text("# Changelog\n\n## [1.0.0]\n- Old\n", encoding="utf-8")
 
     payload = json.dumps({"entries": {"Fixed": ["Resolved issue #42"]}})
     code = main(
@@ -61,24 +70,28 @@ def test_cli_patch_dry_run(tmp_path: Path, capsys: CaptureFixture):
     )
     assert code == 0
     captured = capsys.readouterr()
-    data = json.loads(captured.out)
+    loads_fn: Callable[..., object] = json.loads
+    data = loads_fn(captured.out)
+    assert _is_dict(data)
     assert data["ok"] is True
     assert data["changed"] is True
     assert "preview" in data
-    assert "## [Unreleased]" in data["preview"]
-    assert "- Resolved issue #42" in data["preview"]
+    preview = data["preview"]
+    assert isinstance(preview, str)
+    assert "## [Unreleased]" in preview
+    assert "- Resolved issue #42" in preview
 
 
 def test_cli_prepare_git(tmp_path: Path, capsys: CaptureFixture):
     # Setup test git repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
+    _ = subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    _ = subprocess.run(
         ["git", "config", "user.name", "Test User"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
         cwd=tmp_path,
         check=True,
@@ -86,11 +99,11 @@ def test_cli_prepare_git(tmp_path: Path, capsys: CaptureFixture):
     )
 
     f_init = tmp_path / "README.md"
-    f_init.write_text("# Project", encoding="utf-8")
-    subprocess.run(
+    _ = f_init.write_text("# Project", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "README.md"], cwd=tmp_path, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "chore: init"],
         cwd=tmp_path,
         check=True,
@@ -98,11 +111,11 @@ def test_cli_prepare_git(tmp_path: Path, capsys: CaptureFixture):
     )
 
     f = tmp_path / "app.py"
-    f.write_text("print('hello')", encoding="utf-8")
-    subprocess.run(
+    _ = f.write_text("print('hello')", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "app.py"], cwd=tmp_path, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "feat: initial app (#100)"],
         cwd=tmp_path,
         check=True,
@@ -112,18 +125,27 @@ def test_cli_prepare_git(tmp_path: Path, capsys: CaptureFixture):
     code = main(["prepare", "--range", "HEAD~1..HEAD", "--repo", str(tmp_path)])
     assert code == 0
     captured = capsys.readouterr()
-    data = json.loads(captured.out)
+    loads_fn: Callable[..., object] = json.loads
+    data = loads_fn(captured.out)
+    assert _is_dict(data)
     assert data["source_type"] == "range"
-    assert len(data["commits"]) == 1
-    assert data["commits"][0]["pr_number"] == 100
-    assert data["commits"][0]["category"] == "Added"
+    commits = data.get("commits")
+    assert _is_list(commits)
+    assert len(commits) == 1
+    commit0 = commits[0]
+    assert _is_dict(commit0)
+    assert commit0["pr_number"] == 100
+    assert commit0["category"] == "Added"
 
 
 def test_cli_status(capsys: CaptureFixture):
     code = main(["status"])
     assert code == 0
     captured = capsys.readouterr()
-    data = json.loads(captured.out)
+    loads_fn: Callable[..., object] = json.loads
+    data = loads_fn(captured.out)
+    assert _is_dict(data)
     assert data["ok"] is True
-    assert "tools" in data
-    assert data["tools"]["git"] is True
+    tools = data.get("tools")
+    assert _is_dict(tools)
+    assert tools["git"] is True

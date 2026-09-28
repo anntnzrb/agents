@@ -7,12 +7,12 @@ from boundary_detector import detect_changelog_boundaries, find_nearest_changelo
 
 def test_find_nearest_changelog_monorepo(tmp_path: Path):
     root_cl = tmp_path / "CHANGELOG.md"
-    root_cl.write_text("# Root Changelog\n", encoding="utf-8")
+    _ = root_cl.write_text("# Root Changelog\n", encoding="utf-8")
 
     pkg_a = tmp_path / "packages" / "pkg-a"
     pkg_a.mkdir(parents=True)
     pkg_a_cl = pkg_a / "CHANGELOG.md"
-    pkg_a_cl.write_text("# Package A Changelog\n", encoding="utf-8")
+    _ = pkg_a_cl.write_text("# Package A Changelog\n", encoding="utf-8")
 
     pkg_b = tmp_path / "packages" / "pkg-b"
     pkg_b.mkdir(parents=True)
@@ -30,12 +30,12 @@ def test_find_nearest_changelog_monorepo(tmp_path: Path):
 
 def test_detect_changelog_boundaries(tmp_path: Path):
     root_cl = tmp_path / "CHANGELOG.md"
-    root_cl.write_text("# Root Changelog\n", encoding="utf-8")
+    _ = root_cl.write_text("# Root Changelog\n", encoding="utf-8")
 
     pkg_a = tmp_path / "packages" / "core"
     pkg_a.mkdir(parents=True)
     pkg_a_cl = pkg_a / "CHANGELOG.md"
-    pkg_a_cl.write_text("# Core Changelog\n", encoding="utf-8")
+    _ = pkg_a_cl.write_text("# Core Changelog\n", encoding="utf-8")
 
     files = [
         "packages/core/src/feature.ts",

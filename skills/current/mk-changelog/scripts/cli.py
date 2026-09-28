@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Command-line interface for mk-changelog."""
@@ -7,8 +7,9 @@
 import argparse
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TypeIs
 
 # Add lib directory to sys.path for internal imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
@@ -37,6 +38,29 @@ from patcher import (
 )
 
 
+class CliArgs(argparse.Namespace):
+    """Parsed CLI arguments."""
+
+    command: str | None = None
+    commit_range: str | None = None
+    pr_identifier: str | None = None
+    staged: bool = False
+    repo: Path = Path()
+    entries_file: Path | None = None
+    json_str: str | None = None
+    header: bool = False
+    target: Path | None = None
+    dry_run: bool = False
+
+
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
+
+def _is_list(obj: object) -> TypeIs[list[object]]:
+    return isinstance(obj, list)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser."""
     parser = argparse.ArgumentParser(
@@ -50,22 +74,22 @@ def build_parser() -> argparse.ArgumentParser:
         "prepare",
         help="Extract git commits, boundaries, diffstats, and unreleased entries.",
     )
-    prep_parser.add_argument(
+    _ = prep_parser.add_argument(
         "--range",
         dest="commit_range",
         help="Git commit range, e.g. v1.0.0..HEAD or HEAD~5..HEAD",
     )
-    prep_parser.add_argument(
+    _ = prep_parser.add_argument(
         "--pr",
         dest="pr_identifier",
         help="GitHub Pull Request number or URL",
     )
-    prep_parser.add_argument(
+    _ = prep_parser.add_argument(
         "--staged",
         action="store_true",
         help="Inspect staged changes in the current working tree",
     )
-    prep_parser.add_argument(
+    _ = prep_parser.add_argument(
         "--repo",
         type=Path,
         default=Path(),
@@ -77,17 +101,17 @@ def build_parser() -> argparse.ArgumentParser:
         "format",
         help="Format structured entries JSON into standard Keep a Changelog markdown.",
     )
-    fmt_parser.add_argument(
+    _ = fmt_parser.add_argument(
         "--entries-file",
         type=Path,
         help="Path to JSON file containing { 'entries': { ... } }",
     )
-    fmt_parser.add_argument(
+    _ = fmt_parser.add_argument(
         "--json",
         dest="json_str",
         help="Direct JSON string containing { 'entries': { ... } }",
     )
-    fmt_parser.add_argument(
+    _ = fmt_parser.add_argument(
         "--header",
         action="store_true",
         help="Include ## [Unreleased] header in output",
@@ -98,35 +122,35 @@ def build_parser() -> argparse.ArgumentParser:
         "patch",
         help="Patch target CHANGELOG.md idempotently with new entries.",
     )
-    patch_parser.add_argument(
+    _ = patch_parser.add_argument(
         "--target",
         type=Path,
         help="Path to target CHANGELOG.md file",
     )
-    patch_parser.add_argument(
+    _ = patch_parser.add_argument(
         "--entries-file",
         type=Path,
         help="Path to JSON file containing { 'entries': { ... } }",
     )
-    patch_parser.add_argument(
+    _ = patch_parser.add_argument(
         "--json",
         dest="json_str",
         help="Direct JSON string containing { 'entries': { ... } }",
     )
-    patch_parser.add_argument(
+    _ = patch_parser.add_argument(
         "--repo",
         type=Path,
         default=Path(),
         help="Path to repository root",
     )
-    patch_parser.add_argument(
+    _ = patch_parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview patched content without writing to disk",
     )
 
     # Subcommand: status
-    subparsers.add_parser(
+    _ = subparsers.add_parser(
         "status",
         help="Check tool dependencies and environment availability.",
     )
@@ -139,37 +163,41 @@ def load_entries_payload(
     json_str: str | None,
 ) -> dict[str, list[str]]:
     """Load entries mapping from file or string."""
-    raw_dict: dict[str, object] = {}
+    loads_fn: Callable[..., object] = json.loads
+    raw_obj: object
     if file_path:
         if not file_path.is_file():
-            sys.stderr.write(f"Error: Entries file not found: {file_path}\n")
+            _ = sys.stderr.write(f"Error: Entries file not found: {file_path}\n")
             sys.exit(2)
         content = file_path.read_text(encoding="utf-8")
-        raw_dict = json.loads(content)
+        raw_obj = loads_fn(content)
     elif json_str:
-        raw_dict = json.loads(json_str)
+        raw_obj = loads_fn(json_str)
     else:
-        sys.stderr.write("Error: Either --entries-file or --json must be provided.\n")
+        _ = sys.stderr.write(
+            "Error: Either --entries-file or --json must be provided.\n"
+        )
         sys.exit(2)
 
+    if not _is_dict(raw_obj):
+        return {}
+
     # Handle wrapper object {"entries": {...}} or direct {...}
-    if "entries" in raw_dict and isinstance(raw_dict["entries"], dict):
-        raw_entries = raw_dict["entries"]
-    else:
-        raw_entries = raw_dict
+    entries_val = raw_obj.get("entries")
+    raw_entries = entries_val if _is_dict(entries_val) else raw_obj
 
     result: dict[str, list[str]] = {}
     for k, v in raw_entries.items():
-        if isinstance(v, list):
+        if _is_list(v):
             result[str(k)] = [str(item) for item in v]
     return result
 
 
-def handle_prepare(args: argparse.Namespace) -> int:
+def handle_prepare(args: CliArgs) -> int:
     """Execute prepare subcommand."""
     repo_path: Path = args.repo.resolve()
     if not repo_path.is_dir():
-        sys.stderr.write(f"Error: Repository path does not exist: {repo_path}\n")
+        _ = sys.stderr.write(f"Error: Repository path does not exist: {repo_path}\n")
         return 2
 
     source_type = "unknown"
@@ -210,10 +238,12 @@ def handle_prepare(args: argparse.Namespace) -> int:
             diff_stat = get_diff_stat(repo_path, staged=True)
             diff_snippet = get_diff_snippet(repo_path, staged=True)
         else:
-            sys.stderr.write("Error: Specify --range, --pr, or --staged for prepare.\n")
+            _ = sys.stderr.write(
+                "Error: Specify --range, --pr, or --staged for prepare.\n"
+            )
             return 2
     except RuntimeError as err:
-        sys.stderr.write(f"Runtime error: {err}\n")
+        _ = sys.stderr.write(f"Runtime error: {err}\n")
         return 1
 
     # Deduplicate affected files
@@ -246,19 +276,19 @@ def handle_prepare(args: argparse.Namespace) -> int:
         diff_snippet=diff_snippet,
     )
 
-    sys.stdout.write(json.dumps(context.to_dict(), indent=2) + "\n")
+    _ = sys.stdout.write(json.dumps(context.to_dict(), indent=2) + "\n")
     return 0
 
 
-def handle_format(args: argparse.Namespace) -> int:
+def handle_format(args: CliArgs) -> int:
     """Execute format subcommand."""
     entries = load_entries_payload(args.entries_file, args.json_str)
     output = format_entries_markdown(entries, include_header=args.header)
-    sys.stdout.write(output + "\n")
+    _ = sys.stdout.write(output + "\n")
     return 0
 
 
-def handle_patch(args: argparse.Namespace) -> int:
+def handle_patch(args: CliArgs) -> int:
     """Execute patch subcommand."""
     repo_path: Path = args.repo.resolve()
     entries = load_entries_payload(args.entries_file, args.json_str)
@@ -279,7 +309,7 @@ def handle_patch(args: argparse.Namespace) -> int:
             target_path.read_text(encoding="utf-8") if target_path.is_file() else ""
         )
         patched, changed = patch_changelog_content(original, entries)
-        sys.stdout.write(
+        _ = sys.stdout.write(
             json.dumps(
                 {
                     "ok": True,
@@ -294,7 +324,7 @@ def handle_patch(args: argparse.Namespace) -> int:
         return 0
 
     changed = patch_changelog_file(target_path, entries)
-    sys.stdout.write(
+    _ = sys.stdout.write(
         json.dumps(
             {
                 "ok": True,
@@ -319,15 +349,14 @@ def handle_status() -> int:
         },
         "python_version": sys.version,
     }
-    sys.stdout.write(json.dumps(status_data, indent=2) + "\n")
+    _ = sys.stdout.write(json.dumps(status_data, indent=2) + "\n")
     return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Execute main CLI entrypoint."""
     parser = build_parser()
-    args = parser.parse_args(argv)
-
+    args = parser.parse_args(argv, namespace=CliArgs())
     if args.command == "prepare":
         return handle_prepare(args)
     if args.command == "format":

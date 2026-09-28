@@ -75,7 +75,7 @@ def patch_changelog_content(
             if merged:
                 merged_entries[cat] = merged
 
-    # Any other categories in either
+    # Remaining categories in either
     all_other_cats = set(parsed.entries.keys()).union(new_entries.keys()) - set(
         CATEGORIES
     )
@@ -95,9 +95,9 @@ def patch_changelog_content(
 
         # Strip trailing blank lines from 'before' and leading blank lines from 'after'
         while before and not before[-1].strip():
-            before.pop()
+            _ = before.pop()
         while after and not after[0].strip():
-            after.pop(0)
+            _ = after.pop(0)
 
         assembled_parts: list[str] = []
         if before:
@@ -121,7 +121,7 @@ def patch_changelog_content(
         before = lines[:insert_idx]
         after = lines[insert_idx:]
         while before and not before[-1].strip():
-            before.pop()
+            _ = before.pop()
         assembled_parts = [
             "\n".join(before),
             formatted_unreleased,
@@ -147,6 +147,6 @@ def patch_changelog_file(
 
     if changed:
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(new_content, encoding="utf-8")
+        _ = file_path.write_text(new_content, encoding="utf-8")
 
     return changed

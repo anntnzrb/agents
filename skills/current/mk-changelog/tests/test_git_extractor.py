@@ -50,14 +50,14 @@ def test_parse_bot_and_revert_commit():
 
 def test_git_repo_extraction(tmp_path: Path):
     # Initialize a temporary git repository
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
+    _ = subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    _ = subprocess.run(
         ["git", "config", "user.name", "Test User"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
         cwd=tmp_path,
         check=True,
@@ -66,11 +66,11 @@ def test_git_repo_extraction(tmp_path: Path):
 
     # Base commit
     f0 = tmp_path / "base.txt"
-    f0.write_text("base", encoding="utf-8")
-    subprocess.run(
+    _ = f0.write_text("base", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "base.txt"], cwd=tmp_path, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "chore: base"],
         cwd=tmp_path,
         check=True,
@@ -79,11 +79,11 @@ def test_git_repo_extraction(tmp_path: Path):
 
     # Commit 1
     f1 = tmp_path / "file1.txt"
-    f1.write_text("initial content", encoding="utf-8")
-    subprocess.run(
+    _ = f1.write_text("initial content", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "file1.txt"], cwd=tmp_path, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "feat: initial commit (#1)"],
         cwd=tmp_path,
         check=True,
@@ -92,11 +92,11 @@ def test_git_repo_extraction(tmp_path: Path):
 
     # Commit 2
     f2 = tmp_path / "file2.txt"
-    f2.write_text("another feature", encoding="utf-8")
-    subprocess.run(
+    _ = f2.write_text("another feature", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "file2.txt"], cwd=tmp_path, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "fix(core): fix buffer overflow (#2)"],
         cwd=tmp_path,
         check=True,

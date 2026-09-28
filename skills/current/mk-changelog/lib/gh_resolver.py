@@ -4,10 +4,10 @@ import json
 import re
 import shutil
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TypeIs
 
 from git_extractor import CONVENTIONAL_REGEX
 from models import CONVENTIONAL_TYPE_MAP, CommitInfo
@@ -18,7 +18,15 @@ PR_URL_REGEX: re.Pattern[str] = re.compile(
 )
 
 
-@dataclass(slots=True)
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
+
+def _is_list(obj: object) -> TypeIs[list[object]]:
+    return isinstance(obj, list)
+
+
+@dataclass(frozen=True, slots=True)
 class PRMetadata:
     """Structured representation of GitHub PR details."""
 
@@ -72,30 +80,35 @@ def fetch_pr_metadata(pr_identifier: str, repo_path: Path) -> PRMetadata:
         ["pr", "view", pr_clean, f"--json={fields}"],
         repo_path,
     )
-    data: dict[str, Any] = json.loads(output)
+    loads_fn: Callable[..., object] = json.loads
+    raw_data = loads_fn(output)
+    if not _is_dict(raw_data):
+        msg = f"Unexpected JSON payload from gh pr view: {output}"
+        raise RuntimeError(msg)
 
-    author_val = data.get("author", {})
+    author_val = raw_data.get("author")
     author_login = (
-        author_val.get("login", "unknown")
-        if isinstance(author_val, dict)
-        else "unknown"
+        str(author_val.get("login", "unknown")) if _is_dict(author_val) else "unknown"
     )
 
     files_list: list[str] = []
-    raw_files = data.get("files", [])
-    if isinstance(raw_files, list):
+    raw_files = raw_data.get("files")
+    if _is_list(raw_files):
         for f in raw_files:
-            if isinstance(f, dict) and "path" in f:
+            if _is_dict(f) and "path" in f:
                 files_list.append(str(f["path"]))
 
+    raw_num = raw_data.get("number", 0)
+    num = int(raw_num) if isinstance(raw_num, (int, str)) else 0
+
     return PRMetadata(
-        number=int(data.get("number", 0)),
-        title=str(data.get("title", "")),
-        body=str(data.get("body", "")),
+        number=num,
+        title=str(raw_data.get("title", "")),
+        body=str(raw_data.get("body", "")),
         author=author_login,
-        url=str(data.get("url", "")),
-        base_ref=str(data.get("baseRefName", "")),
-        head_ref=str(data.get("headRefName", "")),
+        url=str(raw_data.get("url", "")),
+        base_ref=str(raw_data.get("baseRefName", "")),
+        head_ref=str(raw_data.get("headRefName", "")),
         files=files_list,
     )
 
