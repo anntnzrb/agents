@@ -22,6 +22,7 @@ from autommit.client import HttpResponse
 from autommit.errors import CancelledError
 from autommit.fallback import CommitWork, _rung_plumbing
 from autommit.inventory import (
+    MAX_DIFF_LINE_CHARS,
     PLAN_SYSTEM,
     CriticEvidence,
     PlannerEvidence,
@@ -210,6 +211,55 @@ class OrchestratorTests(_Sandbox):
         self.assertEqual(
             (self.repo / "tracked.txt").read_text(encoding="utf-8"), "changed\n"
         )
+
+    def test_orchestrated_commit_applies_full_content_for_truncated_line(
+        self,
+    ) -> None:
+        full_content = "bundle=" + "x" * 50_000 + "\n"
+        _ = (self.repo / "bundle.js").write_text(full_content, encoding="utf-8")
+        _ = self.git("add", "bundle.js")
+
+        seen_prompts: list[str] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            if "Independent atomicity critic" in _system_of(payload):
+                return _model_reply(
+                    {
+                        "decision": "accept",
+                        "concerns": [],
+                        "rationale": "Single bundle.",
+                    }
+                )
+            seen_prompts.append(json.dumps(payload))
+            plan = {
+                "commits": [
+                    {
+                        "summary": "Add minified bundle",
+                        "details": [],
+                        "dependencies": [],
+                        "changes": [
+                            {
+                                "path": "bundle.js",
+                                "hunks": {"type": "indices", "indices": [1]},
+                            }
+                        ],
+                    }
+                ]
+            }
+            return _model_reply(plan)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(), "Add minified bundle"
+        )
+        self.assertEqual(len(seen_prompts), 1)
+        self.assertIn("chars elided]", seen_prompts[0])
+        self.assertEqual(
+            (self.repo / "bundle.js").read_text(encoding="utf-8"), full_content
+        )
+        committed = self.git("show", "HEAD:bundle.js")
+        self.assertEqual(committed, full_content)
 
     def test_planner_correction_feeds_the_validation_error(self) -> None:
         self.stage()
@@ -695,6 +745,41 @@ class ProgressAndEfficiencyTests(_Sandbox):
         self.assertIn("-line 39\n", trimmed)
         self.assertNotIn("-line 40\n", trimmed)
         self.assertIn("[160 more deleted line(s) omitted]", trimmed)
+
+    def test_planner_diff_truncates_long_diff_content_lines(self) -> None:
+        initial = "initial " + "a" * 50_000 + "\n"
+        _ = (self.repo / "minified.js").write_text(initial, encoding="utf-8")
+        _ = self.git("add", "minified.js")
+        _ = self.git("commit", "-m", "add minified")
+
+        updated = "updated " + "b" * 50_000 + "\n"
+        _ = (self.repo / "minified.js").write_text(updated, encoding="utf-8")
+        _ = self.git("add", "minified.js")
+
+        raw_diff = self.git("diff", "--cached")
+        trimmed = planner_diff(raw_diff, frozenset())
+
+        raw_lines = raw_diff.split("\n")
+        trimmed_lines = trimmed.split("\n")
+        self.assertEqual(len(trimmed_lines), len(raw_lines))
+
+        self.assertIn("diff --git a/minified.js b/minified.js\n", trimmed)
+        self.assertIn("--- a/minified.js\n", trimmed)
+        self.assertIn("+++ b/minified.js\n", trimmed)
+        self.assertIn("@@ -1 +1 @@\n", trimmed)
+
+        long_lines = [
+            line
+            for line in trimmed_lines
+            if line.startswith(("-", "+")) and not line.startswith(("---", "+++"))
+        ]
+        self.assertTrue(long_lines)
+        for line in long_lines:
+            self.assertIn("chars elided]", line)
+            marker_start = line.index("… [")
+            self.assertLessEqual(marker_start, MAX_DIFF_LINE_CHARS)
+            elision_marker = line[marker_start:]
+            self.assertLessEqual(len(line), MAX_DIFF_LINE_CHARS + len(elision_marker))
 
 
 class PlumbingRungTests(_Sandbox):

@@ -20,6 +20,7 @@ There is no cap on commits, changes per commit, details, or dependencies. The mo
 | Path length | 4,096 | Operating-system path limit |
 | Concern and rationale length | 512 and 2,048 | Bounds one critic response |
 | Critic diff | 256 KiB | Bounds planner and critic context; truncation is disclosed to the critic |
+| Diff line length | 2,000 | Bounds minified single-line files in planner diff; prefix preserves intent without blowing context |
 | Plan or decision file | 1 MiB | Replaces commit counting as the pathological-input valve; exceeding it fails as `invalid_file` |
 
 Structural validation, not counting, carries the safety: exact-once coverage, disjoint selections, dependency cycle rejection, snapshot binding, temporary-worktree apply, tree equality, compare-and-swap creation, and the operation lock.

@@ -83,6 +83,8 @@ BEGIN_DIFF: Final[str] = "----- BEGIN CACHED DIFF -----"
 END_DIFF: Final[str] = "----- END CACHED DIFF -----"
 # a deleted file is selected whole; its head is enough to say what it was
 MAX_DELETED_LINES: Final[int] = 40
+# minified single-line files blow planner context; prefix gives enough intent
+MAX_DIFF_LINE_CHARS: Final[int] = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,12 +229,36 @@ def _deleted_head(content: str) -> str:
     return "\n".join([*kept, f"[{omitted} more deleted line(s) omitted]"])
 
 
+def _truncate_diff_lines(content: str) -> str:
+    lines = content.split("\n")
+    in_hunk = False
+    result: list[str] = []
+    for line in lines:
+        if line.startswith("diff --git "):
+            in_hunk = False
+            result.append(line)
+        elif line.startswith("@@"):
+            in_hunk = True
+            result.append(line)
+        elif in_hunk and line[:1] in ("+", "-", " "):
+            if len(line) > MAX_DIFF_LINE_CHARS:
+                elided = len(line) - MAX_DIFF_LINE_CHARS
+                result.append(f"{line[:MAX_DIFF_LINE_CHARS]}… [{elided} chars elided]")
+            else:
+                result.append(line)
+        else:
+            result.append(line)
+    return "\n".join(result)
+
+
 def planner_diff(diff: str, drop: frozenset[str]) -> str:
-    """Render the model's diff: drop `drop` paths and keep only deletion heads."""
+    """Render the model's diff: drop `drop` paths, bound line lengths, and keep deletion heads."""
     return "\n".join(
-        _deleted_head(file.content)
-        if "\ndeleted file mode " in file.content
-        else file.content
+        _truncate_diff_lines(
+            _deleted_head(file.content)
+            if "\ndeleted file mode " in file.content
+            else file.content
+        )
         for file in parse_file_diffs(diff)
         if file.filename not in drop
     )
