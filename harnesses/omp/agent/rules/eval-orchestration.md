@@ -28,7 +28,7 @@ Choose libraries for the analysis, not as substitutes for specialized tools. Pre
 | **PDF & Document Extraction** | `pymupdf` | High-speed text/table extraction (`find_tables()`), layout & page rendering |
 | **Fuzzy Matching & Search** | `rapidfuzz` | `process.extract()`, Levenshtein distance, typo tolerance, error clustering |
 | **Dependency Graphs & Blast Radius** | `networkx` | Architectures, import/call graphs, cycle detection, shortest paths |
-| **HTTP & API Fetching** | `httpx` | Async/sync REST requests and structured JSON payload retrieval |
+| **HTTP & API Fetching** | `httpx2` | Sync/async REST requests (`httpx2.Client`/`AsyncClient`, HTTP/2) and structured JSON payload retrieval |
 | **Syntax, AST & Diffs** | `ast` / `difflib` | AST inspection/transforms, unified diffs, sequence matching (stdlib) |
 | **Sequences & Buffers** | `itertools` / `collections` | Combinatorics, chunking, `Counter` histograms, `deque` buffers (stdlib) |
 
