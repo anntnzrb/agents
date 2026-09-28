@@ -53,6 +53,9 @@ Check `package.json` `"type"`; `module` / `moduleResolution`; default-import ver
 ### Missing declarations for a dependency
 Options: install matching `@types/*`; add a narrow local `*.d.ts`; wrap the dependency behind a typed adapter. Prefer the narrowest declaration that unblocks the task.
 
+### Plain JavaScript runtime and semantics failures
+For `require is not defined`, `__dirname` missing in ESM, `this` losing receiver, closures capturing stale loop state, event-loop task/microtask ordering, Node stream pipelines, or DOM observer leaks, see `references/javascript.md`.
+
 ## JS to TS migration
 1. Enable `allowJs`.
 2. Enable `checkJs` if the repo can absorb it.

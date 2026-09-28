@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Use when writing TypeScript, editing .ts/.tsx files, resolving type errors, tsconfig, or Bun/tsc tooling."
+description: "Use when writing TypeScript or JavaScript, .ts/.tsx/.js/.mjs files, Node.js, Bun, tsconfig, ESM/CJS, or type errors."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -13,10 +13,11 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 
 ## Activation triggers
 
-- `.ts`, `.tsx`, `.mts`, `.cts`, `tsconfig*.json`, declaration files
+- `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `tsconfig*.json`, declaration files
 - Type errors, `tsc`, `tsx`, `vitest`, `jest`, `biome`, `eslint`, `@types`
 - Node, Bun, Vite, Next.js, CLIs, libraries, workspaces, project references
 - ESM/CJS interop, path aliases, module resolution, JS-to-TS migration
+- Plain JS semantics: closures, `this` binding, prototypes, event loop, streams, DOM
 
 ## Workflow
 
@@ -63,6 +64,7 @@ Type-safe design. Runtime-aware config. One-shot validation. Minimal config chur
 - Use `rg` for repository discovery and `ast-grep` for structural search when it makes the question cheaper to answer
 - Keep tsconfig changes narrow. Do not strictify a repo unless asked
 - Use one-shot diagnostics. No watch servers for validation
+- For plain JavaScript or runtime-specific bugs, debug language semantics first: coercion, equality, this binding, closures, prototype chain, and event-loop microtask/macrotask ordering before architecture
 
 ## Related skills
 
@@ -103,6 +105,7 @@ echo "$PM"
 |Stack-specific implementation references|`references/advanced/README.md`, then its matching reference|A task needs a detailed framework, strict config, boundary modeling, or bootstrap recipe. Repository policy and existing tooling take precedence|
 |Code-structure or logging review|`references/advanced/engineering/code-smells.md`, `references/advanced/engineering/logging.md`|Reviewing structure or observability beyond TypeScript-specific mechanics|
 |Starter compiler config|`assets/tsconfig-bundler.json`, `assets/tsconfig-nodenext.json`|Creating a new matching config|
+|Plain JS semantics, runtime APIs, event loop, ESM/CJS|`references/javascript.md`|Working with .js/.mjs/.cjs files, prototype/closure/this bugs, event loop, Node streams/workers, or DOM observers|
 
 ## Research commands
 

@@ -101,6 +101,30 @@
         "The answer does not move Effect runners into services or business logic merely to remove async syntax",
         "Repository typecheck, tests, lint, Effect diagnostics, and a framework-specific structural review remain distinct readiness evidence"
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "This JavaScript bug is strange: a button click handler logs stale state from an outer loop, a resolved Promise callback executes before setTimeout(..., 0), and a method passed as a callback loses its this context. Explain the root causes and provide a minimal patch.",
+      "expected_output": "A semantics-first diagnosis and working fix covering closure lexical capture across loop iterations, microtask vs macrotask execution ordering, and call-site this binding.",
+      "files": [],
+      "expectations": [
+        "The answer explains closures capture live variable bindings rather than values at creation",
+        "The answer explains the event loop order where microtask queues (Promise.then) drain before macrotasks (setTimeout)",
+        "The answer explains how passing an object method loses receiver context and fixes it with an arrow function wrapper or .bind()",
+        "The patch addresses the root semantics issues with minimal changes"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "We have a Node.js repository using ESM with .js files. Refactor a large file processing script that currently reads the entire file into memory with readFile to use async streaming with backpressure and AbortController cancellation. Also explain how to access __dirname in this ESM file.",
+      "expected_output": "Implements streaming via pipeline from node:stream/promises, wires AbortController signal for cancellation, and uses fileURLToPath(import.meta.url) with dirname for ESM directory resolution.",
+      "files": [],
+      "expectations": [
+        "The answer uses pipeline from node:stream/promises or stream iterators for proper backpressure and error handling",
+        "The answer attaches AbortController or AbortSignal to cancel in-flight stream processing",
+        "The answer explains that __dirname is not available in Node ESM and derives it using fileURLToPath(import.meta.url) and dirname",
+        "The solution avoids buffering large payloads in memory"
+      ]
     }
   ]
 }
