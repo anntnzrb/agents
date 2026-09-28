@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date
 from pathlib import Path
 
@@ -7,7 +5,7 @@ import pytest
 
 from flight_live.models import FlightLiveError
 from flight_live.providers import (
-    _ensure_agent_browser_available,  # pyright: ignore[reportPrivateUsage] - tests exercise the nix-guard directly
+    ensure_agent_browser_available,
     fetch_kiwi_web_calendar,
     parse_kiwi_price_buttons,
 )
@@ -84,7 +82,7 @@ def test_fetch_kiwi_calendar_with_monkeypatched_sources(
 def test_provider_hard_error_when_nix_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _ensure_agent_browser_available.cache_clear()
+    ensure_agent_browser_available.cache_clear()
 
     def fake_which(_: str) -> None:
         return None
@@ -92,6 +90,6 @@ def test_provider_hard_error_when_nix_missing(
     monkeypatch.setattr("flight_live.providers.shutil.which", fake_which)
 
     with pytest.raises(FlightLiveError, match="requires `nix` in PATH"):
-        _ensure_agent_browser_available()
+        ensure_agent_browser_available()
 
-    _ensure_agent_browser_available.cache_clear()
+    ensure_agent_browser_available.cache_clear()

@@ -1,9 +1,10 @@
 """Assembled search payloads, insights, and decisions for flight-live."""
 
-from __future__ import annotations
-
 from statistics import mean
 from typing import TYPE_CHECKING, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from .models import (
     FlightLiveError,
@@ -12,10 +13,6 @@ from .models import (
     ResolvedPlace,
     SearchRequest,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
 from .providers import fetch_kiwi_web_calendar, resolve_place
 from .scoring import rank_options
 

@@ -1,15 +1,13 @@
 """Command-line interface for flight-live search."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
 from datetime import date
-from typing import TYPE_CHECKING, TextIO, cast
+from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 from .models import (
     CabinClass,
@@ -133,13 +131,13 @@ def _run_search(
             destination=_req_str(args, "destination"),
             depart_start=_req_date(args, "depart_start"),
             depart_end=_req_date(args, "depart_end"),
-            trip_type=cast("TripType", _req_str(args, "trip_type")),
+            trip_type=_req_trip_type(args),
             stay_min=_opt_int_or_none(args, "stay_min"),
             stay_max=_opt_int_or_none(args, "stay_max"),
             adults=_req_int(args, "adults"),
             children=_req_int(args, "children"),
             infants=_req_int(args, "infants"),
-            cabin=cast("CabinClass", _req_str(args, "cabin")),
+            cabin=_req_cabin(args),
             currency=_req_str(args, "currency"),
             locale=_req_str(args, "locale"),
             market=_req_str(args, "market"),
@@ -174,9 +172,36 @@ def _parse_args(
         return None, _exit_code(exc.code)
 
 
+def _req_trip_type(args: argparse.Namespace) -> TripType:
+    raw = _req_str(args, "trip_type")
+    match raw:
+        case "oneway" | "roundtrip" as val:
+            return val
+        case other:
+            msg = f"Invalid trip_type: {other}."
+            raise ValueError(msg)
+
+
+def _req_cabin(args: argparse.Namespace) -> CabinClass:
+    raw = _req_str(args, "cabin")
+    match raw:
+        case "economy" | "premium_economy" | "business" | "first" as val:
+            return val
+        case other:
+            msg = f"Invalid cabin: {other}."
+            raise ValueError(msg)
+
+
+_getattr: Callable[[object, str], object] = getattr
+
+
+def _get_arg(args: argparse.Namespace, field: str) -> object:
+    return _getattr(args, field)
+
+
 def _req_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     if not isinstance(value, str) or value == "":
         message = f"Missing required argument: {field}."
         raise ValueError(message)
@@ -185,7 +210,7 @@ def _req_str(args: argparse.Namespace, field: str) -> str:
 
 def _req_date(args: argparse.Namespace, field: str) -> date:
     """Narrow a required date argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     if not isinstance(value, date):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -194,7 +219,7 @@ def _req_date(args: argparse.Namespace, field: str) -> date:
 
 def _req_int(args: argparse.Namespace, field: str) -> int:
     """Narrow a required integer argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     if not isinstance(value, int) or isinstance(value, bool):
         message = f"Invalid integer argument: {field}."
         raise TypeError(message)
@@ -203,31 +228,31 @@ def _req_int(args: argparse.Namespace, field: str) -> int:
 
 def _flag(args: argparse.Namespace, field: str) -> bool:
     """Narrow a boolean flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     return value if isinstance(value, bool) else False
 
 
 def _opt_str_or_none(args: argparse.Namespace, field: str) -> str | None:
     """Narrow an optional string argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     return value if isinstance(value, str) else None
 
 
 def _opt_date_or_none(args: argparse.Namespace, field: str) -> date | None:
     """Narrow an optional date argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     return value if isinstance(value, date) else None
 
 
 def _opt_int_or_none(args: argparse.Namespace, field: str) -> int | None:
     """Narrow an optional integer argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     return value if isinstance(value, int) else None
 
 
 def _opt_float_or_none(args: argparse.Namespace, field: str) -> float | None:
     """Narrow an optional float argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = _get_arg(args, field)
     return value if isinstance(value, float) else None
 
 

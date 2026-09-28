@@ -1,22 +1,29 @@
 """Kiwi and agent-browser providers for flight-live."""
 
-from __future__ import annotations
-
+import http.client
 import json
 import re
 import shutil
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import date, timedelta
 from functools import lru_cache
-from typing import TYPE_CHECKING, cast
-from urllib.parse import quote_plus, urlencode
-from urllib.request import Request, urlopen
+from typing import TypeIs
+from urllib.parse import quote_plus, urlencode, urlsplit
 
 from .models import FlightLiveError, MissingExecutableError, PlannerOffer, ResolvedPlace
 
-if TYPE_CHECKING:
-    import http.client
+_getattr: Callable[[object, str], object] = getattr
+_json_loads: Callable[[str], object] = json.loads
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 _IATA_RE = re.compile(r"^[A-Za-z]{3}$")
 
@@ -310,20 +317,18 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
     }
 
     payload = _http_get_json(_KIWI_LOCATIONS_URL, params=params)
-    if not isinstance(payload, Mapping):
+    if not _is_str_mapping(payload):
         message = "Kiwi locations endpoint returned non-object payload"
         raise FlightLiveError(message)
-    data = cast("Mapping[str, object]", payload)
-    locations = data.get("locations")
-    if not isinstance(locations, list) or not locations:
+    locations = payload.get("locations")
+    if not _is_object_list(locations) or not locations:
         message = f"Could not resolve location on Kiwi: {term}"
         raise FlightLiveError(message)
-    first_raw = cast("object", locations[0])
-    if not isinstance(first_raw, Mapping):
+    first_raw = locations[0]
+    if not _is_str_mapping(first_raw):
         message = f"Could not parse location payload for: {term}"
         raise FlightLiveError(message)
-    first = cast("Mapping[str, object]", first_raw)
-
+    first = first_raw
     code = first.get("code")
     if not isinstance(code, str) or _IATA_RE.fullmatch(code) is None:
         message = f"Could not resolve IATA code for: {term}"
@@ -331,12 +336,10 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 
     city = first.get("city")
     city_slug: str | None = None
-    if isinstance(city, Mapping):
-        city_data = cast("Mapping[str, object]", city)
-        raw_city_slug = city_data.get("slug")
+    if _is_str_mapping(city):
+        raw_city_slug = city.get("slug")
         if isinstance(raw_city_slug, str) and raw_city_slug.strip() != "":
             city_slug = raw_city_slug.strip()
-
     fallback_slug = first.get("slug")
     if city_slug is None:
         if isinstance(fallback_slug, str) and fallback_slug.strip() != "":
@@ -356,7 +359,8 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 
 
 @lru_cache(maxsize=1)
-def _ensure_agent_browser_available() -> None:
+def ensure_agent_browser_available() -> None:
+    """Ensure the agent-browser Nix flake can be run."""
     if shutil.which("nix") is None:
         message = (
             "Kiwi web scraper requires `nix` in PATH. Install Nix, then run: "
@@ -366,7 +370,7 @@ def _ensure_agent_browser_available() -> None:
 
     version_cmd = ["nix", "run", _AGENT_BROWSER_FLAKE, "--", "--version"]
     try:
-        result = subprocess.run(  # noqa: S603 - controlled nix/agent-browser toolchain invocation
+        result = subprocess.run(
             version_cmd,
             check=False,
             shell=False,
@@ -395,6 +399,9 @@ def _ensure_agent_browser_available() -> None:
         raise FlightLiveError(message)
 
 
+_ensure_agent_browser_available = ensure_agent_browser_available
+
+
 def _safe_close_agent_browser() -> None:
     try:
         _ = _run_agent_browser(["close"], timeout=45)
@@ -414,7 +421,7 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
     last_error: FlightLiveError | None = None
     for attempt in range(2):
         try:
-            completed = subprocess.run(  # noqa: S603 - controlled nix/agent-browser toolchain invocation
+            completed = subprocess.run(
                 cmd,
                 check=True,
                 shell=False,
@@ -431,8 +438,8 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
                 + "Retry with a narrower date window or better connectivity."
             )
         except subprocess.CalledProcessError as exc:
-            raw_stderr = cast("object", exc.stderr)
-            raw_stdout = cast("object", exc.stdout)
+            raw_stderr = _getattr(exc, "stderr")
+            raw_stdout = _getattr(exc, "stdout")
             stderr_text = (
                 raw_stderr.strip()[:320] if isinstance(raw_stderr, str) else ""
             )
@@ -465,21 +472,21 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
 def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
     """Fetch a JSON document from a provider endpoint."""
     query = urlencode({key: str(value) for key, value in params.items()})
-    request = Request(  # noqa: S310 - Kiwi API client; URL is a module constant plus encoded params
-        f"{url}?{query}",
-        headers={
-            "User-Agent": "flight-live/0.1",
-            "Accept": "application/json",
-        },
-    )
-
+    parsed = urlsplit(url)
+    target_path = f"{parsed.path}?{query}" if query else parsed.path
+    headers = {
+        "User-Agent": "flight-live/0.1",
+        "Accept": "application/json",
+    }
     try:
-        with urlopen(  # noqa: S310 - Kiwi API client over https
-            request, timeout=20
-        ) as raw_response:  # pyright: ignore[reportAny] - typeshed types urlopen() as Any
-            response = cast("http.client.HTTPResponse", raw_response)
-            status = cast("int", getattr(response, "status", 200))
+        conn = http.client.HTTPSConnection(parsed.netloc, timeout=20)
+        try:
+            conn.request("GET", target_path, headers=headers)
+            response = conn.getresponse()
+            status = response.status
             body = response.read().decode("utf-8", errors="replace")
+        finally:
+            conn.close()
     except OSError as exc:
         message = f"Network error calling provider {url}: {exc}"
         raise FlightLiveError(message) from exc
@@ -489,7 +496,9 @@ def _http_get_json(url: str, *, params: Mapping[str, object]) -> object:
         raise FlightLiveError(message)
 
     try:
-        return cast("object", json.loads(body))
+        data = _json_loads(body)
     except json.JSONDecodeError as exc:
         message = f"Invalid JSON from provider {url}"
         raise FlightLiveError(message) from exc
+    else:
+        return data

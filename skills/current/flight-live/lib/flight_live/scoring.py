@@ -1,14 +1,11 @@
 """Score and rank flight options for flight-live."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import date
 
     from .models import FlightOption
-
 
 _WEEKEND_START_WEEKDAY = 4
 

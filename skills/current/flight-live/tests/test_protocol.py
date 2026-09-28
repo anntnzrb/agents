@@ -1,12 +1,15 @@
-from __future__ import annotations
-
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 
 from flight_live.models import PlannerOffer, ResolvedPlace, SearchRequest
 from flight_live.protocol import get_schema_document, search_flights
 from flight_live.providers import parse_kiwi_price_buttons
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
 
 if TYPE_CHECKING:
     import pytest
@@ -101,12 +104,17 @@ def test_schema_has_expected_rpc_commands() -> None:
 
     assert schema["type"] == "flight-live.schema"
     assert schema["version"] == "1"
-    rpc = cast("dict[str, object]", schema["rpc"])
-    assert sorted(cast("list[str]", rpc["commands"])) == [
+    rpc = schema["rpc"]
+    assert _is_str_dict(rpc)
+    commands = rpc["commands"]
+    assert _is_str_dict(commands)
+    assert sorted(commands) == [
         "get_schema",
         "ping",
         "search",
     ]
-    capabilities = cast("dict[str, object]", schema["capabilities"])
-    credentials = cast("dict[str, object]", capabilities["credentials"])
+    capabilities = schema["capabilities"]
+    assert _is_str_dict(capabilities)
+    credentials = capabilities["credentials"]
+    assert _is_str_dict(credentials)
     assert credentials["required"] == []

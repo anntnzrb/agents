@@ -1,16 +1,48 @@
 """JSON-RPC request handling for flight-live."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Mapping
 from datetime import date
-from typing import Literal, NotRequired, TextIO, TypedDict, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    NotRequired,
+    TextIO,
+    TypedDict,
+    TypeIs,
+    overload,
+)
 
-from .models import FlightLiveError, SearchRequest
+if TYPE_CHECKING:
+    from collections.abc import Callable
+from .models import CabinClass, FlightLiveError, SearchRequest, TripType
 from .protocol import PROTOCOL_VERSION, get_schema_document, search_flights
 
-RequestId = str | int | float | None
+type RequestId = str | int | float | None
+
+_json_loads: Callable[[str], object] = json.loads
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
+
+
+def _parse_trip_type(raw: str) -> TripType:
+    match raw:
+        case "oneway" | "roundtrip" as val:
+            return val
+        case other:
+            msg = f"Invalid trip_type: {other}."
+            raise ValueError(msg)
+
+
+def _parse_cabin(raw: str) -> CabinClass:
+    match raw:
+        case "economy" | "premium_economy" | "business" | "first" as val:
+            return val
+        case other:
+            msg = f"Invalid cabin: {other}."
+            raise ValueError(msg)
 
 
 class RpcErrorPayload(TypedDict):
@@ -58,7 +90,7 @@ def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
 def handle_rpc_line(line: str) -> RpcResponse:
     """Handle one JSON-RPC request line."""
     try:
-        payload = cast("object", json.loads(line))
+        payload = _json_loads(line)
     except json.JSONDecodeError:
         return _error_response(
             command="unknown",
@@ -66,14 +98,14 @@ def handle_rpc_line(line: str) -> RpcResponse:
             message="Invalid JSON request.",
         )
 
-    if not isinstance(payload, Mapping):
+    if not _is_str_mapping(payload):
         return _error_response(
             command="unknown",
             code="parse_error",
             message="JSON request must be an object.",
         )
 
-    request = cast("Mapping[str, object]", payload)
+    request = payload
     request_id = _read_request_id(request.get("id"))
 
     try:
@@ -164,13 +196,13 @@ def _parse_search_request(request: Mapping[str, object]) -> SearchRequest:
         destination=destination,
         depart_start=depart_start,
         depart_end=depart_end,
-        trip_type=cast("Literal['oneway', 'roundtrip']", trip_type),
+        trip_type=_parse_trip_type(trip_type),
         stay_min=_read_int(request, "stayMin", "stay_min", default=None, minimum=0),
         stay_max=_read_int(request, "stayMax", "stay_max", default=None, minimum=0),
         adults=_read_int(request, "adults", "adults", default=1, minimum=1),
         children=_read_int(request, "children", "children", default=0, minimum=0),
         infants=_read_int(request, "infants", "infants", default=0, minimum=0),
-        cabin=cast("Literal['economy', 'premium_economy', 'business', 'first']", cabin),
+        cabin=_parse_cabin(cabin),
         currency=_read_str(request, "currency", "currency", default="USD"),
         locale=_read_str(request, "locale", "locale", default="en"),
         market=_read_str(request, "market", "market", default="us"),

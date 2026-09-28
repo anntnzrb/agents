@@ -1,15 +1,13 @@
 """Domain models for flight-live search requests and results."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from datetime import date
 
-TripType = Literal["oneway", "roundtrip"]
-CabinClass = Literal["economy", "premium_economy", "business", "first"]
+type TripType = Literal["oneway", "roundtrip"]
+type CabinClass = Literal["economy", "premium_economy", "business", "first"]
 
 
 class FlightLiveError(RuntimeError):
@@ -30,7 +28,7 @@ class ResolvedPlace:
     resolved_via_autocomplete: bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PlannerOffer:
     """One raw planner offer before scoring."""
 

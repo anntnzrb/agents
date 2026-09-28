@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date
 
 from flight_live.models import FlightOption
