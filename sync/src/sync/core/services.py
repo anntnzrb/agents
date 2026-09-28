@@ -126,7 +126,16 @@ WantedBy=timers.target
 def _gateway_units(sync_env: SyncEnv) -> list[UserUnit]:
     home = sync_env.home
     state = Path(home) / ".cli-proxy-api"
+    # The launcher pins the release; its digest in the unit makes a version
+    # bump change the unit, which is what triggers a restart.
+    launcher = Path(home) / ".local" / "bin" / "cli-proxy-api"
+    launcher_digest = (
+        hashlib.sha256(launcher.read_bytes()).hexdigest()[:16]
+        if launcher.is_file()
+        else "none"
+    )
     gateway = f"""\
+# launcher sha256 {launcher_digest}
 [Unit]
 Description=CLIProxyAPI gateway
 StartLimitIntervalSec=300

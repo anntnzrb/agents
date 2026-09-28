@@ -126,7 +126,7 @@ Sync installs and controls only the per-user services it declares: systemd user 
 Reconcile rules:
 
 - A declared unit or launch agent is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`. Services keep their pre-existing names so adoption replaces a hand-made service in place instead of starting a duplicate.
-- Sync touches the service manager only when a unit's content changes: on Linux it reloads systemd, enables timers, and enables and restarts long-running services; on macOS it unloads and reloads the changed launch agent. A unit without an `[Install]` section is left to the timer that starts it. A unit that reads an env file embeds a digest of it, so changing only the env file (a token rotation) still restarts the service.
+- Sync touches the service manager only when a unit's content changes: on Linux it reloads systemd, enables timers, and enables and restarts long-running services; on macOS it unloads and reloads the changed launch agent. A unit without an `[Install]` section is left to the timer that starts it. A unit that reads an env file embeds a digest of it, so changing only the env file (a token rotation) still restarts the service. The CLIProxyAPI gateway unit likewise embeds a digest of its `~/.local/bin/cli-proxy-api` launcher, so a new release restarts the gateway onto the new binary.
 - A unit sync owned but no longer declares is disabled, stopped, and deleted. Units sync never owned are left alone.
 - Every unit declares its own `PATH`, so services never depend on hand-made service-manager environment such as `~/.config/environment.d/`.
 - Service reconcile is best-effort: a host without a user service manager gets a warning, not a failed sync.

@@ -195,6 +195,23 @@ def test_gateway_units_only_on_gateway_host(home: Path) -> None:
     )
 
 
+def test_gateway_unit_changes_when_its_launcher_changes(home: Path) -> None:
+    """A new CLIProxyAPI release rewrites the launcher; the gateway must restart."""
+    (home / ".config" / "agents").mkdir(parents=True)
+    launcher = home / ".local" / "bin" / "cli-proxy-api"
+    launcher.parent.mkdir(parents=True)
+
+    def gateway_unit() -> str:
+        units = declared_user_units(_linux(home), gateway_host=True)
+        return next(u.content for u in units if u.name == "cliproxyapi.service")
+
+    _ = launcher.write_text("exec .../versions/8.0.2/cli-proxy-api\n")
+    old = gateway_unit()
+    _ = launcher.write_text("exec .../versions/8.0.3/cli-proxy-api\n")
+    assert gateway_unit() != old
+
+
+
 def test_auth_gateway_unit_changes_when_its_env_changes(home: Path) -> None:
     """A rotated token must restart the gateway, so the unit tracks its env."""
     (home / ".config" / "agents").mkdir(parents=True)
