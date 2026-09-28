@@ -19,7 +19,7 @@ Copy a file or stdin to the host clipboard using the OSC 52 escape sequence. Wor
 ## Public entrypoint
 
 ```text
-python3 <skill-dir>/scripts/cli.py [FILE]
+uv run --script <skill-dir>/scripts/cli.py [FILE]
 ```
 
 - `FILE`: optional path to copy. Reads from stdin if omitted.
@@ -29,13 +29,13 @@ python3 <skill-dir>/scripts/cli.py [FILE]
 
 ```text
 # copy a file
-python3 <skill-dir>/scripts/cli.py ./key.pem
+uv run --script <skill-dir>/scripts/cli.py ./key.pem
 
 # copy command output
-some-command | python3 <skill-dir>/scripts/cli.py
+some-command | uv run --script <skill-dir>/scripts/cli.py
 
 # copy stdin (type or paste, then Ctrl-D)
-python3 <skill-dir>/scripts/cli.py
+uv run --script <skill-dir>/scripts/cli.py
 ```
 
 ## Platform notes

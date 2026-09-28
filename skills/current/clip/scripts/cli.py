@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# ///
 # Copyright (c) 2026
 """Copy stdin or a file to the host clipboard via OSC 52."""
-
-from __future__ import annotations
 
 import argparse
 import base64
@@ -12,18 +14,22 @@ from pathlib import Path
 from typing import BinaryIO
 
 
-def arguments() -> argparse.Namespace:
+class _Args(argparse.Namespace):
+    file: str | None = None
+
+
+def arguments() -> _Args:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Copy stdin or a file to the host clipboard via OSC 52.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "file",
         nargs="?",
         metavar="FILE",
         help="file to copy; reads from stdin if omitted",
     )
-    return parser.parse_args()
+    return parser.parse_args(namespace=_Args())
 
 
 def read_input(path: str | None) -> bytes:
@@ -76,7 +82,7 @@ def main() -> int:
     args = arguments()
 
     if args.file is not None and not Path(args.file).is_file():
-        sys.stderr.write(f"clip: not a file: {args.file}\n")
+        _ = sys.stderr.write(f"clip: not a file: {args.file}\n")
         return 2
 
     data = read_input(args.file)
@@ -88,10 +94,10 @@ def main() -> int:
     osc = build_osc52(data, use_tmux_passthrough=use_tmux)
 
     try:
-        target.write(osc)
+        _ = target.write(osc)
         target.flush()
     except OSError as exc:
-        sys.stderr.write(f"clip: write failed: {exc}\n")
+        _ = sys.stderr.write(f"clip: write failed: {exc}\n")
         return 1
 
     return 0
