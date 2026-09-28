@@ -2,8 +2,6 @@
 # ruff: noqa: INP001
 """Deterministic HTTP response and request fakes for vals-live tests."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
@@ -11,7 +9,7 @@ if TYPE_CHECKING:
     from urllib.request import Request
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Response:
     """Represent one deterministic HTTP response."""
 
@@ -22,7 +20,7 @@ class Response:
 
     def __post_init__(self) -> None:
         """Normalize headers for case-insensitive lookup."""
-        self.headers = dict(self.headers or {})
+        object.__setattr__(self, "headers", dict(self.headers or {}))
 
     def __enter__(self) -> Self:
         """Enter the deterministic response context."""

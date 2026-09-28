@@ -1,23 +1,17 @@
 # Copyright 2026 Vals-live contributors.
 """Keep deterministic vals-live tests offline by default."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, NoReturn, Protocol, cast
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 import pytest
 
-import _path  # noqa: F401  # pyright: ignore[reportUnusedImport]
+import _path
 from vals_live import cache
 
-
-class _MarkedNode(Protocol):
-    """Structural hook for pytest marker lookup without importing internals."""
-
-    def get_closest_marker(self, name: str) -> object: ...
+_ = _path.ROOT
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -34,8 +28,10 @@ def deny_network(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
     """Reject transport access in every test except marked live smoke."""
-    node = cast("_MarkedNode", request.node)
-    if node.get_closest_marker("live_smoke") is not None:
+    getter: Callable[..., object] = getattr
+    node = getter(request, "node", None)
+    get_marker = getter(node, "get_closest_marker", None)
+    if callable(get_marker) and get_marker("live_smoke") is not None:
         yield
         return
 

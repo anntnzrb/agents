@@ -1,14 +1,12 @@
 # Copyright 2026 Vals-live contributors.
 """Stable wire and internal record contracts for vals-live."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
 SCHEMA_VERSION = "1"
 VALUE_STATUSES = ("published", "derived", "missing", "unparsed")
@@ -17,6 +15,12 @@ VALUE_STATUSES = ("published", "derived", "missing", "unparsed")
 def compact(value: object) -> str:
     """Serialize one finite, compact JSON value."""
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
+def safe_json_loads(text: str | bytes) -> object:
+    """Parse JSON text into a top-level object."""
+    loader: Callable[..., object] = json.loads
+    return loader(text)
 
 
 def success(command: str, data: Mapping[str, object]) -> dict[str, object]:
@@ -41,7 +45,7 @@ def failure(
     }
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Diagnostic:
     """Represent one structured source diagnostic."""
 
@@ -69,7 +73,7 @@ class Diagnostic:
         return value
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RawArtifact:
     """Retain immutable source bytes and their transport metadata."""
 
@@ -98,7 +102,7 @@ class RawArtifact:
         return f"vals:{self.release or 'snapshot'}:sha256:{digest}"
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ParsedDocument:
     """Represent one parsed source document and extraction lineage."""
 
@@ -113,7 +117,7 @@ class ParsedDocument:
     diagnostics: list[dict[str, object]] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Catalog:
     """Hold discovered benchmark and model catalog populations."""
 
@@ -126,7 +130,7 @@ class Catalog:
     diagnostics: list[Diagnostic] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RequestContext:
     """Describe one command's source and selector context."""
 

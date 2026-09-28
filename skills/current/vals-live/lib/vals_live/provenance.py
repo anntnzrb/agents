@@ -1,15 +1,17 @@
 # Copyright 2026 Vals-live contributors.
 """Artifact/value provenance projections."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 
 from .diagnostics import redact
 
 if TYPE_CHECKING:
     from .contracts import RawArtifact
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[object, object]]:
+    return isinstance(value, Mapping)
 
 
 def artifact_provenance(
@@ -54,8 +56,8 @@ def artifact_provenance(
             },
         }
     )
-    if isinstance(raw, Mapping):
-        return {str(k): v for k, v in cast("Mapping[object, object]", raw).items()}
+    if _is_mapping(raw):
+        return {str(k): v for k, v in raw.items()}
     return {}
 
 
@@ -83,8 +85,8 @@ def value_evidence(artifact: RawArtifact, **kwargs: object) -> dict[str, object]
         "artifact_id": artifact.artifact_id,
     }
     raw = redact(result)
-    if isinstance(raw, Mapping):
-        return {str(k): v for k, v in cast("Mapping[object, object]", raw).items()}
+    if _is_mapping(raw):
+        return {str(k): v for k, v in raw.items()}
     return {}
 
 

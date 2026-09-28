@@ -1,8 +1,6 @@
 # Copyright 2026 Vals-live contributors.
 """Runtime Vals version and snapshot-only release resolution."""
 
-from __future__ import annotations
-
 from .identity import release_identity
 
 

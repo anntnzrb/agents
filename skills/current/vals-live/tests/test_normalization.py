@@ -3,9 +3,10 @@
 
 import json
 import unittest
-from typing import cast
 
 from _path import FIXTURES
+from _path import as_dict as _as_dict
+from _path import as_list as _as_list
 from vals_live.contracts import ParsedDocument, RawArtifact
 from vals_live.extraction import extract_document
 from vals_live.normalization import (
@@ -46,7 +47,7 @@ class NormalizationTests(unittest.TestCase):
         assert result["normalized_value"] == 72.4
         assert result["unit"] == "percent"
         assert result["normalization"] == "removed_percent_sign"
-        evidence = cast("dict[str, object]", result["source_evidence"])
+        evidence = _as_dict(result["source_evidence"])
         assert evidence["source_path"] == "$.score"
         assert not diagnostics
 
@@ -61,7 +62,7 @@ class NormalizationTests(unittest.TestCase):
         )
         assert result["normalized_value"] is None
         assert result["metric_semantics_status"] == "ambiguous"
-        assert "NUMERIC_AMBIGUITY" in cast("list[object]", result["blocked_reasons"])
+        assert "NUMERIC_AMBIGUITY" in _as_list(result["blocked_reasons"])
         assert diagnostics[0]["code"] == "NUMERIC_AMBIGUITY"
 
     def test_placeholder_and_out_of_range(self) -> None:
@@ -103,7 +104,7 @@ class NormalizationTests(unittest.TestCase):
     def test_unknown_field_round_trip(self) -> None:
         document = self.document("pages/unknown-score.json")
         _catalog, rows, diagnostics, _metadata = parse(document)
-        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        raw = _as_dict(rows[0]["raw_fields"])
         assert raw["novel_quality_index"] == {"value": "17", "unit": "count"}
         assert any(item["code"] == "UNKNOWN_SCORE_SEMANTICS" for item in diagnostics)
 

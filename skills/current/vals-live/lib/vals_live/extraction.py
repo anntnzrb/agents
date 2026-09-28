@@ -1,8 +1,6 @@
 # Copyright 2026 Vals-live contributors.
 """Layered extraction for official Vals JSON, HTML, Astro and table payloads."""
 
-from __future__ import annotations
-
 import csv
 import io
 import json
@@ -10,9 +8,9 @@ import re
 from collections.abc import Mapping
 from html import unescape
 from html.parser import HTMLParser
-from typing import cast, override
+from typing import TypeIs, override
 
-from .contracts import ParsedDocument, RawArtifact
+from .contracts import ParsedDocument, RawArtifact, safe_json_loads
 from .diagnostics import make
 
 _ASTRO_ATTR = re.compile(
@@ -43,23 +41,29 @@ class ExtractionError(RuntimeError):
         self.details = details or {}
 
 
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[object, object]]:
+    return isinstance(value, Mapping)
+
+
 def _decode_astro(value: object) -> object:
-    if isinstance(value, list):
-        items = cast("list[object]", value)
-        if len(items) == _ASTRO_PAIR_LENGTH and isinstance(items[0], int):
-            return _decode_astro(items[1])
-        return [_decode_astro(item) for item in items]
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[object, object]", value)
-        return {str(key): _decode_astro(item) for key, item in mapping.items()}
+    if _is_list(value):
+        if len(value) == _ASTRO_PAIR_LENGTH and isinstance(value[0], int):
+            return _decode_astro(value[1])
+        return [_decode_astro(item) for item in value]
+    if _is_mapping(value):
+        return {str(key): _decode_astro(item) for key, item in value.items()}
     return value
 
 
 def _parse_json(text: str) -> object | None:
     try:
-        raw: object = cast("object", json.loads(text))
+        raw = safe_json_loads(text)
         return _decode_astro(raw)
-    except (TypeError, ValueError, json.JSONDecodeError):
+    except TypeError, ValueError, json.JSONDecodeError:
         return None
 
 
@@ -154,8 +158,8 @@ def _table_rows_to_dict(rows: list[list[str]]) -> list[dict[str, str]]:
             continue
         result.append(
             {
-                headers[index]: row[index].strip() if index < len(row) else ""
-                for index in range(len(headers))
+                header: row[index].strip() if index < len(row) else ""
+                for index, header in enumerate(headers)
             }
         )
     return result
@@ -166,9 +170,9 @@ def _rsc_payloads(text: str) -> list[tuple[str, object]]:
     for index, match in enumerate(_RSC_PUSH.finditer(text)):
         raw = match.group(1)
         try:
-            raw_decoded: object = cast("object", json.loads(raw))
+            raw_decoded = safe_json_loads(raw)
             decoded: object = raw_decoded
-        except (ValueError, json.JSONDecodeError):
+        except ValueError, json.JSONDecodeError:
             decoded = raw[1:-1].replace('\\"', '"').replace("\\n", "\n")
         parsed = (
             _parse_json(decoded) if isinstance(decoded, str) else _decode_astro(decoded)
@@ -193,13 +197,13 @@ def _annotate(
     if diagnostics:
         document.diagnostics.extend(diagnostics)
         malformed = document.unknown_fields.setdefault("malformed_candidates", [])
-        if isinstance(malformed, list):
-            cast("list[object]", malformed).extend(candidates)
+        if _is_list(malformed):
+            malformed.extend(candidates)
         extraction_diags = document.unknown_fields.setdefault(
             "extraction_diagnostics", []
         )
-        if isinstance(extraction_diags, list):
-            cast("list[object]", extraction_diags).extend(diagnostics)
+        if _is_list(extraction_diags):
+            extraction_diags.extend(diagnostics)
     return document
 
 

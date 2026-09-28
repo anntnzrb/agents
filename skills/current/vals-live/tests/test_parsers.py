@@ -2,28 +2,38 @@
 """Exercise layered source extraction precedence."""
 
 import unittest
-from typing import cast
 
 import pytest
 
-from _path import FIXTURES
+from _path import (
+    FIXTURES,
+)
+from _path import (
+    as_dict as _as_dict,
+)
+from _path import (
+    as_dict_list as _as_dict_list,
+)
+from _path import (
+    as_list as _as_list,
+)
 from vals_live.contracts import ParsedDocument, RawArtifact
 from vals_live.extraction import ExtractionError, extract_document
 
 
 def _root(document: ParsedDocument) -> dict[str, object]:
     """Return the root object of a parsed fixture document."""
-    return cast("dict[str, object]", document.root)
+    return _as_dict(document.root)
 
 
 def _row_list(value: object) -> list[dict[str, object]]:
     """Return rows from a root rows value."""
-    return cast("list[dict[str, object]]", value)
+    return _as_dict_list(value)
 
 
 def _root_rows(document: ParsedDocument) -> list[dict[str, object]]:
     """Return the root rows of a parsed table fixture document."""
-    return cast("list[dict[str, object]]", document.root)
+    return _as_dict_list(document.root)
 
 
 class ExtractionTests(unittest.TestCase):
@@ -47,7 +57,7 @@ class ExtractionTests(unittest.TestCase):
     def test_rsc_frames(self) -> None:
         document = extract_document(self.artifact("rsc-next-frames.html"))
         assert document.extraction_method == "rsc"
-        assert cast("list[object]", _root(document)["frames"])
+        assert _as_list(_root(document)["frames"])
 
     def test_table_fallback(self) -> None:
         document = extract_document(self.artifact("table-fallback.html"))
@@ -75,9 +85,7 @@ class ExtractionTests(unittest.TestCase):
         )
         assert document.extraction_method == "html_table"
         assert _root_rows(document)[0]["model"] == "HTML"
-        candidates = cast(
-            "list[dict[str, object]]", document.unknown_fields["malformed_candidates"]
-        )
+        candidates = _as_dict_list(document.unknown_fields["malformed_candidates"])
         assert candidates[0]["path"] == "$"
 
     def test_astro_wrappers_decode(self) -> None:
@@ -93,8 +101,8 @@ class ExtractionTests(unittest.TestCase):
             )
         )
         assert document.extraction_method == "embedded_json"
-        view = cast("dict[str, object]", _root(document)["benchmarkView"])
-        metadata = cast("dict[str, object]", view["metadata"])
+        view = _as_dict(_root(document)["benchmarkView"])
+        metadata = _as_dict(view["metadata"])
         assert metadata["benchmark_id"] == "astro"
 
 

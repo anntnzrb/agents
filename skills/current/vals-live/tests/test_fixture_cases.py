@@ -1,15 +1,14 @@
 # Copyright 2026 Vals-live contributors.
 """Exercise every numbered deterministic fixture case."""
 
-import json
 import unittest
-from typing import cast
 
 import pytest
 
 from _path import FIXTURES
+from _path import as_dict as _as_dict
 from vals_live.catalog_diff import diff
-from vals_live.contracts import ParsedDocument, RawArtifact
+from vals_live.contracts import ParsedDocument, RawArtifact, safe_json_loads
 from vals_live.discovery import discover
 from vals_live.extraction import ExtractionError, extract_document
 from vals_live.normalization import normalize_document_records
@@ -19,14 +18,14 @@ from vals_live.validation import validate_records
 
 def _root(document: ParsedDocument) -> dict[str, object]:
     """Return the root object of a parsed fixture document."""
-    return cast("dict[str, object]", document.root)
+    return _as_dict(document.root)
 
 
 def _metric_value(row: dict[str, object], metric: str) -> dict[str, object]:
     """Return the value object of one metric field."""
-    metrics = cast("dict[str, object]", row["metrics"])
-    field = cast("dict[str, object]", metrics[metric])
-    return cast("dict[str, object]", field["value"])
+    metrics = _as_dict(row["metrics"])
+    field = _as_dict(metrics[metric])
+    return _as_dict(field["value"])
 
 
 class NumberedFixtureCases(unittest.TestCase):
@@ -56,13 +55,13 @@ class NumberedFixtureCases(unittest.TestCase):
     def test_03_new_category(self) -> None:
         document = self.json_doc("catalog/new-category.json")
         assert "categories" in _root(document)
-        assert "Novel Category" in cast("list[object]", _root(document)["categories"])
+        assert "Novel Category" in _as_dict(_root(document)["categories"])
 
     def test_04_new_score_column(self) -> None:
         rows, _ = normalize_document_records(
             self.json_doc("tables/new-score-column.json")
         )
-        assert "new_score" in cast("dict[str, object]", rows[0]["raw_fields"])
+        assert "new_score" in _as_dict(rows[0]["raw_fields"])
 
     def test_05_reordered_columns(self) -> None:
         rows, _ = normalize_document_records(
@@ -78,17 +77,11 @@ class NumberedFixtureCases(unittest.TestCase):
         assert len(catalog.models) >= 2
 
     def test_07_rename(self) -> None:
-        left = cast(
-            "object",
-            json.loads(
-                (FIXTURES / "catalog/renamed-before.json").read_text(encoding="utf-8")
-            ),
+        left = safe_json_loads(
+            (FIXTURES / "catalog/renamed-before.json").read_text(encoding="utf-8")
         )
-        right = cast(
-            "object",
-            json.loads(
-                (FIXTURES / "catalog/renamed-after.json").read_text(encoding="utf-8")
-            ),
+        right = safe_json_loads(
+            (FIXTURES / "catalog/renamed-after.json").read_text(encoding="utf-8")
         )
         assert diff(left, right)["renamed"]
 
@@ -100,7 +93,7 @@ class NumberedFixtureCases(unittest.TestCase):
         rows, _ = normalize_document_records(
             self.json_doc("records/missing-optional.json")
         )
-        assert "cost_per_test" not in cast("dict[str, object]", rows[0]["metrics"])
+        assert "cost_per_test" not in _as_dict(rows[0]["metrics"])
 
     def test_10_placeholder_zero(self) -> None:
         rows, diagnostics = normalize_document_records(
@@ -158,21 +151,19 @@ class NumberedFixtureCases(unittest.TestCase):
         assert "MIXED_RELEASE" in {item["code"] for item in diagnostics}
 
     def test_17_etag_fixture_metadata(self) -> None:
-        payload = cast(
-            "dict[str, object]",
-            json.loads(
+        payload = _as_dict(
+            safe_json_loads(
                 (FIXTURES / "transport/etag-200.json").read_text(encoding="utf-8")
-            ),
+            )
         )
         assert "etag" in payload
         assert "last_modified" in payload
 
     def test_18_404_fixture(self) -> None:
-        payload = cast(
-            "dict[str, object]",
-            json.loads(
+        payload = _as_dict(
+            safe_json_loads(
                 (FIXTURES / "transport/release-404.json").read_text(encoding="utf-8")
-            ),
+            )
         )
         assert payload["http_status"] == 404
 
@@ -212,9 +203,7 @@ class NumberedFixtureCases(unittest.TestCase):
 
     def test_23_unknown_category(self) -> None:
         document = self.json_doc("pages/unknown-category.json")
-        assert "Unmapped Future Category" in cast(
-            "list[object]", _root(document)["categories"]
-        )
+        assert "Unmapped Future Category" in _as_dict(_root(document)["categories"])
 
     def test_24_js_required(self) -> None:
         artifact = RawArtifact(

@@ -1,13 +1,11 @@
 # Copyright 2026 Vals-live contributors.
 """Conservative source identity and URL canonicalization."""
 
-from __future__ import annotations
-
 import re
 import unicodedata
 from collections.abc import Mapping
 from hashlib import sha256
-from typing import cast
+from typing import TypeIs
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _TRACKING = {
@@ -94,13 +92,16 @@ def snapshot_identity(raw: bytes) -> str:
     return f"snapshot:sha256:{sha256(raw).hexdigest()}"
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
 def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
     """Return source-defined release/version and always-available snapshot identity."""
     candidates: list[object] = []
-    if isinstance(root, Mapping):
-        root_map = cast("Mapping[str, object]", root)
+    if _is_mapping(root):
         candidates.extend(
-            root_map[key]
+            root[key]
             for key in (
                 "release",
                 "release_id",
@@ -108,13 +109,12 @@ def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
                 "benchmark_version",
                 "version",
             )
-            if key in root_map
+            if key in root
         )
-        metadata = root_map.get("metadata")
-        if isinstance(metadata, Mapping):
-            meta_map = cast("Mapping[str, object]", metadata)
+        metadata = root.get("metadata")
+        if _is_mapping(metadata):
             candidates.extend(
-                meta_map[key]
+                metadata[key]
                 for key in (
                     "release",
                     "release_id",
@@ -122,7 +122,7 @@ def release_identity(root: object, raw: bytes) -> tuple[str | None, str]:
                     "benchmark_version",
                     "version",
                 )
-                if key in meta_map
+                if key in metadata
             )
     for candidate in candidates:
         if isinstance(candidate, str) and candidate.strip():

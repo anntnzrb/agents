@@ -1,10 +1,8 @@
 # Copyright 2026 Vals-live contributors.
 """Source-specific Vals page parsing and duplicate-path handling."""
 
-from __future__ import annotations
-
-from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, cast
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypeIs
 
 from .diagnostics import make
 from .discovery import discover
@@ -14,26 +12,32 @@ if TYPE_CHECKING:
     from .contracts import Catalog, ParsedDocument
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_mapping_or_list(value: object) -> TypeIs[Mapping[str, object] | list[object]]:
+    return isinstance(value, (Mapping, list))
+
+
 def _find_mappings(
     root: object, keys: set[str], path: str = "$"
 ) -> list[tuple[str, Mapping[str, object]]]:
     found: list[tuple[str, Mapping[str, object]]] = []
-    if isinstance(root, Mapping):
-        root_map = cast("Mapping[str, object]", root)
-        if any(key in root_map for key in keys):
-            found.append((path, root_map))
-        for key, value in root_map.items():
-            if isinstance(value, (Mapping, list)):
-                found.extend(
-                    _find_mappings(cast("object", value), keys, f"{path}.{key}")
-                )
-    elif isinstance(root, list):
-        root_seq = cast("Sequence[object]", root)
-        for index, value in enumerate(root_seq):
-            if isinstance(value, (Mapping, list)):
-                found.extend(
-                    _find_mappings(cast("object", value), keys, f"{path}[{index}]")
-                )
+    if _is_mapping(root):
+        if any(key in root for key in keys):
+            found.append((path, root))
+        for key, value in root.items():
+            if _is_mapping_or_list(value):
+                found.extend(_find_mappings(value, keys, f"{path}.{key}"))
+    elif _is_list(root):
+        for index, value in enumerate(root):
+            if _is_mapping_or_list(value):
+                found.extend(_find_mappings(value, keys, f"{path}[{index}]"))
     return found
 
 
@@ -51,9 +55,8 @@ def benchmark_metadata(
     for path, item in candidates:
         metadata = dict(item)
         meta_sub = metadata.get("metadata")
-        if isinstance(meta_sub, Mapping):
-            meta_sub_map = cast("Mapping[str, object]", meta_sub)
-            metadata = dict(meta_sub_map)
+        if _is_mapping(meta_sub):
+            metadata = dict(meta_sub)
         entry: dict[str, object] = {"path": path}
         entry.update(metadata)
         normalized.append(entry)
@@ -102,11 +105,7 @@ def benchmark_metadata(
         primary["metadata_candidates"] = normalized
     else:
         primary["metadata_candidates"] = normalized
-    doc_root = (
-        cast("Mapping[str, object]", document.root)
-        if isinstance(document.root, Mapping)
-        else None
-    )
+    doc_root = document.root if _is_mapping(document.root) else None
     root_methodology: object = (
         doc_root.get("index_methodology") if doc_root is not None else None
     )
@@ -124,10 +123,8 @@ def benchmark_metadata(
             )
             if key in doc_root_map
         }
-    if isinstance(root_methodology, Mapping) and root_methodology:
-        primary["index_methodology"] = dict(
-            cast("Mapping[str, object]", root_methodology)
-        )
+    if _is_mapping(root_methodology) and root_methodology:
+        primary["index_methodology"] = dict(root_methodology)
     return primary, diagnostics
 
 
@@ -150,11 +147,8 @@ def parse_records(
     diagnostics = metadata_diags + diagnostics
     if not records and metadata is not None:
         models_val = metadata.get("models")
-        if isinstance(models_val, list):
-            # Catalog metadata may publish model identities without metrics;
-            # keep them visible as missing.
-            models_seq = cast("Sequence[object]", models_val)
-            for index, model in enumerate(models_seq):
+        if _is_list(models_val):
+            for index, model in enumerate(models_val):
                 if isinstance(model, str):
                     records.append(
                         {
@@ -210,11 +204,10 @@ def parse(
                 details={"rows": len(records)},
             )
         )
-    if isinstance(document.root, Mapping):
-        doc_root_map = cast("Mapping[str, object]", document.root)
-        categories = doc_root_map.get("categories")
-        if isinstance(categories, Mapping) and categories:
-            cat_map = cast("Mapping[str, object]", categories)
+    if _is_mapping(document.root):
+        categories = document.root.get("categories")
+        if _is_mapping(categories) and categories:
+            cat_map = categories
             diagnostics.append(
                 make(
                     "UNKNOWN_CATEGORY",

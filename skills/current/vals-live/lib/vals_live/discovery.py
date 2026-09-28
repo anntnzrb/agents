@@ -1,12 +1,10 @@
 # Copyright 2026 Vals-live contributors.
 """Runtime discovery of Vals benchmark, version, and model catalogs."""
 
-from __future__ import annotations
-
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from html import unescape
-from typing import cast
+from typing import TypeIs
 
 from .contracts import Catalog, Diagnostic, ParsedDocument
 from .diagnostics import make
@@ -22,18 +20,28 @@ def _text(value: object) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_mapping_or_list(value: object) -> TypeIs[Mapping[str, object] | list[object]]:
+    return isinstance(value, (Mapping, list))
+
+
 def _walk(value: object, path: str = "$") -> Iterable[tuple[Mapping[str, object], str]]:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        yield mapping, path
-        for key, child in mapping.items():
-            if isinstance(child, (Mapping, list)):
-                yield from _walk(cast("object", child), f"{path}.{key}")
-    elif isinstance(value, list):
-        seq = cast("Sequence[object]", value)
-        for index, child in enumerate(seq):
-            if isinstance(child, (Mapping, list)):
-                yield from _walk(cast("object", child), f"{path}[{index}]")
+    if _is_mapping(value):
+        yield value, path
+        for key, child in value.items():
+            if _is_mapping_or_list(child):
+                yield from _walk(child, f"{path}.{key}")
+    elif _is_list(value):
+        for index, child in enumerate(value):
+            if _is_mapping_or_list(child):
+                yield from _walk(child, f"{path}[{index}]")
 
 
 def _is_model(item: Mapping[str, object]) -> bool:
@@ -321,14 +329,11 @@ def _discover_root_benchmarks(
 ) -> None:
     for key in ("data", "active_selector_entries", "benchmarks"):
         value = root.get(key)
-        if not isinstance(value, list):
+        if not _is_list(value):
             continue
-        items_seq = cast("Sequence[object]", value)
-        for index, item in enumerate(items_seq):
-            if isinstance(item, Mapping):
-                entry = _benchmark_entry(
-                    cast("Mapping[str, object]", item), f"$.{key}[{index}]", source_url
-                )
+        for index, item in enumerate(value):
+            if _is_mapping(item):
+                entry = _benchmark_entry(item, f"$.{key}[{index}]", source_url)
                 _add_benchmark(catalog, entry, seen_benchmarks, active=True)
 
 
@@ -336,12 +341,11 @@ def _discover_root_versions(
     root: Mapping[str, object], source_url: str, catalog: Catalog
 ) -> None:
     versions = root.get("versions") or root.get("version_selector_entries")
-    if not isinstance(versions, list):
+    if not _is_list(versions):
         return
-    versions_seq = cast("Sequence[object]", versions)
-    for index, item in enumerate(versions_seq):
-        if isinstance(item, Mapping):
-            version: dict[str, object] = dict(cast("Mapping[str, object]", item))
+    for index, item in enumerate(versions):
+        if _is_mapping(item):
+            version: dict[str, object] = dict(item)
             version["source_path"] = f"$.versions[{index}]"
             version["discovered_from"] = source_url
             catalog.version_selector_entries.append(version)
@@ -365,12 +369,11 @@ def _discover_root_metadata(
     catalog: Catalog,
     seen_benchmarks: set[str],
 ) -> None:
-    if not isinstance(root, Mapping):
+    if not _is_mapping(root):
         return
-    root_map = cast("Mapping[str, object]", root)
-    _discover_root_benchmarks(root_map, source_url, catalog, seen_benchmarks)
-    _discover_root_versions(root_map, source_url, catalog)
-    _preserve_root_populations(root_map, catalog)
+    _discover_root_benchmarks(root, source_url, catalog, seen_benchmarks)
+    _discover_root_versions(root, source_url, catalog)
+    _preserve_root_populations(root, catalog)
 
 
 def _discover_html_links(
@@ -413,13 +416,15 @@ def _catalog_diagnostics(catalog: Catalog, source_url: str) -> None:
                     "display_name": entry.get("display_name"),
                 },
             )
+            details_val = diag.get("details")
+            details = dict(details_val) if _is_mapping(details_val) else {}
             catalog.diagnostics.append(
                 Diagnostic(
                     code=str(diag["code"]),
                     severity=str(diag["severity"]),
                     stage=str(diag["stage"]),
                     message=str(diag["message"]),
-                    details=cast("dict[str, object]", diag.get("details", {})),
+                    details=details,
                 )
             )
     if not catalog.entries and not catalog.models:
@@ -430,13 +435,15 @@ def _catalog_diagnostics(catalog: Catalog, source_url: str) -> None:
             severity="error",
             details={"source_url": source_url},
         )
+        details_val = diag.get("details")
+        details = dict(details_val) if _is_mapping(details_val) else {}
         catalog.diagnostics.append(
             Diagnostic(
                 code=str(diag["code"]),
                 severity=str(diag["severity"]),
                 stage=str(diag["stage"]),
                 message=str(diag["message"]),
-                details=cast("dict[str, object]", diag.get("details", {})),
+                details=details,
             )
         )
 

@@ -1,16 +1,26 @@
 # Copyright 2026 Vals-live contributors.
 """Vals identity, release, duplicate and comparability validation."""
 
-from __future__ import annotations
-
 import json
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import cast
+from typing import TypeIs
 
 from .diagnostics import make
 
 MIN_DUPLICATE_ROWS = 2
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_sequence(value: object) -> TypeIs[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_dict(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
 
 
 def _record_key(row: Mapping[str, object]) -> tuple[object, ...]:
@@ -24,11 +34,10 @@ def _record_key(row: Mapping[str, object]) -> tuple[object, ...]:
 
 def _metric_signature(row: Mapping[str, object]) -> str:
     def stable(value: object) -> object:
-        if isinstance(value, Mapping):
-            value_map = cast("Mapping[object, object]", value)
+        if _is_mapping(value):
             return {
                 str(key): stable(item)
-                for key, item in value_map.items()
+                for key, item in value.items()
                 if str(key)
                 not in {
                     "source_evidence",
@@ -38,9 +47,8 @@ def _metric_signature(row: Mapping[str, object]) -> str:
                     "observed_at",
                 }
             }
-        if isinstance(value, (list, tuple)):
-            seq = cast("Sequence[object]", value)
-            return [stable(item) for item in seq]
+        if _is_sequence(value):
+            return [stable(item) for item in value]
         return value
 
     return json.dumps(
@@ -146,15 +154,13 @@ def validate_records(
 
 def _metric_value(row: Mapping[str, object], field: str) -> Mapping[str, object] | None:
     metrics = row.get("metrics")
-    if not isinstance(metrics, Mapping):
+    if not _is_mapping(metrics):
         return None
-    metrics_map = cast("Mapping[str, object]", metrics)
-    item = metrics_map.get(field)
-    if not isinstance(item, Mapping):
+    item = metrics.get(field)
+    if not _is_mapping(item):
         return None
-    item_map = cast("Mapping[str, object]", item)
-    value = item_map.get("value")
-    return cast("Mapping[str, object]", value) if isinstance(value, Mapping) else None
+    value = item.get("value")
+    return value if _is_mapping(value) else None
 
 
 def comparison_gate(
@@ -232,9 +238,8 @@ def rank_rows(
     gate = comparison_gate(eligible_rows, field)
     for row in rows:
         rank_raw = row.setdefault("rankings", {})
-        if isinstance(rank_raw, dict):
-            rank_map = cast("dict[str, object]", rank_raw)
-            rank_map[field] = None
+        if _is_dict(rank_raw):
+            rank_raw[field] = None
     if gate["status"] != "eligible":
         return rows, gate
     ordered = sorted(
@@ -244,9 +249,8 @@ def rank_rows(
     )
     for rank_number, (_, row) in enumerate(ordered, start=1):
         rank_raw = row.setdefault("rankings", {})
-        if isinstance(rank_raw, dict):
-            rank_map = cast("dict[str, object]", rank_raw)
-            rank_map[field] = rank_number
+        if _is_dict(rank_raw):
+            rank_raw[field] = rank_number
     return rows, gate
 
 

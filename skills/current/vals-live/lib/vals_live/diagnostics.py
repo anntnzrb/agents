@@ -1,11 +1,9 @@
 # Copyright 2026 Vals-live contributors.
 """Stable diagnostics and redaction helpers."""
 
-from __future__ import annotations
-
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from typing import cast
+from typing import TypeIs
 
 CODES = {
     "SOURCE_UNAVAILABLE",
@@ -50,21 +48,27 @@ _SECRET_QUERY = re.compile(
 )
 
 
+def _is_sequence(value: object) -> TypeIs[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[object, object]]:
+    return isinstance(value, Mapping)
+
+
 def redact(value: object) -> object:
     """Recursively remove credentials from diagnostic/provenance data."""
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[object, object]", value)
+    if _is_mapping(value):
         out: dict[str, object] = {}
-        for key, item in mapping.items():
+        for key, item in value.items():
             name = str(key)
             if _SECRET_KEYS.search(name):
                 out[name] = "<redacted>"
             else:
                 out[name] = redact(item)
         return out
-    if isinstance(value, (list, tuple)):
-        seq = cast("Sequence[object]", value)
-        items = [redact(item) for item in seq]
+    if _is_sequence(value):
+        items = [redact(item) for item in value]
         return tuple(items) if isinstance(value, tuple) else items
     if isinstance(value, str):
         if _SECRET_VALUES.search(value):
@@ -85,9 +89,7 @@ def make(code: str, message: str, **kwargs: object) -> dict[str, object]:
     artifact_id = artifact_value if isinstance(artifact_value, str) else None
     details_value = kwargs.get("details")
     details_map: Mapping[object, object] = (
-        cast("Mapping[object, object]", details_value)
-        if isinstance(details_value, Mapping)
-        else {}
+        details_value if _is_mapping(details_value) else {}
     )
     if code not in CODES:
         code = "SCHEMA_DRIFT"
@@ -122,12 +124,9 @@ def merge(*groups: Iterable[Mapping[str, object]]) -> list[dict[str, object]]:
     for group in groups:
         for item in group:
             normalized_raw = redact(dict(item))
-            if not isinstance(normalized_raw, Mapping):
+            if not _is_mapping(normalized_raw):
                 continue
-            normalized = {
-                str(k): v
-                for k, v in cast("Mapping[object, object]", normalized_raw).items()
-            }
+            normalized = {str(k): v for k, v in normalized_raw.items()}
             key = (
                 normalized.get("code"),
                 normalized.get("stage"),

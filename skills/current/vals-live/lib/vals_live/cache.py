@@ -1,24 +1,22 @@
 # Copyright 2026 Vals-live contributors.
 """Immutable content-addressed artifacts and conditional HTTP transport."""
 
-from __future__ import annotations
-
 import contextlib
 import json
 import os
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import NoReturn, Protocol, Self, cast
+from typing import NoReturn, Protocol, Self, TypeIs
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request
 
-from .contracts import RawArtifact
+from .contracts import RawArtifact, safe_json_loads
 from .diagnostics import redact
 
 HTTP_OK = 200
@@ -26,9 +24,14 @@ HTTP_NOT_MODIFIED = 304
 HTTP_SUCCESS_LIMIT = 300
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
 def urlopen(request: Request, *, timeout: float = 30.0) -> object:
     """Indirection used by deterministic transport fakes."""
-    return cast("object", urllib_request.urlopen(request, timeout=timeout))  # noqa: S310
+    opener: Callable[..., object] = urllib_request.urlopen
+    return opener(request, timeout=timeout)
 
 
 class ResponseLike(Protocol):
@@ -62,7 +65,7 @@ class ResponseLike(Protocol):
         ...
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class CacheEntry:
     """Address one immutable cached artifact."""
 
@@ -123,9 +126,8 @@ def _header(headers: object, name: str) -> str | None:
             value = get(wanted)
         if value is not None:
             return str(value)
-    if isinstance(headers, Mapping):
-        headers_map = cast("Mapping[object, object]", headers)
-        for key, value in headers_map.items():
+    if _is_mapping(headers):
+        for key, value in headers.items():
             if str(key).lower() == wanted:
                 return str(value)
     return None
@@ -228,8 +230,8 @@ class CacheStore:
                     "sha256": digest,
                 },
             )
-        artifact.sha256 = digest
-        artifact.local_path = str(body_path)
+        object.__setattr__(artifact, "sha256", digest)
+        object.__setattr__(artifact, "local_path", str(body_path))
         return CacheEntry(
             artifact.source_url,
             artifact.release,
@@ -244,21 +246,17 @@ class CacheStore:
         """Load and validate an artifact index entry."""
         index_path = self.index / f"{_key(url, release)}.json"
         try:
-            pointer_raw: object = cast(
-                "object", json.loads(index_path.read_text(encoding="utf-8"))
-            )
-            if not isinstance(pointer_raw, Mapping):
+            pointer_raw = safe_json_loads(index_path.read_text(encoding="utf-8"))
+            if not _is_mapping(pointer_raw):
                 return None
-            pointer = cast("Mapping[str, object]", pointer_raw)
+            pointer = pointer_raw
             body_path = Path(str(pointer["body_path"]))
             meta_path = Path(str(pointer["metadata_path"]))
             body = body_path.read_bytes()
-            metadata_raw: object = cast(
-                "object", json.loads(meta_path.read_text(encoding="utf-8"))
-            )
-            if not isinstance(metadata_raw, Mapping):
+            metadata_raw = safe_json_loads(meta_path.read_text(encoding="utf-8"))
+            if not _is_mapping(metadata_raw):
                 return None
-            meta_map = cast("Mapping[str, object]", metadata_raw)
+            meta_map = metadata_raw
             digest = sha256(body).hexdigest()
             if digest != str(meta_map.get("sha256")) or digest != str(
                 pointer.get("sha256")
@@ -272,7 +270,7 @@ class CacheStore:
             return CacheEntry(
                 url, release, digest, body_path, meta_path, dict(meta_map), body
             )
-        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        except OSError, KeyError, TypeError, ValueError, json.JSONDecodeError:
             return None
 
     def manifest(
@@ -354,7 +352,7 @@ def _cache_error(code: str, message: str, details: Mapping[str, object]) -> NoRe
     raise CacheError(code, message, details)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _FetchOptions:
     discovered_from: str
     release: str | None
@@ -364,7 +362,7 @@ class _FetchOptions:
     headers: Mapping[str, str] | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _FetchContext:
     url: str
     options: _FetchOptions
@@ -403,16 +401,11 @@ def _fetch_options(kwargs: Mapping[str, object]) -> _FetchOptions:
     if not isinstance(timeout, (int, float)):
         _option_error("fetch() timeout must be numeric")
     headers_value = kwargs.get("headers")
-    if headers_value is not None and not isinstance(headers_value, Mapping):
+    if headers_value is not None and not _is_mapping(headers_value):
         _option_error("fetch() headers must be a mapping or None")
-    headers_map = (
-        cast("Mapping[object, object]", headers_value)
-        if isinstance(headers_value, Mapping)
-        else None
-    )
     headers = (
-        {str(key): str(value) for key, value in headers_map.items()}
-        if headers_map is not None
+        {str(key): str(value) for key, value in headers_value.items()}
+        if _is_mapping(headers_value)
         else None
     )
     return _FetchOptions(

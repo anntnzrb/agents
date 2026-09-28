@@ -1,21 +1,19 @@
 # Copyright 2026 Vals-live contributors.
 """Exercise deterministic catalog change classification."""
 
-import json
 import unittest
-from typing import cast
 
 from _path import FIXTURES
 from vals_live.catalog_diff import diff
+from vals_live.contracts import safe_json_loads
 
 
 class CatalogDiffTests(unittest.TestCase):
     """Verify conservative added/removed/renamed classifications."""
 
     def load(self, name: str) -> object:
-        return cast(
-            "object",
-            json.loads((FIXTURES / "catalog" / name).read_text(encoding="utf-8")),
+        return safe_json_loads(
+            (FIXTURES / "catalog" / name).read_text(encoding="utf-8")
         )
 
     def test_add_remove_rename_metadata_schema(self) -> None:

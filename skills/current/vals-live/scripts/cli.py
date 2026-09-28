@@ -1,11 +1,9 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 # Copyright 2026 Vals-live contributors.
 """Run vals-live without installing a package."""
-
-from __future__ import annotations
 
 import sys
 from pathlib import Path

@@ -1,14 +1,10 @@
 # Copyright 2026 Vals-live contributors.
 """Public vals-live CLI with one compact JSON object per invocation."""
 
-from __future__ import annotations
-
 import argparse
 import sys
-from typing import TYPE_CHECKING, NoReturn, TextIO, cast, override
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from collections.abc import Mapping
+from typing import NoReturn, TextIO, TypeIs, override
 
 from .commands import CommandError, dispatch
 from .contracts import compact, failure, success
@@ -26,7 +22,10 @@ COMMANDS = (
     "refresh",
     "snapshot",
 )
-_INTERNAL_ERRORS = (Exception,)
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
 
 
 class UsageError(RuntimeError):
@@ -123,9 +122,9 @@ def build_parser() -> argparse.ArgumentParser:
 def _args(argv: list[str] | None) -> argparse.Namespace:
     parser = build_parser()
     values = parser.parse_args(argv)
-    if not cast("object", values.command) and not cast(
-        "object", getattr(values, "help", False)
-    ):
+    cmd = getattr(values, "command", None)
+    help_flag = getattr(values, "help", False)
+    if not cmd and not help_flag:
         msg = "a command is required"
         raise UsageError(msg)
     # Defaults belong here so subparser SUPPRESS does not erase global options.
@@ -144,7 +143,7 @@ def _args(argv: list[str] | None) -> argparse.Namespace:
         ("paths", list[str]()),
     ):
         if not hasattr(values, name):
-            setattr(values, name, cast("object", value))
+            setattr(values, name, value)
     return values
 
 
@@ -173,14 +172,11 @@ def main(
     command = "unknown"
     try:
         args = _args(argv)
-        raw_command = cast("object", args.command)
-        command = str(raw_command) if raw_command else "help"
-        wants_help = cast("object", args.help)
-        payload = (
-            _help_payload(cast("str | None", raw_command))
-            if wants_help
-            else dispatch(args)
-        )
+        raw_cmd = getattr(args, "command", None)
+        cmd_str = str(raw_cmd) if isinstance(raw_cmd, str) and raw_cmd else None
+        command = cmd_str or "help"
+        wants_help = bool(getattr(args, "help", False))
+        payload = _help_payload(cmd_str) if wants_help else dispatch(args)
         print(compact(payload), file=out)
         return 0 if payload.get("ok", False) else 1
     except UsageError as exc:
@@ -188,21 +184,22 @@ def main(
         print(compact(payload), file=out)
         return 2
     except CommandError as exc:
+        redacted_details = redact(exc.details)
         payload = failure(
             command,
             exc.code,
             str(exc),
-            cast("Mapping[str, object] | None", redact(exc.details)),
+            redacted_details if _is_mapping(redacted_details) else None,
         )
         print(compact(payload), file=out)
         return 2 if exc.code == "SNAPSHOT_INVALID" else 1
-    except _INTERNAL_ERRORS as exc:
+    except Exception as exc:  # noqa: BLE001 - process boundary catch to format JSON failure envelope
         redacted = redact({"exception_type": type(exc).__name__, "reason": str(exc)})
         payload = failure(
             command,
             "INTERNAL_ERROR",
             "The Vals command failed unexpectedly.",
-            cast("Mapping[str, object]", redacted),
+            redacted if _is_mapping(redacted) else {},
         )
         print(compact(payload), file=out)
         return 1

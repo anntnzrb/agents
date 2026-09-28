@@ -3,8 +3,8 @@
 
 import json
 import unittest
-from typing import cast
 
+from _path import as_dict as _as_dict
 from vals_live.contracts import ParsedDocument, RawArtifact
 from vals_live.discovery import discover
 from vals_live.extraction import extract_document
@@ -13,9 +13,9 @@ from vals_live.normalization import normalize_document_records
 
 def _metric_value(row: dict[str, object], metric: str) -> dict[str, object]:
     """Return the value object of one metric field."""
-    metrics = cast("dict[str, object]", row["metrics"])
-    field = cast("dict[str, object]", metrics[metric])
-    return cast("dict[str, object]", field["value"])
+    metrics = _as_dict(row["metrics"])
+    field = _as_dict(metrics[metric])
+    return _as_dict(field["value"])
 
 
 class PropertyStyleTests(unittest.TestCase):
@@ -55,7 +55,7 @@ class PropertyStyleTests(unittest.TestCase):
         catalog = discover(document)
         assert catalog.entries[0]["source_id"] == "unicode-β"
         rows, diagnostics = normalize_document_records(document)
-        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        raw = _as_dict(rows[0]["raw_fields"])
         assert raw["future_metric"] == {
             "value": "17",
             "unit": "count",
@@ -129,7 +129,7 @@ class PropertyStyleTests(unittest.TestCase):
             }
         )
         rows, _ = normalize_document_records(document)
-        raw = cast("dict[str, object]", rows[0]["raw_fields"])
+        raw = _as_dict(rows[0]["raw_fields"])
         assert raw["t"] == {
             "value": "1%",
             "unit": "percent",

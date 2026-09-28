@@ -1,21 +1,21 @@
 # Copyright 2026 Vals-live contributors.
 """Lossless Vals record and numeric normalization."""
 
-from __future__ import annotations
-
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 
+from .contracts import RawArtifact
 from .diagnostics import make
 from .identity import model_id, stable_id, variant_id
 from .provenance import value_evidence
 
 if TYPE_CHECKING:
-    from .contracts import ParsedDocument, RawArtifact
+    from .contracts import ParsedDocument
 
+_EXPLICIT_RANGE_LEN = 2
 _SENTINELS = {
     "",
     "n/a",
@@ -29,6 +29,36 @@ _SENTINELS = {
     "null",
     "none",
 }
+
+
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_dict(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_sequence(value: object) -> TypeIs[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_mapping_or_list(value: object) -> TypeIs[Mapping[str, object] | list[object]]:
+    return isinstance(value, (Mapping, list))
+
+
+def _is_float_pair(value: object) -> TypeIs[tuple[float, float]]:
+    match value:
+        case (int() | float(), int() | float()):
+            return True
+        case _:
+            return False
+
+
 _KNOWN_FIELDS = {
     "accuracy",
     "score",
@@ -99,13 +129,13 @@ def _to_number(raw: object) -> float | None:
     if isinstance(raw, str):
         try:
             value = float(Decimal(raw.strip().replace(",", "")))
-        except (InvalidOperation, ValueError, TypeError):
+        except InvalidOperation, ValueError, TypeError:
             return None
         return value if math.isfinite(value) else None
     return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _NumericContext:
     raw: object
     unit: object
@@ -153,16 +183,10 @@ def _numeric_failure(
     blocked_reason = str(kwargs.get("blocked_reason", code))
     candidates_value = kwargs.get("candidate_interpretations")
     candidate_interpretations: list[object] = (
-        list(cast("Sequence[object]", candidates_value))
-        if isinstance(candidates_value, (list, tuple))
-        else []
+        list(candidates_value) if _is_sequence(candidates_value) else []
     )
     details_value = kwargs.get("details")
-    details = (
-        cast("Mapping[str, object]", details_value)
-        if isinstance(details_value, Mapping)
-        else None
-    )
+    details = details_value if _is_mapping(details_value) else None
     result: dict[str, object] = {
         "raw_value": context.raw,
         "normalized_value": None,
@@ -342,6 +366,16 @@ def normalize_numeric(
     if not isinstance(source_path_value, str) or not isinstance(field_value, str):
         message = "normalize_numeric() requires source_path and field strings"
         raise TypeError(message)
+    artifact = kwargs.get("artifact")
+    if not isinstance(artifact, RawArtifact):
+        msg = "normalize_numeric() requires a RawArtifact"
+        raise TypeError(msg)
+    explicit_range_val = kwargs.get("explicit_range")
+    explicit_range = (
+        (float(explicit_range_val[0]), float(explicit_range_val[1]))
+        if _is_float_pair(explicit_range_val)
+        else None
+    )
     context = _NumericContext(
         raw=raw,
         unit=kwargs.get("unit"),
@@ -349,9 +383,9 @@ def normalize_numeric(
         source_zero=bool(kwargs.get("source_zero", False)),
         source_path=source_path_value,
         field=field_value,
-        artifact=cast("RawArtifact", kwargs.get("artifact")),
+        artifact=artifact,
         extraction_method=str(kwargs.get("extraction_method", "vals.extraction")),
-        explicit_range=cast("tuple[float, float] | None", kwargs.get("explicit_range")),
+        explicit_range=explicit_range,
     )
     return _normalize_numeric(context)
 
@@ -421,13 +455,12 @@ def _normalize_numeric(
 
 
 def _unwrap_metric(value: object) -> tuple[object, dict[str, object]]:
-    if isinstance(value, Mapping):
-        val_map = cast("Mapping[str, object]", value)
-        metadata: dict[str, object] = dict(val_map)
+    if _is_mapping(value):
+        metadata: dict[str, object] = dict(value)
         for key in ("value", "raw_value", "score", "accuracy", "value_raw"):
-            if key in val_map:
-                return val_map[key], metadata
-        return cast("object", value), metadata
+            if key in value:
+                return value[key], metadata
+        return value, metadata
     return value, {}
 
 
@@ -460,7 +493,7 @@ def _row_identity(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _RowContext:
     row: Mapping[str, object]
     artifact: RawArtifact
@@ -543,12 +576,12 @@ def _initial_result(context: _RowContext) -> dict[str, object]:
             or (hint and hint.get("total_models") is not None)
             else None
         ),
-        "metrics": cast("dict[str, object]", {}),
-        "raw_fields": cast("dict[str, object]", {}),
-        "dependencies": cast("list[object]", []),
+        "metrics": dict[str, object](),
+        "raw_fields": dict[str, object](),
+        "dependencies": list[object](),
         "independence_class": "unknown",
         "value_status": "published",
-        "source_evidence": cast("list[object]", []),
+        "source_evidence": list[object](),
     }
 
 
@@ -574,33 +607,30 @@ def _metric_candidates(
     candidates: list[tuple[str, object, str]] = []
     known_keys = set(_META_FIELDS)
     metric_container = row.get("metrics")
-    if isinstance(metric_container, Mapping):
-        container_map = cast("Mapping[str, object]", metric_container)
+    if _is_mapping(metric_container):
         candidates.extend(
             (str(key), value, f"{context.source_path}.metrics.{key}")
-            for key, value in container_map.items()
+            for key, value in metric_container.items()
         )
         known_keys.add("metrics")
     for key, value in row.items():
         if key in known_keys:
             continue
         if (
-            isinstance(value, Mapping)
+            _is_mapping(value)
             and key not in {"metadata", "raw_fields"}
-            and _has_metric_shape(cast("Mapping[str, object]", value))
+            and _has_metric_shape(value)
         ):
             candidates.append(
                 (
                     str(key),
-                    cast("Mapping[str, object]", value),
+                    value,
                     f"{context.source_path}.{key}",
                 )
             )
             known_keys.add(key)
         else:
-            candidates.append(
-                (str(key), cast("object", value), f"{context.source_path}.{key}")
-            )
+            candidates.append((str(key), value, f"{context.source_path}.{key}"))
     if not candidates and isinstance(row.get("score"), (int, float, str)):
         candidates.append(("score", row["score"], f"{context.source_path}.score"))
     source_zero = row.get("source_zero") is True or row.get("proven_zero") is True
@@ -685,18 +715,16 @@ def _finalize_row(
     diagnostics: list[dict[str, object]],
 ) -> None:
     raw_fields_val = row.get("raw_fields")
-    if isinstance(raw_fields_val, Mapping):
-        raw_map = cast("dict[str, object]", result["raw_fields"])
-        raw_map.update(dict(cast("Mapping[str, object]", raw_fields_val)))
-    metrics_map = cast("dict[str, object]", result["metrics"])
+    raw_map = result.get("raw_fields")
+    if _is_mapping(raw_fields_val) and _is_dict(raw_map):
+        raw_map.update(dict(raw_fields_val))
+    metrics_map = result.get("metrics")
     has_unparsed = False
-    for item in metrics_map.values():
-        if isinstance(item, Mapping):
-            item_map = cast("Mapping[str, object]", item)
-            val_obj = item_map.get("value")
-            if isinstance(val_obj, Mapping):
-                val_map = cast("Mapping[str, object]", val_obj)
-                if val_map.get("value_status") == "unparsed":
+    if _is_dict(metrics_map):
+        for item in metrics_map.values():
+            if _is_mapping(item):
+                val_obj = item.get("value")
+                if _is_mapping(val_obj) and val_obj.get("value_status") == "unparsed":
                     has_unparsed = True
                     break
     if has_unparsed:
@@ -756,14 +784,17 @@ def normalize_row(
             source_zero=source_zero,
         )
         if keep_raw:
-            raw_map = cast("dict[str, object]", result["raw_fields"])
-            raw_map[field] = value
+            raw_map = result.get("raw_fields")
+            if _is_dict(raw_map):
+                raw_map[field] = value
         if metric is not None:
-            metrics_map = cast("dict[str, object]", result["metrics"])
-            metrics_map[field] = metric
-            val_map = cast("Mapping[str, object]", metric["value"])
-            evidence_list = cast("list[object]", result["source_evidence"])
-            evidence_list.append(val_map["source_evidence"])
+            metrics_map = result.get("metrics")
+            if _is_dict(metrics_map):
+                metrics_map[field] = metric
+            val_map = metric.get("value")
+            evidence_list = result.get("source_evidence")
+            if _is_mapping(val_map) and _is_list(evidence_list):
+                evidence_list.append(val_map["source_evidence"])
         diagnostics.extend(field_diags)
     _finalize_row(result, row, diagnostics)
     return result, diagnostics
@@ -774,12 +805,11 @@ def _iter_direct_rows(
 ) -> Iterable[tuple[Mapping[str, object], str, Mapping[str, object] | None]]:
     for key in ("rows", "records", "leaderboard", "results"):
         value = root.get(key)
-        if not isinstance(value, list):
+        if not _is_list(value):
             continue
-        items_seq = cast("Sequence[object]", value)
-        for index, item in enumerate(items_seq):
-            if isinstance(item, Mapping):
-                yield cast("Mapping[str, object]", item), f"{path}.{key}[{index}]", None
+        for index, item in enumerate(value):
+            if _is_mapping(item):
+                yield item, f"{path}.{key}[{index}]", None
 
 
 def _iter_task_rows(
@@ -787,9 +817,9 @@ def _iter_task_rows(
 ) -> Iterable[tuple[Mapping[str, object], str, Mapping[str, object] | None]]:
     by_model: dict[str, dict[str, object]] = {}
     for task_name, task_rows in tasks.items():
-        if not isinstance(task_rows, Mapping):
+        if not _is_mapping(task_rows):
             continue
-        task_rows_map = cast("Mapping[str, object]", task_rows)
+        task_rows_map = task_rows
         for model_name, metric in task_rows_map.items():
             row = by_model.setdefault(str(model_name), {"model": model_name})
             row[str(task_name)] = metric
@@ -802,30 +832,29 @@ def _iter_nested(
 ) -> Iterable[tuple[Mapping[str, object], str, Mapping[str, object] | None]]:
     skipped = {"rows", "records", "leaderboard", "results", "models", "tasks"}
     for key, value in root.items():
-        if key in skipped or not isinstance(value, (Mapping, list)):
+        if key in skipped or not _is_mapping_or_list(value):
             continue
-        yield from iter_record_candidates(cast("object", value), f"{path}.{key}")
+        yield from iter_record_candidates(value, f"{path}.{key}")
 
 
 def iter_record_candidates(
     root: object, path: str = "$"
 ) -> Iterable[tuple[Mapping[str, object], str, Mapping[str, object] | None]]:
     """Find model rows in arbitrary JSON/decoded Astro nesting."""
-    if isinstance(root, list):
-        root_seq = cast("Sequence[object]", root)
-        for index, item in enumerate(root_seq):
+    if _is_list(root):
+        for index, item in enumerate(root):
             yield from iter_record_candidates(item, f"{path}[{index}]")
         return
-    if not isinstance(root, Mapping):
+    if not _is_mapping(root):
         return
-    root_map = cast("Mapping[str, object]", root)
+    root_map = root
     row_keys = {"model", "model_name", "model_key", "model_slug"}
     if any(key in root_map for key in row_keys):
         yield root_map, path, None
     yield from _iter_direct_rows(root_map, path)
     tasks = root_map.get("tasks")
-    if isinstance(tasks, Mapping):
-        yield from _iter_task_rows(cast("Mapping[str, object]", tasks), path)
+    if _is_mapping(tasks):
+        yield from _iter_task_rows(tasks, path)
     yield from _iter_nested(root_map, path)
 
 

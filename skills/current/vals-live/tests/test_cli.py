@@ -4,26 +4,28 @@
 import io
 import json
 import unittest
-from typing import cast
 from unittest.mock import patch
 
 from _path import FIXTURES
+from _path import as_dict as _as_dict
+from _path import as_dict_list as _as_dict_list
 from vals_live.cli import main
+from vals_live.contracts import safe_json_loads
 
 
 def _data(payload: dict[str, object]) -> dict[str, object]:
     """Return the data object of a CLI envelope."""
-    return cast("dict[str, object]", payload["data"])
+    return _as_dict(payload["data"])
 
 
 def _error(payload: dict[str, object]) -> dict[str, object]:
     """Return the error object of a CLI envelope."""
-    return cast("dict[str, object]", payload["error"])
+    return _as_dict(payload["error"])
 
 
 def _rows(data: dict[str, object]) -> list[dict[str, object]]:
     """Return the rows list of a command data object."""
-    return cast("list[dict[str, object]]", data["rows"])
+    return _as_dict_list(data["rows"])
 
 
 class CLITests(unittest.TestCase):
@@ -34,7 +36,7 @@ class CLITests(unittest.TestCase):
         code = main(list(args), stdout=out, stderr=err)
         lines = out.getvalue().splitlines()
         assert len(lines) == 1, out.getvalue()
-        payload = cast("dict[str, object]", json.loads(lines[0]))
+        payload = _as_dict(safe_json_loads(lines[0]))
         assert out.getvalue().strip() == json.dumps(
             payload, ensure_ascii=False, separators=(",", ":")
         )
@@ -70,7 +72,7 @@ class CLITests(unittest.TestCase):
             self.snapshot("records/coding-compare.json"),
         )
         assert code == 0
-        benchmark = cast("dict[str, object]", _data(payload)["benchmark"])
+        benchmark = _as_dict(_data(payload)["benchmark"])
         assert benchmark["benchmark_id"] == "vals:benchmark:code_migration"
         code, payload, _ = self.invoke(
             "model",
@@ -100,7 +102,7 @@ class CLITests(unittest.TestCase):
             "diagnose", "--snapshot", self.snapshot("pages/unknown-score.json")
         )
         assert code == 0
-        warnings = cast("list[dict[str, object]]", _data(payload)["warnings"])
+        warnings = _as_dict_list(_data(payload)["warnings"])
         assert any(item["code"] == "UNKNOWN_SCORE_SEMANTICS" for item in warnings)
 
     def test_diff_and_snapshot_metadata(self) -> None:
@@ -112,7 +114,7 @@ class CLITests(unittest.TestCase):
             self.snapshot("catalog/changed.json"),
         )
         assert code == 0
-        diff = cast("dict[str, object]", _data(payload)["catalog_diff"])
+        diff = _as_dict(_data(payload)["catalog_diff"])
         assert diff["added"]
         assert diff["renamed"]
 
@@ -143,7 +145,7 @@ class CLITests(unittest.TestCase):
         assert code == 1
         assert not payload["ok"]
         assert _error(payload)["code"] == "INTERNAL_ERROR"
-        details = cast("dict[str, object]", _error(payload)["details"])
+        details = _as_dict(_error(payload)["details"])
         assert details["reason"] == ("programmer bug?token=<redacted>")
         assert "secret" not in json.dumps(details)
         assert stderr == ""

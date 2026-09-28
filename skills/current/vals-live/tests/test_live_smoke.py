@@ -7,11 +7,12 @@ import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import cast
 
 import pytest
 
+from _path import as_dict
 from vals_live.cli import main
+from vals_live.contracts import safe_json_loads
 
 
 @pytest.mark.live_smoke
@@ -26,7 +27,7 @@ class LiveSmokeTests(unittest.TestCase):
 
         code = main(["catalog"], stdout=out, stderr=err)
         assert code == 0, err.getvalue()
-        payload = cast("dict[str, object]", json.loads(out.getvalue()))
+        payload = as_dict(safe_json_loads(out.getvalue()))
         assert payload["ok"]
         with TemporaryDirectory(prefix="vals-live-smoke-") as temp_dir:
             evidence = Path(temp_dir) / "vals"

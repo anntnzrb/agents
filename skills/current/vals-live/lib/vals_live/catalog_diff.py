@@ -1,35 +1,30 @@
 # Copyright 2026 Vals-live contributors.
 """Conservative deterministic catalog snapshot diff."""
 
-from __future__ import annotations
-
-from collections.abc import Mapping, Sequence
-from typing import cast
+from collections.abc import Mapping
+from typing import TypeIs
 
 from .identity import canonical_url
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
 def _entries(snapshot: object) -> list[dict[str, object]]:
-    if isinstance(snapshot, list):
-        snapshot_seq = cast("Sequence[object]", snapshot)
-        return [
-            dict(cast("Mapping[str, object]", item))
-            for item in snapshot_seq
-            if isinstance(item, Mapping)
-        ]
-    if isinstance(snapshot, Mapping):
-        snapshot_map = cast("Mapping[str, object]", snapshot)
+    if _is_list(snapshot):
+        return [dict(item) for item in snapshot if _is_mapping(item)]
+    if _is_mapping(snapshot):
         for key in ("entries", "catalog", "rows", "benchmarks", "data"):
-            value = snapshot_map.get(key)
-            if isinstance(value, list):
-                value_seq = cast("Sequence[object]", value)
-                return [
-                    dict(cast("Mapping[str, object]", item))
-                    for item in value_seq
-                    if isinstance(item, Mapping)
-                ]
-            if isinstance(value, Mapping) and key == "data":
-                nested = _entries(cast("object", value))
+            value = snapshot.get(key)
+            if _is_list(value):
+                return [dict(item) for item in value if _is_mapping(item)]
+            if _is_mapping(value) and key == "data":
+                nested = _entries(value)
                 if nested:
                     return nested
     return []
@@ -99,15 +94,11 @@ def diff(left: object, right: object) -> dict[str, object]:
         )
         raw_old = old.get("raw_fields")
         old_fields: set[str] = (
-            {str(k) for k in cast("Mapping[object, object]", raw_old)}
-            if isinstance(raw_old, Mapping)
-            else set(old.keys())
+            {str(k) for k in raw_old} if _is_mapping(raw_old) else set(old.keys())
         )
         raw_new = new.get("raw_fields")
         new_fields: set[str] = (
-            {str(k) for k in cast("Mapping[object, object]", raw_new)}
-            if isinstance(raw_new, Mapping)
-            else set(new.keys())
+            {str(k) for k in raw_new} if _is_mapping(raw_new) else set(new.keys())
         )
         schema_changes.extend(
             {"id": key, "field": field, "change": "added"}
@@ -148,15 +139,14 @@ def diff(left: object, right: object) -> dict[str, object]:
 
 
 def _snapshot_id(value: object) -> str | None:
-    if isinstance(value, Mapping):
-        val_map = cast("Mapping[str, object]", value)
+    if _is_mapping(value):
         for key in ("snapshot_id", "id", "sha256"):
-            candidate = val_map.get(key)
+            candidate = value.get(key)
             if isinstance(candidate, str):
                 return candidate
-        provenance = val_map.get("provenance")
-        if isinstance(provenance, Mapping):
-            prov_map = cast("Mapping[str, object]", provenance)
-            if isinstance(prov_map.get("sha256"), str):
-                return str(prov_map["sha256"])
+        provenance = value.get("provenance")
+        if _is_mapping(provenance):
+            candidate = provenance.get("sha256")
+            if isinstance(candidate, str):
+                return candidate
     return None

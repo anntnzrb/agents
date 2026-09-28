@@ -1,15 +1,13 @@
 # Copyright 2026 Vals-live contributors.
 """Vals command projections and the source-local pipeline."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -20,6 +18,7 @@ from .contracts import (
     Catalog,
     ParsedDocument,
     RawArtifact,
+    safe_json_loads,
     scope,
     success,
 )
@@ -37,6 +36,26 @@ SEED_CATALOG = "https://www.vals.ai/benchmarks"
 SEED_MODELS = "https://www.vals.ai/models"
 
 
+def _is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_dict(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeIs[list[object]]:
+    return isinstance(value, list)
+
+
+def _is_dict_list(value: object) -> TypeIs[list[dict[str, object]]]:
+    return isinstance(value, list)
+
+
+def _opt_str(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
 class CommandError(RuntimeError):
     """Represent a command-level structured failure."""
 
@@ -49,7 +68,7 @@ class CommandError(RuntimeError):
         self.details: dict[str, object] = dict(details) if details is not None else {}
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Pipeline:
     """Carry one extracted artifact through the command projections."""
 
@@ -88,16 +107,15 @@ def _snapshot_metadata(path: Path, body: bytes) -> dict[str, object]:
     if path.suffix.casefold() not in {".json", ".manifest"}:
         return {}
     try:
-        value = cast("object", json.loads(body.decode("utf-8")))
-    except (UnicodeDecodeError, ValueError):
+        value = safe_json_loads(body.decode("utf-8"))
+    except UnicodeDecodeError, ValueError:
         return {}
-    if not isinstance(value, dict):
+    if not _is_mapping(value):
         return {}
-    value_map = cast("Mapping[str, object]", value)
-    candidate = value_map.get("manifest")
-    if isinstance(candidate, Mapping):
-        return dict(cast("Mapping[str, object]", candidate))
-    return dict(value_map)
+    candidate = value.get("manifest")
+    if _is_mapping(candidate):
+        return dict(candidate)
+    return dict(value)
 
 
 def _resolve_snapshot_bytes(
@@ -158,17 +176,19 @@ def _read_snapshot(path_value: str) -> RawArtifact:
         else None
     )
     status_nested = metadata.get("error")
-    if isinstance(status_nested, Mapping):
-        nested_map = cast("Mapping[str, object]", status_nested)
-        nested_status = nested_map.get("http_status")
+    if _is_mapping(status_nested):
+        nested_status = status_nested.get("http_status")
     else:
         nested_status = None
     status_value = metadata.get("status_code") or nested_status or 200
+    status_code = (
+        int(status_value) if isinstance(status_value, (int, float, str)) else 200
+    )
     artifact = RawArtifact(
         source_url,
         discovered_from,
         body,
-        status_code=int(cast("int", status_value)),
+        status_code=status_code,
         content_type=_as_content_type(path, body, metadata),
         final_url=str(metadata.get("final_url") or source_url),
         etag=str(metadata.get("etag")) if metadata.get("etag") else None,
@@ -199,12 +219,12 @@ def _read_snapshot(path_value: str) -> RawArtifact:
 def _source_artifact(
     args: Namespace, *, seed: str, release: str | None = None
 ) -> RawArtifact:
-    snapshot = cast("object", getattr(args, "snapshot", None))
+    snapshot = _opt_str(getattr(args, "snapshot", None))
     if snapshot:
-        return _read_snapshot(str(snapshot))
-    raw_cache_dir = cast("object", getattr(args, "cache_dir", None))
-    cache_dir = Path(str(raw_cache_dir)) if raw_cache_dir is not None else None
-    allow_stale = bool(cast("object", getattr(args, "allow_stale", False)))
+        return _read_snapshot(snapshot)
+    raw_cache_dir = _opt_str(getattr(args, "cache_dir", None))
+    cache_dir = Path(raw_cache_dir) if raw_cache_dir is not None else None
+    allow_stale = getattr(args, "allow_stale", False) is True
     try:
         return fetch(
             seed,
@@ -235,27 +255,23 @@ def _validate_artifact(artifact: RawArtifact) -> None:
 def _annotate_release(rows: list[dict[str, object]], release: str | None) -> None:
     for row in rows:
         evidences = row.get("source_evidence", [])
-        if isinstance(evidences, list):
-            items = cast("list[object]", cast("object", evidences))
-            for evidence in items:
-                if isinstance(evidence, dict):
-                    cast("dict[str, object]", evidence)["source_release"] = release
+        if _is_list(evidences):
+            for evidence in evidences:
+                if _is_dict(evidence):
+                    evidence["source_release"] = release
         metrics = row.get("metrics")
-        if not isinstance(metrics, Mapping):
+        if not _is_mapping(metrics):
             continue
-        metrics_map = cast("Mapping[str, object]", metrics)
-        for metric in metrics_map.values():
-            if not isinstance(metric, Mapping):
+        for metric in metrics.values():
+            if not _is_mapping(metric):
                 continue
-            metric_map = cast("Mapping[str, object]", metric)
-            value = metric_map.get("value")
-            if not isinstance(value, Mapping):
+            value = metric.get("value")
+            if not _is_mapping(value):
                 continue
-            value_map = cast("Mapping[str, object]", value)
-            nested = value_map.get("source_evidence")
-            if not isinstance(nested, Mapping):
+            nested = value.get("source_evidence")
+            if not _is_dict(nested):
                 continue
-            cast("dict[str, object]", nested)["source_release"] = release
+            nested["source_release"] = release
 
 
 def _pipeline_diagnostics(
@@ -304,49 +320,32 @@ def _pipeline(args: Namespace, *, seed: str = SEED_CATALOG) -> Pipeline:
     resolved = resolve(document.root, artifact.body, getattr(args, "release", None))
     if not resolved.get("ok"):
         details_value = resolved.get("details")
-        details = (
-            cast("dict[str, object]", details_value)
-            if isinstance(details_value, dict)
-            else {}
-        )
+        details = details_value if _is_dict(details_value) else {}
         raise CommandError(
             str(resolved.get("code")),
             str(resolved.get("message")),
             details,
         )
-    artifact.release = str(resolved.get("id")) if resolved.get("id") else None
+    resolved_release = str(resolved.get("id")) if resolved.get("id") else None
+    artifact = replace(artifact, release=resolved_release)
     _annotate_release(rows, artifact.release)
     _pipeline_diagnostics(artifact, diagnostics, snapshot_id, source_release)
     if source_release and artifact.release != source_release:
-        artifact.release = source_release
+        artifact = replace(artifact, release=source_release)
     return Pipeline(artifact, document, catalog, rows, diagnostics, resolved, metadata)
 
 
 def _base_data(pipeline: Pipeline, **kwargs: object) -> dict[str, object]:
     benchmark_value = kwargs.get("benchmark")
-    benchmark = (
-        cast("Mapping[str, object]", benchmark_value)
-        if isinstance(benchmark_value, Mapping)
-        else None
-    )
+    benchmark = benchmark_value if _is_mapping(benchmark_value) else None
     model_variant_value = kwargs.get("model_variant")
-    model_variant = (
-        model_variant_value if isinstance(model_variant_value, str) else None
-    )
+    model_variant = _opt_str(model_variant_value)
     rows_value = kwargs.get("rows")
-    rows = (
-        cast("list[dict[str, object]]", cast("object", rows_value))
-        if isinstance(rows_value, list)
-        else None
-    )
+    rows = rows_value if _is_dict_list(rows_value) else None
     value_status_value = kwargs.get("value_status", "published")
     value_status = str(value_status_value)
     filters_value = kwargs.get("filters")
-    filters = (
-        cast("Mapping[str, object]", filters_value)
-        if isinstance(filters_value, Mapping)
-        else None
-    )
+    filters = filters_value if _is_mapping(filters_value) else None
     dependencies, independence = overlap_metadata()
     release_id = pipeline.release.get("id")
     selected_rows = rows if rows is not None else pipeline.rows
@@ -354,13 +353,11 @@ def _base_data(pipeline: Pipeline, **kwargs: object) -> dict[str, object]:
     return {
         "scope": scope(
             source="vals",
-            benchmark=cast("str | None", benchmark.get("benchmark_id"))
+            benchmark=_opt_str(benchmark.get("benchmark_id")) if benchmark else None,
+            benchmark_version=_opt_str(benchmark.get("version"))
             if benchmark
-            else None,
-            benchmark_version=cast("str | None", benchmark.get("version"))
-            if benchmark
-            else cast("str | None", pipeline.release.get("source_release_id")),
-            release=cast("str | None", release_id),
+            else _opt_str(pipeline.release.get("source_release_id")),
+            release=_opt_str(release_id),
             model_variant=model_variant,
             task_count=benchmark.get("task_count") if benchmark else None,
             task_count_population=benchmark.get("task_count_population")
@@ -456,8 +453,8 @@ def _benchmark_rows(
 
 def _benchmark(args: Namespace) -> dict[str, object]:
     pipeline = _pipeline(args)
-    raw_selector = cast("object", getattr(args, "benchmark", None))
-    selector = raw_selector if isinstance(raw_selector, str) else None
+    raw_selector = getattr(args, "benchmark", None)
+    selector = _opt_str(raw_selector)
     benchmark = select_benchmark(pipeline.catalog, selector)
     if benchmark is None:
         # A detail page's metadata can be the only catalog entry.
@@ -511,22 +508,23 @@ def _benchmark(args: Namespace) -> dict[str, object]:
         "raw": benchmark.get("raw_metadata", {}),
     }
     if not rows and not benchmark.get("models"):
-        warnings = cast("list[object]", data["warnings"])
-        warnings.append(
-            make(
-                "PARTIAL_EXTRACTION",
-                "Benchmark metadata was discovered without model metric rows.",
-                stage="parse",
-                details={"benchmark": benchmark.get("benchmark_id")},
+        warnings = data.get("warnings")
+        if _is_list(warnings):
+            warnings.append(
+                make(
+                    "PARTIAL_EXTRACTION",
+                    "Benchmark metadata was discovered without model metric rows.",
+                    stage="parse",
+                    details={"benchmark": benchmark.get("benchmark_id")},
+                )
             )
-        )
     return success("benchmark", data)
 
 
 def _model(args: Namespace) -> dict[str, object]:
     pipeline = _pipeline(args, seed=SEED_MODELS)
-    raw_selector = cast("object", getattr(args, "model", None))
-    selector = raw_selector if isinstance(raw_selector, str) else None
+    raw_selector = getattr(args, "model", None)
+    selector = _opt_str(raw_selector)
     model = select_model(pipeline.catalog, selector)
     rows = [
         row
@@ -573,26 +571,24 @@ def _selectors(raw: str | None) -> list[str]:
 
 def _metric_keys(value: object) -> list[str]:
     """Return metric keys from a metrics mapping."""
-    if not isinstance(value, Mapping):
+    if not _is_mapping(value):
         return []
-    return [str(key) for key in cast("Mapping[str, object]", value)]
+    return [str(key) for key in value]
 
 
 def _gate_blocked(gate: object) -> bool:
     """Check whether a ranking gate reports blocked status."""
-    if not isinstance(gate, Mapping):
+    if not _is_mapping(gate):
         return False
-    return cast("Mapping[str, object]", gate).get("status") == "blocked"
+    return gate.get("status") == "blocked"
 
 
 def _compare(args: Namespace) -> dict[str, object]:
     pipeline = _pipeline(args)
-    raw_models = cast("object", getattr(args, "models", None))
-    raw_benchmarks = cast("object", getattr(args, "benchmarks", None))
-    model_selectors = _selectors(raw_models if isinstance(raw_models, str) else None)
-    benchmark_selectors = _selectors(
-        raw_benchmarks if isinstance(raw_benchmarks, str) else None
-    )
+    raw_models = getattr(args, "models", None)
+    raw_benchmarks = getattr(args, "benchmarks", None)
+    model_selectors = _selectors(_opt_str(raw_models))
+    benchmark_selectors = _selectors(_opt_str(raw_benchmarks))
     if not model_selectors:
         msg = "MISSING_REQUIRED_IDENTITY"
         raise CommandError(msg, "compare requires --models.", {})
@@ -690,8 +686,9 @@ def _compare(args: Namespace) -> dict[str, object]:
         value_status=value_status,
         filters={"models": model_selectors, "benchmarks": benchmark_selectors},
     )
+    warnings_val = data.get("warnings")
     data["warnings"] = merge(
-        cast("list[dict[str, object]]", data["warnings"]), diagnostics
+        warnings_val if _is_dict_list(warnings_val) else [], diagnostics
     )
     data["diagnostics"] = data["warnings"]
     data["rankings"] = rankings
@@ -703,14 +700,10 @@ def _compare(args: Namespace) -> dict[str, object]:
 
 
 def _catalog_diff(args: Namespace) -> dict[str, object]:
-    raw_left = cast("object", getattr(args, "left", None))
-    raw_right = cast("object", getattr(args, "right", None))
-    raw_paths = cast("object", getattr(args, "paths", []))
-    path_list = (
-        cast("list[object]", cast("object", raw_paths))
-        if isinstance(raw_paths, list)
-        else []
-    )
+    raw_left = getattr(args, "left", None)
+    raw_right = getattr(args, "right", None)
+    raw_paths = getattr(args, "paths", [])
+    path_list = raw_paths if _is_list(raw_paths) else []
     left_path = str(raw_left) if isinstance(raw_left, str) and raw_left else None
     if left_path is None and path_list:
         left_path = str(path_list[0])
@@ -747,7 +740,7 @@ def _catalog_diff(args: Namespace) -> dict[str, object]:
 def _load_json_value(path: Path) -> object:
     try:
         text = path.read_text(encoding="utf-8")
-        loaded = cast("object", json.loads(text))
+        loaded = safe_json_loads(text)
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
         msg = "SNAPSHOT_INVALID"
         raise CommandError(
@@ -853,7 +846,7 @@ def _schema() -> dict[str, object]:
 
 def _cache_dir(args: Namespace) -> str | Path | None:
     """Return the cache directory override from parsed arguments."""
-    raw = cast("object", getattr(args, "cache_dir", None))
+    raw = getattr(args, "cache_dir", None)
     return raw if isinstance(raw, (str, Path)) else None
 
 
@@ -882,7 +875,7 @@ def _snapshot(args: Namespace) -> dict[str, object]:
     entry = cache.put(pipeline.artifact)
     manifest = cache.manifest(
         [entry],
-        release=cast("str | None", pipeline.release.get("id")),
+        release=_opt_str(pipeline.release.get("id")),
         source_url=pipeline.artifact.source_url,
     )
     data = _base_data(pipeline, rows=[], value_status="published")
@@ -909,8 +902,8 @@ def dispatch(args: Namespace) -> dict[str, object]:
         "refresh": _refresh,
         "snapshot": _snapshot,
     }
-    raw_command = cast("object", getattr(args, "command", None))
-    handler = handlers.get(raw_command if isinstance(raw_command, str) else "")
+    raw_command = getattr(args, "command", None)
+    handler = handlers.get(_opt_str(raw_command) or "")
     if handler is None:
         msg = "SNAPSHOT_INVALID"
         raise CommandError(
