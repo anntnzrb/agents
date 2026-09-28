@@ -214,9 +214,9 @@ The config above, combined with code review, enforces:
 |What|How|
 |---|---|
 |Exhaustive match|basedpyright `all` mode + `assert_never`|
-|No `Any`|basedpyright `all` mode + script `cast-any` rule|
+|No `Any`|basedpyright `all` mode|
 |Ignored return values|`reportUnusedCallResult = "warning"`|
-|Immutable default|Script `mutable-dataclass` + `missing-slots` rules|
+|Immutable default|`@dataclass(frozen=True, slots=True)` by default|
 |No null surprise|basedpyright strict `None` analysis|
 |Constants are const|basedpyright catches `Final` reassignment|
 |Unused variables|`reportUnusedVariable = "error"`|

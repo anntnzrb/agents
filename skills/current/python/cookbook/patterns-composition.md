@@ -111,13 +111,9 @@ Tip: `singledispatch` dispatches on the first argument's type; it supports exten
 Combine functions into one sequential function.
 
 ```python
-from typing import Callable, TypeVar
+from collections.abc import Callable
 
-T = TypeVar('T')
-U = TypeVar('U')
-V = TypeVar('V')
-
-def compose(f: Callable[[T], U], g: Callable[[U], V]) -> Callable[[T], V]:
+def compose[T, U, V](f: Callable[[T], U], g: Callable[[U], V]) -> Callable[[T], V]:
     def composed(x: T) -> V:
         return g(f(x))
     return composed
@@ -138,10 +134,10 @@ Tip: Composition reads right-to-left mathematically; use pipe functions or metho
 Chain transformations left-to-right.
 
 ```python
+from collections.abc import Callable
 from functools import reduce
-from typing import Callable, Any
 
-def pipe(*functions: Callable[[Any], Any]) -> Callable[[Any], Any]:
+def pipe[T](*functions: Callable[[T], T]) -> Callable[[T], T]:
     return reduce(lambda f, g: lambda x: g(f(x)), functions, lambda x: x)
 
 def add_one(x: int) -> int:
@@ -160,16 +156,13 @@ Tip: Pipelines clarify data transformations; each function receives the previous
 Use method chaining for readable, type-safe transformations.
 
 ```python
-from typing import Generic, TypeVar, Callable
+from collections.abc import Callable
 
-T = TypeVar('T')
-U = TypeVar('U')
-
-class Pipeline(Generic[T]):
-    def __init__(self, value: T):
+class Pipeline[T]:
+    def __init__(self, value: T) -> None:
         self.value = value
 
-    def then(self, func: Callable[[T], U]) -> 'Pipeline[U]':
+    def then[U](self, func: Callable[[T], U]) -> "Pipeline[U]":
         return Pipeline(func(self.value))
 
     def get(self) -> T:
@@ -199,12 +192,12 @@ Use immutable data structures to prevent accidental modification.
 ```python
 from dataclasses import dataclass
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Coordinates:
     x: float
     y: float
 
-    def move(self, dx: float, dy: float) -> 'Coordinates':
+    def move(self, dx: float, dy: float) -> "Coordinates":
         return Coordinates(self.x + dx, self.y + dy)
 
 c1 = Coordinates(0, 0)
@@ -244,7 +237,7 @@ readonly_config = MappingProxyType(config)
 # readonly_config["api_key"] = "new"  # TypeError
 
 # Functional list operations with tuples
-def append_immutable(lst: tuple, item) -> tuple:
+def append_immutable[T](lst: tuple[T, ...], item: T) -> tuple[T, ...]:
     return lst + (item,)
 
 numbers = (1, 2, 3)
@@ -262,16 +255,15 @@ Update data structures without mutating the original.
 from copy import copy
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class UserProfile:
     name: str
-    settings: dict
+    settings: dict[str, str]
 
-    def with_setting(self, key: str, value: object) -> 'UserProfile':
+    def with_setting(self, key: str, value: str) -> "UserProfile":
         new_settings = copy(self.settings)
         new_settings[key] = value
         return UserProfile(name=self.name, settings=new_settings)
-
 profile1 = UserProfile("Alice", {"theme": "light"})
 profile2 = profile1.with_setting("theme", "dark")
 

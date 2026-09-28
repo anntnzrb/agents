@@ -6,7 +6,7 @@ Use heading search; load only the task-matching section. Each domain lists the c
 
 ## CLI: typer
 
-`typer`: type-annotated CLI generation. `argparse`: 5x more code; `click`: ignores type annotations; `fire`: scale-breaking magic. Single-function script: `typer.run(main)`. Subcommands: `@app.command()`.
+Use `typer` + `rich` for multi-command applications. Use stdlib `argparse` for zero-dependency single-file scripts, including skill `scripts/cli.py` entrypoints. Never `click` or `fire`. Single-function script: `typer.run(main)`. Subcommands: `@app.command()`.
 
 ```python
 import typer
@@ -132,7 +132,7 @@ print(user.model_dump_json(indent=2))
 
 ## Async: anyio
 
-Full reference: [async-anyio.md](async-anyio.md). Use anyio; NEVER `import asyncio` directly. Called third-party libraries MAY use asyncio internally.
+Full reference: [cookbook/async.md](../../cookbook/async.md). Use anyio for new code; NEVER `import asyncio` directly in new code (raw asyncio is only for inherited asyncio codebases or when a library hands you an event loop). Called third-party libraries MAY use asyncio internally.
 
 ```python
 import anyio
@@ -233,7 +233,7 @@ DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading
 
 ## Tests: pytest
 
-Use `unittest` for stdlib-only code; otherwise pytest. Conventions: files `test_*.py`; functions `test_*`; fixtures `@pytest.fixture`; async fixtures use `@pytest.fixture` on async functions under bundled `pytest-anyio`; parametrization `@pytest.mark.parametrize`; async tests `@pytest.mark.anyio` from anyio's pytest plugin.
+Use `pytest` for all tests; never `unittest`. Async tests use AnyIO's pytest plugin (`@pytest.mark.anyio`), not `pytest-asyncio`. Conventions: files `test_*.py`; functions `test_*`; fixtures `@pytest.fixture`; parametrization `@pytest.mark.parametrize`.
 
 ```python
 import pytest

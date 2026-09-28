@@ -46,23 +46,16 @@ MAX_RETRIES = 5  # type error: cannot assign to Final
 
 Runtime-changing values are not constants; use a function parameter or config field.
 
-## TypeAlias: name complex types
+## PEP 695 type aliases: name complex types
 Name unions or generics appearing more than once.
 
 ```python
-# Python 3.12+
+# PEP 695 (Python 3.12+)
 type JsonValue = (
-    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+    str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 )
 type Headers = dict[str, str]
 type Middleware = Callable[[Request], Awaitable[Response]]
-
-# Pre-3.12
-from typing import TypeAlias
-
-JsonValue: TypeAlias = (
-    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
-)
 ```
 
 ## StrEnum / IntEnum: closed sets
@@ -148,17 +141,17 @@ def handle(v: str | int) -> None:
 ```
 
 ## Union syntax
-Always `X | Y`; never `Union[X, Y]` or `Optional[X]`.
+Always `X | Y`; never `Union` or legacy `Optional`.
 
 ```python
-# BAD
-from typing import Union, Optional
+# BAD: legacy typing imports
+from typing import Optional, Union
 
 
 def f(x: Optional[int]) -> Union[str, int]: ...
 
 
-# GOOD
+# GOOD: PEP 604 pipe syntax
 def f(x: int | None) -> str | int: ...
 ```
 

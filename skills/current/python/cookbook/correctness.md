@@ -1,25 +1,25 @@
 # Correctness and Boundaries
 
-Use smallest tool making failures obvious: Pyright strict first; runtime validation only at edges; plain typed objects elsewhere.
+Use smallest tool making failures obvious: basedpyright first; runtime validation only at edges; plain typed objects elsewhere.
 
-## Pyright strict baseline
+## basedpyright baseline
 
-New projects MUST start with Pyright strict. Legacy repos MAY retain mypy as a secondary check, never the primary gate.
+New projects MUST start with basedpyright (`typeCheckingMode = "all"`). Legacy repos MAY retain mypy as a secondary check, never the primary gate.
 
 ### `pyproject.toml`
 
 ```toml
-[tool.pyright]
-typeCheckingMode = "strict"
+[tool.basedpyright]
+typeCheckingMode = "all"
 include = ["src", "tests"]
 exclude = [".venv", "build", "dist"]
 ```
 
-### `pyrightconfig.json`
+### `basedpyrightconfig.json`
 
 ```json
 {
-  "typeCheckingMode": "strict",
+  "typeCheckingMode": "all",
   "include": ["src", "tests"],
   "exclude": [".venv", "build", "dist"]
 }
@@ -28,14 +28,14 @@ exclude = [".venv", "build", "dist"]
 Baseline checks:
 
 ```bash
-uv add --dev pyright ruff pytest
-uv run pyright
+uv add --dev basedpyright ruff pytest
+uv run basedpyright
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
 
-Inherited loose codebases: `strict = ["src"]` migration step only. New projects MUST NOT stop there.
+Inherited loose codebases: existing configured mode or standard mode migration step only. New projects MUST start with `typeCheckingMode = "all"`.
 
 ## Boundary validation
 
@@ -58,7 +58,7 @@ Exactly one boundary tool per edge. Parse once, normalize once → plain typed o
 
 ## Prohibitions
 
-- NEVER use `dict[str, Any]` for known payloads.
+- NEVER use `Any` in annotations or `dict[str, Any]` for known payloads.
 - NEVER keep `BaseModel` or `Struct` objects in core business logic.
 - NEVER validate every function argument at runtime.
 - NEVER silently coerce bad input with ad hoc `str()`, `int()`, or defaulting chains.
@@ -70,9 +70,9 @@ Choose the smallest gate matching project shape:
 
 |Project shape|Baseline gate|Add when needed|
 |---|---|---|
-|small library / CLI|`pyright` strict + `ruff` check/format + `pytest`|:|
+|small library / CLI|`basedpyright` + `ruff` check/format + `pytest`|:|
 |API or service with external input|baseline + boundary tests|schema fixtures for request/response shapes|
 |parser / transformer / serializer|baseline + boundary tests|targeted Hypothesis properties|
-|legacy codebase|strict on new code first|expand repo-wide once the debt is paid|
+|legacy codebase|`basedpyright` on new code first|expand repo-wide once the debt is paid|
 
-Gate order: `pyright` strict → lint/format → tests.
+Gate order: `basedpyright` -> lint/format -> tests.

@@ -150,15 +150,14 @@ Use a `@dataclass` container, pass the **type** to `deps_type`, and pass an **in
 
 ```python
 from dataclasses import dataclass
-import httpx
+import httpx2
 from pydantic_ai import Agent, RunContext
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Deps:
     api_key: str
-    http_client: httpx.AsyncClient
-
+    http_client: httpx2.AsyncClient
 
 agent = Agent(
     "openai:gpt-5.5",
@@ -176,8 +175,8 @@ async def fetch_data(ctx: RunContext[Deps], endpoint: str) -> str:
     return r.text
 
 
-async def main():
-    async with httpx.AsyncClient() as client:
+async def main() -> None:
+    async with httpx2.AsyncClient() as client:
         deps = Deps(api_key="sk-...", http_client=client)
         result = await agent.run("Get /users", deps=deps)
         print(result.output)
@@ -260,7 +259,7 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Deps:
     api_key: str
 

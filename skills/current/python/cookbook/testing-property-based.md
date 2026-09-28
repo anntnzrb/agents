@@ -85,7 +85,7 @@ import pytest
 from hypothesis import assume, given, strategies as st
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Interval:
     low: int
     high: int

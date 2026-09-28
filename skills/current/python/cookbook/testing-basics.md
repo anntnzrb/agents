@@ -5,7 +5,7 @@
 Install:
 
 ```bash
-uv add --dev pytest pytest-cov pytest-asyncio
+uv add --dev pytest pytest-cov anyio
 ```
 
 `pyproject.toml`:
@@ -27,10 +27,9 @@ markers = [
     "slow: marks tests as slow",
     "integration: marks tests as integration tests",
 ]
-asyncio_mode = "auto"
 ```
 
-`asyncio_mode = "auto"` avoids `@pytest.mark.asyncio` on every async test.
+Tests use AnyIO's pytest plugin (`@pytest.mark.anyio`); inherited code retains pytest-asyncio until migrated.
 
 ## Basic unit tests
 

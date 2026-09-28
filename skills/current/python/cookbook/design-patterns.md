@@ -7,19 +7,19 @@ Python functional/OOP patterns using Protocols.
 Problem: Construct complex objects step-by-step with a clean, readable, chainable API.
 
 ```python
-from typing import Optional
+from typing import Self
 
 class QueryBuilder:
-    def __init__(self, table: str):
+    def __init__(self, table: str) -> None:
         self.table = table
-        self._where = []
-        self._limit: Optional[int] = None
+        self._where: list[str] = []
+        self._limit: int | None = None
 
-    def where(self, condition: str) -> 'QueryBuilder':
+    def where(self, condition: str) -> Self:
         self._where.append(condition)
         return self
 
-    def limit(self, n: int) -> 'QueryBuilder':
+    def limit(self, n: int) -> Self:
         self._limit = n
         return self
 
@@ -90,31 +90,31 @@ Tip: Protocols define interfaces without inheritance; any class with matching me
 Problem: Create runtime-selected object types without exposing creation logic to the client.
 
 ```python
-from typing import Protocol, Literal
+from typing import Literal, Protocol, assert_never
 
 class DataSource(Protocol):
     def connect(self) -> None: ...
-    def query(self, sql: str) -> list: ...
+    def query(self, sql: str) -> list[tuple[object, ...]]: ...
 
 class PostgreSQL:
     def connect(self) -> None:
         print("Connected to PostgreSQL")
 
-    def query(self, sql: str) -> list:
+    def query(self, sql: str) -> list[tuple[object, ...]]:
         return []
 
 class MySQL:
     def connect(self) -> None:
         print("Connected to MySQL")
 
-    def query(self, sql: str) -> list:
+    def query(self, sql: str) -> list[tuple[object, ...]]:
         return []
 
 class SQLite:
     def connect(self) -> None:
         print("Connected to SQLite")
 
-    def query(self, sql: str) -> list:
+    def query(self, sql: str) -> list[tuple[object, ...]]:
         return []
 
 def create_datasource(db_type: Literal["postgres", "mysql", "sqlite"]) -> DataSource:
@@ -125,9 +125,8 @@ def create_datasource(db_type: Literal["postgres", "mysql", "sqlite"]) -> DataSo
             return MySQL()
         case "sqlite":
             return SQLite()
-        case _:
-            raise ValueError(f"Unknown database: {db_type}")
-
+        case _ as unreachable:
+            assert_never(unreachable)
 # Usage
 db = create_datasource("postgres")
 db.connect()
@@ -200,18 +199,16 @@ Tip: Use Strategy for multiple ways to perform an operation; its Protocol enforc
 Problem: Abstract data access behind a collection-like domain-object interface, enabling storage-backend changes.
 
 ```python
-from typing import Protocol, TypeVar, Generic
 from dataclasses import dataclass
+from typing import Protocol
 
-T = TypeVar("T")
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class User:
     id: int
     name: str
     email: str
 
-class Repository(Protocol[T]):
+class Repository[T](Protocol):
     def get(self, id: int) -> T | None: ...
     def save(self, entity: T) -> None: ...
     def delete(self, id: int) -> None: ...

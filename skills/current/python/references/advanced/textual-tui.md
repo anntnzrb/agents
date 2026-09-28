@@ -96,7 +96,7 @@ class CounterApp(App[None]):
 NEVER block the event loop. For network/disk/CPU work, use `@work` (creates a worker) or `run_worker`.
 
 ```python
-import httpx
+import httpx2
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Static
 from textual.work import work
@@ -109,7 +109,7 @@ class FetchApp(App[None]):
 
     @work(exclusive=True)
     async def fetch(self, url: str) -> None:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx2.AsyncClient(timeout=10.0) as client:
             response = await client.get(url)
         self.query_one("#result", Static).update(
             f"{response.status_code} - {len(response.text)} bytes"
@@ -121,14 +121,14 @@ class FetchApp(App[None]):
 
 `exclusive=True` cancels the previous worker if the user submits a new URL before the first finishes. Workers integrate with Textual's lifecycle - they're cancelled when the app exits.
 
-`@work` is asyncio-flavoured under the hood. That is fine - it does not violate the no-asyncio rule because you are calling Textual's API, not importing asyncio yourself. Inside the worker body, use `httpx.AsyncClient` and other anyio-friendly libraries.
+`@work` is asyncio-flavoured under the hood. That is fine: it does not violate the no-asyncio rule because you are calling Textual's API, not importing asyncio yourself. Inside the worker body, use `httpx2.AsyncClient` and other anyio-friendly libraries.
 
 ## Action handlers
 
 Bind keys to method calls via `BINDINGS` and `action_*` methods.
 
 ```python
-class App(App):
+class App(App[None]):
     BINDINGS = [
         ("ctrl+s", "save", "Save"),
         ("ctrl+r", "reload", "Reload"),

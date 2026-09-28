@@ -193,13 +193,13 @@ Group related parameters into typed value objects with domain names:
 
 ```python
 # CLEAN: grouped by domain concept
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UserIdentity:
     name: str
     email: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OrgPlacement:
     role: str
     department: str

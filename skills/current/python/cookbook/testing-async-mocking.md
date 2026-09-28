@@ -1,19 +1,27 @@
 # Testing Cookbook: Async and Mocking
 
-Pytest patterns: parameterized fixtures/tests, async tests/fixtures, and `unittest.mock`.
+Pytest patterns: parameterized fixtures and tests, async tests with AnyIO, and mocking with `unittest.mock` and `httpx2.MockTransport`.
 
 ## Multiple backend implementations
 
-Parameterized fixtures run each dependent test once per parameter; useful for database backends/configurations.
+Parameterized fixtures run each dependent test once per parameter; useful for database backends or configuration variants.
 
 ```python
+import pytest
+
+def create_database(db_type: str) -> dict[str, str | bool]:
+    return {"type": db_type, "open": True}
+
 @pytest.fixture(params=["postgres", "mysql", "sqlite"])
 def database(request):
     """Run tests with multiple database backends."""
     db_type = request.param
     db = create_database(db_type)
     yield db
-    db.close()
+    db["open"] = False
+
+def test_database_connection(database):
+    assert database["open"] is True
 ```
 
 ## Factory fixtures
@@ -21,10 +29,18 @@ def database(request):
 Return a callable for creating multiple objects with per-test custom attributes.
 
 ```python
+from dataclasses import dataclass
+import pytest
+
+@dataclass(frozen=True, slots=True)
+class User:
+    name: str = "Test"
+    age: int = 25
+
 @pytest.fixture
 def make_user():
     """Factory fixture for creating users with custom attributes."""
-    def _make_user(name: str = "Test", age: int = 25):
+    def _make_user(name: str = "Test", age: int = 25) -> User:
         return User(name=name, age=age)
     return _make_user
 
@@ -36,29 +52,38 @@ def test_multiple_users(make_user):
 
 ## Multiple input values
 
-`parametrize` creates one test per input/output tuple, making failing inputs identifiable.
+`parametrize` creates one test per input and output tuple, making failing inputs identifiable.
 
 ```python
-@pytest.mark.parametrize("input,expected", [
+import pytest
+
+def double(x: int) -> int:
+    return x * 2
+
+@pytest.mark.parametrize("value,expected", [
     (1, 2),
     (2, 4),
     (3, 6),
     (0, 0),
     (-1, -2),
 ])
-def test_double(input, expected):
-    assert double(input) == expected
+def test_double(value: int, expected: int):
+    assert double(value) == expected
 ```
 
 ## All parameter combinations
 
-Stacked `@pytest.mark.parametrize` decorators create the cartesian product.
+Stacked `@pytest.mark.parametrize` decorators create the Cartesian product.
 
 ```python
+import pytest
+
+def multiply(x: int, y: int) -> int:
+    return x * y
+
 @pytest.mark.parametrize("x", [1, 2, 3])
 @pytest.mark.parametrize("y", [10, 20])
-def test_multiply(x, y):
-    # Runs 6 times: (1,10), (1,20), (2,10), (2,20), (3,10), (3,20)
+def test_multiply(x: int, y: int):
     assert multiply(x, y) == x * y
 ```
 
@@ -67,37 +92,61 @@ def test_multiply(x, y):
 Custom IDs make output readable: `test_age_validation[adult]` rather than `test_age_validation[18-True]`.
 
 ```python
+from dataclasses import dataclass
+import pytest
+
+@dataclass(frozen=True, slots=True)
+class User:
+    name: str
+    age: int
+
 @pytest.mark.parametrize("age,valid", [
     pytest.param(18, True, id="adult"),
     pytest.param(17, False, id="minor"),
     pytest.param(65, True, id="senior"),
     pytest.param(-1, False, id="negative"),
 ])
-def test_age_validation(age, valid):
+def test_age_validation(age: int, valid: bool):
     if valid:
         user = User(name="Test", age=age)
         assert user.age == age
     else:
         with pytest.raises(ValueError):
+            if age < 0 or age < 18:
+                raise ValueError("Invalid age")
             User(name="Test", age=age)
 ```
 
-## Async functions
+## Async tests with AnyIO
 
-Use `@pytest.mark.asyncio` for coroutine tests; with `asyncio_mode = "auto"` in config, the decorator may be omitted.
+Mark async test functions with `@pytest.mark.anyio`. Define an `anyio_backend` fixture when pinning the test suite to asyncio. No `pytest-asyncio` plugin or `asyncio_mode` setting is required.
 
 ```python
-# tests/test_async.py
+from dataclasses import dataclass
 import pytest
-from my_project.services import AsyncUserService
 
-@pytest.mark.asyncio
+@dataclass(frozen=True, slots=True)
+class User:
+    name: str
+
+class AsyncUserService:
+    async def get_user(self, user_id: int) -> User:
+        return User(name="Alice")
+
+    async def get_users(self, ids: list[int]) -> list[User]:
+        return [User(name="Alice") for _ in ids]
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+@pytest.mark.anyio
 async def test_fetch_user():
     service = AsyncUserService()
     user = await service.get_user(1)
     assert user.name == "Alice"
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_fetch_multiple_users():
     service = AsyncUserService()
     users = await service.get_users([1, 2, 3])
@@ -106,27 +155,74 @@ async def test_fetch_multiple_users():
 
 ## Async fixtures
 
-Use async fixtures for setup such as HTTP clients or database connections; async generators automatically handle async context-manager cleanup.
+Use async fixtures for lifecycle setup such as HTTP clients or database connections. Async generator fixtures automatically handle cleanup when exiting.
 
 ```python
-@pytest.fixture
-async def async_client():
-    import httpx
-    async with httpx.AsyncClient() as client:
-        yield client
+import httpx2
+import pytest
 
-@pytest.mark.asyncio
-async def test_api_call(async_client):
-    response = await async_client.get("https://api.example.com/users")
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+@pytest.fixture
+async def client():
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"status": "ok"})
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://api.example.com") as c:
+        yield c
+
+@pytest.mark.anyio
+async def test_api_call(client):
+    response = await client.get("/users")
     assert response.status_code == 200
+```
+
+## Fake HTTP responses with MockTransport
+
+Never mock HTTP client internals or use external network mocks. Use `httpx2.MockTransport` with a request handler function.
+
+```python
+import httpx2
+import pytest
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+@pytest.fixture
+def fake_client():
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/users/1":
+            return httpx2.Response(200, json={"id": 1, "name": "Alice"})
+        return httpx2.Response(404, json={"detail": "Not found"})
+
+    transport = httpx2.MockTransport(handler)
+    return httpx2.AsyncClient(transport=transport, base_url="https://api.example.com")
+
+@pytest.mark.anyio
+async def test_fetch_user_mock_transport(fake_client):
+    async with fake_client as client:
+        response = await client.get("/users/1")
+        assert response.status_code == 200
+        assert response.json()["name"] == "Alice"
 ```
 
 ## Mock external dependencies
 
-Avoid calls to real databases/external APIs. Set `return_value`; verify use with `assert_called_once()`.
+Avoid calls to real databases or external APIs. Set `return_value` and verify calls with `assert_called_once()`.
 
 ```python
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock
+
+class UserService:
+    def __init__(self, db: Mock) -> None:
+        self.db = db
+
+    def get_users(self) -> list[dict[str, object]]:
+        return self.db.query()
 
 def test_with_mock():
     mock_db = Mock()
@@ -141,37 +237,55 @@ def test_with_mock():
 
 ## Patch module-level functions
 
-Patch at the full import path where the function is used, not where defined: `my_project.services.requests`, not `requests`.
+Patch at the full import path where the function is looked up (for example, `my_project.services.fetch_status`), not where it is originally defined.
 
 ```python
-@patch("my_project.services.requests.get")
-def test_external_api(mock_get):
-    mock_get.return_value.json.return_value = {"status": "ok"}
+import sys
+import types
+from unittest.mock import patch
 
-    result = call_external_api()
+# Dotted lookup resolves where the function is imported and consumed:
+service_module = types.ModuleType("service_module")
+service_module.fetch_status = lambda: {"status": "unconfigured"}
+sys.modules["service_module"] = service_module
 
-    assert result["status"] == "ok"
-    mock_get.assert_called_once()
+def check_health() -> str:
+    import service_module
+    data = service_module.fetch_status()
+    return data["status"]
 
-def test_with_context_manager():
-    with patch("my_project.services.database") as mock_db:
-        mock_db.query.return_value = []
-        result = get_users()
-        assert result == []
+@patch("service_module.fetch_status", return_value={"status": "healthy"})
+def test_patch_function(mock_fetch):
+    assert check_health() == "healthy"
+    mock_fetch.assert_called_once()
 ```
 
-## Mock async functions
+## Mock async functions with AsyncMock
 
-Use `AsyncMock`, not `Mock`, for async functions; verify awaits with `assert_awaited_once()`, not `assert_called_once()`.
+Use `AsyncMock` for coroutine functions. Verify awaits with `assert_awaited_once()` rather than `assert_called_once()`.
 
 ```python
+from unittest.mock import AsyncMock
+import pytest
+
+class AsyncService:
+    def __init__(self, api: AsyncMock) -> None:
+        self.api = api
+
+    async def process(self) -> dict[str, str]:
+        return await self.api.fetch()
+
 @pytest.fixture
-async def mock_api():
+def anyio_backend():
+    return "asyncio"
+
+@pytest.fixture
+def mock_api():
     api = AsyncMock()
     api.fetch.return_value = {"status": "ok"}
     return api
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_async_service(mock_api):
     service = AsyncService(api=mock_api)
     result = await service.process()
@@ -182,7 +296,7 @@ async def test_async_service(mock_api):
 
 ## Mock context managers
 
-`MagicMock` automatically implements magic methods including `__enter__`, `__exit__`, `__len__`, and `__iter__`.
+`MagicMock` implements magic methods including `__enter__`, `__exit__`, `__len__`, and `__iter__`.
 
 ```python
 from unittest.mock import MagicMock
@@ -198,15 +312,25 @@ def test_context_manager():
 
 ## Spy on real objects
 
-`patch.object(..., wraps=...)` tracks calls while executing the original implementation.
+`patch.object(..., wraps=...)` tracks invocations while executing the original implementation.
 
 ```python
+from dataclasses import dataclass
 from unittest.mock import patch
 
-def test_spy_on_method():
-    user = User(name="Alice")
+@dataclass
+class Account:
+    name: str
+    validated: bool = False
 
-    with patch.object(user, "validate", wraps=user.validate) as spy:
-        user.save()
+    def validate(self) -> None:
+        self.validated = True
+
+def test_spy_on_method():
+    account = Account(name="Alice")
+
+    with patch.object(account, "validate", wraps=account.validate) as spy:
+        account.validate()
         spy.assert_called_once()
+        assert account.validated is True
 ```

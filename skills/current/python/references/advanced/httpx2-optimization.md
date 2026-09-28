@@ -58,9 +58,8 @@ Copy this into the project and always use `create_client()` / `create_async_clie
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 import socket
-import typing
-
 import httpx2
 
 _LIMITS = httpx2.Limits(
@@ -88,9 +87,10 @@ def create_async_client(
     retries: int = 3,
     limits: httpx2.Limits = _LIMITS,
     timeout: httpx2.Timeout = _TIMEOUT,
-    headers: dict[str, str] | None = None,
-    event_hooks: dict[str, list[typing.Callable[..., typing.Any]]] | None = None,
-    **kwargs: typing.Any,
+    headers: Mapping[str, str] | None = None,
+    event_hooks: Mapping[str, list[Callable[..., object]]] | None = None,
+    verify: bool = True,
+    trust_env: bool = True,
 ) -> httpx2.AsyncClient:
     transport = httpx2.AsyncHTTPTransport(
         http2=http2,
@@ -102,10 +102,11 @@ def create_async_client(
         transport=transport,
         timeout=timeout,
         base_url=base_url,
-        headers=headers or {},
-        event_hooks=event_hooks or {},
+        headers=headers,
+        event_hooks=event_hooks,
+        verify=verify,
+        trust_env=trust_env,
         follow_redirects=True,
-        **kwargs,
     )
 
 
@@ -116,9 +117,10 @@ def create_client(
     retries: int = 3,
     limits: httpx2.Limits = _LIMITS,
     timeout: httpx2.Timeout = _TIMEOUT,
-    headers: dict[str, str] | None = None,
-    event_hooks: dict[str, list[typing.Callable[..., typing.Any]]] | None = None,
-    **kwargs: typing.Any,
+    headers: Mapping[str, str] | None = None,
+    event_hooks: Mapping[str, list[Callable[..., object]]] | None = None,
+    verify: bool = True,
+    trust_env: bool = True,
 ) -> httpx2.Client:
     transport = httpx2.HTTPTransport(
         http2=http2,
@@ -130,10 +132,11 @@ def create_client(
         transport=transport,
         timeout=timeout,
         base_url=base_url,
-        headers=headers or {},
-        event_hooks=event_hooks or {},
+        headers=headers,
+        event_hooks=event_hooks,
+        verify=verify,
+        trust_env=trust_env,
         follow_redirects=True,
-        **kwargs,
     )
 ```
 

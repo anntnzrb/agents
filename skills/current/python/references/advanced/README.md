@@ -1,7 +1,7 @@
 
 # Python Programmer
 
-> **Precedence:** Treat this directory as an opinionated recipe library, not universal policy. Repository instructions, declared Python versions, lockfiles, configured gates, existing dependencies, and nearby working code override its stack and style defaults.
+> **Precedence:** Policy lives in SKILL.md and cookbook/modern.md. This directory contains opinionated recipes that MUST NOT contradict that policy. An inherited project's existing configuration, declared Python target, lockfiles, and stack override stack defaults; new code follows the policy.
 
 ## Index
 
@@ -19,24 +19,12 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 
 ### Tooling
 
-| Category | Use | Never |
-|---|---|---|
-| Package manager | `uv` | pip, poetry, conda, pipenv |
-| Type checker | `basedpyright` (`typeCheckingMode = "all"`) | pyright, mypy |
-| Linter + formatter | `ruff` (`select = ["ALL"]`) | flake8, black, isort, autopep8 |
-| Async runtime | `anyio` | `import asyncio` |
-| Data | `polars` + `duckdb` + `numpy` | pandas |
-| Web framework | FastAPI + Pydantic v2 | Flask, Django REST |
-| ORM | SQLAlchemy 2.x async | Django ORM, Tortoise |
-| HTTP client | [`httpx2`](https://github.com/pydantic/httpx2) | requests, aiohttp, httpx |
-| Testing | `pytest` | unittest |
-| CLI | `typer` + `rich` | argparse, click, fire |
-
+The canonical tooling stack and policy defaults are defined in `SKILL.md` `## Stack`. This section details the coding rules enforced across recipes.
 ### The iron list
 
 1. **Frozen by default**: `@dataclass(frozen=True, slots=True)`. Pydantic: `model_config = ConfigDict(frozen=True)`. Mutable only when mutation is the documented purpose
 2. **NewType for distinct IDs**: `UserId = NewType("UserId", int)`. Never pass raw `int` where a branded type exists
-3. **`match` only for variants, `if` only for booleans**: **NEVER** use `if/elif/else` to discriminate on type (`isinstance`), enum value, or literal variant. `match/case` is mandatory for these; non-negotiable. **ALWAYS** end with `case unreachable: assert_never(unreachable)`; bare `case _: pass` and `case _: raise ValueError` are banned (they silently swallow new variants). `if/else` is fine only for boolean expressions, range checks, and predicate calls that aren't variant discrimination. See "Why `if/elif` on variants is banned" below for examples
+3. **`match` only for variants, `if` only for booleans**: **NEVER** use `if/elif/else` to discriminate on type (`isinstance`), enum value, or literal variant. `match/case` is mandatory for these; non-negotiable. **ALWAYS** end with `case _ as unreachable: assert_never(unreachable)`; bare `case _: pass` and `case _: raise ValueError` are banned (they silently swallow new variants). `if/else` is fine for boolean expressions, range checks, and predicate calls that aren't variant discrimination. A single `isinstance` check that narrows one value (for example, narrowing `object` at a boundary) is fine. See "Why `if/elif` on variants is banned" below for examples
 4. **Protocol over ABC**: `typing.Protocol` for interfaces. ABC only when you need shared method implementation
 5. **No raw dicts in signatures**: params and returns use `TypedDict`, `dataclass`, or Pydantic model. Internal scratch dicts are fine
 6. **Parse, don't validate**: constructors produce typed objects or raise. Never pass unvalidated data deeper into the call stack
@@ -44,29 +32,39 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 8. **Final for constants**: module-level constants use `Final`. Mutable module globals are a code smell
 9. **Explicit None**: annotate `-> X | None`. Never return `None` from a function whose signature omits it
 10. **Context managers for resources**: files, DB connections, HTTP clients, locks. No manual `.close()`
-11. **No Any, no object**: both are banned as type annotations. `object` erases all structural information (zero callable attributes, zero narrowing). Use `Protocol` (structural typing), `TypeVar` (generic pass-through), explicit union (known variants), or `TypedDict` (dict shapes)
+11. **Any is banned; object only for unknown values**: `Any` is banned in annotations; when a third-party signature forces it, contain it at the boundary and narrow immediately. `object` is the correct annotation for a genuinely unknown value (for example `__eq__(self, other: object)` or boundary inputs narrowed with `isinstance`/`match`). NEVER use `object` where a Protocol, PEP 695 type parameter, union, or TypedDict can express the shape
 12. **No cast**: `cast()` is banned. Redesign the types
 13. **No type: ignore**; fix the type error. The checker is right; you are wrong
-14. **No broad except**: `except Exception` and `except BaseException` are banned. Catch the **specific** exception you expect. A broad catch swallows bugs you need to see; `KeyError`, `AttributeError`, `TypeError` all vanish silently. If you genuinely need a catch-all at a top-level boundary (CLI entry, HTTP handler), use `# noqa: BROAD_EXCEPT_OK` and log + re-raise
+14. **Specific except by default**: catch the specific exception you expect. `except Exception` is permitted only at process, request, or task boundaries, and only to log and then re-raise or map; mark it with `# noqa: BLE001 - <reason>`. Bare `except:` and `except BaseException` are never allowed
+15. **CLI**: `typer` + `rich` for multi-command applications; stdlib `argparse` for zero-dependency single-file scripts (including skill `scripts/cli.py` entrypoints). Never click or fire
 
 ### Typing and safety
 
+- Universal idioms, baseline syntax, and the Never table are defined in `cookbook/modern.md`
 - `basedpyright` in `typeCheckingMode = "all"`. Every public function has full annotations. Internal helpers: annotate return type; parameter types may be inferred
 - `ruff` with `select = ["ALL"]`. Override specific rules per project in `pyproject.toml`, never globally disable the strict baseline
 - Every new function must have a `docstring` unless its name + signature makes it completely obvious (e.g. `def full_name(first: str, last: str) -> str:`)
-- Use `X | Y` union syntax (PEP 604), never `Union[X, Y]` or `Optional[X]`
 
-### Why `object` is banned
+### Any and object handling
 
-`object` pretends to be safe ("it's the top type!") but gives **zero** narrowing and **zero** attributes. Even `Any` is more honest; it admits the boundary is untyped.
+`Any` is banned in type annotations. When a third-party signature forces it, isolate it at the boundary and narrow immediately. `object` is the top type and the correct annotation for genuinely unknown values (such as `__eq__(self, other: object)` or untrusted payloads), which must be narrowed with `isinstance` or `match`. NEVER use `object` where a Protocol, PEP 695 type parameter, union, or TypedDict can express the shape.
 
 ```python
-# BANNED
-def process(data: object) -> object: ...
-def store(items: list[object]) -> None: ...
+# BANNED: Any in annotations
+def process(data: Any) -> Any: ...
 
 
-results: dict[str, object] = {}
+# BANNED: object where a structured type is known
+def store(items: list[object]) -> None: ...  # use list[T] or list[Item]
+
+
+# GOOD: object for genuinely unknown values, narrowed immediately
+def parse_payload(raw: object) -> Document:
+    if isinstance(raw, bytes):
+        return Document.from_bytes(raw)
+    if isinstance(raw, str):
+        return Document.from_str(raw)
+    raise TypeError(f"unsupported payload type: {type(raw).__name__}")
 
 
 # GOOD: Protocol for structural typing
@@ -77,7 +75,7 @@ class Serializable(Protocol):
 def process(data: Serializable) -> ProcessResult: ...
 
 
-# GOOD: TypeVar for generic pass-through
+# GOOD: PEP 695 generic pass-through
 def identity[T](x: T) -> T: ...
 def first[T](items: Sequence[T]) -> T: ...
 
@@ -120,7 +118,7 @@ match event:
         handle_click(x, y)
     case Scroll(delta=delta):
         handle_scroll(delta)
-    case unreachable:
+    case _ as unreachable:
         assert_never(unreachable)
 
 # GOOD: enum match
@@ -131,7 +129,7 @@ match status:
         continue_processing()
     case Status.CLOSED:
         archive()
-    case unreachable:
+    case _ as unreachable:
         assert_never(unreachable)
 ```
 
@@ -166,28 +164,28 @@ except Exception:
 # GOOD: catch what you expect
 try:
     result = api.fetch(url)
-except httpx.HTTPStatusError as e:
+except httpx2.HTTPStatusError as e:
     logger.error("API %d: %s", e.response.status_code, e.request.url)
     return None
-except httpx.ConnectError:
+except httpx2.ConnectError:
     raise ServiceUnavailableError(service="api") from None
 
 
 # GOOD: top-level boundary (only place broad catch is acceptable)
-def main() -> int:  # noqa: BROAD_EXCEPT_OK
+def main() -> int:
     try:
         return run()
-    except Exception:
+    except Exception:  # noqa: BLE001 - process boundary logs and maps to exit code
         logger.exception("unhandled error")
         return 1
 ```
 
 ### Async
 
-- `import asyncio` is **BANNED**. Use `import anyio`
+- `import asyncio` is banned in new code. Use `import anyio`
 - For background tasks, use `anyio.create_task_group`. Never fire-and-forget with `asyncio.create_task`
 - For concurrency gates, use `anyio.CapacityLimiter` (not `asyncio.Semaphore`)
-- Load `async-anyio.md` when writing async code for the full pattern library
+- Load `../../cookbook/async.md` for the full async guide
 
 ### Data modeling: which container, when
 
@@ -204,7 +202,7 @@ Use `polars` + `duckdb` for data. pandas is never the right answer in this stack
 | Distinct primitive (UserId vs MovieId) | `NewType` |
 | Contract / capability | `Protocol` |
 | Contract + shared implementation | `ABC` |
-| ORM model (SQLAlchemy) | `Mapped[]`: inherently mutable, `# noqa: MUTABLE_OK` |
+| ORM model (SQLAlchemy) | `Mapped[]`: inherently mutable |
 | Config from env vars | `pydantic-settings BaseSettings` |
 
 **The one rule**: data crosses trust boundary → Pydantic. Everything else → dataclass.
@@ -213,11 +211,9 @@ Load `data-modeling.md` for the full decision flowchart and comparison matrix.
 
 ### When frozen=True does not apply
 
-- **ORM models**: SQLAlchemy `Mapped[]` requires mutation. Use `# noqa: MUTABLE_OK`
+- **ORM models**: SQLAlchemy `Mapped[]` requires mutation
 - **Builder / accumulator**: object exists to be mutated (counter, buffer, state machine). Docstring must explain why
 - **Pydantic Settings**: tests override fields. Mutable is acceptable
-
-If you need `# noqa: MUTABLE_OK`, the class docstring must say why mutation is required.
 
 ### Libraries
 
@@ -258,7 +254,7 @@ Load on demand; not all at once.
 | Type patterns (NewType, Final, enums, narrowing) | `type-patterns.md` |
 | Data modeling (container choice, frozen, parse-don't-validate) | `data-modeling.md` |
 | Error handling (typed errors, union returns, exhaustive match) | `error-handling.md` |
-| Async patterns (anyio) | `async-anyio.md` |
+| Async patterns (anyio) | `../../cookbook/async.md` |
 | Data processing (polars / duckdb) | `data-processing.md` |
 | FastAPI + SQLAlchemy stack | `fastapi-stack.md` |
 | Library decision tree | `libraries.md` |
@@ -276,27 +272,13 @@ Every outgoing HTTP call MUST use [`httpx2`](https://github.com/pydantic/httpx2)
 
 When writing or reviewing ANY network code, **ALWAYS load `httpx2-optimization.md`** and use the factory pattern verbatim. No exceptions.
 
-## No-excuse audit
+## Quality verification
 
-Use the repository's configured formatter, linter, type checker, and test suite after every edit session. The following table is a review checklist, not a bundled checker contract.
-
-| Rule ID | Catches | Opt-out |
-|---|---|---|
-| `cast-any` | `cast(Any, ...)` | None: redesign types |
-| `type-ignore` | `# type: ignore` | None: fix the type |
-| `pyright-ignore` | `# pyright: ignore` | None: fix the type |
-| `bare-except` | `except:` with no class | None: name the exception |
-| `silent-except` | `except X: pass` / `except X: ...` | None: handle or re-raise |
-| `no-asyncio` | `import asyncio` | `# noqa: ANYIO_OK` |
-| `no-pandas` | `import pandas` | `# noqa: PANDAS_OK` |
-| `mutable-dataclass` | `@dataclass` without `frozen=True` | `# noqa: MUTABLE_OK` |
-| `missing-slots` | `@dataclass` without `slots=True` | `# noqa: SLOTS_OK` |
-| `raw-dict-return` | `-> dict` in function return type | `# noqa: DICT_OK` |
-| `missing-assert-never` | `match` block without `assert_never` default | `# noqa: MATCH_OK` |
-| `generic-exception` | `raise ValueError("...")` / `raise TypeError("...")` with bare string | `# noqa: GENERIC_ERR_OK` |
-| `no-object` | `object` used as type annotation (param, return, generic arg) | `# noqa: OBJECT_OK` |
-| `if-elif-on-variant` | `if isinstance()`/`if x == Enum.V` chain that should be `match/case` | `# noqa: IF_VARIANT_OK` |
-| `broad-except` | `except Exception` / `except BaseException` (too broad) | `# noqa: BROAD_EXCEPT_OK` |
+Run the project quality gates after every edit session:
+- `uv run basedpyright`
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run pytest`
 
 Fix every violation before declaring work done. basedpyright + ruff strict config catches the rest.
 
@@ -312,7 +294,7 @@ Tests are strict too, with these exceptions (already configured in `pyproject.to
 | Skip docstrings | Test names are the docs (`D` ignored) |
 | Have unused function args | Fixtures (`ARG` ignored) |
 
-Tests still follow the iron list; frozen dataclasses, typed errors, exhaustive match. If test fixtures need mutable state, use `# noqa: MUTABLE_OK` on the fixture class.
+Tests still follow the iron list; frozen dataclasses, typed errors, exhaustive match. If test fixtures need mutable state, explain the reason in the fixture class docstring.
 
 ## Existing codebases
 

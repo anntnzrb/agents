@@ -1,511 +1,372 @@
-# Async/Await Cookbook
+# Async Programming with AnyIO
 
-Deep dive into async programming in Python 3.14+.
+Modern async Python uses AnyIO for structured concurrency, cancellation scopes, and bounded resource execution.
 
 ## Contents
 
-- [Running concurrent tasks](#running-concurrent-tasks-with-taskgroup)
-- [Gathering results](#gathering-multiple-results)
-- [Timeouts](#adding-timeouts-to-async-operations)
-- [Async generators and comprehensions](#creating-async-generators)
-- [Async context managers](#creating-class-based-async-context-managers)
-- [HTTP requests, clients, and retries](#making-http-requests-with-httpx)
-- [Exception groups and degradation](#handling-exception-groups)
-- [Blocking code and rate limits](#running-blocking-code-in-async-context)
-- [Events, queues, and locks](#coordinating-tasks-with-events)
-- [Anti-patterns](#anti-patterns-to-avoid)
-- [Quick reference](#quick-reference)
+- [Structured Concurrency with Task Groups](#structured-concurrency-with-task-groups)
+- [Cancellation and Timeouts](#cancellation-and-timeouts)
+- [Shielding and Graceful Shutdown](#shielding-and-graceful-shutdown)
+- [Bounded Concurrency with CapacityLimiter](#bounded-concurrency-with-capacitylimiter)
+- [Streams and Backpressure](#streams-and-backpressure)
+- [Running Blocking Work in Worker Threads](#running-blocking-work-in-worker-threads)
+- [Resource Ownership and Async Context Managers](#resource-ownership-and-async-context-managers)
+- [HTTP Client Lifecycle with httpx2](#http-client-lifecycle-with-httpx2)
+- [Inherited asyncio Codebases](#inherited-asyncio-codebases)
 
 ---
 
-## Running Concurrent Tasks with TaskGroup
+## Structured Concurrency with Task Groups
 
-**Problem**: You need to run multiple async operations concurrently with proper error handling and automatic cleanup.
+Task groups bind concurrent tasks to a single lexical scope. A task group guarantees that all spawned tasks complete before the context block exits. If any child task raises an unhandled exception, AnyIO cancels all remaining siblings and raises an `ExceptionGroup`.
 
-**Solution**:
+### Spawning Concurrent Tasks with `start_soon`
+
+`tg.start_soon()` accepts a coroutine function and its arguments. It does not accept an already-called coroutine object.
 
 ```python
-import asyncio
+import anyio
 
-async def fetch_data(url: str) -> str:
-    await asyncio.sleep(0.1)
-    return f"Data from {url}"
+async def fetch_item(item_id: int) -> str:
+    await anyio.sleep(0.01)
+    return f"item-{item_id}"
 
-async def main():
-    async with asyncio.TaskGroup() as tg:
-        task1 = tg.create_task(fetch_data("url1"))
-        task2 = tg.create_task(fetch_data("url2"))
-        task3 = tg.create_task(fetch_data("url3"))
+async def main() -> None:
+    results: dict[int, str] = {}
 
-    # All tasks completed or exception raised
-    print(f"Task1: {task1.result()}")
-    print(f"Task2: {task2.result()}")
-    print(f"Task3: {task3.result()}")
+    async def worker(item_id: int) -> None:
+        results[item_id] = await fetch_item(item_id)
 
-asyncio.run(main())
+    async with anyio.create_task_group() as tg:
+        for item_id in range(3):
+            tg.start_soon(worker, item_id)
+
+    assert results == {0: "item-0", 1: "item-1", 2: "item-2"}
+
+anyio.run(main)
 ```
 
-**Tip**: TaskGroup (Python 3.11+) is the recommended way for structured concurrency. It ensures all tasks complete before exiting the context and properly propagates exceptions.
+Collect return values by populating a dictionary, list, or memory object stream. Task groups deliberately do not return detached future objects.
 
----
+### Initializing Tasks with `start`
 
-## Gathering Multiple Results
-
-**Problem**: You need to collect results from multiple async operations running in parallel.
-
-**Solution**:
+Use `tg.start()` when a spawned task must initialize resources (such as binding a socket or loading state) before the calling task continues. The child task receives a `task_status` parameter and calls `task_status.started(value)` to signal readiness.
 
 ```python
-async def fetch_all(urls: list[str]) -> list[str]:
-    tasks = [fetch_data(url) for url in urls]
-    results = await asyncio.gather(*tasks)
-    return results
+import anyio
+from anyio.abc import TaskStatus
 
-# With return_exceptions for partial failures
-async def fetch_all_safe(urls: list[str]):
-    results = await asyncio.gather(
-        *[fetch_data(url) for url in urls],
-        return_exceptions=True
-    )
-    successes = [r for r in results if not isinstance(r, Exception)]
-    errors = [r for r in results if isinstance(r, Exception)]
-    return successes, errors
+async def server_worker(*, task_status: TaskStatus[int] = anyio.TASK_STATUS_IGNORED) -> None:
+    await anyio.sleep(0.01)
+    assigned_port = 8080
+    task_status.started(assigned_port)
+    await anyio.sleep(0.02)
+
+async def main() -> None:
+    async with anyio.create_task_group() as tg:
+        port = await tg.start(server_worker)
+        assert port == 8080
+
+anyio.run(main)
 ```
 
-**Tip**: Use `return_exceptions=True` to handle partial failures gracefully. Without it, any single failure will raise an exception immediately.
-
 ---
 
-## Adding Timeouts to Async Operations
+## Cancellation and Timeouts
 
-**Problem**: You need to ensure async operations don't run indefinitely.
+AnyIO implements level cancellation. When a `CancelScope` is cancelled, every async checkpoint (such as `anyio.sleep()` or stream I/O) within that scope raises a cancellation exception. Catching cancellation requires re-raising it; never swallow cancellation.
 
-**Solution**:
+### Raising on Timeout: `fail_after`
+
+`anyio.fail_after()` creates a cancel scope that raises `TimeoutError` when the deadline expires:
 
 ```python
-async def with_timeout():
+import anyio
+
+async def slow_work() -> None:
+    await anyio.sleep(1.0)
+
+async def main() -> None:
+    timed_out = False
     try:
-        async with asyncio.timeout(5.0):
-            result = await slow_operation()
-            return result
-    except asyncio.TimeoutError:
-        print("Operation timed out")
-        return None
+        with anyio.fail_after(0.02):
+            await slow_work()
+    except TimeoutError:
+        timed_out = True
+    assert timed_out
 
-# wait_for (older API)
-try:
-    result = await asyncio.wait_for(slow_operation(), timeout=5.0)
-except asyncio.TimeoutError:
-    print("Timed out")
+anyio.run(main)
 ```
 
-**Tip**: Prefer `asyncio.timeout()` context manager (Python 3.11+) over `wait_for()` for cleaner timeout handling.
+### Exiting Silently on Timeout: `move_on_after`
+
+`anyio.move_on_after()` cancels the enclosed block on deadline expiry but exits without raising an exception. Inspect `scope.cancelled_caught` to verify whether execution timed out:
+
+```python
+import anyio
+
+async def slow_work() -> None:
+    await anyio.sleep(1.0)
+
+async def main() -> None:
+    with anyio.move_on_after(0.02) as scope:
+        await slow_work()
+
+    assert scope.cancelled_caught
+
+anyio.run(main)
+```
 
 ---
 
-## Creating Async Generators
+## Shielding and Graceful Shutdown
 
-**Problem**: You need to yield values asynchronously, processing data as it becomes available.
-
-**Solution**:
+When an outer scope is cancelled, entering cleanup code that awaits async operations will immediately raise cancellation. Use `CancelScope(shield=True)` to protect async cleanup. Always combine shielding with `move_on_after` so cleanup cannot hang indefinitely:
 
 ```python
-from typing import AsyncGenerator
+import anyio
 
-async def async_range(n: int) -> AsyncGenerator[int, None]:
-    for i in range(n):
-        await asyncio.sleep(0.01)
-        yield i
-
-async def consume():
-    async for value in async_range(5):
-        print(value)
-```
-
-**Tip**: Use async generators for streaming data, paginated API responses, or any scenario where you want to process items as they arrive rather than waiting for all data.
-
----
-
-## Using Async Comprehensions
-
-**Problem**: You want to build collections from async generators concisely.
-
-**Solution**:
-
-```python
-async def get_items() -> list[int]:
-    return [i async for i in async_range(10)]
-
-async def filter_items() -> list[int]:
-    return [i async for i in async_range(10) if i % 2 == 0]
-```
-
-**Tip**: Async comprehensions work just like regular comprehensions but use `async for` to iterate over async iterables.
-
----
-
-## Cleaning Up Async Generators
-
-**Problem**: You need to ensure cleanup happens when an async generator is done or interrupted.
-
-**Solution**:
-
-```python
-async def stream_data():
+async def resilient_worker() -> None:
     try:
-        async for chunk in fetch_stream():
-            yield chunk
-    finally:
-        await cleanup_connection()
-```
+        await anyio.sleep(10.0)
+    except anyio.get_cancelled_exc_class():
+        with anyio.move_on_after(0.5, shield=True):
+            await anyio.sleep(0.01)
+        raise
 
-**Tip**: Always use try/finally blocks in async generators to guarantee cleanup code runs, even if the generator is closed early.
+async def main() -> None:
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(resilient_worker)
+        await anyio.sleep(0.02)
+        tg.cancel_scope.cancel()
+
+anyio.run(main)
+```
 
 ---
 
-## Creating Class-Based Async Context Managers
+## Bounded Concurrency with CapacityLimiter
 
-**Problem**: You need to manage async resources with setup and teardown logic.
-
-**Solution**:
+Limit concurrent access to constrained resources (databases, third-party APIs, disk I/O) with `anyio.CapacityLimiter`. Unlike basic semaphores, `CapacityLimiter` tracks borrower identity and prevents token leaks or deadlocks from re-entrant acquisition:
 
 ```python
-class AsyncDatabaseConnection:
-    async def __aenter__(self):
-        print("Connecting...")
-        await asyncio.sleep(0.1)
+import anyio
+
+async def limited_worker(limiter: anyio.CapacityLimiter, results: list[int], item: int) -> None:
+    async with limiter:
+        await anyio.sleep(0.01)
+        results.append(item)
+
+async def main() -> None:
+    limiter = anyio.CapacityLimiter(2)
+    results: list[int] = []
+
+    async with anyio.create_task_group() as tg:
+        for i in range(4):
+            tg.start_soon(limited_worker, limiter, results, i)
+
+    assert len(results) == 4
+
+anyio.run(main)
+```
+
+---
+
+## Streams and Backpressure
+
+Memory object streams replace `asyncio.Queue` with typed, cloneable, backpressured channels. `create_memory_object_stream[T](max_buffer_size)` returns a connected pair of `(MemoryObjectSendStream, MemoryObjectReceiveStream)`:
+
+```python
+import anyio
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+
+async def producer(send_stream: MemoryObjectSendStream[int]) -> None:
+    async with send_stream:
+        for item in range(5):
+            await send_stream.send(item)
+
+async def consumer(receive_stream: MemoryObjectReceiveStream[int], output: list[int]) -> None:
+    async with receive_stream:
+        async for item in receive_stream:
+            output.append(item)
+
+async def main() -> None:
+    send_stream, receive_stream = anyio.create_memory_object_stream[int](max_buffer_size=2)
+    output: list[int] = []
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(producer, send_stream)
+        tg.start_soon(consumer, receive_stream, output)
+
+    assert output == [0, 1, 2, 3, 4]
+
+anyio.run(main)
+```
+
+Key guarantees:
+- Setting `max_buffer_size=0` makes `send()` block until a consumer is waiting to receive.
+- Closing all clones of the send stream terminates the consumer's `async for` loop cleanly.
+- Clones allow multiple concurrent producers and consumers without external locks.
+
+---
+
+## Running Blocking Work in Worker Threads
+
+Never invoke synchronous file I/O, heavy CPU routines, or blocking network clients directly on the async event loop. Offload them using `anyio.to_thread.run_sync()`:
+
+```python
+import time
+import anyio
+
+def cpu_intensive_hash(raw: str) -> str:
+    time.sleep(0.01)
+    return f"digest-{raw}"
+
+def worker_thread_action() -> str:
+    anyio.from_thread.run(anyio.sleep, 0.01)
+    return "completed"
+
+async def main() -> None:
+    digest = await anyio.to_thread.run_sync(cpu_intensive_hash, "payload")
+    assert digest == "digest-payload"
+
+    result = await anyio.to_thread.run_sync(worker_thread_action)
+    assert result == "completed"
+
+anyio.run(main)
+```
+
+Use `anyio.from_thread.run()` inside a worker thread to execute an async coroutine back on the original event loop.
+
+---
+
+## Resource Ownership and Async Context Managers
+
+Async resources must be acquired and released using `async with`. Implement either a class with `__aenter__` and `__aexit__` or a generator decorated with `@contextlib.asynccontextmanager`:
+
+```python
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+import anyio
+
+class ManagedPool:
+    def __init__(self) -> None:
+        self.active = False
+
+    async def __aenter__(self) -> ManagedPool:
+        await anyio.sleep(0.01)
+        self.active = True
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        print("Closing...")
-        await asyncio.sleep(0.05)
-        return False  # Don't suppress exceptions
-
-async def use_db():
-    async with AsyncDatabaseConnection() as conn:
-        print("Using connection")
-```
-
-**Tip**: Return `False` from `__aexit__` to let exceptions propagate. Only return `True` if you want to suppress exceptions.
-
----
-
-## Creating Decorator-Based Async Context Managers
-
-**Problem**: You want to create simple async context managers without defining a full class.
-
-**Solution**:
-
-```python
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
+        with anyio.move_on_after(0.5, shield=True):
+            await anyio.sleep(0.01)
+            self.active = False
 
 @asynccontextmanager
-async def async_timer(name: str) -> AsyncGenerator[None, None]:
-    import time
-    start = time.time()
+async def database_lease(name: str) -> AsyncIterator[str]:
+    await anyio.sleep(0.01)
     try:
-        yield
+        yield f"connection:{name}"
     finally:
-        elapsed = time.time() - start
-        print(f"{name} took {elapsed:.4f}s")
+        with anyio.move_on_after(0.5, shield=True):
+            await anyio.sleep(0.01)
 
-async def timed_operation():
-    async with async_timer("fetch"):
-        await fetch_data("url")
+async def main() -> None:
+    async with ManagedPool() as pool:
+        assert pool.active
+    assert not pool.active
+
+    async with database_lease("users") as lease:
+        assert lease == "connection:users"
+
+anyio.run(main)
 ```
-
-**Tip**: Use `@asynccontextmanager` for one-off context managers. It's more concise than defining a class with `__aenter__` and `__aexit__`.
 
 ---
 
-## Making HTTP Requests with httpx
+## HTTP Client Lifecycle with httpx2
 
-**Problem**: You need to make async HTTP requests efficiently.
-
-**Solution**:
+Use `httpx2.AsyncClient` for all async HTTP communication. Create a single client per application or operation lifecycle to reuse connection pools and HTTP/2 multiplexing. For client configuration, connection limits, and socket options, see `references/advanced/httpx2-optimization.md`.
 
 ```python
-import httpx
+import anyio
+import httpx2
 
-async def fetch_json(url: str) -> dict:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.json()
+async def fetch_path(client: httpx2.AsyncClient, path: str) -> str:
+    response = await client.get(path)
+    response.raise_for_status()
+    payload: dict[str, str] = response.json()
+    return payload["path"]
 
-async def post_data(url: str, data: dict) -> dict:
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=data)
-        response.raise_for_status()
-        return response.json()
+async def main() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"path": request.url.path})
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://api.example.com") as client:
+        paths = ["/items/1", "/items/2"]
+        results: dict[str, str] = {}
+
+        async def worker(path: str) -> None:
+            results[path] = await fetch_path(client, path)
+
+        async with anyio.create_task_group() as tg:
+            for path in paths:
+                tg.start_soon(worker, path)
+
+        assert results == {"/items/1": "/items/1", "/items/2": "/items/2"}
+
+anyio.run(main)
 ```
-
-**Tip**: Always use `async with` to ensure the client is properly closed. Never use the synchronous `requests` library in async code.
 
 ---
 
-## Reusing HTTP Client for Multiple Requests
+## Inherited asyncio Codebases
 
-**Problem**: You need to make multiple HTTP requests and want to reuse connections for better performance.
+When maintaining existing asyncio codebases or integrating with libraries that manage an asyncio loop directly:
 
-**Solution**:
+### Modern asyncio Patterns
 
-```python
-async def fetch_multiple(urls: list[str]) -> list[dict]:
-    async with httpx.AsyncClient() as client:
-        async with asyncio.TaskGroup() as tg:
-            tasks = [
-                tg.create_task(client.get(url))
-                for url in urls
-            ]
-        return [t.result().json() for t in tasks]
-```
-
-**Tip**: Reusing a single AsyncClient across multiple requests enables connection pooling and significantly improves performance.
-
----
-
-## Adding Retry Logic to HTTP Requests
-
-**Problem**: You need to automatically retry failed HTTP requests with backoff.
-
-**Solution**:
-
-```python
-import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1))
-async def fetch_with_retry(url: str) -> dict:
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.json()
-```
-
-**Tip**: Use the `tenacity` library for robust retry logic with exponential backoff. Combine with timeouts to prevent hanging requests.
-
----
-
-## Handling Exception Groups
-
-**Problem**: You need to handle different types of exceptions from multiple concurrent tasks.
-
-**Solution**:
-
-```python
-async def run_tasks():
-    try:
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(might_fail_1())
-            tg.create_task(might_fail_2())
-            tg.create_task(might_fail_3())
-    except* ValueError as eg:
-        print(f"ValueError(s): {eg.exceptions}")
-    except* TypeError as eg:
-        print(f"TypeError(s): {eg.exceptions}")
-```
-
-**Tip**: Use `except*` syntax (Python 3.11+) to handle exception groups from TaskGroup. It allows you to handle different exception types separately.
-
----
-
-## Implementing Graceful Degradation
-
-**Problem**: You want your async code to continue working even if some operations fail.
-
-**Solution**:
-
-```python
-async def fetch_with_fallback(primary: str, fallback: str) -> str:
-    try:
-        return await fetch_data(primary)
-    except Exception:
-        return await fetch_data(fallback)
-
-async def fetch_best_effort(urls: list[str]) -> list[str]:
-    results = await asyncio.gather(
-        *[fetch_data(url) for url in urls],
-        return_exceptions=True
-    )
-    return [r for r in results if isinstance(r, str)]
-```
-
-**Tip**: Use fallbacks for critical operations and filter out exceptions for best-effort batch operations.
-
----
-
-## Running Blocking Code in Async Context
-
-**Problem**: You need to run blocking I/O or CPU-intensive code without blocking the event loop.
-
-**Solution**:
+Run concurrent work in `asyncio.TaskGroup` and bound execution with timeouts:
 
 ```python
 import asyncio
 
-def blocking_io():
-    import time
-    time.sleep(1)
-    return "done"
+async def fetch(val: int) -> int:
+    await asyncio.sleep(0.01)
+    return val * 2
 
-async def main():
-    # Run blocking code without blocking event loop
-    result = await asyncio.to_thread(blocking_io)
-    print(result)
-```
+async def main() -> None:
+    loop = asyncio.get_running_loop()
+    assert loop.is_running()
 
-**Tip**: Always use `asyncio.to_thread()` for blocking operations. Never call blocking functions directly in async code or use `time.sleep()`.
+    async with asyncio.timeout(1.0):
+        async with asyncio.TaskGroup() as tg:
+            t1 = tg.create_task(fetch(1))
+            t2 = tg.create_task(fetch(2))
 
----
+    assert t1.result() == 2
+    assert t2.result() == 4
 
-## Rate Limiting with Semaphores
-
-**Problem**: You need to limit the number of concurrent async operations.
-
-**Solution**:
-
-```python
-async def fetch_with_limit(urls: list[str], max_concurrent: int = 10):
-    semaphore = asyncio.Semaphore(max_concurrent)
-
-    async def limited_fetch(url: str):
-        async with semaphore:
-            return await fetch_data(url)
-
-    return await asyncio.gather(*[limited_fetch(url) for url in urls])
-```
-
-**Tip**: Use semaphores to prevent overwhelming external services or exhausting system resources when making many concurrent requests.
-
----
-
-## Coordinating Tasks with Events
-
-**Problem**: You need to signal between async tasks or wait for a specific condition.
-
-**Solution**:
-
-```python
-async def waiter(event: asyncio.Event):
-    print("Waiting...")
-    await event.wait()
-    print("Got signal!")
-
-async def setter(event: asyncio.Event):
-    await asyncio.sleep(1)
-    event.set()
-
-async def main():
-    event = asyncio.Event()
-    await asyncio.gather(waiter(event), setter(event))
-```
-
-**Tip**: Events are useful for simple signaling between tasks. For passing data, use Queues instead.
-
----
-
-## Producer-Consumer Pattern with Queues
-
-**Problem**: You need to process items asynchronously with separate producer and consumer tasks.
-
-**Solution**:
-
-```python
-async def producer(queue: asyncio.Queue):
-    for i in range(10):
-        await queue.put(i)
-        await asyncio.sleep(0.1)
-    await queue.put(None)  # Sentinel
-
-async def consumer(queue: asyncio.Queue):
-    while True:
-        item = await queue.get()
-        if item is None:
-            break
-        print(f"Processing {item}")
-        queue.task_done()
-
-async def main():
-    queue = asyncio.Queue()
-    await asyncio.gather(producer(queue), consumer(queue))
-```
-
-**Tip**: Use a sentinel value (like `None`) to signal when the producer is done. Call `task_done()` after processing each item for proper queue tracking.
-
----
-
-## Protecting Shared State with Locks
-
-**Problem**: You need to safely access and modify shared state from multiple async tasks.
-
-**Solution**:
-
-```python
-class AsyncCounter:
-    def __init__(self):
-        self.value = 0
-        self._lock = asyncio.Lock()
-
-    async def increment(self):
-        async with self._lock:
-            self.value += 1
-            return self.value
-```
-
-**Tip**: Always use locks when multiple tasks access shared mutable state. Without locks, you risk race conditions even in async code.
-
----
-
-## Anti-Patterns to Avoid
-
-**Problem**: You want to avoid common mistakes in async Python code.
-
-**Solution**:
-
-| Avoid                        | Do Instead                         |
-| ---------------------------- | ---------------------------------- |
-| `requests.get(url)`          | `await client.get(url)` with httpx |
-| `time.sleep(n)`              | `await asyncio.sleep(n)`           |
-| Bare `asyncio.create_task()` | Use TaskGroup or gather            |
-| Global event loop            | `asyncio.run(main())`              |
-| `loop.run_until_complete()`  | `asyncio.run()`                    |
-
-**Tip**: Blocking calls in async code will freeze the entire event loop. Always use async equivalents and prefer modern APIs like TaskGroup and `asyncio.run()`.
-
----
-
-## Quick Reference
-
-**Problem**: You need a quick lookup of common async patterns.
-
-**Solution**:
-
-```python
-# Run async code
 asyncio.run(main())
-
-# Create tasks
-async with asyncio.TaskGroup() as tg:
-    task = tg.create_task(coro())
-
-# Concurrent execution
-results = await asyncio.gather(*coros)
-
-# Timeout
-async with asyncio.timeout(5.0):
-    await slow_op()
-
-# Sleep
-await asyncio.sleep(1.0)
-
-# Run blocking in thread
-await asyncio.to_thread(blocking_fn)
-
-# Rate limit
-async with semaphore:
-    await limited_op()
 ```
 
-**Tip**: Bookmark this reference for quick access to the most common async patterns in Python 3.11+.
+- Access the loop with `asyncio.get_running_loop()` inside running coroutines.
+- Pass custom loop factories via `asyncio.run(main(), loop_factory=custom_factory)`.
+
+### Prohibitions in asyncio Code
+
+| Never | Instead | Reason |
+| --- | --- | --- |
+| `asyncio.get_event_loop()` | `asyncio.get_running_loop()` | Deprecated without running loop; removed in Python 3.16. |
+| Event loop policies | `asyncio.run(..., loop_factory=...)` | Policy mechanism is deprecated. |
+| Bare `asyncio.create_task()` without tracking | `asyncio.TaskGroup` | Unreferenced tasks are garbage-collected mid-execution. |
+| `asyncio.gather()` in new code | `asyncio.TaskGroup` | Does not cancel running tasks on sibling failure. |
+| `asyncio.wait_for()` | `asyncio.timeout()` | Cancels tasks via edge cancellation, risking task leaks. |
+| Blocking calls (`time.sleep`) on the loop | `asyncio.to_thread()` | Freezes the event loop for all concurrent tasks. |

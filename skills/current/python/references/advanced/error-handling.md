@@ -111,7 +111,7 @@ def handle_result(result: GetUserResult) -> str:
 
 ## Exhaustive match: every match needs a default
 
-Every `match` statement ends with `case _: assert_never(x)`. No exceptions.
+Every `match` statement discriminating variants ends with `case _ as unreachable: assert_never(unreachable)`.
 
 ```python
 from enum import StrEnum
@@ -159,11 +159,11 @@ data = Path("data.txt").read_text()
 ### Async resources
 
 ```python
-import httpx
+import httpx2
 
 
 async def fetch_users() -> list[User]:
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         response = await client.get("https://api.example.com/users")
         response.raise_for_status()
         return [User(**u) for u in response.json()]

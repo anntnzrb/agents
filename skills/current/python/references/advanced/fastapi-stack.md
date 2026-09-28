@@ -34,7 +34,7 @@ myapi/
 
 ```bash
 uv add fastapi 'sqlalchemy[asyncio]>=2.0' asyncpg 'pydantic[email]>=2' pydantic-settings 'uvicorn[standard]' orjson
-uv add --dev httpx pytest alembic
+uv add --dev httpx2 pytest alembic
 ```
 
 `orjson` is mandatory: set `default_response_class=ORJSONResponse` on the FastAPI app. Pydantic-typed responses bypass it (Pydantic v2's `model_dump_json` is already Rust-backed); raw `dict` / `list` returns are accelerated. For SSE / NDJSON streams, call `orjson.dumps(...)` per chunk inside `StreamingResponse`. See `orjson-stack.md` for the decision tree, flag reference, and benchmarks.
@@ -280,7 +280,7 @@ uv run alembic upgrade head
 
 ```python
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from myapi.main import app
 

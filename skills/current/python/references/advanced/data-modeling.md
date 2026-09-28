@@ -59,7 +59,7 @@ class Point:
     y: float
 ```
 
-Always `frozen=True, slots=True`. Mutable only when mutation is the documented purpose; opt out with `# noqa: MUTABLE_OK`.
+Always `frozen=True, slots=True`. Mutable only when mutation is the documented purpose (such as an accumulator, builder, or state machine whose docstring explains why).
 
 ### Pydantic BaseModel: trust boundary guardian
 
@@ -145,14 +145,14 @@ Only when Protocol isn't enough.
 from abc import ABC, abstractmethod
 
 
-class BaseRepository(ABC):
+class BaseRepository[T](ABC):
     @abstractmethod
-    async def get(self, id: int) -> Model | None: ...
+    async def get(self, id: int) -> T | None: ...
 
     @abstractmethod
-    async def save(self, model: Model) -> None: ...
+    async def save(self, model: T) -> None: ...
 
-    async def get_or_raise(self, id: int) -> Model:
+    async def get_or_raise(self, id: int) -> T:
         result = await self.get(id)
         if result is None:
             msg = f"{type(self).__name__}: id {id} not found"

@@ -47,23 +47,22 @@ assert cumprod == [1, 2, 6, 24]
 
 `chain.from_iterable()` efficiently flattens nested iterables; `accumulate()` supports running totals and cumulative operations.
 
-## Batching and Pairing
+## Batching and Pairing Recipes
 
-Group elements into chunks or consecutive pairs.
+Deeper chunking and sliding window operations. See `cookbook/modern.md` for baseline `batched` and `pairwise` rules.
 
 ```python
 from itertools import batched, pairwise
 
-# batched: Group into fixed-size chunks (3.12+)
-data = list(batched('ABCDEFG', 2))
-assert data == [('A', 'B'), ('C', 'D'), ('E', 'F'), ('G',)]
+# Chunk processing with unpacking
+data = [list(batch) for batch in batched("ABCDEFG", 2)]
+assert data == [["A", "B"], ["C", "D"], ["E", "F"], ["G"]]
 
-# pairwise: Consecutive overlapping pairs
-pairs = list(pairwise('ABCD'))
-assert pairs == [('A', 'B'), ('B', 'C'), ('C', 'D')]
+# Sliding difference calculation over data series
+timestamps = [100, 105, 120, 128]
+deltas = [b - a for a, b in pairwise(timestamps)]
+assert deltas == [5, 15, 8]
 ```
-
-`batched()` suits chunk processing; `pairwise()` suits consecutive comparisons or differences.
 
 ## Filtering Iterators
 
@@ -151,28 +150,28 @@ Sort by the grouping key first: `groupby()` groups consecutive, not global, matc
 Common patterns; flattening, taking `n` items, and ordered uniqueness; are often more efficient than list-based approaches.
 
 ```python
-from itertools import islice, chain
+from collections.abc import Callable, Iterable, Iterator
+from itertools import chain, islice
 
 # flatten one level
-def flatten(list_of_lists):
+def flatten[T](list_of_lists: Iterable[Iterable[T]]) -> Iterator[T]:
     return chain.from_iterable(list_of_lists)
 
 nested = [[1, 2], [3, 4], [5, 6]]
 assert list(flatten(nested)) == [1, 2, 3, 4, 5, 6]
 
 # take first n items
-def take(n: int, iterable):
+def take[T](n: int, iterable: Iterable[T]) -> list[T]:
     return list(islice(iterable, n))
 
 assert take(3, range(10)) == [0, 1, 2]
 
 # unique elements (preserving order)
-def unique(iterable, key=None):
-    seen = set()
+def unique[T, K](iterable: Iterable[T], key: Callable[[T], K] | None = None) -> Iterator[T]:
+    seen: set[K | T] = set()
     for item in iterable:
-        k = key(item) if key else item
+        k = key(item) if key is not None else item
         if k not in seen:
             seen.add(k)
             yield item
-```
 

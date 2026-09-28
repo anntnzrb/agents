@@ -34,7 +34,7 @@ Boundary rule:
 1. Decode or receive untrusted data at the edge
 2. Validate/narrow once with typed code, Pydantic `TypeAdapter`, or msgspec
 3. Convert inward to `TypedDict`s or domain objects
-4. Keep `dict[str, Any]` and validator objects out of core logic unless the project intentionally uses them as domain models
+4. Keep unvalidated dict payloads, `Any`, and validator objects out of core logic unless the project intentionally uses them as domain models
 
 ### Pydantic standalone validation
 
@@ -68,9 +68,10 @@ payload = msgspec.json.decode(raw_bytes, type=CreateUser)
 - Public functions and methods should have explicit parameter and return types
 - For inputs, prefer abstract/read-only protocols when mutation is not required: `Iterable[T]`, `Sequence[T]`, `Mapping[K, V]`
 - For concrete implementation returns, prefer concrete types: `list[T]`, `dict[K, V]`, domain objects
-- Use `object` instead of `Any` when accepting any value but treating it generically
-- Prefer `T | None`, `A | B`, `Protocol`, `typing.Self`, and `@override` when supported by the project target
-- Avoid `cast(...)`, `# type: ignore`, and `pyright: ignore`; improve the model first
+- `Any` is banned in annotations; when a third-party signature forces it, contain it at the boundary and narrow immediately
+- `object` is the correct annotation for a genuinely unknown value; narrow it with `isinstance` or `match`. NEVER use `object` where a Protocol, PEP 695 type parameter, union, or TypedDict can express the shape
+- Dispatch on variants with `match`, ending in `case _ as unreachable: assert_never(unreachable)`
+- Avoid `cast(...)`, `# type: ignore`, and `# basedpyright: ignore`; improve the model first
 
 ## Error Handling and Result Types
 
@@ -78,12 +79,9 @@ Catch specific exceptions at the layer that can act. At process/task/API boundar
 
 ```python
 from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 @dataclass(frozen=True, slots=True)
-class Ok(Generic[T]):
+class Ok[T]:
     value: T
 
 @dataclass(frozen=True, slots=True)
@@ -91,33 +89,13 @@ class Err:
     code: str
     message: str
 
-Result = Ok[T] | Err
+type Result[T] = Ok[T] | Err
 
 def parse_count(value: object) -> Result[int]:
     if isinstance(value, int):
         return Ok(value)
     return Err("invalid_count", "count must be an integer")
 ```
-
-## Anti-Patterns
-
-| Avoid                                                      | Do Instead                                                                          |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------- |
-| Mutable default args `def f(items=[])`                     | `def f(items: Sequence[T]                                                           | None = None)`or`field(default_factory=list)` |
-| `dict[str, Any]` for known payloads                        | `TypedDict` / `Literal` / discriminated unions                                      |
-| `Any` for "accepts anything"                               | `object` plus narrowing                                                             |
-| Concrete mutable input types (`list[T]`) when only reading | `Sequence[T]`, `Iterable[T]`, `Mapping[K, V]`                                       |
-| Abstract return types from concrete implementations        | Concrete `list[T]`, `dict[K, V]`, domain objects                                    |
-| `Optional[T]` / `Union[A, B]` on modern targets            | `T                                                                                  | None`/`A                                     | B` when runtime target allows |
-| `requests.get` in async code                               | `httpx.AsyncClient` or `await asyncio.to_thread(...)` for unavoidable blocking work |
-| Bare `asyncio.create_task()`                               | `TaskGroup` or tracked/cancelled task lifecycle                                     |
-| Classes for data bags                                      | `@dataclass(frozen=True, slots=True)` or `TypedDict`                                |
-| Inheritance hierarchies for behavior seams                 | Protocols + composition                                                             |
-| Mutating function arguments                                | Return new values / copy-on-write                                                   |
-| `try/except Exception` around core logic                   | Specific exceptions; boundary-level catch/log/map only                              |
-| Blind `dataclasses.asdict()` in hot paths                  | Explicit shallow projection or serializer                                           |
-| `os.path` string manipulation                              | `pathlib.Path`                                                                      |
-| Naive UTC `utcnow()`                                       | timezone-aware `datetime.now(UTC)`                                                  |
 
 ## Pitfalls and Fixes
 
@@ -127,13 +105,10 @@ def parse_count(value: object) -> Result[int]:
 | Pydantic/msgspec everywhere        | Validate once at the edge; convert inward                         |
 | Pydantic coercion hides bad input  | Use strict mode where coercion is unsafe                          |
 | msgspec accepts unexpected keys    | Use `forbid_unknown_fields=True` for closed payloads              |
-| mypy/Pyright narrowing pain        | Use `isinstance`, `match`, Protocols, or discriminated unions     |
-| Shared mutable state               | Prefer immutable data or copy-on-write                            |
-| Over-clever comprehensions         | Extract a named pure function                                     |
-| Async client leaks                 | Use `async with` or explicit application lifecycle                |
+| basedpyright narrowing pain        | Use `match`, `TypeIs`, Protocols, or discriminated unions         |
+| Async client leaks                 | Use `async with` on `httpx2.AsyncClient()` or explicit lifecycle  |
 | Slow tests from real I/O           | Use fixtures, `tmp_path`, local fakes, and boundary seams         |
 | Hypothesis noise                   | Reserve for invariants/round-trips; keep strategies domain-shaped |
-| Ruff/formatter churn               | Use `ruff format` as the only formatter                           |
 
 ## Project Structure
 

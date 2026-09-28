@@ -65,7 +65,7 @@ Every PEP 723 script MUST contain:
 1. `#!/usr/bin/env -S uv run --script`
 2. `# /// script` … `# ///`, containing `requires-python` and `dependencies`
 3. The usage comment block: uv installation plus script execution; use the exact template below
-4. `from __future__ import annotations` as the first import
+4. `from __future__ import annotations` as the first import when `requires-python` < 3.14 (omit on 3.14+ targets where annotations need no deferral)
 5. `if __name__ == "__main__": main()` entry-point guard
 
 ### Required usage comment block

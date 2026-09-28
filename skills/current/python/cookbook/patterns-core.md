@@ -34,13 +34,15 @@ assert result == 7  # 5 -> 6 -> 7
 **Solution**:
 
 ```python
+from decimal import Decimal
+
 # OK Pure: Same input -> Same output, no side effects
-def calculate_discount(price: float, rate: float) -> float:
-    return price * (1 - rate)
+def calculate_discount(price: Decimal, rate: Decimal) -> Decimal:
+    return price * (Decimal(1) - rate)
 
 # BAD Impure: Side effects (modifies external state)
-total = 0
-def add_to_total(amount: float) -> None:
+total = Decimal(0)
+def add_to_total(amount: Decimal) -> None:
     global total
     total += amount
 ```
@@ -148,7 +150,13 @@ good = [x * 2 for x in numbers if x > 5]
 bad = [x * 2 if x > 5 else x for x in numbers]
 
 # Extract to function if complex
-def is_valid(item: dict) -> bool:
+from typing import TypedDict
+
+class Item(TypedDict):
+    age: int
+    status: str
+
+def is_valid(item: Item) -> bool:
     return item["age"] >= 18 and item["status"] == "active"
 
 valid_items = [item for item in data if is_valid(item)]
