@@ -21,6 +21,7 @@ modelRoles:
   astra: cliproxy/gpt-6-astra:medium
   sol: cliproxy/gpt-6-sol:medium
   luna: cliproxy/gpt-6-luna:xhigh
+  swe: cliproxy/devin/swe-2:max
 
 cycleOrder:
   - default
@@ -31,6 +32,7 @@ cycleOrder:
   - luna
   - muse
   - gem
+  - swe
 
 modelRoleStorage: global
 defaultThinkingLevel: auto

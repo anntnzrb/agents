@@ -61,6 +61,25 @@ providers:
         input:
           - text
           - image
+      devin/swe-2:
+        reasoning: true
+        contextWindow: 262000
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+            - high
+            - max
+          defaultLevel: max
+          requiresEffort: true
+        input:
+          - text
+          - image
+        cost:
+          input: 0
+          output: 0
+          cacheRead: 0
+          cacheWrite: 0
   google-antigravity:
     modelOverrides:
       gemini-3.7-flash:
