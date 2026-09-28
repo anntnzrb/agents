@@ -331,7 +331,7 @@ Use this skill when the user requests any of the following:
 | **Choose style / color / font** | "What style fits a fintech app?", "Recommend a color palette" | Step 2 (design system) |
 | **Review existing UI** | "Review this page for UX issues", "Check accessibility" | Quick Reference checklist above |
 | **Fix a UI bug** | "Button hover is broken", "Layout shifts on load" | Quick Reference → relevant section |
-| **Improve / optimize** | "Make this faster", "Improve mobile experience" | Step 3 (domain search: ux, react) |
+| **Improve / optimize** | "Make this faster", "Improve mobile experience" | Step 3 (domain search: ux) |
 | **Implement dark mode** | "Add dark mode support" | Step 3 (domain: style "dark mode") |
 | **Add charts / data viz** | "Add an analytics dashboard chart" | Step 3 (domain: chart) |
 | **Stack best practices** | "React performance tips"、"SwiftUI navigation" | Step 4 (stack search) |
@@ -443,7 +443,6 @@ uv run --script <skill-dir>/scripts/cli.py "<keyword>" --domain <domain> [-n <ma
 | Alternative fonts | `typography` | `--domain typography "elegant luxury"` |
 | Individual Google Fonts | `google-fonts` | `--domain google-fonts "sans serif popular variable"` |
 | Landing structure | `landing` | `--domain landing "hero social-proof"` |
-| React Native perf | `react` | `--domain react "rerender memo list"` |
 | App interface a11y | `web` | `--domain web "accessibilityLabel touch safe-areas"` |
 | AI prompt / CSS keywords | `prompt` | `--domain prompt "minimalism"` |
 
@@ -474,7 +473,6 @@ uv run --script <skill-dir>/scripts/cli.py "<keyword>" --stack <your-stack>
 | `ux` | Best practices, anti-patterns | animation, accessibility, z-index, loading |
 | `gsap` | GSAP animation skeletons by intensity tier | scroll reveal, stagger, magnetic cursor, page transition |
 | `google-fonts` | Individual Google Fonts lookup | sans serif, monospace, japanese, variable font, popular |
-| `react` | React/Next.js performance | waterfall, bundle, suspense, memo, rerender, cache |
 | `web` | App interface guidelines (iOS/Android/React Native) | accessibilityLabel, touch targets, safe areas, Dynamic Type |
 | `prompt` | AI prompts, CSS keywords | (style name) |
 
