@@ -1,10 +1,8 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Cross-platform public entrypoint for UI/UX Pro Max search."""
-
-from __future__ import annotations
 
 import runpy
 import sys

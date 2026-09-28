@@ -33,27 +33,23 @@ import io
 import json
 import sys
 from collections.abc import Mapping
-from typing import BinaryIO, TextIO, cast
+from typing import TypeIs
 
 from core import AVAILABLE_STACKS, CSV_CONFIG, MAX_RESULTS, search, search_stack
 from design_system import generate_design_system
 
-
-def _force_utf8(stream: TextIO) -> TextIO:
-    """Rewrap a text stream in UTF-8 unless it already uses UTF-8."""
-    encoding = stream.encoding
-    if encoding and encoding.lower() == "utf-8":
-        return stream
-    raw_buffer = cast("object", getattr(stream, "buffer", None))
-    if raw_buffer is None:
-        return stream
-    buffer = cast("BinaryIO", raw_buffer)
-    return io.TextIOWrapper(buffer, encoding="utf-8")
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 
-# Force UTF-8 for stdout/stderr to handle emojis on Windows (cp1252 default)
-sys.stdout = _force_utf8(sys.stdout)
-sys.stderr = _force_utf8(sys.stderr)
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
 
 
 _MAX_VALUE_CHARS = 300
@@ -61,13 +57,13 @@ _MAX_VALUE_CHARS = 300
 
 def _opt_str(args: argparse.Namespace, field: str) -> str | None:
     """Narrow an optional string CLI value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, str) else None
 
 
 def _req_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string CLI value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     if not isinstance(value, str):
         message = f"Missing required CLI value: {field}."
         raise TypeError(message)
@@ -76,19 +72,19 @@ def _req_str(args: argparse.Namespace, field: str) -> str:
 
 def _opt_int(args: argparse.Namespace, field: str) -> int | None:
     """Narrow an optional integer CLI value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, int) else None
 
 
 def _req_int(args: argparse.Namespace, field: str, default: int) -> int:
     """Narrow a required integer CLI value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, int) else default
 
 
 def _flag(args: argparse.Namespace, field: str) -> bool:
     """Narrow a boolean CLI flag."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, bool) else False
 
 
@@ -108,17 +104,19 @@ def format_output(result: Mapping[str, object]) -> str:
         f"**Source:** {result['file']} | **Found:** {result['count']} results\n",
     )
 
-    rows = cast("list[object]", result["results"])
+    rows = result.get("results")
+    if not _is_object_list(rows):
+        return "\n".join(output)
     for i, row in enumerate(rows, 1):
-        mapping = cast("Mapping[str, object]", row)
+        if not _is_str_mapping(row):
+            continue
         output.append(f"### Result {i}")
-        for key, value in mapping.items():
+        for key, value in row.items():
             value_str = str(value)
             if len(value_str) > _MAX_VALUE_CHARS:
                 value_str = value_str[:_MAX_VALUE_CHARS] + "..."
             output.append(f"- **{key}:** {value_str}")
         output.append("")
-
     return "\n".join(output)
 
 

@@ -14,8 +14,6 @@ Usage:
     )
 """
 
-from __future__ import annotations
-
 import contextlib
 import csv
 import io
@@ -23,24 +21,60 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast, final
+from typing import TypeIs, final
 
 import core
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
 DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
+
+
+def _is_object_sequence(val: object) -> TypeIs[Sequence[object]]:
+    return isinstance(val, Sequence) and not isinstance(val, (str, bytes))
+
+
+def _as_str_dict(val: object) -> dict[str, str]:
+    if not _is_str_mapping(val):
+        return {}
+    return {k: str(v) for k, v in val.items()}
+
+
+def _as_obj_dict(val: object) -> dict[str, object]:
+    if not _is_str_mapping(val):
+        return {}
+    return dict(val)
+
+
+def _as_str_list(val: object) -> list[str]:
+    if not _is_object_sequence(val):
+        return []
+    return [str(x) for x in val]
+
+
+def _extract_results_list(search_result: dict[str, object]) -> list[dict[str, str]]:
+    raw = search_result.get("results")
+    if not _is_object_sequence(raw):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not _is_str_mapping(item):
+            continue
+        out.append({k: str(v) for k, v in item.items() if v is not None})
+    return out
 
 
 def search(
     query: str, domain: str | None = None, max_results: int = 3
 ) -> dict[str, object]:
     """Delegate search query to core search engine."""
-    raw_fn = cast("Callable[..., object]", core.search)
-    return cast("dict[str, object]", raw_fn(query, domain, max_results))
+    return core.search(query, domain, max_results)
 
 
 # Force UTF-8 for stdout/stderr to handle emojis/box-drawing chars on Windows
@@ -342,7 +376,7 @@ class DesignSystemGenerator:
         decision_rules: object = {}
         with contextlib.suppress(json.JSONDecodeError):
             raw_rules = rule.get("Decision_Rules", "{}")
-            decision_rules = cast("object", json.loads(raw_rules))
+            decision_rules = _json_loads(raw_rules)
 
         return {
             "pattern": rule.get("Recommended_Pattern", ""),
@@ -384,10 +418,7 @@ class DesignSystemGenerator:
         self, search_result: dict[str, object]
     ) -> list[dict[str, str]]:
         """Extract results list from search result dict."""
-        raw = search_result.get("results", [])
-        if isinstance(raw, list):
-            return cast("list[dict[str, str]]", raw)
-        return []
+        return _extract_results_list(search_result)
 
     def generate(
         self,
@@ -416,16 +447,13 @@ class DesignSystemGenerator:
 
         # Step 2: Get reasoning rules for this category
         reasoning = self._apply_reasoning(category, {})
-        raw_priority = reasoning.get("style_priority", [])
-        style_priority = (
-            cast("list[str]", raw_priority) if isinstance(raw_priority, list) else []
-        )
+        style_priority = _as_str_list(reasoning.get("style_priority"))
 
         # DESIGN_VARIANCE dial: bias style retrieval/selection toward
         # centered-minimal (low) or bold-asymmetric (high) keywords.
         effective_style_priority = style_priority
         if variance_info:
-            kw_list = cast("list[str]", variance_info.get("style_keywords", []))
+            kw_list = _as_str_list(variance_info.get("style_keywords"))
             effective_style_priority = kw_list + style_priority
 
         # Step 3: Multi-domain search with style priority hints
@@ -433,10 +461,14 @@ class DesignSystemGenerator:
         search_results["product"] = product_raw  # Reuse product search
 
         # Step 4: Select best matches from each domain using priority
-        style_results = self._extract_results(search_results.get("style", {}))
-        color_results = self._extract_results(search_results.get("color", {}))
-        typography_results = self._extract_results(search_results.get("typography", {}))
-        landing_results = self._extract_results(search_results.get("landing", {}))
+        style_results = self._extract_results(_as_obj_dict(search_results.get("style")))
+        color_results = self._extract_results(_as_obj_dict(search_results.get("color")))
+        typography_results = self._extract_results(
+            _as_obj_dict(search_results.get("typography"))
+        )
+        landing_results = self._extract_results(
+            _as_obj_dict(search_results.get("landing"))
+        )
 
         best_style = self._select_best_match(style_results, effective_style_priority)
         best_color = color_results[0] if color_results else {}
@@ -789,14 +821,14 @@ def _format_ascii_motion(motion_snippet: dict[str, str]) -> list[str]:
 def format_ascii_box(design_system: dict[str, object]) -> str:
     """Format design system as Unicode box with ANSI color swatches."""
     project = str(design_system.get("project_name", "PROJECT"))
-    pattern = cast("dict[str, str]", design_system.get("pattern", {}))
-    style = cast("dict[str, str]", design_system.get("style", {}))
-    colors = cast("dict[str, str]", design_system.get("colors", {}))
-    typography = cast("dict[str, str]", design_system.get("typography", {}))
+    pattern = _as_str_dict(design_system.get("pattern"))
+    style = _as_str_dict(design_system.get("style"))
+    colors = _as_str_dict(design_system.get("colors"))
+    typography = _as_str_dict(design_system.get("typography"))
     effects = str(design_system.get("key_effects", ""))
     anti_patterns = str(design_system.get("anti_patterns", ""))
-    dials = cast("dict[str, object]", design_system.get("dials", {}))
-    motion_snippet = cast("dict[str, str]", design_system.get("motion_snippet", {}))
+    dials = _as_obj_dict(design_system.get("dials"))
+    motion_snippet = _as_str_dict(design_system.get("motion_snippet"))
 
     w = BOX_WIDTH - 1
     lines: list[str] = [
@@ -977,14 +1009,14 @@ def _format_md_motion(motion_snippet: dict[str, str]) -> list[str]:
 def format_markdown(design_system: dict[str, object]) -> str:
     """Format design system as markdown."""
     project = str(design_system.get("project_name", "PROJECT"))
-    pattern = cast("dict[str, str]", design_system.get("pattern", {}))
-    style = cast("dict[str, str]", design_system.get("style", {}))
-    colors = cast("dict[str, str]", design_system.get("colors", {}))
-    typography = cast("dict[str, str]", design_system.get("typography", {}))
+    pattern = _as_str_dict(design_system.get("pattern"))
+    style = _as_str_dict(design_system.get("style"))
+    colors = _as_str_dict(design_system.get("colors"))
+    typography = _as_str_dict(design_system.get("typography"))
     effects = str(design_system.get("key_effects", ""))
     anti_patterns = str(design_system.get("anti_patterns", ""))
-    dials = cast("dict[str, object]", design_system.get("dials", {}))
-    motion_snippet = cast("dict[str, str]", design_system.get("motion_snippet", {}))
+    dials = _as_obj_dict(design_system.get("dials"))
+    motion_snippet = _as_str_dict(design_system.get("motion_snippet"))
 
     lines = [f"## Design System: {project}", ""]
     lines.extend(_format_md_dials(dials))
@@ -1220,7 +1252,7 @@ def _format_master_spacing(
 ) -> list[str]:
     """Format the spacing variables and shadows section for MASTER.md."""
     density_raw = DIAL_TIERS["density"][1][2]["spacing"]
-    default_spacing = cast("dict[str, str]", density_raw)
+    default_spacing = _as_str_dict(density_raw)
     scale = spacing_scale or default_spacing
     lines = ["### Spacing Variables", ""]
     if spacing_scale:
@@ -1475,23 +1507,21 @@ def _format_master_anti_patterns(anti_patterns: str) -> list[str]:
 def format_master_md(design_system: dict[str, object]) -> str:
     """Format design system as MASTER.md with hierarchical override logic."""
     project = str(design_system.get("project_name", "PROJECT"))
-    pattern = cast("dict[str, str]", design_system.get("pattern", {}))
-    style = cast("dict[str, str]", design_system.get("style", {}))
-    colors = cast("dict[str, str]", design_system.get("colors", {}))
-    typography = cast("dict[str, str]", design_system.get("typography", {}))
+    pattern = _as_str_dict(design_system.get("pattern"))
+    style = _as_str_dict(design_system.get("style"))
+    colors = _as_str_dict(design_system.get("colors"))
+    typography = _as_str_dict(design_system.get("typography"))
     effects = str(design_system.get("key_effects", ""))
     anti_patterns = str(design_system.get("anti_patterns", ""))
-    dials = cast("dict[str, object]", design_system.get("dials", {}))
-    motion_snippet = cast("dict[str, str]", design_system.get("motion_snippet", {}))
+    dials = _as_obj_dict(design_system.get("dials"))
+    motion_snippet = _as_str_dict(design_system.get("motion_snippet"))
     spacing_scale_raw = design_system.get("spacing_scale")
     spacing_scale = (
-        cast("dict[str, str]", spacing_scale_raw)
-        if isinstance(spacing_scale_raw, dict)
-        else None
+        _as_str_dict(spacing_scale_raw) if _is_str_mapping(spacing_scale_raw) else None
     )
 
     category = str(design_system.get("category", "General"))
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     lines: list[str] = []
     lines.extend(_format_master_header(project, timestamp, category, dials))
@@ -1548,7 +1578,7 @@ def format_page_override_md(
 ) -> str:
     """Format a page-specific override file with intelligent AI-generated content."""
     project = str(design_system.get("project_name", "PROJECT"))
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     page_title = page_name.replace("-", " ").replace("_", " ").title()
 
     # Detect page type and generate intelligent overrides
@@ -1559,13 +1589,13 @@ def format_page_override_md(
     )
 
     page_type = str(page_overrides.get("page_type", "General"))
-    layout = cast("dict[str, str]", page_overrides.get("layout", {}))
-    spacing = cast("dict[str, str]", page_overrides.get("spacing", {}))
-    typography = cast("dict[str, str]", page_overrides.get("typography", {}))
-    colors = cast("dict[str, str]", page_overrides.get("colors", {}))
-    components = cast("list[str]", page_overrides.get("components", []))
-    unique_components = cast("list[str]", page_overrides.get("unique_components", []))
-    recommendations = cast("list[str]", page_overrides.get("recommendations", []))
+    layout = _as_str_dict(page_overrides.get("layout"))
+    spacing = _as_str_dict(page_overrides.get("spacing"))
+    typography = _as_str_dict(page_overrides.get("typography"))
+    colors = _as_str_dict(page_overrides.get("colors"))
+    components = _as_str_list(page_overrides.get("components"))
+    unique_components = _as_str_list(page_overrides.get("unique_components"))
+    recommendations = _as_str_list(page_overrides.get("recommendations"))
 
     lines: list[str] = [
         f"# {page_title} Page Overrides",
@@ -1743,26 +1773,9 @@ def _generate_intelligent_overrides(
     ux_search = search(combined_context, "ux", max_results=3)
     landing_search = search(combined_context, "landing", max_results=1)
 
-    style_results_raw = style_search.get("results", [])
-    style_results = (
-        cast("list[dict[str, str]]", style_results_raw)
-        if isinstance(style_results_raw, list)
-        else []
-    )
-
-    ux_results_raw = ux_search.get("results", [])
-    ux_results = (
-        cast("list[dict[str, str]]", ux_results_raw)
-        if isinstance(ux_results_raw, list)
-        else []
-    )
-
-    landing_results_raw = landing_search.get("results", [])
-    landing_results = (
-        cast("list[dict[str, str]]", landing_results_raw)
-        if isinstance(landing_results_raw, list)
-        else []
-    )
+    style_results = _extract_results_list(style_search)
+    ux_results = _extract_results_list(ux_search)
+    landing_results = _extract_results_list(landing_search)
 
     page_type = _detect_page_type(combined_context, style_results)
 
@@ -1838,7 +1851,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    args_dict = cast("dict[str, object]", vars(args))
+    args_dict = _as_obj_dict(vars(args))
 
     cli_query = str(args_dict.get("query", ""))
     cli_project_name = (

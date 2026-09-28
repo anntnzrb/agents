@@ -5,8 +5,9 @@ import csv
 import re
 from collections import defaultdict
 from math import log
+from operator import itemgetter
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict
 
 # ============ CONFIGURATION ============
 MAX_RESULTS = 3
@@ -359,14 +360,17 @@ class BM25:
 
             scores.append((idx, score))
 
-        return sorted(scores, key=lambda x: x[1], reverse=True)
+        return sorted(scores, key=itemgetter(1), reverse=True)
 
 
 # ============ SEARCH FUNCTIONS ============
 def _load_csv(filepath: Path) -> list[dict[str, str | None]]:
     """Load CSV and return list of dicts."""
     with filepath.open(encoding="utf-8") as f:
-        return [cast("dict[str, str | None]", row) for row in csv.DictReader(f)]
+        return [
+            {str(k): (str(v) if v is not None else None) for k, v in row.items()}
+            for row in csv.DictReader(f)
+        ]
 
 
 def _search_csv(
@@ -627,7 +631,7 @@ def detect_domain(query: str) -> str:
         )
         for domain, keywords in domain_keywords.items()
     }
-    best = max(scores, key=lambda domain: scores[domain])
+    best = max(scores, key=scores.__getitem__)
     return best if scores[best] > 0 else "style"
 
 

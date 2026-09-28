@@ -1,12 +1,13 @@
 # Copyright (c) 2026
 """Executable contracts for the ui-ux-pro-max search CLI."""
 
-from __future__ import annotations
-
 import json
 import subprocess
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import cast
+from typing import TypeIs
+
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
 
 SKILL: Path = Path(__file__).resolve().parents[1]
 SEARCH: Path = SKILL / "scripts" / "search.py"
@@ -24,11 +25,22 @@ def run_search(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def json_result(args: list[str]) -> dict[str, object]:
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def json_result(args: list[str]) -> Mapping[str, object]:
     """Run a JSON search and decode a successful payload."""
     result = run_search(*args)
     assert result.returncode == 0, result.stderr
-    return cast("dict[str, object]", json.loads(result.stdout))
+    raw = _json_loads(result.stdout)
+    if not _is_str_mapping(raw):
+        raise TypeError("expected JSON object")
+    return raw
 
 
 def test_domain_search_returns_ranked_results() -> None:
@@ -37,9 +49,13 @@ def test_domain_search_returns_ranked_results() -> None:
     )
     assert payload["domain"] == "style"
     assert payload["query"] == "button"
-    results = cast("list[object]", payload["results"])
+    results = payload["results"]
+    if not _is_object_list(results):
+        raise TypeError("expected results list")
     assert len(results) == 2
-    first = cast("dict[str, object]", results[0])
+    first = results[0]
+    if not _is_str_mapping(first):
+        raise TypeError("expected result object")
     assert first["Style Category"] == "3D Product Preview"
 
 
