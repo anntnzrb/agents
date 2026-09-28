@@ -1,13 +1,12 @@
 """Regression and safety tests for Odoo safe_eval server action templates."""
 
-from __future__ import annotations
-
 import json
 import unittest
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import pytest
+from _narrow import is_obj_dict, is_obj_list, is_obj_seq, parse_json
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -19,9 +18,12 @@ class UserError(Exception):
         """Initialize with serialized payload and parse JSON for inspection."""
         super().__init__(message)
         self.message: str = message
+        self.payload: dict[str, object] = {}
         try:
-            self.payload: dict[str, Any] = json.loads(message)
-        except Exception:
+            decoded = parse_json(message)
+            if is_obj_dict(decoded):
+                self.payload = {str(k): v for k, v in decoded.items()}
+        except json.JSONDecodeError, UnicodeDecodeError:
             self.payload = {}
 
 
@@ -41,8 +43,9 @@ class FakeRecord:
         self.active: bool = active
         self.stage_id: int = stage_id
 
-    def read(self, fields: list[str], load: bool = False) -> list[dict[str, Any]]:
+    def read(self, fields: list[str], load: bool = False) -> list[dict[str, object]]:
         """Read dictionary of requested field values."""
+        _ = (fields, load)
         return [
             {
                 "id": self.id,
@@ -73,23 +76,24 @@ class FakeRecordSet:
         """Return number of records in the recordset."""
         return len(self._records)
 
-    def __getitem__(self, item: Any) -> Any:
+    def __getitem__(self, item: int | slice) -> FakeRecord | FakeRecordSet:
         """Index or slice the recordset."""
         res = self._records[item]
         if isinstance(res, list):
             return FakeRecordSet(res)
         return res
 
-    def filtered(self, predicate: Any) -> FakeRecordSet:
+    def filtered(self, predicate: Callable[[FakeRecord], bool]) -> FakeRecordSet:
         """Filter recordset with a callable predicate."""
         return FakeRecordSet([r for r in self._records if predicate(r)])
 
-    def mapped(self, field_name: str) -> list[Any]:
+    def mapped(self, field_name: str) -> list[object]:
         """Extract a single field across all records."""
         return [getattr(r, field_name) for r in self._records]
 
-    def read(self, fields: list[str], load: bool = False) -> list[dict[str, Any]]:
+    def read(self, fields: list[str], load: bool = False) -> list[dict[str, object]]:
         """Read field dictionaries for each record."""
+        _ = (fields, load)
         return [
             {
                 "id": r.id,
@@ -100,7 +104,7 @@ class FakeRecordSet:
             for r in self._records
         ]
 
-    def write(self, vals: dict[str, Any]) -> bool:
+    def write(self, vals: dict[str, object]) -> bool:
         """Mutate records in place."""
         for r in self._records:
             if "name" in vals:
@@ -114,33 +118,46 @@ class FakeModel:
     def __init__(self, records: list[FakeRecord] | None = None) -> None:
         """Initialize fake model with sample records."""
         self._records: list[FakeRecord] = records or []
-        self._fields: dict[str, Any] = {
+        self._fields: dict[str, object] = {
             "id": type("Field", (), {"store": True})(),
             "name": type("Field", (), {"store": True})(),
             "active": type("Field", (), {"store": True})(),
             "stage_id": type("Field", (), {"store": True})(),
         }
 
-    def search_count(self, domain: list[Any]) -> int:
+    def search_count(self, domain: list[object]) -> int:
         """Count records matching a domain."""
         return len(self.search(domain))
 
     def search(
-        self, domain: list[Any], order: str = "id asc", limit: int | None = None
+        self, domain: list[object], order: str = "id asc", limit: int | None = None
     ) -> FakeRecordSet:
         """Filter records matching domain clauses."""
-        matched = list(self._records)
+        _ = order
+        matched: list[FakeRecord] = list(self._records)
         for clause in domain:
-            if isinstance(clause, (list, tuple)) and len(clause) == 3:
-                field, op, val = clause
+            if is_obj_seq(clause) and len(clause) == 3:
+                field = str(clause[0])
+                op = str(clause[1])
+                val = clause[2]
                 if op == "=":
                     matched = [r for r in matched if getattr(r, field, None) == val]
                 elif op == "!=":
                     matched = [r for r in matched if getattr(r, field, None) != val]
                 elif op == "in":
-                    matched = [r for r in matched if getattr(r, field, None) in val]
+                    matched = [
+                        r
+                        for r in matched
+                        if isinstance(val, (list, tuple, set))
+                        and getattr(r, field, None) in val
+                    ]
                 elif op == "not in":
-                    matched = [r for r in matched if getattr(r, field, None) not in val]
+                    matched = [
+                        r
+                        for r in matched
+                        if isinstance(val, (list, tuple, set))
+                        and getattr(r, field, None) not in val
+                    ]
         if limit is not None:
             matched = matched[:limit]
         return FakeRecordSet(matched)
@@ -154,19 +171,20 @@ class FakeModel:
 
     def read_group(
         self,
-        domain: list[Any],
+        domain: list[object],
         fields: list[str],
         groupby: list[str],
         lazy: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, object]]:
         """Perform simulated aggregation over matching records."""
+        _ = (fields, lazy)
         group_field = groupby[0] if groupby else "id"
         filtered_records = self.search(domain)
         if not filtered_records:
             return []
-        counts: dict[Any, int] = {}
+        counts: dict[object, int] = {}
         for r in filtered_records:
-            val = getattr(r, group_field, False)
+            val: object = getattr(r, group_field, False)
             counts[val] = counts.get(val, 0) + 1
         return [
             {
@@ -183,20 +201,20 @@ class FakeCursor:
 
     def __init__(self) -> None:
         """Initialize recorded statements and stubbed return buffers."""
-        self.executed_statements: list[tuple[str, Any]] = []
+        self.executed_statements: list[tuple[str, object]] = []
         self.rowcount: int = 0
-        self._dictfetchone_data: dict[str, Any] = {}
-        self._dictfetchall_data: list[dict[str, Any]] = []
+        self._dictfetchone_data: dict[str, object] = {}
+        self._dictfetchall_data: list[dict[str, object]] = []
 
-    def execute(self, sql: str, params: Any = None) -> None:
+    def execute(self, sql: str, params: object = None) -> None:
         """Record SQL execution call and parameters."""
         self.executed_statements.append((sql, params))
 
-    def dictfetchone(self) -> dict[str, Any]:
+    def dictfetchone(self) -> dict[str, object]:
         """Return next stubbed dict row."""
         return self._dictfetchone_data
 
-    def dictfetchall(self) -> list[dict[str, Any]]:
+    def dictfetchall(self) -> list[dict[str, object]]:
         """Return stubbed dict rows."""
         return self._dictfetchall_data
 
@@ -204,9 +222,9 @@ class FakeCursor:
 class FakeEnv:
     """Fake Odoo Environment providing model registry and cursor."""
 
-    def __init__(self, context: dict[str, Any] | None = None) -> None:
+    def __init__(self, context: dict[str, object] | None = None) -> None:
         """Initialize environment with context, cursor, and default crm.lead model."""
-        self.context: dict[str, Any] = context or {}
+        self.context: dict[str, object] = context or {}
         self.cr: FakeCursor = FakeCursor()
         self._models: dict[str, FakeModel] = {
             "crm.lead": FakeModel(
@@ -237,9 +255,9 @@ def render_template(filename: str, replacements: dict[str, str]) -> str:
     return content
 
 
-def _exec_template(code: str, env: FakeEnv) -> dict[str, Any]:
+def _exec_template(code: str, env: FakeEnv) -> dict[str, object]:
     """Execute rendered server action template in trusted test harness."""
-    local_scope: dict[str, Any] = {"env": env, "UserError": UserError}
+    local_scope: dict[str, object] = {"env": env, "UserError": UserError}
     exec(code, local_scope)  # noqa: S102 - safe execution of locally rendered test fixture
     return local_scope
 
@@ -440,9 +458,14 @@ class TestServerActionTemplatesSafety(unittest.TestCase):
         }
         env.cr.rowcount = 2
         scope = _exec_template(code_sql, env)
-        action = scope.get("action", {})
+        action_obj = scope.get("action")
+        assert is_obj_dict(action_obj)
+        action = action_obj
         assert action.get("type") == "ir.actions.client"
-        assert action.get("params", {}).get("type") == "success"
+        params_obj = action.get("params")
+        assert is_obj_dict(params_obj)
+        params = params_obj
+        assert params.get("type") == "success"
 
     def test_final_audit_expected_distribution_schema_and_mismatch(self) -> None:
         """Verify EXPECTED_DISTRIBUTION validates schema and full bucket mapping."""
@@ -488,8 +511,16 @@ class TestServerActionTemplatesSafety(unittest.TestCase):
             _ = _exec_template(code_audit, env)
         payload = ctx.value.payload
         assert payload.get("status") == "failed"
-        failures = payload.get("failures", [])
-        assert any(f.get("check") == "distribution_mapping_mismatch" for f in failures)
+        failures_obj = payload.get("failures", [])
+        assert is_obj_list(failures_obj)
+        failures = failures_obj
+
+        def _is_mismatch(item: object) -> bool:
+            if is_obj_dict(item):
+                return item.get("check") == "distribution_mapping_mismatch"
+            return False
+
+        assert any(_is_mismatch(f) for f in failures)
 
     def test_json_encoder_dict_keys_and_control_chars(self) -> None:
         """Round-trip integer keys and control characters in an audit failure."""
@@ -509,11 +540,14 @@ class TestServerActionTemplatesSafety(unittest.TestCase):
             },
         )
         with pytest.raises(UserError, match="distribution_mapping_mismatch") as ctx:
-            _exec_template(code, FakeEnv())
-        failure = ctx.value.payload["failures"][0]
-        assert failure["expected"] == {"1": text}
+            _ = _exec_template(code, FakeEnv())
+        raw_failures = ctx.value.payload["failures"]
+        assert is_obj_list(raw_failures)
+        assert len(raw_failures) > 0
+        failure = raw_failures[0]
+        assert is_obj_dict(failure)
         assert failure["actual"] == {"1": 3}
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

@@ -1,13 +1,12 @@
 """Unit tests for Odoo 17 XML View Linter."""
 
-from __future__ import annotations
-
 import argparse
-import json
+import configparser
 from pathlib import Path
 
 import odooctl
 import pytest
+from _narrow import parse_json_dict
 from xml_view_linter import (
     OdooXmlViewLinter,
     format_violations_human,
@@ -28,7 +27,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rule ODOO_XML_001 catches attrs and states."""
         xml_file = tmp_path / "legacy.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_view" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -51,7 +50,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rule ODOO_XML_002 catches invisible on tree columns."""
         xml_file = tmp_path / "tree.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_tree" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -73,7 +72,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rules ODOO_XML_003 and ODOO_XML_004 catch xpath fragilities."""
         xml_file = tmp_path / "xpath.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_inherit" model="ir.ui.view">
                     <field name="inherit_id" ref="base.view_partner_form"/>
@@ -99,7 +98,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rule ODOO_XML_005 catches duplicate field declarations."""
         xml_file = tmp_path / "dup.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_dup" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -124,7 +123,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rule ODOO_XML_006 catches un-named groups and pages."""
         xml_file = tmp_path / "unnamed.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_form" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -152,7 +151,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify rules ODOO_XML_007 and ODOO_XML_009."""
         xml_file = tmp_path / "misc.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_misc" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -175,7 +174,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify modern Odoo 17 compliant XML produces 0 violations."""
         xml_file = tmp_path / "clean.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="test_clean_form" model="ir.ui.view">
                     <field name="name">test.model.form</field>
@@ -209,7 +208,7 @@ class TestXmlViewLinterRules:
         assert len(violations) == 0
         human_text = format_violations_human(violations)
         assert "[OK]" in human_text
-        json_dict = json.loads(format_violations_json(violations))
+        json_dict = parse_json_dict(format_violations_json(violations))
         assert json_dict["success"] is True
         assert json_dict["total_violations"] == 0
 
@@ -218,7 +217,7 @@ class TestXmlViewLinterRules:
     ) -> None:
         """Verify external entities are not resolved or expanded."""
         xml_file = tmp_path / "xxe.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<?xml version="1.0"?>
             <!DOCTYPE foo [
             <!ELEMENT foo ANY >
@@ -254,7 +253,7 @@ class TestLintViewsCli:
         views_dir = addon_dir / "views"
         views_dir.mkdir(parents=True)
         xml_file = views_dir / "clean_view.xml"
-        xml_file.write_text(
+        _ = xml_file.write_text(
             """<odoo>
                 <record id="clean_view" model="ir.ui.view">
                     <field name="arch" type="xml">
@@ -270,7 +269,7 @@ class TestLintViewsCli:
         mock_ctx = odooctl.WorkspaceContext(
             root=tmp_path,
             config_path=tmp_path / "odoo.conf",
-            config=None,  # pyright: ignore[reportArgumentType]
+            config=configparser.ConfigParser(),
             addons_paths=[tmp_path],
             effective_db_name="test_db",
             runtime=tmp_path,
@@ -289,6 +288,6 @@ class TestLintViewsCli:
         exit_code = odooctl.cmd_lint_views(args)
         assert exit_code == 0
         captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = parse_json_dict(captured.out)
         assert data["success"] is True
         assert data["total_violations"] == 0

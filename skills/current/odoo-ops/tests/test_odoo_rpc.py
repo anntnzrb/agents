@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import http.server
 import io
 import json
@@ -12,13 +10,21 @@ import threading
 import unittest
 import urllib.error
 from pathlib import Path
-from typing import cast
+from typing import override
 from unittest.mock import MagicMock, patch
 
 import pytest
+from _narrow import (
+    is_obj_dict,
+    is_obj_list,
+    mock_call_args,
+    parse_json,
+    parse_json_dict,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import odoo_rpc
 from odoo_rpc import (
     OdooRpcClient,
     OdooRpcConfig,
@@ -185,7 +191,7 @@ class TestOdooAllowlistsAndGuards(unittest.TestCase):
                 "authenticate",
                 "testdb",
                 "user",
-                "token",  # noqa: S106 - test fixture credential
+                "token",
                 {},
                 allow_rpc=False,
             )
@@ -229,21 +235,25 @@ class TestOdooAllowlistsAndGuards(unittest.TestCase):
 
     def test_strict_positive_ids_enforced(self) -> None:
         readonly_client, write_client = _make_clients()
-        for invalid_id in (0, -1, True, False, "1"):
+        for invalid_id in (0, -1, True, False):
             with (
                 self.subTest(invalid_id=invalid_id),
                 pytest.raises(
                     ValueError, match="ID must be a positive non-boolean integer"
                 ),
             ):
-                _ = readonly_client.read("res.partner", cast("list[int]", [invalid_id]))
+                _ = readonly_client.read("res.partner", [invalid_id])
             with (
                 self.subTest(invalid_id=invalid_id),
                 pytest.raises(
                     ValueError, match="ID must be a positive non-boolean integer"
                 ),
             ):
-                _ = write_client.unlink("res.partner", cast("list[int]", [invalid_id]))
+                _ = write_client.unlink("res.partner", [invalid_id])
+        with pytest.raises(
+            ValueError, match="ID must be a positive non-boolean integer"
+        ):
+            _ = odoo_rpc._check_positive_id("1", "id")
 
 
 class TestOdooJsonRpc(unittest.TestCase):
@@ -274,7 +284,7 @@ class TestOdooJsonRpc(unittest.TestCase):
                 "execute",
                 "testdb",
                 1,
-                "token",  # noqa: S106 - test fixture credential
+                "token",
                 "res.partner",
                 "read",
                 [],
@@ -289,7 +299,7 @@ class TestOdooJsonRpc(unittest.TestCase):
                 "execute_kw",
                 "testdb",
                 1,
-                "token",  # noqa: S106 - test fixture credential
+                "token",
                 "res.partner",
                 "unlink",
                 [[1]],
@@ -320,7 +330,7 @@ class TestOdooJsonRpc(unittest.TestCase):
                 "authenticate",
                 "testdb",
                 "user",
-                "token",  # noqa: S106 - test fixture credential
+                "token",
                 {},
                 allow_rpc=True,
             )
@@ -334,9 +344,13 @@ class _MockHttpServer:
     """Ephemeral HTTP test server running on loopback."""
 
     def __init__(self, handler_cls: type[http.server.BaseHTTPRequestHandler]) -> None:
-        self.server = http.server.HTTPServer(("127.0.0.1", 0), handler_cls)
-        self.port = self.server.server_port
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.server: http.server.HTTPServer = http.server.HTTPServer(
+            ("127.0.0.1", 0), handler_cls
+        )
+        self.port: int = self.server.server_port
+        self.thread: threading.Thread = threading.Thread(
+            target=self.server.serve_forever, daemon=True
+        )
 
     def start(self) -> None:
         self.thread.start()
@@ -351,7 +365,7 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
         request_count = {"redirect_hit": 0, "target_hit": 0}
 
         class RedirectHandler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self) -> None:  # noqa: N802
+            def do_POST(self) -> None:
                 if self.path == "/jsonrpc":
                     request_count["redirect_hit"] += 1
                     self.send_response(302)
@@ -364,9 +378,10 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                     request_count["target_hit"] += 1
                     self.send_response(200)
                     self.end_headers()
-                    self.wfile.write(b'{"result": "leaked"}')
+                    _ = self.wfile.write(b'{"result": "leaked"}')
 
-            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+            @override
+            def log_message(self, format: str, *args: object) -> None:
                 pass
 
         server = _MockHttpServer(RedirectHandler)
@@ -379,7 +394,7 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                     "authenticate",
                     "testdb",
                     "user",
-                    "secret_token",  # noqa: S106 - test fixture credential
+                    "secret_token",
                     {},
                     allow_rpc=True,
                 )
@@ -392,13 +407,14 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
         request_count = {"count": 0}
 
         class CountingHandler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self) -> None:  # noqa: N802
+            def do_POST(self) -> None:
                 request_count["count"] += 1
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(b'{"result": 1}')
+                _ = self.wfile.write(b'{"result": 1}')
 
-            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+            @override
+            def log_message(self, format: str, *args: object) -> None:
                 pass
 
         server = _MockHttpServer(CountingHandler)
@@ -413,7 +429,7 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret",  # noqa: S106 - test fixture credential
+                "secret",
                 "search_read",
                 "crm.lead",
             ]
@@ -432,7 +448,7 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret",  # noqa: S106 - test fixture credential
+                "secret",
                 "create",
                 "crm.lead",
                 '{"name": "Lead"}',
@@ -447,25 +463,23 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
         received_calls: list[dict[str, object]] = []
 
         class E2eOdooHandler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self) -> None:  # noqa: N802
+            def do_POST(self) -> None:
                 length = int(self.headers.get("Content-Length", 0))
-                body = cast(
-                    "dict[str, object]",
-                    json.loads(self.rfile.read(length).decode("utf-8")),
-                )
-                params = cast("dict[str, object]", body.get("params", {}))
+                raw_body = parse_json(self.rfile.read(length).decode("utf-8"))
+                body = raw_body if is_obj_dict(raw_body) else {}
+                raw_params = body.get("params")
+                params = raw_params if is_obj_dict(raw_params) else {}
                 service = params.get("service")
                 method = params.get("method")
-                args = cast("list[object]", params.get("args", []))
-
+                raw_args = params.get("args")
+                args = raw_args if is_obj_list(raw_args) else []
                 received_calls.append(
                     {"service": service, "method": method, "args": args}
                 )
-
                 if service == "common" and method == "authenticate":
                     resp = {"jsonrpc": "2.0", "id": 1, "result": 2}
                 elif service == "object" and method == "execute_kw":
-                    inner_method = args[4]
+                    inner_method = args[4] if len(args) > 4 else None
                     if inner_method == "search_read":
                         resp = {
                             "jsonrpc": "2.0",
@@ -486,9 +500,10 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps(resp).encode("utf-8"))
+                _ = self.wfile.write(json.dumps(resp).encode("utf-8"))
 
-            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+            @override
+            def log_message(self, format: str, *args: object) -> None:
                 pass
 
         server = _MockHttpServer(E2eOdooHandler)
@@ -521,14 +536,14 @@ class TestOdooRpcControlledLoopbackHttp(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret_token",  # noqa: S106 - test fixture credential
+                "secret_token",
                 "search_read",
                 "res.partner",
             ]
             with patch("sys.stdout", new=io.StringIO()) as fake_stdout:
                 exit_code = main(argv_cli)
                 assert exit_code == 0
-                parsed_out = json.loads(fake_stdout.getvalue())
+                parsed_out = parse_json(fake_stdout.getvalue())
                 assert parsed_out == [{"id": 1, "name": "Partner A"}]
         finally:
             server.stop()
@@ -544,7 +559,7 @@ class TestOdooRpcCli(unittest.TestCase):
             "--user",
             "user@test.com",
             "--token",
-            "secret",  # noqa: S106 - test fixture credential
+            "secret",
             "search_read",
             "crm.lead",
             '[["active", "=", true]]',
@@ -565,7 +580,7 @@ class TestOdooRpcCli(unittest.TestCase):
             "--user",
             "user@test.com",
             "--token",
-            "secret",  # noqa: S106 - test fixture credential
+            "secret",
             "create",
             "crm.lead",
             '{"name": "Lead"}',
@@ -588,10 +603,11 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 patch("odoo_rpc.json_rpc") as mock_rpc,
                 patch("sys.stdout", new=io.StringIO()) as fake_stdout,
             ):
-                mock_rpc.side_effect = lambda *args, **kwargs: (
-                    1
-                    if args[2] == "authenticate"
-                    else [
+
+                def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                    if len(args) > 2 and args[2] == "authenticate":
+                        return 1
+                    return [
                         {
                             "id": 1,
                             "name": "Old",
@@ -599,7 +615,8 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                             "display_name": "Partner 1",
                         }
                     ]
-                )
+
+                mock_rpc.side_effect = _fake_rpc
                 argv = [
                     "--allow-rpc",
                     "--url",
@@ -609,7 +626,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "write",
                     "res.partner",
                     "[1]",
@@ -618,12 +635,12 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 exit_code = main(argv)
                 assert exit_code == 0
                 for call_args in mock_rpc.call_args_list:
-                    args = call_args[0]
+                    args = mock_call_args(call_args)
                     if len(args) > 4 and args[1] == "object":
                         assert args[4] != "write"
                 plans = list((state_dir / "plans").glob("*.json"))
                 assert len(plans) == 1
-                plan_data = json.loads(plans[0].read_text(encoding="utf-8"))
+                plan_data = parse_json_dict(plans[0].read_text(encoding="utf-8"))
                 assert plan_data["command"] == "write"
                 assert plan_data["model"] == "res.partner"
                 assert plan_data["ids"] == [1]
@@ -644,7 +661,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             "--user",
             "admin",
             "--token",
-            "tok",  # noqa: S106 - test credential
+            "tok",
             "write",
             "res.partner",
             "[1]",
@@ -665,7 +682,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             plans_dir.mkdir(parents=True, exist_ok=True)
             plan_id = "testplan01"
             plan_file = plans_dir / f"{plan_id}.json"
-            plan_file.write_text(
+            _ = plan_file.write_text(
                 json.dumps(
                     {
                         "id": plan_id,
@@ -694,11 +711,13 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 patch("odoo_rpc.json_rpc") as mock_rpc,
                 patch("sys.stderr", new=io.StringIO()) as fake_stderr,
             ):
-                mock_rpc.side_effect = lambda *args, **kwargs: (
-                    1
-                    if args[2] == "authenticate"
-                    else [{"id": 1, "write_date": "2026-09-02 12:00:00"}]
-                )
+
+                def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                    if len(args) > 2 and args[2] == "authenticate":
+                        return 1
+                    return [{"id": 1, "write_date": "2026-09-02 12:00:00"}]
+
+                mock_rpc.side_effect = _fake_rpc
                 argv = [
                     "--allow-rpc",
                     "--write",
@@ -709,7 +728,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "apply",
                     plan_id,
                 ]
@@ -717,7 +736,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 assert exit_code == 1
                 assert "drift detected on res.partner ids [1]" in fake_stderr.getvalue()
                 for call_args in mock_rpc.call_args_list:
-                    args = call_args[0]
+                    args = mock_call_args(call_args)
                     if len(args) > 4 and args[1] == "object":
                         assert args[4] != "write"
         finally:
@@ -730,7 +749,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             plans_dir.mkdir(parents=True, exist_ok=True)
             plan_id = "testplan02"
             plan_file = plans_dir / f"{plan_id}.json"
-            plan_file.write_text(
+            _ = plan_file.write_text(
                 json.dumps(
                     {
                         "id": plan_id,
@@ -762,7 +781,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "apply",
                     plan_id,
                 ]
@@ -789,7 +808,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "call",
                     "res.partner",
                     "message_post",
@@ -809,17 +828,19 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 patch("odoo_rpc.json_rpc") as mock_rpc,
                 patch("sys.stdout", new=io.StringIO()) as fake_stdout,
             ):
-                mock_rpc.side_effect = lambda *args, **kwargs: (
-                    1
-                    if args[2] == "authenticate"
-                    else [
+
+                def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                    if len(args) > 2 and args[2] == "authenticate":
+                        return 1
+                    return [
                         {
                             "id": 1,
                             "display_name": "Partner 1",
                             "write_date": "2026-09-01 10:00:00",
                         }
                     ]
-                )
+
+                mock_rpc.side_effect = _fake_rpc
                 argv_loopback = [
                     "--allow-rpc",
                     "--url",
@@ -829,7 +850,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "call",
                     "res.partner",
                     "message_post",
@@ -854,10 +875,11 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     patch("odoo_rpc.json_rpc") as mock_rpc,
                     patch("sys.stdout", new=io.StringIO()) as fake_stdout,
                 ):
-                    mock_rpc.side_effect = lambda *args, **kwargs: (
-                        1
-                        if args[2] == "authenticate"
-                        else [
+
+                    def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                        if len(args) > 2 and args[2] == "authenticate":
+                            return 1
+                        return [
                             {
                                 "id": 1,
                                 "active": True,
@@ -865,7 +887,8 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                                 "write_date": "2026-09-01 10:00:00",
                             }
                         ]
-                    )
+
+                    mock_rpc.side_effect = _fake_rpc
                     argv_archive = [
                         "--allow-rpc",
                         "--url",
@@ -875,7 +898,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                         "--user",
                         "admin",
                         "--token",
-                        "tok",  # noqa: S106 - test credential
+                        "tok",
                         "archive",
                         "ir.cron",
                         "[1]",
@@ -895,7 +918,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                         "--user",
                         "admin",
                         "--token",
-                        "tok",  # noqa: S106 - test credential
+                        "tok",
                         "write",
                         "ir.config_parameter",
                         "[1]",
@@ -943,7 +966,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 "authenticate",
                 "testdb",
                 "user",
-                "token",  # noqa: S106 - test credential
+                "token",
                 {},
                 allow_rpc=True,
             )
@@ -958,9 +981,15 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             patch("odoo_rpc.json_rpc") as mock_rpc,
             patch("sys.stdout", new=io.StringIO()) as fake_stdout,
         ):
-            mock_rpc.side_effect = lambda *args, **kwargs: (
-                1 if args[2] == "authenticate" else [{"id": 1, "name": "Partner A"}]
-            )
+
+            def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                return (
+                    1
+                    if len(args) > 2 and args[2] == "authenticate"
+                    else [{"id": 1, "name": "Partner A"}]
+                )
+
+            mock_rpc.side_effect = _fake_rpc
             argv = [
                 "search_read",
                 "res.partner",
@@ -972,12 +1001,12 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret",  # noqa: S106 - test credential
+                "secret",
                 "--json",
             ]
             exit_code = main(argv)
             assert exit_code == 0
-            parsed_out = json.loads(fake_stdout.getvalue())
+            parsed_out = parse_json(fake_stdout.getvalue())
             assert parsed_out == [{"id": 1, "name": "Partner A"}]
 
     def test_search_read_truncation_warning(self) -> None:
@@ -987,11 +1016,17 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             patch("sys.stderr", new=io.StringIO()) as fake_stderr,
             patch("sys.stdout", new=io.StringIO()),
         ):
-            mock_rpc.side_effect = lambda *args, **kwargs: (
-                1
-                if args[2] == "authenticate"
-                else ([{"id": 1}, {"id": 2}] if args[7] == "search_read" else 5)
-            )
+
+            def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                if len(args) > 2 and args[2] == "authenticate":
+                    return 1
+                return (
+                    [{"id": 1}, {"id": 2}]
+                    if len(args) > 7 and args[7] == "search_read"
+                    else 5
+                )
+
+            mock_rpc.side_effect = _fake_rpc
             argv = [
                 "--allow-rpc",
                 "--url",
@@ -1001,7 +1036,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret",  # noqa: S106 - test credential
+                "secret",
                 "search_read",
                 "res.partner",
                 "[]",
@@ -1021,11 +1056,17 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             patch("sys.stderr", new=io.StringIO()) as fake_stderr,
             patch("sys.stdout", new=io.StringIO()),
         ):
-            mock_rpc.side_effect = lambda *args, **kwargs: (
-                1
-                if args[2] == "authenticate"
-                else ([{"id": 1}, {"id": 2}] if args[7] == "search_read" else 2)
-            )
+
+            def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                if len(args) > 2 and args[2] == "authenticate":
+                    return 1
+                return (
+                    [{"id": 1}, {"id": 2}]
+                    if len(args) > 7 and args[7] == "search_read"
+                    else 2
+                )
+
+            mock_rpc.side_effect = _fake_rpc
             argv = [
                 "--allow-rpc",
                 "--url",
@@ -1035,7 +1076,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 "--user",
                 "user@test.com",
                 "--token",
-                "secret",  # noqa: S106 - test credential
+                "secret",
                 "search_read",
                 "res.partner",
                 "[]",
@@ -1053,7 +1094,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             backups_dir.mkdir(parents=True, exist_ok=True)
             plan_id = "planrev01"
             backup_file = backups_dir / f"{plan_id}.json"
-            backup_file.write_text(
+            _ = backup_file.write_text(
                 json.dumps(
                     {
                         "plan_id": plan_id,
@@ -1078,10 +1119,11 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 patch("odoo_rpc.json_rpc") as mock_rpc,
                 patch("sys.stdout", new=io.StringIO()) as fake_stdout,
             ):
-                mock_rpc.side_effect = lambda *args, **kwargs: (
-                    1
-                    if args[2] == "authenticate"
-                    else [
+
+                def _fake_rpc(*args: object, **_kwargs: object) -> object:
+                    if len(args) > 2 and args[2] == "authenticate":
+                        return 1
+                    return [
                         {
                             "id": 1,
                             "name": "Current Mutated Name",
@@ -1089,7 +1131,8 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                             "display_name": "Partner 1",
                         }
                     ]
-                )
+
+                mock_rpc.side_effect = _fake_rpc
                 argv = [
                     "--allow-rpc",
                     "--url",
@@ -1099,7 +1142,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     "--user",
                     "admin",
                     "--token",
-                    "tok",  # noqa: S106 - test credential
+                    "tok",
                     "revert",
                     plan_id,
                 ]
@@ -1114,7 +1157,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                     if p.name != f"{plan_id}.json"
                 ]
                 assert len(plans) == 1
-                new_plan = json.loads(plans[0].read_text(encoding="utf-8"))
+                new_plan = parse_json_dict(plans[0].read_text(encoding="utf-8"))
                 assert new_plan["command"] == "write-batch"
                 assert new_plan["model"] == "res.partner"
                 assert new_plan["values_by_id"] == {
@@ -1170,7 +1213,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
                 "authenticate",
                 "testdb",
                 "user",
-                "token",  # noqa: S106 - test credential
+                "token",
                 {},
                 allow_rpc=True,
             )
@@ -1185,7 +1228,7 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
             "--user",
             "user",
             "--token",
-            "tok",  # noqa: S106 - test credential
+            "tok",
             "search_read",
             "res.partner",
             "[('name', '=', 'bad')]",

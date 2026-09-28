@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "pytest>=8",
 #     "lxml>=5.0",
+#     "lxml-stubs",
 # ]
 # ///
 """Public entrypoint and dispatcher for Odoo Ops."""
-
-from __future__ import annotations
 
 import sys
 
@@ -62,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     """Delegate to odoo_rpc if command is 'rpc', otherwise odooctl."""
     args = sys.argv[1:] if argv is None else list(argv)
     if not args or args in (["-h"], ["--help"]):
-        odooctl._build_parser().print_help()
+        odooctl.build_parser().print_help()
         print("rpc: Odoo JSON-RPC client (see 'cli.py rpc --help')")
         return 0
     if args[0] == "rpc":

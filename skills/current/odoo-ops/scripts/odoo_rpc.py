@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # ///
 """Odoo JSON-RPC Client.
 
@@ -15,8 +15,6 @@ Note: Client-side method allowlists do not guarantee server-side read-only trans
 as custom server-side method implementations or hooks could perform mutations.
 Consent flags record explicit user authorization.
 """
-
-from __future__ import annotations
 
 import argparse
 import contextlib
@@ -34,26 +32,77 @@ import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-
-# typing.Union is deprecated in favor of X | Y, but a recursive alias needs
-# quoted forward references while X | "Y" is a runtime TypeError (TC010);
-# the type statement needs Python 3.12+ and this skill supports 3.10.
-from typing import (
-    TYPE_CHECKING,
-    TypeAlias,
-    Union,  # pyright: ignore[reportDeprecated] - see note above
-    cast,
-)
+from typing import TYPE_CHECKING, Protocol, Self, TypeIs, override
 
 if TYPE_CHECKING:
     import http.client
     from typing import IO
 
-JsonValue: TypeAlias = Union[  # pyright: ignore[reportDeprecated] - see note above
-    bool, int, float, str, "list[JsonValue]", "dict[str, JsonValue]", None
-]
-JsonObject: TypeAlias = dict[str, JsonValue]
-JsonRecord: TypeAlias = dict[str, JsonValue]
+type JsonValue = (
+    bool | int | float | str | None | list[JsonValue] | dict[str, JsonValue]  # noqa: RUF036 - exact alias ordering
+)
+type JsonObject = dict[str, JsonValue]
+type JsonRecord = dict[str, JsonValue]
+
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
+
+
+class _ReadableContext(Protocol):
+    def read(self) -> bytes: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> object: ...
+
+
+def _open_url(
+    opener: urllib.request.OpenerDirector, req: urllib.request.Request, timeout: float
+) -> _ReadableContext:
+    fn: Callable[..., _ReadableContext] = opener.open
+    return fn(req, timeout=timeout)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _narrow_json_value(val: object) -> JsonValue:
+    if val is None or isinstance(val, (bool, int, float, str)):
+        return val
+    if _is_obj_list(val):
+        return [_narrow_json_value(item) for item in val]
+    if _is_obj_dict(val):
+        return {str(k): _narrow_json_value(v) for k, v in val.items()}
+    return str(val)
+
+
+def _narrow_record(val: object) -> JsonRecord:
+    if _is_obj_dict(val):
+        return {str(k): _narrow_json_value(v) for k, v in val.items()}
+    return {}
+
+
+def _narrow_record_list(val: object) -> list[JsonRecord]:
+    if _is_obj_list(val):
+        return [_narrow_record(item) for item in val if _is_obj_dict(item)]
+    return []
+
+
+def _narrow_object(val: object) -> JsonObject:
+    if _is_obj_dict(val):
+        return {str(k): _narrow_json_value(v) for k, v in val.items()}
+    return {}
+
+
+def _narrow_id_or_ids(val: object) -> int | list[int]:
+    if isinstance(val, int) and not isinstance(val, bool):
+        return val
+    if _is_obj_list(val):
+        return [x for x in val if isinstance(x, int) and not isinstance(x, bool)]
+    return 0
+
 
 SKILL_DIR: Path = Path(__file__).resolve().parent.parent
 _MIN_QUOTED_LENGTH = 2
@@ -228,7 +277,8 @@ class ProductionDeniedError(PermissionError):
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Prevent automatic HTTP redirection to safeguard credentials from leaking."""
 
-    def redirect_request(  # noqa: PLR0913, PLR0917 - stdlib override signature
+    @override
+    def redirect_request(
         self,
         req: urllib.request.Request,
         fp: IO[bytes],
@@ -266,7 +316,7 @@ def is_loopback(url: OdooRpcConfig | str) -> bool:
 
 def _validate_url(raw_url: str, *, verify_ssl: bool = True) -> str:
     """Validate URL structure, schemes, credentials, query/fragments, and transport safety."""
-    if not isinstance(raw_url, str) or not raw_url.strip():
+    if not raw_url.strip():
         message = "Odoo RPC URL must be a non-empty string."
         raise ValueError(message)
 
@@ -317,7 +367,7 @@ def _check_positive_id(val: object, label: str) -> int:
 
 def _validate_id_list(ids: list[int], label: str = "IDs") -> list[int]:
     """Ensure list of IDs is non-empty and contains only positive non-bool ints."""
-    if not isinstance(ids, list) or not ids:
+    if not ids:
         message = (
             f"Invalid {label}: ID list must be a non-empty list of positive integers."
         )
@@ -391,7 +441,7 @@ class OdooRpcConfig:
     verify_ssl: bool = True
 
     @classmethod
-    def from_env(  # noqa: PLR0913 - parameters mirror the documented CLI/config surface one-to-one
+    def from_env(
         cls,
         *,
         url: str | None = None,
@@ -579,61 +629,61 @@ def json_rpc(
     )
 
     try:
-        with opener.open(  # noqa: S310 - validated_url is strictly checked by _validate_url
-            req, timeout=timeout
-        ) as raw_resp:  # pyright: ignore[reportAny] - typeshed types open() as Any; narrowed to HTTPResponse on the next line
-            resp = cast("http.client.HTTPResponse", raw_resp)
-            raw = resp.read().decode("utf-8")
-            decoded = cast("object", json.loads(raw))
-            if not isinstance(decoded, dict):
-                message = "Unexpected JSON-RPC response format from server."
-                raise TypeError(message)
-            res = cast("dict[object, object]", decoded)
-            if "error" in res:
-                err_dict = res["error"] if isinstance(res["error"], dict) else {}
-                raw_code = err_dict.get("code")
-                err_code = (
-                    raw_code
-                    if isinstance(raw_code, int) and not isinstance(raw_code, bool)
-                    else "unknown"
-                )
-                data_obj = err_dict.get("data")
-                data_dict = data_obj if isinstance(data_obj, dict) else {}
-                data_name = (
-                    data_dict.get("name")
-                    if isinstance(data_dict.get("name"), str)
-                    else ""
-                )
+        with _open_url(opener, req, timeout) as raw_resp:
+            raw = raw_resp.read().decode("utf-8")
+        decoded = _json_loads(raw)
+        if not _is_obj_dict(decoded):
+            message = "Unexpected JSON-RPC response format from server."
+            raise TypeError(message)
+        res: dict[str, object] = {str(k): v for k, v in decoded.items()}
+        if "error" in res:
+            err_raw = res["error"]
+            err_dict: dict[str, object] = (
+                {str(k): v for k, v in err_raw.items()} if _is_obj_dict(err_raw) else {}
+            )
+            raw_code = err_dict.get("code")
+            err_code = (
+                raw_code
+                if isinstance(raw_code, int) and not isinstance(raw_code, bool)
+                else "unknown"
+            )
+            data_obj = err_dict.get("data")
+            data_dict: dict[str, object] = (
+                {str(k): v for k, v in data_obj.items()}
+                if _is_obj_dict(data_obj)
+                else {}
+            )
+            raw_name = data_dict.get("name")
+            data_name: str = raw_name if isinstance(raw_name, str) else ""
 
-                raw_msg = ""
-                data_msg = data_dict.get("message")
-                if isinstance(data_msg, str) and data_msg.strip():
-                    raw_msg = data_msg
-                else:
-                    err_msg = err_dict.get("message")
-                    if isinstance(err_msg, str) and err_msg.strip():
-                        raw_msg = err_msg
+            raw_msg = ""
+            data_msg = data_dict.get("message")
+            if isinstance(data_msg, str) and data_msg.strip():
+                raw_msg = data_msg
+            else:
+                err_msg = err_dict.get("message")
+                if isinstance(err_msg, str) and err_msg.strip():
+                    raw_msg = err_msg
 
-                first_line = raw_msg.splitlines()[0].strip() if raw_msg else ""
+            first_line = raw_msg.splitlines()[0].strip() if raw_msg else ""
 
-                if data_name and first_line:
-                    detail = f"{data_name}: {first_line}"
-                elif data_name:
-                    detail = data_name
-                elif first_line:
-                    detail = first_line
-                else:
-                    detail = ""
+            if data_name and first_line:
+                detail = f"{data_name}: {first_line}"
+            elif data_name:
+                detail = data_name
+            elif first_line:
+                detail = first_line
+            else:
+                detail = ""
+            if detail:
+                failure = f"Odoo RPC server error (code {err_code}): {detail}"
+            else:
+                failure = f"Odoo RPC server error (code {err_code})"
 
-                if detail:
-                    failure = f"Odoo RPC server error (code {err_code}): {detail}"
-                else:
-                    failure = f"Odoo RPC server error (code {err_code})"
-
-                if len(failure) > _MAX_ERROR_MESSAGE_LEN:
-                    failure = failure[:_MAX_ERROR_MESSAGE_LEN]
-                raise RuntimeError(failure)
-            return cast("JsonValue", res.get("result"))
+            if len(failure) > _MAX_ERROR_MESSAGE_LEN:
+                failure = failure[:_MAX_ERROR_MESSAGE_LEN]
+            raise RuntimeError(failure)
+        return _narrow_json_value(res.get("result"))
     except urllib.error.HTTPError as e:
         http_failure = f"HTTP {e.code} error from server"
         raise RuntimeError(http_failure) from None
@@ -733,7 +783,7 @@ class OdooRpcClient:
         allow_custom: bool = False,
     ) -> JsonValue:
         """Execute a model method after checking method permission policies."""
-        if not isinstance(model, str) or not model.strip():
+        if not model.strip():
             message = "Model name must be a non-empty string."
             raise ValueError(message)
         if not all(c.isalnum() or c in "._" for c in model):
@@ -778,7 +828,7 @@ class OdooRpcClient:
             verify_ssl=self.config.verify_ssl,
         )
 
-    def read_group(  # noqa: PLR0913, PLR0917
+    def read_group(  # noqa: PLR0917
         self,
         model: str,
         groupby: list[str],
@@ -791,16 +841,16 @@ class OdooRpcClient:
     ) -> list[JsonRecord]:
         """Execute read_group query on model."""
         args: list[JsonValue] = [
-            cast("JsonValue", domain or []),
-            cast("JsonValue", fields or []),
-            cast("JsonValue", groupby),
+            _narrow_json_value(domain or []),
+            _narrow_json_value(fields or []),
+            _narrow_json_value(groupby),
         ]
         kwargs: JsonObject = {"lazy": lazy, "offset": offset}
         if orderby:
             kwargs["orderby"] = orderby
         if limit is not None:
             kwargs["limit"] = limit
-        return cast("list[JsonRecord]", self.execute(model, "read_group", args, kwargs))
+        return _narrow_record_list(self.execute(model, "read_group", args, kwargs))
 
     def call(
         self,
@@ -817,7 +867,7 @@ class OdooRpcClient:
 
     # --- Read & Query Operations ---
 
-    def search_read(  # noqa: PLR0913, PLR0917 - mirrors Odoo's search_read signature position-for-position
+    def search_read(  # noqa: PLR0917 - mirrors Odoo's search_read signature position-for-position
         self,
         model: str,
         domain: list[JsonValue] | None = None,
@@ -829,19 +879,19 @@ class OdooRpcClient:
         """Search records and read their fields in one call."""
         kwargs: JsonObject = {"offset": offset}
         if fields:
-            kwargs["fields"] = cast("JsonValue", fields)
+            kwargs["fields"] = _narrow_json_value(fields)
         if limit is not None:
             kwargs["limit"] = limit
         if order:
             kwargs["order"] = order
-        return cast(
-            "list[JsonRecord]",
-            self.execute(model, "search_read", [domain or []], kwargs),
+        return _narrow_record_list(
+            self.execute(model, "search_read", [domain or []], kwargs)
         )
 
     def search_count(self, model: str, domain: list[JsonValue] | None = None) -> int:
         """Count records matching a domain."""
-        return cast("int", self.execute(model, "search_count", [domain or []]))
+        res = self.execute(model, "search_count", [domain or []])
+        return res if isinstance(res, int) and not isinstance(res, bool) else 0
 
     def read(
         self,
@@ -851,10 +901,9 @@ class OdooRpcClient:
     ) -> list[JsonRecord]:
         """Read field values for record ids."""
         valid_ids = _validate_id_list(ids, "ids")
-        kwargs: JsonObject = {"fields": cast("JsonValue", fields)} if fields else {}
-        return cast(
-            "list[JsonRecord]",
-            self.execute(model, "read", [cast("JsonValue", valid_ids)], kwargs),
+        kwargs: JsonObject = {"fields": _narrow_json_value(fields)} if fields else {}
+        return _narrow_record_list(
+            self.execute(model, "read", [_narrow_json_value(valid_ids)], kwargs)
         )
 
     def fields_get(
@@ -864,11 +913,11 @@ class OdooRpcClient:
         attributes: list[str] | None = None,
     ) -> JsonObject:
         """Inspect model field definitions."""
-        args = [cast("JsonValue", allfields)] if allfields is not None else []
+        args = [_narrow_json_value(allfields)] if allfields is not None else []
         kwargs: JsonObject = (
-            {"attributes": cast("JsonValue", attributes)} if attributes else {}
+            {"attributes": _narrow_json_value(attributes)} if attributes else {}
         )
-        return cast("JsonObject", self.execute(model, "fields_get", args, kwargs))
+        return _narrow_object(self.execute(model, "fields_get", args, kwargs))
 
     def get_view(
         self,
@@ -880,7 +929,7 @@ class OdooRpcClient:
         kwargs: JsonObject = {"view_type": view_type}
         if view_id is not None:
             kwargs["view_id"] = _check_positive_id(view_id, "view_id")
-        return cast("JsonObject", self.execute(model, "get_view", [], kwargs))
+        return _narrow_object(self.execute(model, "get_view", [], kwargs))
 
     def get_views(
         self,
@@ -889,14 +938,13 @@ class OdooRpcClient:
         options: JsonObject | None = None,
     ) -> JsonObject:
         """Inspect rendered view architectures."""
-        return cast(
-            "JsonObject",
+        return _narrow_object(
             self.execute(
                 model,
                 "get_views",
-                [cast("JsonValue", views)],
+                [_narrow_json_value(views)],
                 {"options": options or {}},
-            ),
+            )
         )
 
     # --- Safe Introspection Operations ---
@@ -908,9 +956,8 @@ class OdooRpcClient:
     ) -> list[JsonRecord]:
         """Fetch record metadata for ids."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "list[JsonRecord]",
-            self.execute(model, "get_metadata", [cast("JsonValue", valid_ids)]),
+        return _narrow_record_list(
+            self.execute(model, "get_metadata", [_narrow_json_value(valid_ids)])
         )
 
     def get_external_id(
@@ -920,10 +967,12 @@ class OdooRpcClient:
     ) -> dict[int, str]:
         """Fetch XML external ids for record ids."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "dict[int, str]",
-            self.execute(model, "get_external_id", [cast("JsonValue", valid_ids)]),
+        res = _narrow_object(
+            self.execute(model, "get_external_id", [_narrow_json_value(valid_ids)])
         )
+        return {
+            int(str(k)): str(v) for k, v in res.items() if str(k).lstrip("-").isdigit()
+        }
 
     def default_get(
         self,
@@ -931,9 +980,8 @@ class OdooRpcClient:
         fields: list[str],
     ) -> JsonObject:
         """Fetch default values for fields."""
-        return cast(
-            "JsonObject",
-            self.execute(model, "default_get", [cast("JsonValue", fields)]),
+        return _narrow_object(
+            self.execute(model, "default_get", [_narrow_json_value(fields)])
         )
 
     def check_access_rights(
@@ -943,14 +991,13 @@ class OdooRpcClient:
         raise_exception: bool = False,
     ) -> bool:
         """Check model access rights for an operation."""
-        return cast(
-            "bool",
+        return bool(
             self.execute(
                 model,
                 "check_access_rights",
                 [operation],
                 {"raise_exception": raise_exception},
-            ),
+            )
         )
 
     def user_has_groups(
@@ -958,7 +1005,7 @@ class OdooRpcClient:
         groups: str,
     ) -> bool:
         """Check whether the current user has a group."""
-        return cast("bool", self.execute("res.users", "user_has_groups", [groups]))
+        return bool(self.execute("res.users", "user_has_groups", [groups]))
 
     # --- State Mutation Operations (Guarded by --write / allow_write=True) ---
 
@@ -968,8 +1015,8 @@ class OdooRpcClient:
         vals: JsonObject | list[JsonRecord],
     ) -> int | list[int]:
         """Create records from field values."""
-        return cast(
-            "int | list[int]", self.execute(model, "create", [cast("JsonValue", vals)])
+        return _narrow_id_or_ids(
+            self.execute(model, "create", [_narrow_json_value(vals)])
         )
 
     def write(
@@ -980,13 +1027,10 @@ class OdooRpcClient:
     ) -> bool:
         """Update records with field values."""
         valid_ids = _validate_id_list(ids, "ids")
-        if not isinstance(vals, dict) or not vals:
+        if not vals:
             message = "vals must be a non-empty dictionary of field updates."
             raise ValueError(message)
-        return cast(
-            "bool",
-            self.execute(model, "write", [cast("JsonValue", valid_ids), vals]),
-        )
+        return bool(self.execute(model, "write", [_narrow_json_value(valid_ids), vals]))
 
     def unlink(
         self,
@@ -995,9 +1039,7 @@ class OdooRpcClient:
     ) -> bool:
         """Delete records by id."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "bool", self.execute(model, "unlink", [cast("JsonValue", valid_ids)])
-        )
+        return bool(self.execute(model, "unlink", [_narrow_json_value(valid_ids)]))
 
     def copy(
         self,
@@ -1008,7 +1050,8 @@ class OdooRpcClient:
         """Duplicate a record with optional default overrides."""
         valid_id = _check_positive_id(record_id, "record_id")
         kwargs: JsonObject = {"default": default} if default else {}
-        return cast("int", self.execute(model, "copy", [valid_id], kwargs))
+        res = self.execute(model, "copy", [valid_id], kwargs)
+        return res if isinstance(res, int) and not isinstance(res, bool) else 0
 
     def action_archive(
         self,
@@ -1017,9 +1060,8 @@ class OdooRpcClient:
     ) -> bool:
         """Archive records by id."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "bool",
-            self.execute(model, "action_archive", [cast("JsonValue", valid_ids)]),
+        return bool(
+            self.execute(model, "action_archive", [_narrow_json_value(valid_ids)])
         )
 
     def action_unarchive(
@@ -1029,9 +1071,8 @@ class OdooRpcClient:
     ) -> bool:
         """Unarchive records by id."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "bool",
-            self.execute(model, "action_unarchive", [cast("JsonValue", valid_ids)]),
+        return bool(
+            self.execute(model, "action_unarchive", [_narrow_json_value(valid_ids)])
         )
 
     def toggle_active(
@@ -1041,9 +1082,8 @@ class OdooRpcClient:
     ) -> bool:
         """Toggle the active flag on records."""
         valid_ids = _validate_id_list(ids, "ids")
-        return cast(
-            "bool",
-            self.execute(model, "toggle_active", [cast("JsonValue", valid_ids)]),
+        return bool(
+            self.execute(model, "toggle_active", [_narrow_json_value(valid_ids)])
         )
 
 
@@ -1141,7 +1181,7 @@ def build_parser() -> argparse.ArgumentParser:
     def add_subparser(
         name: str,
         *,
-        help: str | None = None,  # noqa: A002
+        help: str | None = None,
         aliases: Sequence[str] = (),
     ) -> argparse.ArgumentParser:
         return subparsers.add_parser(
@@ -1383,8 +1423,8 @@ def normalize_fields(fields: Sequence[str] | str | None) -> list[str] | None:
             continue
         if text.startswith("[") and text.endswith("]"):
             try:
-                parsed = cast("object", json.loads(text))
-                if isinstance(parsed, list):
+                parsed = _json_loads(text)
+                if _is_obj_list(parsed):
                     for sub in parsed:
                         if isinstance(sub, str) and sub.strip():
                             result.append(sub.strip())
@@ -1400,65 +1440,65 @@ def normalize_fields(fields: Sequence[str] | str | None) -> list[str] | None:
 def _json_domain(text: str) -> list[JsonValue]:
     """Parse a CLI domain argument expecting a JSON array with hint on error."""
     try:
-        value = cast("object", json.loads(text))
+        value = _json_loads(text)
     except json.JSONDecodeError as exc:
         message = f"Invalid domain JSON: {exc} ({_DOMAIN_JSON_HINT})."
         raise ValueError(message) from exc
-    if not isinstance(value, list):
+    if not _is_obj_list(value):
         message = f"Invalid domain JSON: expected an array ({_DOMAIN_JSON_HINT})."
         raise TypeError(message)
-    return cast("list[JsonValue]", value)
+    return [_narrow_json_value(item) for item in value]
 
 
 def _json_list(text: str, label: str) -> list[JsonValue]:
     """Parse a CLI JSON-array argument."""
     try:
-        value = cast("object", json.loads(text))
+        value = _json_loads(text)
     except json.JSONDecodeError as exc:
         hint = f" ({_DOMAIN_JSON_HINT})" if label == "domain" else ""
         message = f"Invalid {label} JSON: {exc}.{hint}"
         raise ValueError(message) from exc
-    if not isinstance(value, list):
+    if not _is_obj_list(value):
         hint = f" ({_DOMAIN_JSON_HINT})" if label == "domain" else ""
         message = f"Invalid {label} JSON: expected an array.{hint}"
         raise TypeError(message)
-    return cast("list[JsonValue]", value)
+    return [_narrow_json_value(item) for item in value]
 
 
 def _json_object_arg(text: str, label: str) -> JsonObject:
     """Parse a CLI JSON-object argument."""
     try:
-        value = cast("object", json.loads(text))
+        value = _json_loads(text)
     except json.JSONDecodeError as exc:
         message = f"Invalid {label} JSON: {exc}."
         raise ValueError(message) from exc
-    if not isinstance(value, dict):
+    if not _is_obj_dict(value):
         message = f"Invalid {label} JSON: expected an object."
         raise TypeError(message)
-    return cast("JsonObject", value)
+    return {str(k): _narrow_json_value(v) for k, v in value.items()}
 
 
 def _json_vals(text: str, label: str) -> JsonObject | list[JsonRecord]:
     """Parse a CLI JSON argument that may be an object or a non-empty array of objects."""
     try:
-        value = cast("object", json.loads(text))
+        value = _json_loads(text)
     except json.JSONDecodeError as exc:
         message = f"Invalid {label} JSON: {exc}."
         raise ValueError(message) from exc
-    if isinstance(value, dict):
+    if _is_obj_dict(value):
         if not all(isinstance(k, str) for k in value):
             message = f"Invalid {label} JSON: keys must be strings."
             raise TypeError(message)
-        return cast("JsonObject", value)
-    if isinstance(value, list) and value:
+        return {str(k): _narrow_json_value(v) for k, v in value.items()}
+    if _is_obj_list(value) and value:
         for idx, item in enumerate(value):
-            if not isinstance(item, dict) or not all(isinstance(k, str) for k in item):
+            if not _is_obj_dict(item) or not all(isinstance(k, str) for k in item):
                 message = (
                     f"Invalid {label} JSON item at index {idx}: "
                     + "expected an object with string keys."
                 )
                 raise TypeError(message)
-        return cast("list[JsonRecord]", value)
+        return [_narrow_record(item) for item in value if _is_obj_dict(item)]
     message = (
         f"Invalid {label} JSON: expected an object or a non-empty array of objects."
     )
@@ -1479,13 +1519,13 @@ def _parse_call_ids(text: str | None) -> list[int] | None:
     if not text:
         return None
     try:
-        val = cast("object", json.loads(text))
+        val = _json_loads(text)
     except json.JSONDecodeError as exc:
         message = f"Invalid --ids JSON: {exc}."
         raise ValueError(message) from exc
     if isinstance(val, int) and not isinstance(val, bool):
         return [_check_positive_id(val, "id")]
-    if isinstance(val, list):
+    if _is_obj_list(val):
         return [_check_positive_id(x, "id item") for x in val]
     message = (
         "Invalid --ids JSON: expected a positive integer or list of positive integers."
@@ -1509,79 +1549,77 @@ def _parse_batch_file(path_or_stdin: str) -> dict[int, JsonObject]:
             raise OSError(message) from exc
 
     try:
-        data = cast("object", json.loads(content))
+        data = _json_loads(content)
     except json.JSONDecodeError as exc:
         message = f"Invalid write-batch JSON: {exc}."
         raise ValueError(message) from exc
 
-    if not isinstance(data, dict) or not data:
+    if not _is_obj_dict(data) or not data:
         message = "Invalid write-batch JSON: expected a non-empty object mapping id -> values."
         raise TypeError(message)
 
     result: dict[int, JsonObject] = {}
     for key, val in data.items():
         try:
-            raw_id = int(key)
+            raw_id = int(str(key))
         except (ValueError, TypeError) as exc:
             message = f"Invalid write-batch key: {key!r} must be an integer ID."
             raise ValueError(message) from exc
         valid_id = _check_positive_id(raw_id, "batch ID")
-        if not isinstance(val, dict) or not val:
+        if not _is_obj_dict(val) or not val:
             message = f"Invalid write-batch values for ID {valid_id}: must be a non-empty object."
             raise TypeError(message)
         if not all(isinstance(k, str) for k in val):
             message = f"Invalid write-batch values for ID {valid_id}: field names must be strings."
             raise TypeError(message)
-        result[valid_id] = cast("JsonObject", val)
+        result[valid_id] = {str(k): _narrow_json_value(v) for k, v in val.items()}
     return result
 
 
 def _optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Narrow an optional string flag to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     return value if isinstance(value, str) else None
 
 
 def _optional_str_list(args: argparse.Namespace, field: str) -> list[str] | None:
     """Narrow an optional string-list flag to a typed value."""
-    value = cast("object", getattr(args, field, None))
-    if value is None:
+    value: object = getattr(args, field, None)
+    if not _is_obj_list(value):
         return None
-    items = cast("list[object]", value)
-    return [item for item in items if isinstance(item, str)]
+    return [item for item in value if isinstance(item, str)]
 
 
 def _required_str_list(args: argparse.Namespace, field: str) -> list[str]:
     """Narrow a required string-list argument to a typed value."""
-    value = cast("object", getattr(args, field, None))
-    if not isinstance(value, list):
+    value: object = getattr(args, field, None)
+    if not _is_obj_list(value):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
-    items = cast("list[object]", value)
-    return [item for item in items if isinstance(item, str)]
+    return [item for item in value if isinstance(item, str)]
 
 
 def _optional_int(args: argparse.Namespace, field: str, default: int) -> int:
     """Narrow an optional integer flag to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     return value if isinstance(value, int) and not isinstance(value, bool) else default
 
 
 def _optional_int_or_none(args: argparse.Namespace, field: str) -> int | None:
     """Narrow an optional integer-or-null flag to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _optional_flag(args: argparse.Namespace, field: str) -> bool:
     """Narrow an optional boolean flag to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     return value is True
 
 
 def _required_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string argument to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     if not isinstance(value, str):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -1590,7 +1628,7 @@ def _required_str(args: argparse.Namespace, field: str) -> str:
 
 def _required_int(args: argparse.Namespace, field: str) -> int:
     """Narrow a required integer argument to a typed value."""
-    value = cast("object", getattr(args, field, None))
+    value: object = getattr(args, field, None)
     if not isinstance(value, int) or isinstance(value, bool):
         message = f"Invalid integer argument: {field}."
         raise TypeError(message)
@@ -1688,7 +1726,7 @@ def check_production_denylist(
         if isinstance(values, dict):
             dicts_to_check.append(values)
         elif isinstance(values, list):
-            dicts_to_check.extend(d for d in values if isinstance(d, dict))
+            dicts_to_check.extend(values)
         if values_by_id:
             dicts_to_check.extend(values_by_id.values())
 
@@ -1707,9 +1745,9 @@ def _generate_plan_id(canonical_payload: JsonObject) -> str:
 
 def _print_plan_diff(plan: JsonObject) -> None:
     """Print per-record diff of old -> new values."""
-    model = cast("str", plan.get("model", ""))
-    command = cast("str", plan.get("command", ""))
-    preimage = cast("list[JsonRecord]", plan.get("preimage", []))
+    model = str(plan.get("model", ""))
+    command = str(plan.get("command", ""))
+    preimage = _narrow_record_list(plan.get("preimage", []))
     pre_by_id: dict[int, JsonRecord] = {
         int(r["id"]): r
         for r in preimage
@@ -1717,8 +1755,13 @@ def _print_plan_diff(plan: JsonObject) -> None:
     }
 
     if command in ("write", "update"):
-        vals = cast("JsonObject", plan.get("values", {}))
-        ids = cast("list[int]", plan.get("ids", []))
+        vals = _narrow_object(plan.get("values", {}))
+        raw_ids = plan.get("ids", [])
+        ids = (
+            [int(x) for x in raw_ids if isinstance(x, int) and not isinstance(x, bool)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         for rid in ids:
             rec = pre_by_id.get(rid, {})
             dname = rec.get("display_name", f"id={rid}")
@@ -1727,7 +1770,12 @@ def _print_plan_diff(plan: JsonObject) -> None:
                 old_val = rec.get(field)
                 print(f"  {field}: {old_val} -> {new_val}")
     elif command == "write-batch":
-        v_by_id = cast("dict[str, JsonObject]", plan.get("values_by_id", {}))
+        raw_v_by_id = plan.get("values_by_id", {})
+        v_by_id = (
+            {str(k): _narrow_object(v) for k, v in raw_v_by_id.items()}
+            if isinstance(raw_v_by_id, dict)
+            else {}
+        )
         for id_str, vals in v_by_id.items():
             rid = int(id_str)
             rec = pre_by_id.get(rid, {})
@@ -1737,14 +1785,24 @@ def _print_plan_diff(plan: JsonObject) -> None:
                 old_val = rec.get(field)
                 print(f"  {field}: {old_val} -> {new_val}")
     elif command == "archive":
-        ids = cast("list[int]", plan.get("ids", []))
+        raw_ids = plan.get("ids", [])
+        ids = (
+            [int(x) for x in raw_ids if isinstance(x, int) and not isinstance(x, bool)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         for rid in ids:
             rec = pre_by_id.get(rid, {})
             dname = rec.get("display_name", f"id={rid}")
             print(f"# {model} id={rid} ({dname}):")
             print("  active: True -> False")
     elif command == "unarchive":
-        ids = cast("list[int]", plan.get("ids", []))
+        raw_ids = plan.get("ids", [])
+        ids = (
+            [int(x) for x in raw_ids if isinstance(x, int) and not isinstance(x, bool)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         for rid in ids:
             rec = pre_by_id.get(rid, {})
             dname = rec.get("display_name", f"id={rid}")
@@ -1763,16 +1821,26 @@ def _print_plan_diff(plan: JsonObject) -> None:
                 for field, val in rec_vals.items():
                     print(f"  {field}: None -> {val}")
     elif command == "copy":
-        ids = cast("list[int]", plan.get("ids", []))
+        raw_ids = plan.get("ids", [])
+        ids = (
+            [int(x) for x in raw_ids if isinstance(x, int) and not isinstance(x, bool)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         rid = ids[0] if ids else 0
         rec = pre_by_id.get(rid, {})
         dname = rec.get("display_name", f"id={rid}")
         print(f"# {model} copy id={rid} ({dname}):")
-        defaults = cast("JsonObject", plan.get("default", {})) or {}
+        defaults = _narrow_object(plan.get("default", {}))
         for field, val in defaults.items():
             print(f"  override {field} -> {val}")
     elif command in ("unlink", "delete"):
-        ids = cast("list[int]", plan.get("ids", []))
+        raw_ids = plan.get("ids", [])
+        ids = (
+            [int(x) for x in raw_ids if isinstance(x, int) and not isinstance(x, bool)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         for rid in ids:
             rec = pre_by_id.get(rid, {})
             dname = rec.get("display_name", f"id={rid}")
@@ -1810,7 +1878,7 @@ def _create_and_save_plan(
         "db": client.config.database,
     }
     if ids is not None:
-        canonical["ids"] = cast("JsonValue", ids)
+        canonical["ids"] = _narrow_json_value(ids)
     plan_id = _generate_plan_id(canonical)
 
     plan: JsonObject = {
@@ -1821,21 +1889,21 @@ def _create_and_save_plan(
         "user": client.config.user,
         "command": command,
         "model": model,
-        "ids": cast("JsonValue", ids),
-        "preimage": cast("JsonValue", preimage),
+        "ids": _narrow_json_value(ids),
+        "preimage": _narrow_json_value(preimage),
     }
     if values is not None:
-        plan["values"] = cast("JsonValue", values)
+        plan["values"] = _narrow_json_value(values)
     if values_by_id is not None:
-        plan["values_by_id"] = cast(
-            "JsonValue", {str(k): v for k, v in values_by_id.items()}
-        )
+        plan["values_by_id"] = {
+            str(k): _narrow_object(v) for k, v in values_by_id.items()
+        }
     if default_vals is not None:
-        plan["default"] = cast("JsonValue", default_vals)
+        plan["default"] = _narrow_object(default_vals)
     if method is not None:
         plan["method"] = method
-        plan["args"] = cast("JsonValue", call_args or [])
-        plan["kwargs"] = cast("JsonValue", call_kwargs or {})
+        plan["args"] = _narrow_json_value(call_args or [])
+        plan["kwargs"] = _narrow_object(call_kwargs or {})
 
     plan_path = get_state_dir() / "plans" / f"{plan_id}.json"
     _write_file_0600(
@@ -1875,7 +1943,7 @@ def _run_read_commands(
             offset=offset_val,
             order=order_val,
         )
-        if limit_val is not None and len(res) == limit_val:
+        if len(res) == limit_val:
             total = client.search_count(model, domain=domain_val)
             if total > limit_val:
                 _ = sys.stderr.write(
@@ -2005,7 +2073,7 @@ def _run_mutation_commands(
         )
         if method in READONLY_ALLOWLIST:
             full_args = (
-                [cast("JsonValue", call_ids), *call_args] if call_ids else call_args
+                [_narrow_json_value(call_ids), *call_args] if call_ids else call_args
             )
             res = client.execute(model, method, full_args, call_kwargs)
             _emit(res)
@@ -2058,15 +2126,19 @@ def _run_mutation_commands(
     # Loopback with --write executes directly
     if is_target_loopback and allow_write:
         if command == "create":
-            created = client.create(
-                model, vals=cast("JsonObject | list[JsonRecord]", vals)
-            )
+            if isinstance(vals, dict):
+                created = client.create(model, vals=_narrow_object(vals))
+            elif isinstance(vals, list):
+                created = client.create(model, vals=_narrow_record_list(vals))
+            else:
+                created = client.create(model, vals={})
             _emit_compact({"created_id": created})
         elif command in ("write", "update"):
+            target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
             updated = client.write(
                 model,
-                ids=cast("list[int]", ids),
-                vals=cast("JsonObject", vals),
+                ids=target_ids,
+                vals=_narrow_object(vals) if isinstance(vals, dict) else {},
             )
             _emit_compact({"updated": updated})
         elif command == "write-batch":
@@ -2081,40 +2153,43 @@ def _run_mutation_commands(
                 _ = client.write(model, ids=grp_ids, vals=grp_vals)
             _emit_compact({"updated": True})
         elif command in ("unlink", "delete"):
-            deleted = client.unlink(model, ids=cast("list[int]", ids))
+            target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
+            deleted = client.unlink(model, ids=target_ids)
             _emit_compact({"deleted": deleted})
         elif command == "copy":
+            target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
             copied = client.copy(
                 model,
-                record_id=cast("list[int]", ids)[0],
+                record_id=target_ids[0],
                 default=default_vals,
             )
             _emit_compact({"copied_id": copied})
         elif command == "archive":
-            archived = client.action_archive(model, ids=cast("list[int]", ids))
+            target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
+            archived = client.action_archive(model, ids=target_ids)
             _emit_compact({"archived": archived})
         elif command == "unarchive":
-            unarchived = client.action_unarchive(model, ids=cast("list[int]", ids))
+            target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
+            unarchived = client.action_unarchive(model, ids=target_ids)
             _emit_compact({"unarchived": unarchived})
         elif command == "call":
-            call_m = cast("str", method)
+            call_m = str(method or "")
             c_args = call_args or []
             c_kwargs = call_kwargs or {}
-            full_c_args = [cast("JsonValue", ids), *c_args] if ids else c_args
+            full_c_args = [_narrow_json_value(ids), *c_args] if ids else c_args
             result = client.call(model, call_m, full_c_args, c_kwargs)
             _emit(result)
         return 0
 
     # Without --write: create and save plan
     preimage: list[JsonRecord] = []
+    target_ids = [int(x) for x in ids] if isinstance(ids, list) else []
     if command in ("write", "update"):
-        target_ids = cast("list[int]", ids)
-        write_vals = cast("JsonObject", vals)
+        write_vals = _narrow_object(vals) if isinstance(vals, dict) else {}
         fetch_fields = sorted({*write_vals.keys(), "write_date", "display_name"})
         preimage = client.read(model, target_ids, fields=fetch_fields)
     elif command == "write-batch":
-        target_ids = cast("list[int]", ids)
-        batch_vals = cast("dict[int, JsonObject]", values_by_id)
+        batch_vals = values_by_id or {}
         fetch_fields = sorted(
             {
                 *(f for d in batch_vals.values() for f in d),
@@ -2124,18 +2199,17 @@ def _run_mutation_commands(
         )
         preimage = client.read(model, target_ids, fields=fetch_fields)
     elif command in ("archive", "unarchive"):
-        target_ids = cast("list[int]", ids)
         preimage = client.read(
             model, target_ids, fields=["active", "write_date", "display_name"]
         )
     elif command == "copy":
-        target_ids = cast("list[int]", ids)
         preimage = client.read(model, target_ids, fields=["display_name", "write_date"])
     elif command == "call":
         if ids:
-            preimage = client.read(model, ids, fields=["display_name", "write_date"])
+            preimage = client.read(
+                model, target_ids, fields=["display_name", "write_date"]
+            )
     elif command in ("unlink", "delete"):
-        target_ids = cast("list[int]", ids)
         preimage = client.read(model, target_ids, fields=["display_name", "write_date"])
     elif command == "create":
         preimage = []
@@ -2176,11 +2250,11 @@ def _run_apply(
         return 1
 
     try:
-        plan_raw = json.loads(plan_path.read_text(encoding="utf-8"))
-        if not isinstance(plan_raw, dict):
+        plan_raw = _json_loads(plan_path.read_text(encoding="utf-8"))
+        if not _is_obj_dict(plan_raw):
             _ = sys.stderr.write(f"Error: Plan file {plan_id} is corrupt.\n")
             return 1
-        plan = cast("JsonObject", plan_raw)
+        plan = _narrow_object(plan_raw)
     except (OSError, json.JSONDecodeError) as exc:
         _ = sys.stderr.write(f"Error: Cannot read plan {plan_id}: {exc}\n")
         return 1
@@ -2200,14 +2274,23 @@ def _run_apply(
         )
         return 1
 
-    command = cast("str", plan["command"])
-    model = cast("str", plan["model"])
-    method = cast("str | None", plan.get("method"))
-    values_obj = cast("JsonObject | list[JsonRecord] | None", plan.get("values"))
+    command = str(plan.get("command", ""))
+    model = str(plan.get("model", ""))
+    raw_method = plan.get("method")
+    method = str(raw_method) if isinstance(raw_method, str) else None
+    values_obj: JsonObject | list[JsonRecord] | None = None
+    if isinstance(raw_vals := plan.get("values"), dict):
+        values_obj = _narrow_object(raw_vals)
+    elif isinstance(raw_vals, list):
+        values_obj = _narrow_record_list(raw_vals)
     raw_v_by_id = plan.get("values_by_id")
     v_by_id: dict[int, JsonObject] | None = None
     if isinstance(raw_v_by_id, dict):
-        v_by_id = {int(k): cast("JsonObject", v) for k, v in raw_v_by_id.items()}
+        v_by_id = {
+            int(str(k)): _narrow_object(v)
+            for k, v in raw_v_by_id.items()
+            if str(k).lstrip("-").isdigit() and isinstance(v, dict)
+        }
 
     # Re-check production deny-list
     check_production_denylist(
@@ -2234,7 +2317,7 @@ def _run_apply(
             for r in current_records
             if "id" in r and isinstance(r["id"], int) and not isinstance(r["id"], bool)
         }
-        preimage = cast("list[JsonRecord]", plan.get("preimage", []))
+        preimage = _narrow_record_list(plan.get("preimage", []))
         pre_by_id = {
             int(r["id"]): r
             for r in preimage
@@ -2264,7 +2347,7 @@ def _run_apply(
         "applied_at": None,
         "command": command,
         "model": model,
-        "ids": cast("JsonValue", planned_ids),
+        "ids": _narrow_json_value(planned_ids),
         "preimage": plan.get("preimage", []),
         "created_ids": [],
         "steps_completed": [],
@@ -2277,7 +2360,7 @@ def _run_apply(
     remaining_ids: list[int] = list(planned_ids)
     try:
         if command in ("write", "update"):
-            vals = cast("JsonObject", plan["values"])
+            vals = _narrow_object(plan.get("values", {}))
             _ = client.write(model, planned_ids, vals)
             done_ids.extend(planned_ids)
             remaining_ids.clear()
@@ -2315,14 +2398,27 @@ def _run_apply(
                     }
                 )
         elif command == "create":
-            create_vals = cast("JsonObject | list[JsonRecord]", plan["values"])
+            raw_create = plan.get("values")
+            create_vals: JsonObject | list[JsonRecord] = (
+                _narrow_object(raw_create)
+                if isinstance(raw_create, dict)
+                else (
+                    _narrow_record_list(raw_create)
+                    if isinstance(raw_create, list)
+                    else {}
+                )
+            )
             created = client.create(model, create_vals)
             created_ids = (
                 [created]
                 if isinstance(created, int) and not isinstance(created, bool)
-                else (cast("list[int]", created) if isinstance(created, list) else [])
+                else (
+                    [x for x in created if not isinstance(x, bool)]
+                    if isinstance(created, list)
+                    else []
+                )
             )
-            backup["created_ids"] = cast("JsonValue", created_ids)
+            backup["created_ids"] = _narrow_json_value(created_ids)
             _write_file_0600(
                 backup_path,
                 json.dumps(backup, indent=2, sort_keys=True, ensure_ascii=False),
@@ -2338,7 +2434,11 @@ def _run_apply(
             )
         elif command == "copy":
             rec_id = planned_ids[0]
-            default_override = cast("JsonObject | None", plan.get("default"))
+            default_override = (
+                _narrow_object(raw_def)
+                if isinstance(raw_def := plan.get("default"), dict)
+                else None
+            )
             copied_id = client.copy(model, rec_id, default=default_override)
             backup["created_ids"] = [copied_id]
             _write_file_0600(
@@ -2394,11 +2494,13 @@ def _run_apply(
                 }
             )
         elif command == "call":
-            call_method = cast("str", plan["method"])
-            call_args = cast("list[JsonValue]", plan.get("args", []))
-            call_kwargs = cast("JsonObject", plan.get("kwargs", {}))
+            call_method = str(plan.get("method", ""))
+            call_args = (
+                list(raw_args) if isinstance(raw_args := plan.get("args"), list) else []
+            )
+            call_kwargs = _narrow_object(plan.get("kwargs", {}))
             full_args = (
-                [cast("JsonValue", planned_ids), *call_args]
+                [_narrow_json_value(planned_ids), *call_args]
                 if planned_ids
                 else call_args
             )
@@ -2415,7 +2517,7 @@ def _run_apply(
                     "ids": planned_ids,
                 }
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - boundary catch during plan execution to abort and report failure
         _ = sys.stderr.write(
             f"Error during apply: {exc}. Done IDs: {done_ids}, remaining IDs: {remaining_ids}\n"
         )
@@ -2450,18 +2552,18 @@ def _run_revert(
         return 1
 
     try:
-        backup_raw = json.loads(backup_path.read_text(encoding="utf-8"))
-        if not isinstance(backup_raw, dict):
+        backup_raw = _json_loads(backup_path.read_text(encoding="utf-8"))
+        if not _is_obj_dict(backup_raw):
             _ = sys.stderr.write(f"Error: Backup file {plan_id} is corrupt.\n")
             return 1
-        backup = cast("JsonObject", backup_raw)
+        backup = _narrow_object(backup_raw)
     except (OSError, json.JSONDecodeError) as exc:
         _ = sys.stderr.write(f"Error: Cannot read backup {plan_id}: {exc}\n")
         return 1
 
-    command = cast("str", backup.get("command", ""))
-    model = cast("str", backup.get("model", ""))
-    preimage = cast("list[JsonRecord]", backup.get("preimage", []))
+    command = str(backup.get("command", ""))
+    model = str(backup.get("model", ""))
+    preimage = _narrow_record_list(backup.get("preimage", []))
 
     if command == "call":
         _ = sys.stderr.write(

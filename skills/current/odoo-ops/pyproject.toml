@@ -1,9 +1,10 @@
 [project]
 name = "odoo-ops"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
     "lxml>=5.0",
+    "lxml-stubs",
 ]
 
 [project.optional-dependencies]
@@ -12,47 +13,43 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
     "A002",
-    "ANN401",
-    "BLE001",
+    "C901",    # complex-structure: cyclomatic complexity in large CLI parsers
     "COM812",
-    "CPY001",
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
+    "CPY001",  # flake8-copyright: no copyright header required
+    "D100",    # pydocstyle: missing docstring in public module
+    "D101",    # pydocstyle: missing docstring in public class
+    "D102",    # pydocstyle: missing docstring in public method
+    "D103",    # pydocstyle: missing docstring in public function
+    "D104",    # pydocstyle: missing docstring in public package
     "D203",
     "D213",
-    "E501",
+    "E501",    # pycodestyle: line length handled by ruff format
     "EM101",
     "EM102",
     "ERA001",
-    "FBT001",
-    "FBT002",
-    "ISC003",
+    "FBT001",  # flake8-boolean-trap: boolean positional arg in CLI/RPC signatures
+    "FBT002",  # flake8-boolean-trap: boolean default arg in CLI/RPC signatures
+    "ISC003",  # flake8-implicit-str-concat: explicit multi-line SQL concatenation
     "PERF401",
     "PLR0911",
     "PLR0912",
-    "PLR0913",
-    "PLR0915",
-    "PLR2004",
-    "C901",
-    "RUF100",
+    "PLR0913", # refactor: functions with many parameters in CLI and RPC helpers
+    "PLR0915", # refactor: complex command handlers with many statements
+    "PLR2004", # refactor: magic values in status codes, exit codes, AST checks
     "S101",
     "S603",
     "S607",
     "SLF001",
-    "TC003",
+    "TC003",   # flake8-type-checking: stdlib imports used at runtime
     "TRY003",
     "TRY301",
-    "UP040",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -63,12 +60,16 @@ ignore = [
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "tests"]
 extraPaths = ["scripts"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 
+# Tests deliberately exercise internal helpers directly and use dynamic mocks
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = false  # Tests deliberately exercise private helper functions
 [tool.pytest.ini_options]
 pythonpath = ["scripts"]
 testpaths = ["tests"]

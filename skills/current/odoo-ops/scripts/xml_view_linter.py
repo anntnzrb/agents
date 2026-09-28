@@ -1,22 +1,67 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # dependencies = [
 #     "lxml>=5.0",
 # ]
 # ///
 """AST and semantic linter for Odoo 17 XML views and QWeb templates."""
 
-from __future__ import annotations
-
+import importlib
 import json
 import re
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TypedDict
+from typing import Protocol, TypedDict, TypeIs
 
-from lxml import etree  # pyright: ignore[reportAttributeAccessIssue]
+
+class _XmlElement(Protocol):
+    @property
+    def tag(self) -> str | object: ...
+    @property
+    def attrib(self) -> Mapping[str, str]: ...
+    @property
+    def sourceline(self) -> int | None: ...
+    def iter(self) -> Iterator[_XmlElement]: ...
+    def xpath(self, _path: str) -> list[_XmlElement]: ...
+    def iterancestors(self) -> Iterator[_XmlElement]: ...
+    def __iter__(self) -> Iterator[_XmlElement]: ...
+
+
+class _XmlSyntaxError(Exception):
+    lineno: int = 1
+    msg: str = ""
+
+
+class _EtreeModule(Protocol):
+    XMLSyntaxError: type[_XmlSyntaxError]
+
+    def XMLParser(  # noqa: N802
+        self,
+        *,
+        recover: bool = ...,
+        remove_blank_text: bool = ...,
+        resolve_entities: bool = ...,
+        no_network: bool = ...,
+    ) -> object: ...
+    def fromstring(self, text: bytes, parser: object = ...) -> _XmlElement: ...
+
+
+def _is_etree_module(mod: object) -> TypeIs[_EtreeModule]:
+    return hasattr(mod, "fromstring") and hasattr(mod, "XMLParser")
+
+
+def _load_etree() -> _EtreeModule:
+    mod: object = importlib.import_module("lxml.etree")
+    if not _is_etree_module(mod):
+        msg = "lxml.etree module is missing required attributes"
+        raise ImportError(msg)
+    return mod
+
+
+etree: _EtreeModule = _load_etree()
 
 
 class Severity(StrEnum):
@@ -39,7 +84,7 @@ class ViewViolation(TypedDict):
     fix_suggestion: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuleDefinition:
     """Linter rule metadata."""
 
@@ -108,7 +153,9 @@ class OdooXmlViewLinter:
 
     def __init__(self, root_path: Path | None = None) -> None:
         """Initialize linter with optional project root path for relative reporting."""
-        self.root_path = root_path.resolve() if root_path else Path.cwd().resolve()
+        self.root_path: Path = (
+            root_path.resolve() if root_path else Path.cwd().resolve()
+        )
 
     def _relpath(self, path: Path) -> str:
         """Return clean relative path string."""
@@ -126,7 +173,7 @@ class OdooXmlViewLinter:
         try:
             content_bytes = path.read_bytes()
             content_text = content_bytes.decode("utf-8", errors="replace")
-        except Exception as err:
+        except OSError as err:
             return [
                 ViewViolation(
                     file=self._relpath(path),
@@ -200,13 +247,13 @@ class OdooXmlViewLinter:
             )
 
     def _check_deprecated_attrs_and_states(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_001: attrs='' and states='' are deprecated in Odoo 17."""
         for elem in tree.iter():
             if not isinstance(elem.tag, str):
                 continue
-            line = getattr(elem, "sourceline", 1)
+            line = elem.sourceline or 1
             if "attrs" in elem.attrib:
                 val = elem.attrib.get("attrs", "")
                 violations.append(
@@ -235,13 +282,13 @@ class OdooXmlViewLinter:
                 )
 
     def _check_tree_column_invisible(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_002: <tree><field invisible='1'/> must be column_invisible='1'."""
         # Find all field elements directly or inside tree/list containers
         for tree_node in tree.xpath("//tree | //list"):
             for field_node in tree_node.xpath(".//field"):
-                line = getattr(field_node, "sourceline", 1)
+                line = field_node.sourceline or 1
                 inv_val = field_node.attrib.get("invisible")
                 # If invisible is defined on a tree field, and column_invisible is not present
                 if inv_val is not None and "column_invisible" not in field_node.attrib:
@@ -262,11 +309,11 @@ class OdooXmlViewLinter:
                     )
 
     def _check_xpath_expressions(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rules ODOO_XML_003 and ODOO_XML_004: XPath fragilities."""
         for xpath_node in tree.xpath("//xpath"):
-            line = getattr(xpath_node, "sourceline", 1)
+            line = xpath_node.sourceline or 1
             expr = xpath_node.attrib.get("expr", "")
 
             # Check exact @class matching
@@ -300,12 +347,12 @@ class OdooXmlViewLinter:
                 )
 
     def _check_duplicate_fields(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_005: Duplicate field names in the same view arch."""
         # Find view architectures
         for arch_node in tree.xpath("//field[@name='arch']"):
-            seen_fields: dict[str, tuple[int, etree._Element]] = {}
+            seen_fields: dict[str, tuple[int, _XmlElement]] = {}
             for field_node in arch_node.xpath(".//form//field | .//tree//field"):
                 # Check if this field belongs to an embedded relational sub-form or sub-tree
                 ancestors = list(field_node.iterancestors())
@@ -320,7 +367,7 @@ class OdooXmlViewLinter:
                 if not field_name:
                     continue
 
-                line = getattr(field_node, "sourceline", 1)
+                line = field_node.sourceline or 1
                 inv = field_node.attrib.get("invisible")
 
                 if field_name in seen_fields:
@@ -367,11 +414,11 @@ class OdooXmlViewLinter:
                     seen_fields[field_name] = (line, field_node)
 
     def _check_unnamed_groups_and_pages(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_006: Groups and notebook pages should have name='' attribute."""
         for page_node in tree.xpath("//page[not(@name)]"):
-            line = getattr(page_node, "sourceline", 1)
+            line = page_node.sourceline or 1
             page_string = page_node.attrib.get("string", "unnamed")
             violations.append(
                 ViewViolation(
@@ -387,7 +434,7 @@ class OdooXmlViewLinter:
 
         # Check inner groups (excluding 2-column outer layout wrapper groups that only hold sub-groups)
         for group_node in tree.xpath("//group[not(@name)]"):
-            line = getattr(group_node, "sourceline", 1)
+            line = group_node.sourceline or 1
             # If this group contains only other groups, it is an outer 2-column layout wrapper
             child_tags = [c.tag for c in group_node if isinstance(c.tag, str)]
             if child_tags and all(tag == "group" for tag in child_tags):
@@ -414,11 +461,11 @@ class OdooXmlViewLinter:
                 )
 
     def _check_accessible_alerts(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_007: Alert div missing role='status' or role='alert'."""
         for div_node in tree.xpath("//div[contains(@class, 'alert')]"):
-            line = getattr(div_node, "sourceline", 1)
+            line = div_node.sourceline or 1
             role = div_node.attrib.get("role")
             if not role or role not in ("status", "alert", "alertdialog"):
                 class_str = div_node.attrib.get("class", "alert")
@@ -435,12 +482,12 @@ class OdooXmlViewLinter:
                 )
 
     def _check_template_xpath_injections(
-        self, path: Path, tree: etree._Element, violations: list[ViewViolation]
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
         """Rule ODOO_XML_008: Literal <xpath> inside non-inherited <template>."""
         for template_node in tree.xpath("//template[not(@inherit_id)]"):
             for xpath_node in template_node.xpath(".//xpath"):
-                line = getattr(xpath_node, "sourceline", 1)
+                line = xpath_node.sourceline or 1
                 expr = xpath_node.attrib.get("expr", "")
                 violations.append(
                     ViewViolation(

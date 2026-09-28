@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.14"
 # ///
 """Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."""
-
-from __future__ import annotations
 
 import argparse
 import ast
@@ -27,22 +25,60 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from io import BufferedIOBase
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, Protocol, Self, TypedDict, TypeIs, override
 
-try:
+if sys.platform != "win32":
     import fcntl
-except ImportError:
-    fcntl = None  # type: ignore[assignment]
+else:
+    fcntl = None
 
 import xml_view_linter
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Sequence
+    from collections.abc import Generator, Sequence
 
-# CONFIGURATION & CONSTANTS
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
+_literal_eval: Callable[[str | ast.AST], object] = ast.literal_eval
+
+
+class _HttpResponse(Protocol):
+    status: int
+
+    def __enter__(self) -> Self: ...
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> object: ...
+
+
+def _urlopen(req: urllib.request.Request, timeout: float) -> _HttpResponse:
+    fn: Callable[..., _HttpResponse] = urllib.request.urlopen
+    return fn(req, timeout=timeout)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_tuple(val: object) -> TypeIs[tuple[object, ...]]:
+    return isinstance(val, tuple)
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_iterable(val: object) -> TypeIs[Iterable[object]]:
+    return isinstance(val, Iterable)
+
+
+def _to_str_dict(val: object) -> dict[str, object]:
+    if _is_obj_dict(val):
+        return {str(k): v for k, v in val.items()}
+    return {}
+
+
 # ==============================================================================
 
 # Script Directories
@@ -230,13 +266,12 @@ class _OdooASTVisitor(ast.NodeVisitor):
 
     def _eval_literal(self, node: ast.AST) -> object:
         try:
-            val: object = cast("object", ast.literal_eval(node))
-        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+            return _literal_eval(node)
+        except ValueError, TypeError, SyntaxError, MemoryError, RecursionError:
             if isinstance(node, ast.Constant):
-                return cast("object", node.value)
+                const_val: object = node.value
+                return const_val
             return None
-        else:
-            return val
 
     def _is_controller_class(self, node: ast.ClassDef) -> bool:
         for base in node.bases:
@@ -283,15 +318,15 @@ class _OdooASTVisitor(ast.NodeVisitor):
                 val = self._eval_literal(stmt.value)
                 if isinstance(val, str):
                     self._current_inherit = val
-                elif isinstance(val, list):
-                    items = cast("list[object]", val)
-                    self._current_inherit = [str(item) for item in items]
+                elif _is_obj_list(val):
+                    self._current_inherit = [str(item) for item in val]
             else:
                 field_type = self._extract_field_type(stmt)
                 if field_type is not None:
                     self._current_fields[target.id] = field_type
 
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # pyright: ignore[reportImplicitOverride]
+    @override
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Inspect class definitions for Odoo models and controllers."""
         prev_cls = self._current_cls
         prev_model = self._current_model_name
@@ -360,9 +395,8 @@ class _OdooASTVisitor(ast.NodeVisitor):
             val = self._eval_literal(arg)
             if isinstance(val, str):
                 routes.append(val)
-            elif isinstance(val, (list, tuple)):
-                items = cast("list[object] | tuple[object, ...]", val)
-                routes.extend(x for x in items if isinstance(x, str))
+            elif _is_obj_list(val) or _is_obj_tuple(val):
+                routes.extend(x for x in val if isinstance(x, str))
 
         for kw in dec.keywords:
             if kw.arg == "auth":
@@ -370,9 +404,8 @@ class _OdooASTVisitor(ast.NodeVisitor):
                 auth = str(auth_val) if auth_val is not None else "user"
             elif kw.arg == "methods":
                 m = self._eval_literal(kw.value)
-                if isinstance(m, (list, tuple)):
-                    m_items = cast("list[object] | tuple[object, ...]", m)
-                    methods = [str(x) for x in m_items]
+                if _is_obj_list(m) or _is_obj_tuple(m):
+                    methods = [str(x) for x in m]
 
         return routes, auth, methods
 
@@ -428,7 +461,7 @@ def _run(
         full_env.update(env)
 
     try:
-        return subprocess.run(  # noqa: S603 - controlled toolchain invocation
+        return subprocess.run(
             cmd,
             cwd=cwd,
             check=check,
@@ -485,21 +518,21 @@ def _ensure_podman() -> None:
     if not container_host:
         # This command reads local connection metadata; it does not contact a server.
         result = _run(["podman", "system", "connection", "list", "--format", "json"])
-        connections = cast("object", json.loads(result.stdout))
-        if not isinstance(connections, list):
+        connections = _json_loads(result.stdout)
+        if not _is_obj_list(connections):
             raise CliError("Cannot resolve the local Podman connection.")
         selected = os.environ.get("CONTAINER_CONNECTION")
-        for connection in cast("list[object]", connections):
-            if not isinstance(connection, dict):
+        for connection in connections:
+            if not _is_obj_dict(connection):
                 raise CliError("Invalid Podman connection metadata.")
-            entry = cast("dict[str, object]", connection)
+            conn_map = _to_str_dict(connection)
             is_selected = (
-                entry.get("Name") == selected
+                conn_map.get("Name") == selected
                 if selected
-                else entry.get("Default") is True
+                else bool(conn_map.get("Default"))
             )
             if is_selected:
-                endpoint = entry.get("URI")
+                endpoint = conn_map.get("URI")
                 if not isinstance(endpoint, str):
                     raise CliError("Podman connection has no endpoint.")
                 container_host = endpoint
@@ -560,10 +593,10 @@ def _parse_manifest(manifest_path: Path) -> dict[str, object]:
         return {}
     try:
         content = manifest_path.read_text(encoding="utf-8")
-        parsed: object = cast("object", ast.literal_eval(content))
-        if isinstance(parsed, dict):
-            return cast("dict[str, object]", parsed)
-    except (ValueError, TypeError, SyntaxError, OSError):
+        parsed = _literal_eval(content)
+        if _is_obj_dict(parsed):
+            return _to_str_dict(parsed)
+    except ValueError, TypeError, SyntaxError, OSError:
         pass
     return {}
 
@@ -640,22 +673,23 @@ def _resolve_effective_database(
         pfile = PROFILE_DIR / f"{prof_name}.json"
         if pfile.is_file() and pfile.resolve().parent == PROFILE_DIR.resolve():
             try:
-                data_raw: object = cast(
-                    "object", json.loads(pfile.read_text(encoding="utf-8"))
-                )
-                if isinstance(data_raw, dict):
-                    workflows_obj = data_raw.get("workflows")
-                    if isinstance(workflows_obj, dict):
+                data_raw = _json_loads(pfile.read_text(encoding="utf-8"))
+                if _is_obj_dict(data_raw):
+                    data_map = _to_str_dict(data_raw)
+                    workflows_obj = data_map.get("workflows")
+                    if _is_obj_dict(workflows_obj):
+                        wf_map = _to_str_dict(workflows_obj)
                         wf_key = (
                             "crm"
-                            if "crm" in workflows_obj
-                            else next(iter(workflows_obj.keys()), None)
+                            if "crm" in wf_map
+                            else next(iter(wf_map.keys()), None)
                         )
-                        if wf_key and isinstance(workflows_obj[wf_key], dict):
-                            db_val = workflows_obj[wf_key].get("database")
+                        if wf_key and _is_obj_dict(wf_map[wf_key]):
+                            wf_entry = _to_str_dict(wf_map[wf_key])
+                            db_val = wf_entry.get("database")
                             if db_val and str(db_val) not in ("False", "None", ""):
                                 return _validate_db_name(str(db_val)), "profile"
-            except (json.JSONDecodeError, OSError):
+            except json.JSONDecodeError, OSError:
                 pass
 
     if config is not None:
@@ -720,55 +754,42 @@ def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
     if not pfile.is_file() or pfile.resolve().parent != PROFILE_DIR.resolve():
         msg = f"workflow profile not found: {pfile}"
         raise CliError(msg)
-    data_raw: object = cast("object", json.loads(pfile.read_text(encoding="utf-8")))
-    data = cast("dict[str, object]", data_raw) if isinstance(data_raw, dict) else {}
+    data_raw = _json_loads(pfile.read_text(encoding="utf-8"))
+    data = _to_str_dict(data_raw)
     workflows_obj = data.get("workflows")
-    workflows = (
-        cast("dict[str, object]", workflows_obj)
-        if isinstance(workflows_obj, dict)
-        else {}
-    )
+    workflows = _to_str_dict(workflows_obj)
     wf_obj = workflows.get(workflow)
-    if not isinstance(wf_obj, dict):
+    if not _is_obj_dict(wf_obj):
         available = list(workflows.keys())
         msg = (
             f"workflow {workflow!r} not found in profile {profile!r}. "
-            f"Available workflows: {available}"
+            + f"Available workflows: {available}"
         )
         raise CliError(msg)
 
-    wf = cast("dict[str, object]", wf_obj)
+    wf = _to_str_dict(wf_obj)
     db_val = wf.get("database")
     if db_val and str(db_val) not in ("False", "None", ""):
         db = _validate_db_name(str(db_val))
     else:
         db, _ = _resolve_effective_database(profile_name=profile, require=True)
 
-    raw_mods: object = wf.get("modules")
-    mods = (
-        [str(m) for m in cast("list[object]", raw_mods)]
-        if isinstance(raw_mods, list)
-        else []
-    )
+    raw_mods = wf.get("modules")
+    mods = [str(m) for m in raw_mods] if _is_obj_list(raw_mods) else []
     for dep in ("admin_units", "contact_extension"):
         if dep not in mods and (_resolve_addons() / dep).is_dir():
             mods.append(dep)
 
-    raw_tests: object = wf.get("test_modules")
-    test_mods = (
-        [str(m) for m in cast("list[object]", raw_tests)]
-        if isinstance(raw_tests, list)
-        else mods
-    )
+    raw_tests = wf.get("test_modules")
+    test_mods = [str(m) for m in raw_tests] if _is_obj_list(raw_tests) else mods
 
-    raw_lint_val: object = wf.get("lint_modules")
-    if isinstance(raw_lint_val, list):
-        lint_mods = [str(m) for m in cast("list[object]", raw_lint_val)]
+    raw_lint_val = wf.get("lint_modules")
+    if _is_obj_list(raw_lint_val):
+        lint_mods = [str(m) for m in raw_lint_val]
     elif raw_tests is not None:
         lint_mods = test_mods
     else:
         lint_mods = mods
-
     return WorkflowProfile(
         database=db,
         modules=mods,
@@ -861,16 +882,19 @@ def _exec_sql_json(
     wrapped = f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({clean_subquery}) t;"  # noqa: S608 - internal JSON aggregation wrapper
     raw = _exec_sql(wrapped, db=db, readonly=readonly, tuples_only=True).strip()
     try:
-        parsed: object = json.loads(raw)
+        parsed = _json_loads(raw)
     except json.JSONDecodeError as exc:
         raise CliError(
             "Database query returned invalid JSON; no audit result is available."
         ) from exc
-    if not isinstance(parsed, list) or any(
-        not isinstance(item, dict) for item in parsed
-    ):
+    if not _is_obj_list(parsed):
         raise CliError("Database query did not return an array of records.")
-    return cast("list[dict[str, object]]", parsed)
+    rows: list[dict[str, object]] = []
+    for item in parsed:
+        if not _is_obj_dict(item):
+            raise CliError("Database query did not return an array of records.")
+        rows.append(_to_str_dict(item))
+    return rows
 
 
 def _quote_literal(val: str) -> str:
@@ -992,7 +1016,7 @@ _LOCK_STATE = _LockState()
 
 
 @contextlib.contextmanager
-def _op_lock() -> Generator[None, None, None]:
+def _op_lock() -> Generator[None]:
     """Exclusive file lock for pod creation and test execution."""
     if fcntl is None:
         yield
@@ -1007,10 +1031,10 @@ def _op_lock() -> Generator[None, None, None]:
         return
 
     lock_file = Path(tempfile.gettempdir()) / "odoo-ops.lock"
-    with lock_file.open("a+") as f:
+    with lock_file.open("a+", encoding="utf-8") as f:
         try:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (BlockingIOError, OSError):
+        except BlockingIOError, OSError:
             print(
                 "waiting for odoo-ops lock (another test/pod operation is running)...",
                 file=sys.stderr,
@@ -1221,9 +1245,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         print(banner)
         print(f"Modules: {modules_str}")
         print("Press Ctrl+C to stop.\n")
-        _ = subprocess.run(  # noqa: S603 - controlled podman dev execution
-            cmd, check=False
-        )
+        _ = subprocess.run(cmd, check=False)
     finally:
         _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
     return 0
@@ -1258,7 +1280,7 @@ def _evaluate_odoo_test_result(exit_code: int, output: str) -> tuple[bool, list[
         )
     )
     executed_tests = max(
-        (int(count) for count in re.findall(r"of (\d+) tests", output)), default=0
+        (int(m.group(1)) for m in re.finditer(r"of (\d+) tests", output)), default=0
     )
     has_passed = (
         exit_code == 0
@@ -1306,11 +1328,11 @@ def _cleanup_stale_test_containers() -> None:
 
 _FAILED_TEST_RE = re.compile(
     r"\b(?:FAIL|ERROR):\s*"
-    r"(?:"
-    r"([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_.]+)\)"
-    r"|"
-    r"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"
-    r")"
+    + r"(?:"
+    + r"([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_.]+)\)"
+    + r"|"
+    + r"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"
+    + r")"
 )
 
 
@@ -1526,7 +1548,7 @@ def _run_baseline_test_comparison(
 
         print(
             f"\nRESULT baseline={baseline_ref} new={len(new_failures)} "
-            f"preexisting={len(preexisting)} fixed={len(fixed)}"
+            + f"preexisting={len(preexisting)} fixed={len(fixed)}"
         )
 
     return 0 if len(new_failures) == 0 else 1
@@ -1541,30 +1563,31 @@ def _resolve_test_targets(
         pfile = PROFILE_DIR / f"{profile_name}.json"
         if pfile.is_file():
             try:
-                raw_data: object = json.loads(pfile.read_text(encoding="utf-8"))
-                if isinstance(raw_data, dict):
-                    workflows: object = raw_data.get("workflows")
-                    if isinstance(workflows, dict):
+                raw_data = _json_loads(pfile.read_text(encoding="utf-8"))
+                if _is_obj_dict(raw_data):
+                    workflows = _to_str_dict(raw_data).get("workflows")
+                    if _is_obj_dict(workflows):
                         for wf_data in workflows.values():
-                            if isinstance(wf_data, dict):
-                                raw_mods: object = wf_data.get("modules")
-                                raw_test_mods: object = wf_data.get("test_modules")
+                            if _is_obj_dict(wf_data):
+                                wf_dict = _to_str_dict(wf_data)
+                                raw_mods = wf_dict.get("modules")
+                                raw_test_mods = wf_dict.get("test_modules")
                                 mods: list[str] = (
                                     [str(m) for m in raw_mods]
-                                    if isinstance(raw_mods, list)
+                                    if _is_obj_list(raw_mods)
                                     else []
                                 ) + (
                                     [str(m) for m in raw_test_mods]
-                                    if isinstance(raw_test_mods, list)
+                                    if _is_obj_list(raw_test_mods)
                                     else []
                                 )
                                 if target in mods:
-                                    db_val: object = wf_data.get("database")
+                                    db_val = wf_dict.get("database")
                                     db = (
                                         str(db_val) if db_val else ctx.effective_db_name
                                     )
                                     return db, [f"/{target}"], [target]
-            except (json.JSONDecodeError, OSError):
+            except json.JSONDecodeError, OSError:
                 pass
         return ctx.effective_db_name, [f"/{target}"], [target]
     profile = _load_workflow_profile(profile_name, target)
@@ -1648,10 +1671,9 @@ def _build_test_cmd(
 def _stream_test_output(proc: subprocess.Popen[str], *, json_mode: bool) -> list[str]:
     """Stream process stdout to appropriate descriptor and collect lines."""
     output_lines: list[str] = []
-    if proc.stdout is not None:
-        raw_stream = cast("object", proc.stdout)
-        iterator = cast("Iterable[object]", raw_stream)
-        for raw_line in iterator:
+    stdout_obj: object = getattr(proc, "stdout", None)
+    if _is_obj_iterable(stdout_obj):
+        for raw_line in stdout_obj:
             line = str(raw_line)
             output_lines.append(line)
             if json_mode:
@@ -1668,7 +1690,7 @@ def _run_test_process(
 ) -> tuple[int, str]:
     """Execute test container process with live output streaming and cleanup."""
     try:
-        proc = subprocess.Popen(  # noqa: S603 - controlled podman test execution
+        proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -1924,9 +1946,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     cmd.extend([str(p) for p in target_paths])
 
     if skip_views:
-        proc = subprocess.run(  # noqa: S603 - controlled ruff execution
-            cmd, check=False
-        )
+        proc = subprocess.run(cmd, check=False)
         return proc.returncode
 
     ctx = _resolve_workspace()
@@ -1947,12 +1967,10 @@ def cmd_lint(args: argparse.Namespace) -> int:
     views_failed = has_critical or (strict and has_warning)
 
     if json_mode:
-        proc = subprocess.run(  # noqa: S603 - controlled ruff execution
-            cmd, capture_output=True, text=True, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
         try:
-            ruff_json = json.loads(proc.stdout) if proc.stdout.strip() else []
-        except Exception:
+            ruff_json: object = _json_loads(proc.stdout) if proc.stdout.strip() else []
+        except json.JSONDecodeError:
             ruff_json = proc.stdout.strip()
 
         combined_success = proc.returncode == 0 and not views_failed
@@ -1962,7 +1980,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
             "python_violations": ruff_json,
             "view_violations": violations,
             "total_python_violations": len(ruff_json)
-            if isinstance(ruff_json, list)
+            if _is_obj_list(ruff_json)
             else (1 if proc.returncode != 0 else 0),
             "total_view_violations": len(violations),
         }
@@ -1971,9 +1989,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
             0 if combined_success else (proc.returncode if proc.returncode != 0 else 1)
         )
 
-    proc = subprocess.run(  # noqa: S603 - controlled ruff execution
-        cmd, check=False
-    )
+    proc = subprocess.run(cmd, check=False)
     print("\n--- Odoo 17 XML View Linter ---")
     print(xml_view_linter.format_violations_human(violations))
 
@@ -2000,9 +2016,7 @@ def cmd_fmt(args: argparse.Namespace) -> int:
 
     cmd.extend([str(p) for p in target_paths])
 
-    proc = subprocess.run(  # noqa: S603 - controlled ruff execution
-        cmd, check=False
-    )
+    proc = subprocess.run(cmd, check=False)
     return proc.returncode
 
 
@@ -2058,8 +2072,8 @@ def _get_latest_test_container() -> str | None:
     out = res.stdout.strip()
     if out:
         try:
-            parsed: object = json.loads(out)
-            if isinstance(parsed, list) and parsed:
+            parsed = _json_loads(out)
+            if _is_obj_list(parsed) and parsed:
 
                 def _created_ts(item: dict[str, object]) -> float:
                     created = item.get("Created")
@@ -2067,13 +2081,13 @@ def _get_latest_test_container() -> str | None:
                         return float(created)
                     return 0.0
 
-                valid_items = [
-                    x for x in cast("list[object]", parsed) if isinstance(x, dict)
+                valid_items: list[dict[str, object]] = [
+                    _to_str_dict(x) for x in parsed if _is_obj_dict(x)
                 ]
                 sorted_items = sorted(valid_items, key=_created_ts, reverse=True)
                 for item in sorted_items:
-                    names: object = item.get("Names")
-                    if isinstance(names, list) and names:
+                    names = item.get("Names")
+                    if _is_obj_list(names) and names:
                         name = str(names[0]).lstrip("/")
                         if name.startswith("odoo-test-"):
                             return name
@@ -2118,9 +2132,7 @@ def cmd_logs(args: argparse.Namespace) -> int:
     if follow:
         cmd.append("-f")
     cmd.append(target)
-    proc = subprocess.run(  # noqa: S603 - controlled podman logs execution
-        cmd, check=False
-    )
+    proc = subprocess.run(cmd, check=False)
     return proc.returncode
 
 
@@ -2193,14 +2205,15 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
         print(f"Custom Addons:       {data['custom_addons_path']}")
         print(
             f"Effective Database:  {data['effective_database']} "
-            f"(source: {data['database_source']})"
+            + f"(source: {data['database_source']})"
         )
         print(f"Pod Status:          {data['pod_status']}")
         print(f"Local Addons Count:  {data['local_modules_count']}")
         if "database_exists" in data:
             print(f"Database Exists:     {data['database_exists']}")
             if not data["database_exists"] and "available_databases" in data:
-                avail_list = cast("list[str]", data["available_databases"])
+                avail = data["available_databases"]
+                avail_list = [str(x) for x in avail] if _is_obj_list(avail) else []
                 avail_str = ", ".join(avail_list) or "none"
                 print(f"Available DBs:       {avail_str}")
     return 0
@@ -2225,7 +2238,7 @@ def _parse_python_tree(pyfile: Path) -> ast.AST | None:
     """Parse python source file into AST, ignoring syntax and OS errors."""
     try:
         return ast.parse(pyfile.read_text(encoding="utf-8"), filename=str(pyfile))
-    except (SyntaxError, ValueError, OSError):
+    except SyntaxError, ValueError, OSError:
         return None
 
 
@@ -2466,7 +2479,7 @@ def cmd_db_query(args: argparse.Namespace) -> int:
                         wrapped, db=db, readonly=False, tuples_only=True
                     ).strip()
                     try:
-                        rows = json.loads(raw_out)
+                        rows = _json_loads(raw_out)
                     except json.JSONDecodeError as exc:
                         msg = "Failed to parse JSON result from RETURNING query."
                         raise CliError(msg) from exc
@@ -2540,7 +2553,7 @@ def _copy_filestore(ctx: WorkspaceContext, source: str, target: str) -> bool:
     if not from_fs.is_dir() or not any(from_fs.iterdir()):
         print(
             f"[WARN] {source!r} has no filestore: attachments will not resolve "
-            f"in {target!r}."
+            + f"in {target!r}."
         )
         return False
     _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
@@ -2625,10 +2638,10 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
     size_mib = dump_path.stat().st_size / (1024 * 1024)
     print(f"Restoring {dump_path.name} ({size_mib:.0f} MiB) -> {target!r}...")
 
-    drop_sql = f'DROP DATABASE IF EXISTS "{target}";'  # noqa: S608 - validated database identifier
+    drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
     _ = _exec_sql(drop_sql, db="postgres")
     create_sql = (
-        f'CREATE DATABASE "{target}" OWNER "{_validate_db_name(DEFAULT_DB_USER)}";'  # noqa: S608 - validated database identifier
+        f'CREATE DATABASE "{target}" OWNER "{_validate_db_name(DEFAULT_DB_USER)}";'
     )
     _ = _exec_sql(create_sql, db="postgres")
 
@@ -2638,8 +2651,8 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
     elapsed = time.monotonic() - started
 
     print(
-        f"[WARN] A SQL dump carries no filestore: attachments will not resolve in "
-        f"{target!r}."
+        "[WARN] A SQL dump carries no filestore: attachments will not resolve in "
+        + f"{target!r}."
     )
     if json_mode:
         print(
@@ -2682,7 +2695,7 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
         _ = _exec_sql(drop_sql, db="postgres")
 
     # 3. Create database as template copy
-    create_sql = f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'  # noqa: S608 - create database with validated identifiers
+    create_sql = f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'
     _ = _exec_sql(create_sql, db="postgres")
 
     # 4. A template copy is neither filestore-aware nor uuid-unique
@@ -2770,7 +2783,7 @@ def cmd_db_drop(args: argparse.Namespace) -> int:
             f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
         )
         _ = _exec_sql(term_sql, db="postgres")
-        drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'  # noqa: S608 - validated db name
+        drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'
         _ = _exec_sql(drop_sql, db="postgres")
         fs_removed = _remove_filestore(ctx, db_name)
 
@@ -2867,7 +2880,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         db,
         "--no-http",
     ]
-    proc = subprocess.run(  # noqa: S603 - controlled podman exec odoo shell execution
+    proc = subprocess.run(
         cmd,
         input=full_script,
         text=True,
@@ -2907,7 +2920,7 @@ def cmd_auth_temp(args: argparse.Namespace) -> int:
         raise CliError(msg, code=1)
 
     user_row = rows[0]
-    user_id = int(cast("int | str", user_row["id"]))
+    user_id = int(str(user_row["id"]))
     user_login = str(user_row["login"])
     current_hash = str(user_row.get("password") or "")
 
@@ -2996,7 +3009,7 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
         if not rows:
             msg = f"User with login {login_arg!r} not found in database {db!r}."
             raise CliError(msg, code=1)
-        user_id = int(cast("int | str", rows[0]["id"]))
+        user_id = int(str(rows[0]["id"]))
         user_login = str(rows[0]["login"])
         backup_path = auth_dir / f"{db}__{user_id}.json"
     else:
@@ -3011,21 +3024,21 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
         raise CliError(msg, code=1)
 
     try:
-        backup_data = cast(
-            "dict[str, object]",
-            json.loads(backup_path.read_text(encoding="utf-8")),
-        )
+        raw_backup = _json_loads(backup_path.read_text(encoding="utf-8"))
+        if not _is_obj_dict(raw_backup):
+            raise CliError(f"Corrupt auth backup file: {backup_path}", code=1)
+        backup_data = _to_str_dict(raw_backup)
     except (json.JSONDecodeError, OSError) as exc:
         msg = f"Failed to read auth backup file: {backup_path}"
         raise CliError(msg, code=1) from exc
 
-    user_id = int(cast("int | str", backup_data["user_id"]))
+    user_id = int(str(backup_data["user_id"]))
     user_login = str(backup_data.get("login") or login_arg or "admin")
     original_hash = str(backup_data.get("password_hash") or "")
 
     update_sql = (
         f"UPDATE res_users SET password = {_quote_literal(original_hash)} "  # noqa: S608 - hash quoted, user_id is int
-        f"WHERE id = {user_id};"
+        + f"WHERE id = {user_id};"
     )
     _ = _exec_sql(update_sql, db=db, readonly=False)
 
@@ -3078,7 +3091,7 @@ def cmd_health(args: argparse.Namespace) -> int:
             headers={"User-Agent": "odoo-ops-health"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=3.0) as resp:  # noqa: S310 - internal loopback readiness probe
+            with _urlopen(req, timeout=3.0) as resp:
                 status = resp.status
                 if status == 200:
                     return True, str(status)
@@ -3512,6 +3525,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+build_parser = _build_parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
