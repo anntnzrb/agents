@@ -27,7 +27,7 @@ Discover fields with `--json` without a field list when installed options drift.
 - Inspection reads: `gh pr list`, `view`, `diff`, `checks`, `status`, `review`. `diff` returns patch text; a browser URL is not the patch.
 - Required-check machine route: `gh pr checks NUMBER --repo OWNER/REPO --json ... --jq ...`. Separate pending, failed, skipped, successful; NEVER claim CI green from a human summary.
 - `gh pr view --json reviews,reviewDecision,statusCheckRollup,latestReviews` (fields available in installed CLI) exposes review/check state. If thread-level anchors or unresolved conversations matter, use the GitHub API reference and preserve file/line identity.
-- `gh pr diff --patch` remains a read; use `hunk` only for a live Hunk review.
+- `gh pr diff --patch` remains a read.
 - `gh pr checkout` changes local branch/worktree state; route lifecycle decisions to `git-worktrees` and inspect current worktree ownership first.
 - Writes: `gh pr create`, `edit`, `close`, `reopen`, `comment`, `review`, `ready`, `lock`, `unlock`, `update-branch`, `merge`. Before execution, confirm base/head/repository, draft state, body, reviewers, and requested authorization.
 - Ordinary single-PR contribution sequencing, repository rules, push policy, and issue/PR creation → `gh-contrib`; this file owns CLI selection and state verification only.

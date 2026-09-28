@@ -45,6 +45,6 @@ Read the listed reference whenever its trigger applies. Use `references/core.md`
 
 ## Stacked PR boundary
 
-For explicit stack intent, read all three stack references (`references/stack-design.md`, `references/stacked-pr-workflow.md`, and `references/stack-commands.md`) before branch or PR mutation. If the focused `github/gh-stack` agent skill is installed and active, defer to it; otherwise use local references. Check `gh extension list` and `gh skill list`; NEVER auto-install either. Missing capability, 404, or stack exit 9 means availability/rollout failure, not permission to silently use ordinary PR commands.
+For explicit stack intent, read all three stack references (`references/stack-design.md`, `references/stacked-pr-workflow.md`, and `references/stack-commands.md`) before branch or PR mutation; use local references. Check `gh extension list`; NEVER auto-install extensions. Missing capability, 404, or stack exit 9 means availability/rollout failure, not permission to silently use ordinary PR commands.
 
-Ownership: `git-worktrees` owns worktree lifecycle; `autommit` owns staging and history; `gh-contrib` owns contribution policy and ordinary PR review; `hunk` owns Hunk sessions; `go`/`do` own delegation. This skill owns GitHub CLI routing and stack-specific remote state only.
+Ownership: `git-worktrees` owns worktree lifecycle; `autommit` owns staging and history; `gh-contrib` owns contribution policy and ordinary PR review. This skill owns GitHub CLI routing and stack-specific remote state only.

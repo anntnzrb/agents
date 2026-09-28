@@ -25,7 +25,7 @@ Do not probe a missing `gh stack` with `gh stack --help`: the installed environm
 gh extension install github/gh-stack --pin TAG_OR_COMMIT
 ```
 
-If a focused `github/gh-stack` agent skill is installed and active, hand off to it; otherwise use this reference as fallback. A missing command, 404, disabled feature, or stack exit `9` means availability/rollout failure; do not silently use ordinary PR commands. With multiple remotes, name the intended remote on every remote-aware command and verify its host/repository.
+A missing command, 404, disabled feature, or stack exit `9` means availability/rollout failure; do not silently use ordinary PR commands. With multiple remotes, name the intended remote on every remote-aware command and verify its host/repository.
 
 Set `GH_PROMPT_DISABLED=1` for automation and verification. It prevents prompts; it does not authorize writes. Prefer explicit branch/stack/PR arguments and avoid the interactive `modify`, `switch`, or picker forms in agent execution. These examples are planning forms; exact flags are version-sensitive, so after capability discovery check `gh stack <command> --help`.
 
