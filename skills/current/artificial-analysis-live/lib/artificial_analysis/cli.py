@@ -1,7 +1,5 @@
-# ruff: noqa: C901, D103, FBT003, PERF401, PLR0911, PLR0912, PLR0915
+# ruff: noqa: C901, D103, FBT003, PLR0915
 """Command-line and RPC interfaces for Artificial Analysis snapshots."""
-
-from __future__ import annotations
 
 import argparse
 import contextlib
@@ -16,7 +14,7 @@ import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol
 from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
@@ -24,7 +22,15 @@ if TYPE_CHECKING:
     from typing import NoReturn, TextIO
 
 from .comparison import compare_models
-from .contracts import compact_json
+from .contracts import (
+    as_dict,
+    as_list,
+    compact_json,
+    is_object_list,
+    is_object_tuple,
+    is_str_dict,
+    parse_json,
+)
 from .diagnose import diagnose
 from .diagnostics import redact, redact_query
 from .diff import schema_aware_diff
@@ -62,7 +68,10 @@ from .rsc import (
 )
 from .values import parse_numeric
 
-type _Subparsers = argparse._SubParsersAction[argparse.ArgumentParser]  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+class _Subparsers(Protocol):
+    def add_parser(self, name: str, *, help: str = ...) -> argparse.ArgumentParser: ...
+
 
 PROTOCOL_VERSION = "1"
 
@@ -77,18 +86,11 @@ NOT_MODIFIED = 304
 
 
 def _as_dict(val: object) -> dict[str, object]:
-    if isinstance(val, dict):
-        d: dict[str, object] = {}
-        for k, v in val.items():  # pyright: ignore[reportUnknownVariableType]
-            d[str(k)] = v  # pyright: ignore[reportUnknownArgumentType]
-        return d
-    return {}
+    return as_dict(val)
 
 
 def _as_list(val: object) -> list[object]:
-    if isinstance(val, list):
-        return list(val)  # pyright: ignore[reportUnknownArgumentType]
-    return []
+    return as_list(val)
 
 
 def _finite_number(value: object) -> bool:
@@ -97,7 +99,7 @@ def _finite_number(value: object) -> bool:
         return False
     try:
         return math.isfinite(float(value))
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return False
 
 
@@ -143,10 +145,10 @@ def _evidence_record(  # noqa: PLR0913
         reasons: list[object] = (
             [
                 reason
-                for reason in _as_list(raw_reasons)  # pyright: ignore[reportUnknownArgumentType]
+                for reason in raw_reasons
                 if reason not in {"missing_value", "unparsed_value"}
             ]
-            if isinstance(raw_reasons, list)
+            if is_object_list(raw_reasons)
             else []
         )
         if "MISSING_REQUIRED_INPUT" not in reasons:
@@ -159,8 +161,8 @@ def _evidence_record(  # noqa: PLR0913
     # inspect field/status without a translation table.
     raw_blockers = evidence.get("blocked_reasons")
     blockers_list: list[object] = (
-        [str(r) for r in _as_list(raw_blockers)]  # pyright: ignore[reportUnknownArgumentType]
-        if isinstance(raw_blockers, (list, tuple))
+        [str(r) for r in raw_blockers]
+        if is_object_list(raw_blockers) or is_object_tuple(raw_blockers)
         else []
     )
     evidence.update(
@@ -185,9 +187,9 @@ def _evidence_record(  # noqa: PLR0913
 def _lookup_path(row: dict[str, object], path: str) -> object:
     current: object = row
     for part in path.split("."):
-        if not isinstance(current, dict):
+        if not is_str_dict(current):
             return None
-        current = _as_dict(current).get(part)  # pyright: ignore[reportUnknownArgumentType]
+        current = current.get(part)
     return current
 
 
@@ -254,8 +256,8 @@ def _attach_row_evidence(  # noqa: PLR0913
         )
 
     def walk(node: object, prefix: str) -> None:
-        if isinstance(node, dict):
-            for key, value in _as_dict(node).items():  # pyright: ignore[reportUnknownArgumentType]
+        if is_str_dict(node):
+            for key, value in node.items():
                 if key in {"metric_evidence", "raw_metadata"}:
                     continue
                 path = f"{prefix}.{key}" if prefix else key
@@ -265,13 +267,13 @@ def _attach_row_evidence(  # noqa: PLR0913
                         value,
                         unknown=prefix.startswith(("raw_fields", "unknowns")),
                     )
-                elif isinstance(value, dict):
-                    walk(value, path)  # pyright: ignore[reportUnknownArgumentType]
-                elif isinstance(value, list):
-                    for index, item in enumerate(_as_list(value)):  # pyright: ignore[reportUnknownArgumentType]
+                elif is_str_dict(value):
+                    walk(value, path)
+                elif is_object_list(value):
+                    for index, item in enumerate(value):
                         walk(item, f"{path}[{index}]")
-        elif isinstance(node, list):
-            for index, item in enumerate(_as_list(node)):  # pyright: ignore[reportUnknownArgumentType]
+        elif is_object_list(node):
+            for index, item in enumerate(node):
                 walk(item, f"{prefix}[{index}]")
 
     walk(row, "")
@@ -289,8 +291,8 @@ def _attach_payload_evidence(
     metric_evidence: dict[str, object] = _as_dict(payload.get("metric_evidence"))
 
     def walk(node: object, prefix: str) -> None:
-        if isinstance(node, dict):
-            for key, value in _as_dict(node).items():  # pyright: ignore[reportUnknownArgumentType]
+        if is_str_dict(node):
+            for key, value in node.items():
                 if key in {"metric_evidence", "raw_metadata"}:
                     continue
                 path = f"{prefix}.{key}" if prefix else key
@@ -303,10 +305,10 @@ def _attach_payload_evidence(
                             artifact_hash=resolved_hash,
                             value_status="derived",
                         )
-                elif isinstance(value, (dict, list)):
-                    walk(value, path)  # pyright: ignore[reportUnknownArgumentType]
-        elif isinstance(node, list):
-            for index, item in enumerate(_as_list(node)):  # pyright: ignore[reportUnknownArgumentType]
+                elif is_str_dict(value) or is_object_list(value):
+                    walk(value, path)
+        elif is_object_list(node):
+            for index, item in enumerate(node):
                 walk(item, f"{prefix}[{index}]")
 
     walk(payload, "")
@@ -323,9 +325,7 @@ def _snapshot_overlap(
     meta = _as_dict(snapshot.get("meta"))
     source_val = snapshot.get("overlap")
     source: dict[str, object] = (
-        _as_dict(source_val)  # pyright: ignore[reportUnknownArgumentType]
-        if isinstance(source_val, dict)
-        else _as_dict(meta.get("overlap"))
+        source_val if is_str_dict(source_val) else as_dict(meta.get("overlap"))
     )
     declarations = source.get("declared_joins", source.get("overlap_claims"))
     left = source.get("left")
@@ -879,15 +879,14 @@ def _canonical_models(
     if _schema_version(snapshot) < SCHEMA_V2:
         return {}
     models_val = snapshot.get("models")
-    if not isinstance(models_val, list):
+    if not is_object_list(models_val):
         _raise_extraction_error("Schema-v2 snapshot missing models list")
     result: dict[str, dict[str, object]] = {}
-    for item in _as_list(models_val):  # pyright: ignore[reportUnknownArgumentType]
-        if isinstance(item, dict):
-            item_d = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
-            slug = item_d.get("slug")
+    for item in models_val:
+        if is_str_dict(item):
+            slug = item.get("slug")
             if isinstance(slug, str) and slug:
-                result[slug] = item_d
+                result[slug] = item
     return result
 
 
@@ -896,23 +895,20 @@ def _model_rows(snapshot: dict[str, object]) -> list[dict[str, object]]:
     if canonical:
         return list(canonical.values())
     hosts_models_val = snapshot.get("hosts_models")
-    if not isinstance(hosts_models_val, list):
+    if not is_object_list(hosts_models_val):
         _raise_extraction_error("Snapshot missing hosts_models list")
     result: list[dict[str, object]] = []
-    for item in _as_list(hosts_models_val):  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
-        if isinstance(item, dict):
-            item_d = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
-            model_val = item_d.get("model")
-            if isinstance(model_val, dict):
-                model_d = _as_dict(model_val)  # pyright: ignore[reportUnknownArgumentType]
-                if isinstance(model_d.get("slug"), str):
-                    result.append(model_d)
+    for item in hosts_models_val:
+        if is_str_dict(item):
+            model_val = item.get("model")
+            if is_str_dict(model_val) and isinstance(model_val.get("slug"), str):
+                result.append(model_val)
     return result
 
 
 def _artifact_record_metadata(record: dict[str, object]) -> dict[str, object]:
     nested = record.get("metadata")
-    return _as_dict(nested) if isinstance(nested, dict) else {}  # pyright: ignore[reportUnknownArgumentType]
+    return nested if is_str_dict(nested) else {}
 
 
 def _cached_source_info(
@@ -926,9 +922,9 @@ def _cached_source_info(
 
 def _result_headers(result: object) -> dict[str, str]:
     headers = getattr(result, "headers", None)
-    if not isinstance(headers, dict):
+    if not is_str_dict(headers):
         return {}
-    return {str(k): str(v) for k, v in _as_dict(headers).items()}  # pyright: ignore[reportUnknownArgumentType]
+    return {str(k): str(v) for k, v in headers.items()}
 
 
 def _result_header(result: object, name: str) -> str | None:
@@ -1728,14 +1724,15 @@ def _nested_sort_metric(
     current: object = _lookup_path(row, path)
     evidence = _as_dict(row.get("metric_evidence"))
     target_evidence = evidence.get(path)
-    if isinstance(target_evidence, dict):
-        target_dict = _as_dict(target_evidence)  # pyright: ignore[reportUnknownArgumentType]
-        eligibility = target_dict.get(
-            "comparison_eligibility", target_dict.get("eligibility")
+    if is_str_dict(target_evidence):
+        eligibility = target_evidence.get(
+            "comparison_eligibility", target_evidence.get("eligibility")
         )
         if eligibility != "eligible":
             return (1, 0.0)
-        current = target_dict.get("normalized_value", target_dict.get("normalized"))
+        current = target_evidence.get(
+            "normalized_value", target_evidence.get("normalized")
+        )
     if _finite_number(current) and isinstance(current, (int, float)):
         normalized = -float(current) if reverse else float(current)
         return (0, normalized)
@@ -1753,9 +1750,9 @@ def _query_row(
     provider_filter: str | None,
     endpoint_filter: str | None,
 ) -> dict[str, object] | None:
-    if not isinstance(item, dict):
+    if not is_str_dict(item):
         return None
-    item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+    item_dict = item
     endpoint_slug = item_dict.get("slug")
     if not isinstance(endpoint_slug, str) or "_" not in endpoint_slug:
         return None
@@ -1826,8 +1823,11 @@ def _query_row(
     for preserved_key in ("raw_fields", "unknowns"):
         for source in (item_dict, model):
             preserved = source.get(preserved_key)
-            if isinstance(preserved, (dict, list)):
-                row[preserved_key] = copy.deepcopy(preserved)  # pyright: ignore[reportUnknownArgumentType]
+            if is_str_dict(preserved):
+                row[preserved_key] = dict(preserved)
+                break
+            if is_object_list(preserved):
+                row[preserved_key] = list(preserved)
                 break
     _ = _attach_row_evidence(
         row,
@@ -1887,9 +1887,9 @@ def _query_payload(args: argparse.Namespace) -> dict[str, object]:
 
     snapshot = _load_reader_snapshot(snapshot_path)
     hosts_models_val = snapshot.get("hosts_models")
-    if not isinstance(hosts_models_val, list):
+    if not is_object_list(hosts_models_val):
         _raise_extraction_error("Snapshot missing hosts_models list")
-    hosts_models = _as_list(hosts_models_val)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
+    hosts_models = hosts_models_val
     canonical_models = _canonical_models(snapshot)
 
     model_filter = model_arg.lower() if model_arg else None
@@ -1970,14 +1970,15 @@ def _sort_metric(
     value: object = row.get(metric)
     evidence = _as_dict(row.get("metric_evidence"))
     target_evidence = evidence.get(metric)
-    if isinstance(target_evidence, dict):
-        target_dict = _as_dict(target_evidence)  # pyright: ignore[reportUnknownArgumentType]
-        eligibility = target_dict.get(
-            "comparison_eligibility", target_dict.get("eligibility")
+    if is_str_dict(target_evidence):
+        eligibility = target_evidence.get(
+            "comparison_eligibility", target_evidence.get("eligibility")
         )
         if eligibility != "eligible":
             return (1, 0.0)
-        value = target_dict.get("normalized_value", target_dict.get("normalized"))
+        value = target_evidence.get(
+            "normalized_value", target_evidence.get("normalized")
+        )
     if _finite_number(value) and isinstance(value, (int, float)):
         normalized = -float(value) if reverse else float(value)
         return (0, normalized)
@@ -1999,14 +2000,14 @@ def _provider_counts_from_rows(rows: list[dict[str, object]]) -> dict[str, int]:
 
 def _provider_counts_from_snapshot(snapshot: dict[str, object]) -> dict[str, int]:
     hosts_models_val = snapshot.get("hosts_models")
-    if not isinstance(hosts_models_val, list):
+    if not is_object_list(hosts_models_val):
         _raise_extraction_error("Snapshot missing hosts_models list")
 
     counts: dict[str, int] = {}
-    for item in _as_list(hosts_models_val):  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
-        if not isinstance(item, dict):
+    for item in hosts_models_val:
+        if not is_str_dict(item):
             continue
-        item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+        item_dict = item
         provider: str | None = None
         host = _as_dict(item_dict.get("host"))
         if isinstance(host.get("slug"), str):
@@ -2050,9 +2051,9 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, object]:
 
     snapshot = _load_reader_snapshot(snapshot_path)
     hosts_models_val = snapshot.get("hosts_models")
-    if not isinstance(hosts_models_val, list):
+    if not is_object_list(hosts_models_val):
         _raise_extraction_error("Snapshot missing hosts_models list")
-    hosts_models = _as_list(hosts_models_val)  # pyright: ignore[reportUnknownArgumentType]  # pyright: ignore[reportUnknownArgumentType]
+    hosts_models = hosts_models_val
 
     inferred_model = model_arg or _infer_model(question, _model_rows(snapshot))
     inferred_provider = provider_arg or _infer_provider(question, hosts_models)
@@ -2124,9 +2125,9 @@ def _infer_provider(question: str, hosts_models: list[object]) -> str | None:
     best: tuple[int, str] | None = None
 
     for item in hosts_models:
-        if not isinstance(item, dict):
+        if not is_str_dict(item):
             continue
-        item_dict = _as_dict(item)  # pyright: ignore[reportUnknownArgumentType]
+        item_dict = item
         host = _as_dict(item_dict.get("host"))
         candidates = [host.get("slug"), host.get("name")]
         for candidate in candidates:
@@ -2233,15 +2234,14 @@ def _handle_qa(args: argparse.Namespace) -> int:
 
 def _compare_payload(args: argparse.Namespace) -> dict[str, object]:
     snapshot_path = _ns_path(args, "snapshot", DEFAULT_OUTPUT_JSON)
-    select_arg = cast("object", getattr(args, "select", None))
+    select_arg = vars(args).get("select")
     selectors: list[str] = []
     if isinstance(select_arg, str):
         selectors = [select_arg]
-    elif isinstance(select_arg, (list, tuple)):
-        items = cast("Sequence[object]", select_arg)
-        if any(not isinstance(value, str) for value in items):
+    elif is_object_list(select_arg) or is_object_tuple(select_arg):
+        if any(not isinstance(value, str) for value in select_arg):
             _raise_cli_usage_error("compare selectors must be strings")
-        selectors = [cast("str", value) for value in items]
+        selectors = [value for value in select_arg if isinstance(value, str)]
     elif select_arg is not None:
         _raise_cli_usage_error("compare selectors must be strings")
     if not selectors:
@@ -2267,13 +2267,16 @@ def _compare_payload(args: argparse.Namespace) -> dict[str, object]:
     model_positions = {
         model.get("slug"): index for index, model in enumerate(_model_rows(snapshot))
     }
-    for row in cast("list[dict[str, object]]", payload["rows"]):
-        source_index = model_positions[row.get("slug")]
-        _ = _attach_row_evidence(
-            row,
-            source_prefix=f"$.models[{source_index}]",
-            artifact_hash=_source_hash_from_payload(snapshot),
-        )
+    rows_val = payload.get("rows")
+    if is_object_list(rows_val):
+        for row in rows_val:
+            if is_str_dict(row):
+                source_index = model_positions[row.get("slug")]
+                _ = _attach_row_evidence(
+                    row,
+                    source_prefix=f"$.models[{source_index}]",
+                    artifact_hash=_source_hash_from_payload(snapshot),
+                )
     return payload
 
 
@@ -2677,11 +2680,10 @@ def _compare_namespace(args: dict[str, object]) -> argparse.Namespace:
     selectors: list[str] = []
     if isinstance(select_val, str):
         selectors = [select_val]
-    elif isinstance(select_val, list):
-        items = cast("list[object]", select_val)
-        if any(not isinstance(value, str) for value in items):
+    elif is_object_list(select_val):
+        if any(not isinstance(value, str) for value in select_val):
             _raise_cli_usage_error("compare selectors must be strings")
-        selectors = [cast("str", value) for value in items]
+        selectors = [value for value in select_val if isinstance(value, str)]
     elif select_val is not None:
         _raise_cli_usage_error("compare selectors must be strings")
     if not selectors:
@@ -2702,7 +2704,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             continue
 
         try:
-            request_obj = cast("object", json.loads(line))
+            request_obj = parse_json(line)
         except json.JSONDecodeError:
             _emit_json(
                 _error_response(
@@ -2714,7 +2716,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
-        if not isinstance(request_obj, dict):
+        if not is_str_dict(request_obj):
             _emit_json(
                 _error_response(
                     None,
@@ -2726,7 +2728,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
             )
             continue
 
-        request_dict: dict[str, object] = _as_dict(request_obj)  # pyright: ignore[reportUnknownArgumentType]
+        request_dict: dict[str, object] = request_obj
         request_id = request_dict.get("id")
         command_val = request_dict.get("type") or request_dict.get("command")
         if not isinstance(command_val, str):
@@ -2743,7 +2745,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
         command = command_val
 
         args_raw = request_dict.get("args", {})
-        if not isinstance(args_raw, dict):
+        if not is_str_dict(args_raw):
             _emit_json(
                 _error_response(
                     request_id,
@@ -2754,7 +2756,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
                 stdout=output_stream,
             )
             continue
-        args_payload: dict[str, object] = _as_dict(args_raw)  # pyright: ignore[reportUnknownArgumentType]
+        args_payload: dict[str, object] = args_raw
         try:
             if command == "ping":
                 response = _success_response(
@@ -2848,7 +2850,7 @@ def run_rpc(*, stdin: TextIO | None = None, stdout: TextIO | None = None) -> int
 
         try:
             _emit_json(response, stdout=output_stream)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             fallback = _error_response(
                 request_id,
                 command,

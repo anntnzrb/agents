@@ -1,11 +1,9 @@
 """Credential redaction and immutable artifact safety tests."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
-from typing import cast
 
+from artificial_analysis.contracts import as_dict
 from artificial_analysis.diagnostics import REDACTED, redact
 from artificial_analysis.provenance import ArtifactStore
 
@@ -34,12 +32,13 @@ def test_redaction_preserves_safe_metrics_and_public_url_shape() -> None:
         "headers": {"Authorization": "Bearer do-not-leak", "cookie": "sid=secret"},
         "api_key": "do-not-leak",
     }
-    redacted = cast("dict[str, object]", redact(payload))
+    redacted = as_dict(redact(payload))
     encoded = json.dumps(redacted, sort_keys=True)
 
     assert redacted["score"] == 42.5
     assert redacted["output_tokens"] == 100
-    assert "tab=score" in cast("str", redacted["source_url"])
+    assert isinstance(redacted["source_url"], str)
+    assert "tab=score" in redacted["source_url"]
     assert REDACTED in encoded
     assert "do-not-leak" not in encoded
     assert "sid=secret" not in encoded

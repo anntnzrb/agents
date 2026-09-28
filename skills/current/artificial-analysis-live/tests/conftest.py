@@ -1,7 +1,5 @@
 """Safety fixtures for deterministic Artificial Analysis tests."""
 
-from __future__ import annotations
-
 import os
 import socket
 import sys
@@ -15,20 +13,14 @@ if str(LIB_DIR) not in sys.path:
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
-from typing import TYPE_CHECKING, cast
 
 import pytest
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
 
 def _live_smoke_enabled(request: pytest.FixtureRequest) -> bool:
-    path = getattr(cast("object", request.node), "path", None)
     return (
         os.environ.get("RUN_LIVE_SMOKE") == "1"
-        and isinstance(path, Path)
-        and path.name == "test_live_smoke.py"
+        and request.path.name == "test_live_smoke.py"
     )
 
 
@@ -55,19 +47,18 @@ def deny_network_and_real_dotenv(
         if rsc_module is not None and hasattr(rsc_module, "urlopen"):
             monkeypatch.setattr(rsc_module, "urlopen", _deny_network)
 
-    cli_module = sys.modules.get("artificial_analysis.cli")
-    if cli_module is None or not hasattr(cli_module, "_dotenv_candidates"):
+    if "artificial_analysis.cli" not in sys.modules:
         return
-    skill_env = Path(__file__).resolve().parents[1] / ".env"
-    original_candidates = cast(
-        "Callable[..., list[Path]]", cli_module._dotenv_candidates
-    )
+    from artificial_analysis import cli
 
-    def safe_candidates(*args: object, **kwargs: object) -> list[Path]:
+    skill_env = Path(__file__).resolve().parents[1] / ".env"
+    original_candidates = cli._dotenv_candidates
+
+    def safe_candidates() -> list[Path]:
         return [
-            Path(candidate)
-            for candidate in original_candidates(*args, **kwargs)
-            if Path(candidate).resolve() != skill_env.resolve()
+            candidate
+            for candidate in original_candidates()
+            if candidate.resolve() != skill_env.resolve()
         ]
 
-    monkeypatch.setattr(cli_module, "_dotenv_candidates", safe_candidates)
+    monkeypatch.setattr(cli, "_dotenv_candidates", safe_candidates)

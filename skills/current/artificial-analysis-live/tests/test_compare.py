@@ -1,17 +1,15 @@
 """Tests for model family and effort comparison interfaces."""
 
-from __future__ import annotations
-
 import argparse
 import io
 import json
 from pathlib import Path
-from typing import cast
 
 import pytest
 
 from artificial_analysis import cli
 from artificial_analysis.comparison import compare_models
+from artificial_analysis.contracts import as_dict, as_list, parse_json
 
 SYNTHETIC_PATH = Path("synthetic.json")
 
@@ -201,13 +199,13 @@ def test_future_effort_and_unknown_fields_retained_losslessly() -> None:
         ["Future Family:ultra-tier"],
         usage_error_factory=cli.CliUsageError,
     )
-    rows = cast("list[dict[str, object]]", result["rows"])
+    rows = as_list(result["rows"])
     assert len(rows) == 1
-    row = rows[0]
+    row = as_dict(rows[0])
     assert row["slug"] == "future-model-ultra"
     assert row["effort_slug"] == "ultra-tier"
     assert row["effort_level"] == 99
-    raw = cast("dict[str, object]", row["raw_fields"])
+    raw = as_dict(row["raw_fields"])
     assert raw["arbitrary_future_benchmark"] == 98.7
     assert row["unknown_top_level_metric"] == {"complex": [1, 2, 3]}
 
@@ -228,10 +226,11 @@ def test_null_effort_with_true_reasoning_is_unknown_not_non_reasoning() -> None:
         ["Model Beta"],
         usage_error_factory=cli.CliUsageError,
     )
-    rows = cast("list[dict[str, object]]", result["rows"])
+    rows = as_list(result["rows"])
     assert len(rows) == 1
-    assert rows[0]["effort_slug"] is None
-    assert rows[0]["is_reasoning"] is True
+    row0 = as_dict(rows[0])
+    assert row0["effort_slug"] is None
+    assert row0["is_reasoning"] is True
 
 
 def test_unavailable_metrics_remain_none_not_zero() -> None:
@@ -242,8 +241,9 @@ def test_unavailable_metrics_remain_none_not_zero() -> None:
         ["Model Alpha:max"],
         usage_error_factory=cli.CliUsageError,
     )
-    rows = cast("list[dict[str, object]]", result["rows"])
-    assert rows[0]["coding_index"] is None
+    rows = as_list(result["rows"])
+    row0 = as_dict(rows[0])
+    assert row0["coding_index"] is None
 
 
 def test_canonical_row_deduplication_across_selectors() -> None:
@@ -254,9 +254,10 @@ def test_canonical_row_deduplication_across_selectors() -> None:
         ["Model Alpha:max", "Model Alpha:max"],
         usage_error_factory=cli.CliUsageError,
     )
-    rows = cast("list[dict[str, object]]", result["rows"])
+    rows = as_list(result["rows"])
     assert len(rows) == 1
-    assert rows[0]["slug"] == "model-a-max"
+    row0 = as_dict(rows[0])
+    assert row0["slug"] == "model-a-max"
 
 
 def test_qa_rejects_multi_model_comparisons_with_compare_guidance(
@@ -266,7 +267,7 @@ def test_qa_rejects_multi_model_comparisons_with_compare_guidance(
     _ = snapshot_file.write_text(json.dumps(_synthetic_snapshot()), encoding="utf-8")
 
     with pytest.raises(cli.CliUsageError):
-        _ = cli._qa_payload(  # pyright: ignore[reportPrivateUsage]
+        _ = cli._qa_payload(
             argparse.Namespace(
                 question="compare Model Alpha against Model Beta",
                 snapshot=snapshot_file,
@@ -287,7 +288,7 @@ def test_cli_and_rpc_parity_via_tmp_snapshot(tmp_path: Path) -> None:
         snapshot=snapshot_file,
         select=["Model Alpha:max,non-reasoning", "Model Beta"],
     )
-    payload_cli = cli._compare_payload(cli_args)  # pyright: ignore[reportPrivateUsage]
+    payload_cli = cli._compare_payload(cli_args)
     assert payload_cli["matched_models"] == 3
 
     rpc_input = (
@@ -311,13 +312,13 @@ def test_cli_and_rpc_parity_via_tmp_snapshot(tmp_path: Path) -> None:
     assert exit_code == 0
     rpc_lines = rpc_stdout.getvalue().strip().splitlines()
     assert len(rpc_lines) == 1
-    response = cast("dict[str, object]", json.loads(rpc_lines[0]))
+    response = as_dict(parse_json(rpc_lines[0]))
     assert response["id"] == "test-123"
     assert response["success"] is True
-    data = cast("dict[str, object]", response["data"])
+    data = as_dict(response["data"])
     assert data["matched_models"] == 3
-    rows = cast("list[dict[str, object]]", data["rows"])
-    assert [r["slug"] for r in rows] == [
+    rows = as_list(data["rows"])
+    assert [as_dict(r)["slug"] for r in rows] == [
         "model-a-max",
         "model-a-non-reasoning",
         "model-b-thinking-only",

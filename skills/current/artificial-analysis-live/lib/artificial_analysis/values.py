@@ -1,14 +1,12 @@
 # Copyright (c) 2026 anntnzrb
 """Evidence records and conservative numeric parsing for Artificial Analysis."""
 
-from __future__ import annotations
-
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Final, cast
+from typing import Final
 
 from .contracts import (
     ComparisonEligibility,
@@ -16,6 +14,7 @@ from .contracts import (
     NumericEvidence,
     SourceEvidence,
     ValueStatus,
+    is_str_mapping,
 )
 
 
@@ -92,8 +91,8 @@ def _marker_is_chart_zero(marker: object) -> bool:
         if any(word in lowered for word in ("false", "never", "no")):
             return False
         return "chart" in lowered and ("zero" in lowered or "placeholder" in lowered)
-    if isinstance(marker, Mapping):
-        mapping = cast("Mapping[str, object]", marker)
+    if is_str_mapping(marker):
+        mapping = marker
         return any(
             str(key).casefold().replace("-", "_")
             in {
@@ -122,7 +121,7 @@ def classify_placeholder(
                 and float(raw_value) == 0.0
                 and not isinstance(raw_value, bool)
             )
-        except (OverflowError, TypeError, ValueError):
+        except OverflowError, TypeError, ValueError:
             is_zero = False
         if is_zero:
             return PlaceholderKind.SOURCE_MARKED_CHART_ZERO
@@ -161,7 +160,7 @@ def _normalise_unit(unit: object) -> str | None:
     return aliases.get(value.casefold(), value)
 
 
-def _parse_number_and_unit(  # noqa: C901, PLR0911, PLR0912
+def _parse_number_and_unit(  # noqa: C901
     raw_value: object,
     explicit_unit: str | None,
 ) -> tuple[Decimal | None, str | None, str | None]:
@@ -227,11 +226,11 @@ def _number_from_decimal(value: Decimal) -> int | float | None:
     if value == value.to_integral_value():
         try:
             return int(value)
-        except (OverflowError, ValueError):
+        except OverflowError, ValueError:
             return None
     try:
         converted = float(value)
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     return converted if math.isfinite(converted) else None
 
@@ -294,7 +293,7 @@ def _evidence(  # noqa: PLR0913
     )
 
 
-def parse_numeric(  # noqa: C901, PLR0911, PLR0913
+def parse_numeric(  # noqa: C901, PLR0913
     raw_value: object,
     *,
     unit: str | None = None,

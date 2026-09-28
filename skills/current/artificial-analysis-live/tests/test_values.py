@@ -1,9 +1,6 @@
 """Contract tests for finite JSON and numeric evidence."""
 
-from __future__ import annotations
-
 from decimal import Decimal
-from typing import cast
 
 import pytest
 
@@ -375,7 +372,7 @@ def test_numeric_evidence_rejects_boolean_normalized_values(
     with pytest.raises(TypeError, match="must not be bool"):
         _ = NumericEvidence(
             raw_value=normalized_value,
-            normalized_value=cast("int | float | None", normalized_value),
+            normalized_value=normalized_value,
         )
 
 

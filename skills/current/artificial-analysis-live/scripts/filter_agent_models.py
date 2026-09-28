@@ -1,7 +1,6 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # ///
-# ruff: noqa: S607
 """Filter Artificial Analysis model snapshot for agent/dev model selection.
 
 The v2 snapshot stores canonical model metrics in ``models`` and endpoint
@@ -24,8 +23,6 @@ Fresh data first:
   --fetch
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import math
@@ -34,15 +31,19 @@ import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-type JsonValue = (
-    bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from artificial_analysis.contracts import (
+    is_object_list,
+    is_object_tuple,
+    is_str_dict,
+    is_str_mapping,
+    parse_json,
 )
-type Json = dict[str, JsonValue]
+
+type JsonValue = object
+type Json = dict[str, object]
 type OpenWeight = Literal["all", "true", "false"]
 type SortKey = Literal["tbench", "omni", "ifbench", "name"]
 type OutputFormat = Literal["markdown", "tsv", "json"]
@@ -86,9 +87,9 @@ def model_omni(model: Json) -> float:
     if direct is not None:
         return direct
     breakdown = model.get("omniscience_breakdown")
-    if isinstance(breakdown, dict):
+    if is_str_dict(breakdown):
         total = breakdown.get("total")
-        if isinstance(total, dict):
+        if is_str_dict(total):
             nested = number(total.get("omniscience"))
             if nested is not None:
                 return nested
@@ -131,7 +132,7 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
         return
 
     meta = raw.get("meta")
-    fetched_at = meta.get("fetched_at") if isinstance(meta, dict) else None
+    fetched_at = meta.get("fetched_at") if is_str_dict(meta) else None
     if not isinstance(fetched_at, str) or not fetched_at:
         message = (
             f"default snapshot missing meta.fetched_at: {snapshot}. "
@@ -160,13 +161,13 @@ def ensure_default_snapshot_fresh(snapshot: Path, raw: Json) -> None:
 LAST_LOAD_DIAGNOSTICS: list[Json] = []
 
 
-def _build_canonical(models: JsonValue) -> dict[str, Json]:
+def _build_canonical(models: object) -> dict[str, Json]:
     """Index canonical models by slug."""
     canonical: dict[str, Json] = {}
-    if not isinstance(models, list):
+    if not is_object_list(models):
         return canonical
     for model in models:
-        if not isinstance(model, dict):
+        if not is_str_dict(model):
             continue
         slug = model.get("slug")
         if not isinstance(slug, str):
@@ -181,18 +182,18 @@ def load_rows(  # noqa: C901
     diagnostics: list[Json] | None = None,
 ) -> list[Row]:
     """Load canonical model rows joined from v1 or schema-v2 endpoints."""
-    raw_value = cast("object", json.loads(snapshot.read_text()))
-    if not isinstance(raw_value, dict):
+    raw_value = parse_json(snapshot.read_text(encoding="utf-8"))
+    if not is_str_dict(raw_value):
         message = f"snapshot must be an object: {snapshot}"
         raise TypeError(message)
-    raw = cast("Json", raw_value)
+    raw = raw_value
     ensure_default_snapshot_fresh(snapshot, raw)
     hosts_models = raw.get("hosts_models")
-    if not isinstance(hosts_models, list):
+    if not is_object_list(hosts_models):
         message = f"snapshot missing hosts_models list: {snapshot}"
-        raise ValueError(message)  # noqa: TRY004
+        raise ValueError(message)
     meta = raw.get("meta")
-    schema_version = meta.get("schema_version") if isinstance(meta, dict) else None
+    schema_version = meta.get("schema_version") if is_str_dict(meta) else None
     require_canonical_join = (
         isinstance(schema_version, int)
         and not isinstance(schema_version, bool)
@@ -204,7 +205,7 @@ def load_rows(  # noqa: C901
     by_slug: dict[str, Row] = {}
 
     for index, endpoint in enumerate(hosts_models):
-        if not isinstance(endpoint, dict):
+        if not is_str_dict(endpoint):
             continue
         model_slug = endpoint.get("model_slug")
         nested_model = endpoint.get("model")
@@ -226,14 +227,14 @@ def load_rows(  # noqa: C901
                 )
                 continue
             nested_slug = (
-                nested_model.get("slug") if isinstance(nested_model, dict) else None
+                nested_model.get("slug") if is_str_dict(nested_model) else None
             )
             if not isinstance(nested_slug, str):
                 continue
             model_slug = nested_slug
         model = canonical.get(model_slug)
         if model is None and not require_canonical_join:
-            model = nested_model if isinstance(nested_model, dict) else None
+            model = nested_model if is_str_dict(nested_model) else None
         if model is None:
             local_diagnostics.append(
                 {
@@ -384,15 +385,10 @@ def _finite_json(value: object) -> object:
     """Replace non-finite floats so json.dumps(allow_nan=False) succeeds."""
     if isinstance(value, float):
         return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        mapping = cast("Mapping[str, object]", value)
-        return {str(key): _finite_json(item) for key, item in mapping.items()}
-    if isinstance(value, list):
-        items = cast("list[object]", cast("object", value))
-        return [_finite_json(item) for item in items]
-    if isinstance(value, tuple):
-        entries = cast("tuple[object, ...]", cast("object", value))
-        return [_finite_json(item) for item in entries]
+    if is_str_mapping(value):
+        return {str(key): _finite_json(item) for key, item in value.items()}
+    if is_object_list(value) or is_object_tuple(value):
+        return [_finite_json(item) for item in value]
     return value
 
 
@@ -406,7 +402,7 @@ def emit_json(rows: list[Row]) -> None:
 
 def fetch_snapshot(skill_cli: Path) -> None:
     """Fetch a fresh snapshot through the skill CLI."""
-    _ = subprocess.run(  # noqa: S603 (trusted local skill CLI)
+    _ = subprocess.run(
         ["uv", "run", "--script", str(skill_cli), "fetch"],
         check=True,
         stdout=subprocess.DEVNULL,
@@ -464,21 +460,36 @@ def main() -> int:
     rows = load_rows(snapshot, diagnostics=diagnostics)
     for diagnostic in diagnostics:
         _ = sys.stderr.write(json.dumps(diagnostic, sort_keys=True) + "\n")
+    ow_arg = _req_str(args, "open_weight")
+    open_weight: OpenWeight = (
+        "true" if ow_arg == "true" else "false" if ow_arg == "false" else "all"
+    )
     filtered = apply_filter(
         rows,
-        open_weight=cast("OpenWeight", _req_str(args, "open_weight")),
+        open_weight=open_weight,
         min_omni=_req_float(args, "min_omni"),
         min_tbench=_req_float(args, "min_tbench"),
         min_ifbench=_req_float(args, "min_ifbench"),
     )
-    sorted_rows = sort_rows(
-        filtered, cast("SortKey", _req_str(args, "sort_by")), not _flag(args, "asc")
+    sort_by_arg = _req_str(args, "sort_by")
+    sort_by: SortKey = (
+        "omni"
+        if sort_by_arg == "omni"
+        else "ifbench"
+        if sort_by_arg == "ifbench"
+        else "name"
+        if sort_by_arg == "name"
+        else "tbench"
     )
+    sorted_rows = sort_rows(filtered, sort_by, not _flag(args, "asc"))
     limit = _req_int(args, "limit")
     if limit > 0:
         sorted_rows = sorted_rows[:limit]
 
-    output_format = cast("OutputFormat", _req_str(args, "format"))
+    fmt_arg = _req_str(args, "format")
+    output_format: OutputFormat = (
+        "json" if fmt_arg == "json" else "tsv" if fmt_arg == "tsv" else "markdown"
+    )
     if output_format == "json":
         emit_json(sorted_rows)
     elif output_format == "tsv":
@@ -490,7 +501,7 @@ def main() -> int:
 
 def _req_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = vars(args).get(field)
     if not isinstance(value, str):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -499,7 +510,7 @@ def _req_str(args: argparse.Namespace, field: str) -> str:
 
 def _req_path(args: argparse.Namespace, field: str) -> Path:
     """Narrow a required path argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = vars(args).get(field)
     if not isinstance(value, Path):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -508,7 +519,7 @@ def _req_path(args: argparse.Namespace, field: str) -> Path:
 
 def _req_float(args: argparse.Namespace, field: str) -> float:
     """Narrow a required float argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = vars(args).get(field)
     if not isinstance(value, float):
         message = f"Invalid float argument: {field}."
         raise TypeError(message)
@@ -517,7 +528,7 @@ def _req_float(args: argparse.Namespace, field: str) -> float:
 
 def _req_int(args: argparse.Namespace, field: str) -> int:
     """Narrow a required integer argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = vars(args).get(field)
     if not isinstance(value, int) or isinstance(value, bool):
         message = f"Invalid integer argument: {field}."
         raise TypeError(message)
@@ -526,7 +537,7 @@ def _req_int(args: argparse.Namespace, field: str) -> int:
 
 def _flag(args: argparse.Namespace, field: str) -> bool:
     """Narrow a boolean flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = vars(args).get(field)
     return value if isinstance(value, bool) else False
 
 

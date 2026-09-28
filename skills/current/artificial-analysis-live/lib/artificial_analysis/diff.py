@@ -1,16 +1,21 @@
 # Copyright (c) 2026 anntnzrb
 """Deterministic, additive schema-aware comparison for AA snapshots."""
 
-from __future__ import annotations
-
 import hashlib
 import math
 from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from numbers import Real
-from typing import Final, cast
+from typing import Final
 
-from .contracts import compact_json
+from .contracts import (
+    compact_json,
+    is_object_list,
+    is_object_mapping,
+    is_object_tuple,
+    is_str_dict,
+    is_str_mapping,
+)
 from .diagnostics import redact
 
 _STATUS_KEYS = frozenset(
@@ -42,12 +47,10 @@ RENAME_SIMILARITY_THRESHOLD: Final[float] = 0.72
 def _safe(value: object) -> object:
     """Return a redacted, finite JSON projection for diff output."""
     value = redact(value)
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        return {str(key): _safe(item) for key, item in mapping.items()}
-    if isinstance(value, (list, tuple)):
-        items = cast("list[object]", cast("object", value))
-        return [_safe(item) for item in items]
+    if is_str_mapping(value):
+        return {str(key): _safe(item) for key, item in value.items()}
+    if is_object_list(value) or is_object_tuple(value):
+        return [_safe(item) for item in value]
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         return None
     if isinstance(value, (str, int, float, bool)) or value is None:
@@ -58,15 +61,15 @@ def _safe(value: object) -> object:
 def _encoded(value: object) -> str:
     try:
         return compact_json(_safe(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return compact_json(str(value))
 
 
 def _mapping(value: object) -> Mapping[str, object]:
     """Narrow an arbitrary value to a string-keyed mapping."""
-    if not isinstance(value, Mapping):
-        return {}
-    return cast("Mapping[str, object]", value)
+    if is_str_mapping(value):
+        return value
+    return {}
 
 
 def _rows(
@@ -75,24 +78,17 @@ def _rows(
     """Collect row mappings from the first present snapshot section."""
     for name in names:
         section = snapshot.get(name)
-        if isinstance(section, Mapping):
-            mapping = cast("Mapping[str, object]", section)
-            section = list(mapping.values())
-        if isinstance(section, list):
-            entries = cast("list[object]", cast("object", section))
-            return [
-                cast("dict[str, object]", row)
-                for row in entries
-                if isinstance(row, Mapping)
-            ]
+        if is_object_mapping(section):
+            section = list(section.values())
+        if is_object_list(section):
+            return [dict(row) for row in section if is_str_mapping(row)]
     return []
 
 
 def _nested_slug(value: object, fallback: object) -> object:
     """Read a slug from a nested mapping or fall back to a flat value."""
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        return mapping.get("slug", fallback)
+    if is_str_mapping(value):
+        return value.get("slug", fallback)
     return fallback
 
 
@@ -118,9 +114,8 @@ def _display_name(row: Mapping[str, object]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     nested = row.get("model")
-    if isinstance(nested, Mapping):
-        nested_mapping = cast("Mapping[str, object]", nested)
-        value = nested_mapping.get("name")
+    if is_str_mapping(nested):
+        value = nested.get("name")
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
@@ -157,14 +152,13 @@ def _indexed(
 
 def _leaf_values(value: object, prefix: str = "") -> dict[str, object]:
     """Flatten nested mappings to dotted-path leaf values."""
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    if is_str_mapping(value):
         result: dict[str, object] = {}
-        if not mapping:
+        if not value:
             result[prefix] = {}
-        for key in sorted(mapping, key=str):
+        for key in sorted(value, key=str):
             path = f"{prefix}.{key}" if prefix else str(key)
-            result.update(_leaf_values(mapping[key], path))
+            result.update(_leaf_values(value[key], path))
         return result
     return {prefix: value}
 
@@ -197,9 +191,8 @@ def _field_diff(
 def _metric_names(row: Mapping[str, object]) -> set[str]:
     names: set[str] = set()
     evidence = row.get("metric_evidence")
-    if isinstance(evidence, Mapping):
-        mapping = cast("Mapping[str, object]", evidence)
-        names.update(str(key) for key in mapping)
+    if is_str_mapping(evidence):
+        names.update(str(key) for key in evidence)
     for path, value in _leaf_values(row).items():
         leaf = path.rsplit(".", 1)[-1]
         if leaf in _STRUCTURAL_KEYS or leaf in _STATUS_KEYS:
@@ -216,26 +209,20 @@ def _metric_value(row: Mapping[str, object], metric: str) -> object:
         return row[metric]
     current: object = row
     for piece in metric.split("."):
-        if not isinstance(current, Mapping):
+        if not is_str_mapping(current):
             current = None
             break
-        mapping = cast(  # pyright: ignore[reportUnnecessaryCast]
-            "Mapping[str, object]", current
-        )
-        if piece not in mapping:
+        if piece not in current:
             current = None
             break
-        current = mapping[piece]
+        current = current[piece]
     if current is not None:
         return current
     evidence = row.get("metric_evidence")
-    if isinstance(evidence, Mapping):
-        evidence_mapping = cast("Mapping[str, object]", evidence)
-        item = evidence_mapping.get(metric)
-        if isinstance(item, Mapping):
-            item_mapping = cast("Mapping[str, object]", item)
-            if "normalized_value" in item_mapping:
-                return item_mapping.get("normalized_value")
+    if is_str_mapping(evidence):
+        item = evidence.get(metric)
+        if is_str_mapping(item) and "normalized_value" in item:
+            return item.get("normalized_value")
     return None
 
 
@@ -273,17 +260,9 @@ def _metric_diff(
             changed.append(entry)
         left_evidence = _mapping(before.get("metric_evidence")).get(metric)
         right_evidence = _mapping(after.get("metric_evidence")).get(metric)
-        if isinstance(left_evidence, Mapping) or isinstance(right_evidence, Mapping):
-            left_map: Mapping[str, object] = (
-                cast("Mapping[str, object]", left_evidence)
-                if isinstance(left_evidence, Mapping)
-                else {}
-            )
-            right_map: Mapping[str, object] = (
-                cast("Mapping[str, object]", right_evidence)
-                if isinstance(right_evidence, Mapping)
-                else {}
-            )
+        if is_str_mapping(left_evidence) or is_str_mapping(right_evidence):
+            left_map = _mapping(left_evidence)
+            right_map = _mapping(right_evidence)
             left_status = {
                 key: left_map.get(key) for key in _STATUS_KEYS if key in left_map
             }
@@ -326,9 +305,8 @@ def _diagnostics(snapshot: Mapping[str, object]) -> list[object]:
     value = snapshot.get("diagnostics")
     if value is None:
         value = _mapping(snapshot.get("meta")).get("diagnostics")
-    if isinstance(value, list):
-        items = cast("list[object]", cast("object", value))
-        return sorted((_safe(item) for item in items), key=_encoded)
+    if is_object_list(value):
+        return sorted((_safe(item) for item in value), key=_encoded)
     return []
 
 
@@ -510,7 +488,10 @@ def schema_aware_diff(
         ),
     }
     # Make the output finite and redact every branch, including identity names.
-    return cast("dict[str, object]", _safe(result))
+    safe_result = _safe(result)
+    if is_str_dict(safe_result):
+        return safe_result
+    return {}
 
 
 __all__ = ["schema_aware_diff"]

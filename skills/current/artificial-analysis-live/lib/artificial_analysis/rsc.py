@@ -1,8 +1,6 @@
 # ruff: noqa: S310
 """Fetch, normalize, and persist Artificial Analysis data snapshots."""
 
-from __future__ import annotations
-
 import binascii
 import contextlib
 import gzip
@@ -14,7 +12,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.error import HTTPError
 from urllib.parse import quote, urljoin, urlparse
 from urllib.request import Request, urlopen
@@ -22,6 +20,12 @@ from urllib.request import Request, urlopen
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from .contracts import (
+    is_object_list,
+    is_str_dict,
+    is_str_mapping,
+    parse_json,
+)
 from .diagnostics import Diagnostic, redact, redact_query
 from .identity import (
     canonical_endpoint_identity,
@@ -39,7 +43,6 @@ from .provenance import (
 )
 
 if TYPE_CHECKING:
-    from http.client import HTTPResponse
     from typing import NoReturn
 
 NOT_MODIFIED = 304
@@ -92,15 +95,33 @@ class CacheError(ExtractionError):
         self.details = dict(details or {})
 
 
+@runtime_checkable
+class _HasItems(Protocol):
+    def items(self) -> Iterable[tuple[object, object]]: ...
+
+
+@runtime_checkable
+class _HttpResponseContext(Protocol):
+    def __enter__(self) -> object: ...
+    def __exit__(self, *args: object) -> object: ...
+    def read(self) -> bytes: ...
+
+
+def _urlopen(request: Request, timeout_seconds: float) -> object:
+    fn: Callable[..., object] = urlopen
+    return fn(request, timeout=timeout_seconds)
+
+
+def _raw_decode(decoder: json.JSONDecoder, s: str, idx: int = 0) -> tuple[object, int]:
+    fn: Callable[..., tuple[object, int]] = decoder.raw_decode
+    return fn(s, idx)
+
+
 def _safe_headers(headers: object) -> dict[str, str]:
-    if headers is None:
-        return {}
-    items = getattr(headers, "items", None)
-    if not callable(items):
+    if not isinstance(headers, _HasItems):
         return {}
     result: dict[str, str] = {}
-    items_fn = cast("Callable[[], Iterable[tuple[object, object]]]", items)
-    for key, value in items_fn():
+    for key, value in headers.items():
         name = str(key).casefold()
         if name in {"authorization", "cookie", "set-cookie", "x-api-key", "api-key"}:
             continue
@@ -179,12 +200,14 @@ def fetch_rsc(
     fetched_at = datetime.now(UTC).isoformat()
 
     try:
-        raw_resp = cast("object", urlopen(request, timeout=timeout_seconds))
-        with cast("HTTPResponse", raw_resp) as response:
+        raw_resp = _urlopen(request, timeout_seconds)
+        if not isinstance(raw_resp, _HttpResponseContext):
+            _raise_os_error("Failed to open response context", ValueError())
+        with raw_resp as response:
             status_code = _response_status(response)
             headers = _safe_headers(getattr(response, "headers", None))
             final_url = _response_final_url(response, url)
-            raw = response.read()
+            raw = raw_resp.read()
             body = raw.decode("utf-8", errors="replace")
             raw_bytes = body.encode("utf-8")
             return FetchResult(
@@ -235,12 +258,14 @@ def fetch_page(
     fetched_at = datetime.now(UTC).isoformat()
 
     try:
-        raw_resp = cast("object", urlopen(request, timeout=timeout_seconds))
-        with cast("HTTPResponse", raw_resp) as response:
+        raw_resp = _urlopen(request, timeout_seconds)
+        if not isinstance(raw_resp, _HttpResponseContext):
+            _raise_os_error("Failed to open response context", ValueError())
+        with raw_resp as response:
             status_code = _response_status(response)
             headers = _safe_headers(getattr(response, "headers", None))
             final_url = _response_final_url(response, url)
-            raw = response.read()
+            raw = raw_resp.read()
             body = raw.decode("utf-8", errors="replace")
             raw_bytes = body.encode("utf-8")
             return FetchResult(
@@ -293,12 +318,14 @@ def fetch_models(
     fetched_at = datetime.now(UTC).isoformat()
 
     try:
-        raw_resp = cast("object", urlopen(request, timeout=timeout_seconds))
-        with cast("HTTPResponse", raw_resp) as response:
+        raw_resp = _urlopen(request, timeout_seconds)
+        if not isinstance(raw_resp, _HttpResponseContext):
+            _raise_os_error("Failed to open response context", ValueError())
+        with raw_resp as response:
             status_code = _response_status(response)
             headers = _safe_headers(getattr(response, "headers", None))
             final_url = _response_final_url(response, request_url)
-            raw = response.read()
+            raw = raw_resp.read()
             body = raw.decode("utf-8", errors="replace")
             raw_bytes = body.encode("utf-8")
             return FetchResult(
@@ -338,20 +365,20 @@ def normalize_official_models(
 ) -> list[dict[str, object]]:
     """Validate and project official models without losing source fields."""
     try:
-        parsed = cast("object", json.loads(api_payload))
+        parsed = parse_json(api_payload)
     except json.JSONDecodeError as exc:
         _raise_extraction_error("Official model API returned invalid JSON.", exc)
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         _raise_extraction_error("Official model API envelope must be an object.")
-    parsed_dict = cast("dict[str, object]", parsed)
+    parsed_dict = parsed
 
     status = parsed_dict.get("status")
     prompt_options = parsed_dict.get("prompt_options")
     rows_raw = parsed_dict.get("data")
     if (
         not isinstance(status, int)
-        or not isinstance(prompt_options, dict)
-        or not isinstance(rows_raw, list)
+        or not is_str_dict(prompt_options)
+        or not is_object_list(rows_raw)
     ):
         msg = (
             "Official model API envelope requires integer status, object "
@@ -359,7 +386,7 @@ def normalize_official_models(
         )
         _raise_extraction_error(msg)
 
-    rows = cast("list[object]", rows_raw)
+    rows = rows_raw
     effective_hash = source_hash or calculate_source_hash(api_payload)
     collected = diagnostics if diagnostics is not None else []
     result = [
@@ -438,11 +465,10 @@ def _normalize_nested_source(  # noqa: PLR0913
     parser: str,
     diagnostics: list[Diagnostic] | None,
 ) -> object:
-    if not isinstance(value, dict):
+    if not is_str_dict(value):
         return value
-    dict_val = cast("dict[str, object]", value)
     return normalize_mapping(
-        cast("Mapping[object, object]", dict_val),
+        value,
         known_fields=known_fields,
         path=path,
         source_path=source_path,
@@ -460,9 +486,9 @@ def _normalize_official_model(
     parser: str = "official-api-v2",
     diagnostics: list[Diagnostic] | None = None,
 ) -> dict[str, object]:
-    if not isinstance(row, dict):
+    if not is_str_dict(row):
         _raise_extraction_error("Official model API data rows must be objects.")
-    row_dict = cast("dict[str, object]", row)
+    row_dict = row
 
     slug = row_dict.get("slug")
     name = row_dict.get("name")
@@ -474,9 +500,9 @@ def _normalize_official_model(
         or not slug
         or not isinstance(name, str)
         or not name
-        or not isinstance(creator, dict)
-        or not isinstance(evaluations, dict)
-        or not isinstance(pricing, dict)
+        or not is_str_dict(creator)
+        or not is_str_dict(evaluations)
+        or not is_str_dict(pricing)
     ):
         msg = (
             "Official model API rows require non-empty slug/name and object "
@@ -484,12 +510,12 @@ def _normalize_official_model(
         )
         _raise_extraction_error(msg)
 
-    creator_dict = cast("dict[str, object]", creator)
-    evaluations_dict = cast("dict[str, object]", evaluations)
-    pricing_dict = cast("dict[str, object]", pricing)
+    creator_dict = creator
+    evaluations_dict = evaluations
+    pricing_dict = pricing
 
     source = normalize_mapping(
-        cast("Mapping[object, object]", row_dict),
+        row_dict,
         known_fields=_OFFICIAL_MODEL_FIELDS,
         path=source_path or "data",
         source_path=source_path,
@@ -516,7 +542,7 @@ def _normalize_official_model(
         diagnostics=diagnostics,
     )
     normalized_evaluations = normalize_mapping(
-        cast("Mapping[object, object]", evaluations_dict),
+        evaluations_dict,
         known_fields=frozenset(_OFFICIAL_EVALUATION_NAMES)
         | {"coding_index", "intelligence_index", "math_index", "tau_2"},
         path=f"{source_path}.evaluations" if source_path else "evaluations",
@@ -554,25 +580,25 @@ def _normalize_official_model(
     }
     raw_fields: dict[str, object] = {}
     source_raw_fields = source.get("raw_fields")
-    if isinstance(source_raw_fields, dict):
-        raw_fields.update(cast("dict[str, object]", source_raw_fields))
+    if is_str_dict(source_raw_fields):
+        raw_fields.update(source_raw_fields)
     creator_raw = (
-        cast("dict[str, object]", normalized_creator).get("raw_fields")
-        if isinstance(normalized_creator, dict)
+        normalized_creator.get("raw_fields")
+        if is_str_dict(normalized_creator)
         else None
     )
     pricing_raw = (
-        cast("dict[str, object]", normalized_pricing).get("raw_fields")
-        if isinstance(normalized_pricing, dict)
+        normalized_pricing.get("raw_fields")
+        if is_str_dict(normalized_pricing)
         else None
     )
     evaluations_raw = normalized_evaluations.get("raw_fields")
-    if isinstance(creator_raw, dict) and creator_raw:
-        raw_fields["model_creator"] = cast("dict[str, object]", creator_raw)
-    if isinstance(pricing_raw, dict) and pricing_raw:
-        raw_fields["pricing"] = cast("dict[str, object]", pricing_raw)
-    if isinstance(evaluations_raw, dict) and evaluations_raw:
-        raw_fields["evaluations"] = cast("dict[str, object]", evaluations_raw)
+    if is_str_dict(creator_raw) and creator_raw:
+        raw_fields["model_creator"] = creator_raw
+    if is_str_dict(pricing_raw) and pricing_raw:
+        raw_fields["pricing"] = pricing_raw
+    if is_str_dict(evaluations_raw) and evaluations_raw:
+        raw_fields["evaluations"] = evaluations_raw
     if raw_fields:
         result["raw_fields"] = raw_fields
     metadata = _raw_metadata(
@@ -601,8 +627,8 @@ def _deduplicate_models(
     diagnostics: list[Diagnostic] | None,
 ) -> list[dict[str, object]]:
     def key(row: object) -> str | None:
-        if isinstance(row, dict):
-            val = cast("dict[str, object]", row).get("slug")
+        if is_str_dict(row):
+            val = row.get("slug")
             return val if isinstance(val, str) else None
         return None
 
@@ -628,7 +654,7 @@ def parse_json_frames(rsc_payload: str) -> list[tuple[str, object]]:
         if not payload or payload[0] not in ("[", "{", '"'):
             continue
         try:
-            parsed = cast("object", json.loads(payload))
+            parsed = parse_json(payload)
         except json.JSONDecodeError:
             continue
         parsed_frames.append((frame_id, parsed))
@@ -647,22 +673,14 @@ def parse_next_payload(document: str) -> list[tuple[str, object]]:
             break
         payload_start = marker_start + len(marker)
         try:
-            payload_raw, cursor = cast(
-                "tuple[object, int]",
-                decoder.raw_decode(document, payload_start),
-            )
+            payload_raw, cursor = _raw_decode(decoder, document, payload_start)
         except json.JSONDecodeError:
             cursor = payload_start
             continue
-        payload = payload_raw
-        if (
-            not isinstance(payload, list)
-            or len(cast("list[object]", payload)) < MIN_NEXT_PUSH_ITEMS
-        ):
+        if not is_object_list(payload_raw) or len(payload_raw) < MIN_NEXT_PUSH_ITEMS:
             continue
-        payload_list = cast("list[object]", payload)
-        frame_id = payload_list[0]
-        value = payload_list[1]
+        frame_id = payload_raw[0]
+        value = payload_raw[1]
         if isinstance(value, str):
             frames.extend(parse_json_frames(value))
         elif isinstance(frame_id, (str, int, float)):
@@ -711,32 +729,29 @@ def _scan_evaluation_node(
     candidates: list[list[dict[str, object]]],
     seen_lists: set[int],
 ) -> None:
-    if isinstance(node, dict):
-        dict_node = cast("dict[str, object]", node)
-        initial_models = dict_node.get("initialModels")
+    if is_str_dict(node):
+        initial_models = node.get("initialModels")
         has_eval_container = (
-            isinstance(dict_node.get("slug"), str)
-            and isinstance(dict_node.get("manifest"), dict)
-            and isinstance(dict_node.get("fallbackPriceByModelSlug"), dict)
+            isinstance(node.get("slug"), str)
+            and is_str_dict(node.get("manifest"))
+            and is_str_dict(node.get("fallbackPriceByModelSlug"))
         )
-        if isinstance(initial_models, list) and has_eval_container:
-            list_node = cast("list[object]", initial_models)
-            node_id = id(list_node)
+        if is_object_list(initial_models) and has_eval_container:
+            node_id = id(initial_models)
             if node_id not in seen_lists:
                 seen_lists.add(node_id)
                 matched: list[dict[str, object]] = [
-                    cast("dict[str, object]", item)
-                    for item in list_node
-                    if isinstance(item, dict)
+                    item
+                    for item in initial_models
+                    if is_str_dict(item)
                     and any(
-                        isinstance(cast("dict[str, object]", item).get(k), str)
-                        and bool(cast("dict[str, object]", item).get(k))
+                        isinstance(item.get(k), str) and bool(item.get(k))
                         for k in _EVALUATION_IDENTITY_KEYS
                     )
                 ]
                 if len(matched) >= min_rows:
                     candidates.append(matched)
-        for value in dict_node.values():
+        for value in node.values():
             _scan_evaluation_node(
                 value,
                 predicate=predicate,
@@ -744,19 +759,14 @@ def _scan_evaluation_node(
                 candidates=candidates,
                 seen_lists=seen_lists,
             )
-    elif isinstance(node, list):
-        list_node = cast("list[object]", node)
-        node_id = id(list_node)
+    elif is_object_list(node):
+        node_id = id(node)
         if node_id not in seen_lists:
             seen_lists.add(node_id)
-            matched = [
-                cast("dict[str, object]", item)
-                for item in list_node
-                if isinstance(item, dict) and predicate(cast("dict[str, object]", item))
-            ]
+            matched = [item for item in node if is_str_dict(item) and predicate(item)]
             if len(matched) >= min_rows:
                 candidates.append(matched)
-        for item in list_node:
+        for item in node:
             _scan_evaluation_node(
                 item,
                 predicate=predicate,
@@ -778,24 +788,23 @@ def extract_evaluation_manifest(
 
 
 def _find_manifest_node(node: object) -> dict[str, str] | None:
-    if isinstance(node, dict):
-        dict_node = cast("dict[str, object]", node)
-        manifest = dict_node.get("manifest")
+    if is_str_dict(node):
+        manifest = node.get("manifest")
         if (
-            isinstance(manifest, dict)
-            and isinstance(cast("dict[str, object]", manifest).get("path"), str)
-            and isinstance(cast("dict[str, object]", manifest).get("key"), str)
+            is_str_dict(manifest)
+            and isinstance(manifest.get("path"), str)
+            and isinstance(manifest.get("key"), str)
         ):
             return {
-                "path": cast("str", manifest["path"]),
-                "key": cast("str", manifest["key"]),
+                "path": str(manifest["path"]),
+                "key": str(manifest["key"]),
             }
-        for value in dict_node.values():
+        for value in node.values():
             found = _find_manifest_node(value)
             if found is not None:
                 return found
-    elif isinstance(node, list):
-        for item in cast("list[object]", node):
+    elif is_object_list(node):
+        for item in node:
             found = _find_manifest_node(item)
             if found is not None:
                 return found
@@ -807,12 +816,12 @@ def decode_manifest_payload(data: bytes, key_hex: str) -> dict[str, object]:
     try:
         key = bytes.fromhex(key_hex)
         decrypted = AESGCM(key).decrypt(hashlib.sha256(key).digest()[:12], data, None)
-        parsed = cast("object", json.loads(gzip.decompress(decrypted)))
+        parsed = parse_json(gzip.decompress(decrypted))
     except (ValueError, InvalidTag, OSError, EOFError, binascii.Error) as exc:
         _raise_extraction_error("Invalid public evaluation manifest payload", exc)
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         _raise_extraction_error("Evaluation manifest must contain an object")
-    return cast("dict[str, object]", parsed)
+    return parsed
 
 
 def fetch_manifest_models(
@@ -834,8 +843,10 @@ def fetch_manifest_models(
         _raise_extraction_error("Evaluation manifest must use the page's HTTPS origin")
     request = Request(url, headers={"User-Agent": "artificial-analysis/0.3"})
     try:
-        raw_response = cast("object", urlopen(request, timeout=timeout_seconds))
-        with cast("HTTPResponse", raw_response) as response:
+        raw_response = _urlopen(request, timeout_seconds)
+        if not isinstance(raw_response, _HttpResponseContext):
+            _raise_os_error("Failed to open response context", ValueError())
+        with raw_response as response:
             final = _response_final_url(response, url) or url
             if (
                 urlparse(final).netloc != base.netloc
@@ -844,23 +855,21 @@ def fetch_manifest_models(
                 _raise_extraction_error(
                     "Evaluation manifest redirected outside its origin"
                 )
-            raw = response.read()
-            status = response.status
+            raw = raw_response.read()
+            status = _response_status(response)
     except HTTPError as exc:
         _raise_os_error(f"Evaluation manifest request failed: HTTP {exc.code}", exc)
     decoded = decode_manifest_payload(raw, manifest["key"])
     models = decoded.get("models")
-    if not isinstance(models, list) or not models:
+    if not is_object_list(models) or not models:
         _raise_extraction_error("Evaluation manifest missing non-empty models list")
     rows: list[dict[str, object]] = []
-    for item in cast("list[object]", models):
-        if not isinstance(item, dict) or not isinstance(
-            cast("dict[str, object]", item).get("slug"), str
-        ):
+    for item in models:
+        if not is_str_dict(item) or not isinstance(item.get("slug"), str):
             _raise_extraction_error(
                 "Evaluation manifest contains invalid model identity"
             )
-        rows.append(cast("dict[str, object]", item))
+        rows.append(item)
     return rows, {
         "url": redact_query(url),
         "final_url": redact_query(final),
@@ -936,17 +945,13 @@ def _scan_node(
     candidates: dict[str, list[list[object]]],
     alias_map: dict[str, tuple[str, ...]],
 ) -> None:
-    if isinstance(node, dict):
-        dict_node = cast("dict[str, object]", node)
-        for key, value in dict_node.items():
-            if isinstance(value, list):
-                _record_list_candidates(
-                    key, cast("list[object]", value), candidates, alias_map
-                )
-            _scan_node(cast("object", value), candidates, alias_map)
-    elif isinstance(node, list):
-        list_node = cast("list[object]", node)
-        for item in list_node:
+    if is_str_dict(node):
+        for key, value in node.items():
+            if is_object_list(value):
+                _record_list_candidates(key, value, candidates, alias_map)
+            _scan_node(value, candidates, alias_map)
+    elif is_object_list(node):
+        for item in node:
             _scan_node(item, candidates, alias_map)
 
 
@@ -1165,11 +1170,11 @@ def _normalize_current_row(  # noqa: C901
     source_hash: str | None = None,
     diagnostics: list[Diagnostic] | None = None,
 ) -> dict[str, object] | None:
-    if not isinstance(row, dict):
+    if not is_str_dict(row):
         return None
-    row_dict = cast("dict[str, object]", row)
+    row_dict = row
     source = normalize_mapping(
-        cast("Mapping[object, object]", row_dict),
+        row_dict,
         known_fields=_PROVIDER_ENDPOINT_FIELDS,
         path=source_path or "rows",
         source_path=source_path,
@@ -1179,13 +1184,13 @@ def _normalize_current_row(  # noqa: C901
     )
     host = source.get("host")
     model = source.get("model")
-    if not isinstance(host, dict) or not isinstance(model, dict):
+    if not is_str_dict(host) or not is_str_dict(model):
         return None
-    host_dict = cast("dict[str, object]", host)
-    model_dict = cast("dict[str, object]", model)
+    host_dict = host
+    model_dict = model
 
     host_source = normalize_mapping(
-        cast("Mapping[object, object]", host_dict),
+        host_dict,
         known_fields=_PROVIDER_HOST_FIELDS,
         path=f"{source_path}.host" if source_path else "rows.host",
         source_path=source_path,
@@ -1194,7 +1199,7 @@ def _normalize_current_row(  # noqa: C901
         diagnostics=diagnostics,
     )
     model_source = normalize_mapping(
-        cast("Mapping[object, object]", model_dict),
+        model_dict,
         known_fields=_PROVIDER_MODEL_FIELDS,
         path=f"{source_path}.model" if source_path else "rows.model",
         source_path=source_path,
@@ -1237,9 +1242,7 @@ def _normalize_current_row(  # noqa: C901
         diagnostics=diagnostics,
     )
     performance_mapping: Mapping[str, object] = (
-        cast("Mapping[str, object]", performance)
-        if isinstance(performance, Mapping)
-        else {}
+        performance if is_str_mapping(performance) else {}
     )
     endpoint: dict[str, object] = {
         "slug": f"{host_slug}_{model_slug}",
@@ -1268,21 +1271,19 @@ def _normalize_current_row(  # noqa: C901
         ),
     }
 
-    if isinstance(normalized_features, dict):
-        features_dict = cast("dict[str, object]", normalized_features)
+    if is_str_dict(normalized_features):
         endpoint.update(
             {
                 key: value
-                for key, value in features_dict.items()
+                for key, value in normalized_features.items()
                 if key not in {"raw_fields", "raw_metadata"}
             },
         )
-    if isinstance(normalized_pricing, dict):
-        pricing_dict = cast("dict[str, object]", normalized_pricing)
+    if is_str_dict(normalized_pricing):
         endpoint.update(
             {
                 key: value
-                for key, value in pricing_dict.items()
+                for key, value in normalized_pricing.items()
                 if key not in {"raw_fields", "raw_metadata"}
             },
         )
@@ -1293,14 +1294,14 @@ def _normalize_current_row(  # noqa: C901
         (host_source.get("raw_fields"), "host"),
         (model_source.get("raw_fields"), "model"),
         (
-            cast("dict[str, object]", normalized_features).get("raw_fields")
-            if isinstance(normalized_features, dict)
+            normalized_features.get("raw_fields")
+            if is_str_dict(normalized_features)
             else None,
             "features",
         ),
         (
-            cast("dict[str, object]", normalized_pricing).get("raw_fields")
-            if isinstance(normalized_pricing, dict)
+            normalized_pricing.get("raw_fields")
+            if is_str_dict(normalized_pricing)
             else None,
             "pricing",
         ),
@@ -1309,13 +1310,12 @@ def _normalize_current_row(  # noqa: C901
             "performance",
         ),
     ):
-        if not isinstance(value, dict):
+        if not is_str_dict(value):
             continue
-        dict_val = cast("dict[str, object]", value)
         if prefix:
-            raw_fields[prefix] = dict_val
+            raw_fields[prefix] = value
         else:
-            raw_fields.update(dict_val)
+            raw_fields.update(value)
     if raw_fields:
         endpoint["raw_fields"] = raw_fields
     metadata = _raw_metadata(
@@ -1336,18 +1336,17 @@ def _normalize_camel_keys(
     source_hash: str | None = None,
     diagnostics: list[Diagnostic] | None = None,
 ) -> object:
-    if isinstance(value, dict):
-        dict_val = cast("dict[str, object]", value)
+    if is_str_dict(value):
         return normalize_mapping(
-            cast("Mapping[object, object]", dict_val),
+            value,
             path=path,
             source_path=source_path,
             source_hash=source_hash,
             parser="provider-rsc",
             diagnostics=diagnostics,
         )
-    if isinstance(value, list):
-        list_val = cast("list[object]", value)
+    if is_object_list(value):
+        list_val = value
         return [
             _normalize_camel_keys(
                 item,
@@ -1362,9 +1361,7 @@ def _normalize_camel_keys(
 
 
 def _looks_like_current_endpoint_rows(value: list[object]) -> bool:
-    sample = [
-        cast("dict[str, object]", item) for item in value[:25] if isinstance(item, dict)
-    ]
+    sample = [item for item in value[:25] if is_str_dict(item)]
     if not sample:
         return False
     hits = 0
@@ -1372,10 +1369,10 @@ def _looks_like_current_endpoint_rows(value: list[object]) -> bool:
         host = item.get("host")
         model = item.get("model")
         if (
-            isinstance(host, dict)
-            and isinstance(model, dict)
-            and isinstance(cast("dict[str, object]", host).get("slug"), str)
-            and isinstance(cast("dict[str, object]", model).get("slug"), str)
+            is_str_dict(host)
+            and is_str_dict(model)
+            and isinstance(host.get("slug"), str)
+            and isinstance(model.get("slug"), str)
             and any(key in item for key in ("features", "pricing", "performance"))
         ):
             hits += 1
@@ -1389,8 +1386,8 @@ def _deduplicate_endpoints(
     diagnostics: list[Diagnostic] | None,
 ) -> list[dict[str, object]]:
     def key(row: object) -> str | None:
-        if isinstance(row, dict):
-            val = cast("dict[str, object]", row).get("slug")
+        if is_str_dict(row):
+            val = row.get("slug")
             return val if isinstance(val, str) else None
         return None
 
@@ -1421,12 +1418,11 @@ def _normalize_provider_rows(
     }[kind]
     normalized_rows: list[dict[str, object]] = []
     for index, row in enumerate(rows):
-        if not isinstance(row, dict):
+        if not is_str_dict(row):
             continue
-        row_dict = cast("dict[str, object]", row)
         path = f"{source_path}[{index}]" if source_path else f"{kind}[{index}]"
         projected = normalize_mapping(
-            cast("Mapping[object, object]", row_dict),
+            row,
             known_fields=known_fields,
             path=path,
             source_path=path,
@@ -1482,9 +1478,7 @@ def _pick_best[T: list[object]](options: list[T]) -> T | None:
 
 
 def _looks_like_endpoint_list(value: list[object]) -> bool:
-    sample = [
-        cast("dict[str, object]", item) for item in value[:25] if isinstance(item, dict)
-    ]
+    sample = [item for item in value[:25] if is_str_dict(item)]
     if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
@@ -1501,9 +1495,7 @@ def _looks_like_endpoint_list(value: list[object]) -> bool:
 
 
 def _looks_like_host_list(value: list[object]) -> bool:
-    sample = [
-        cast("dict[str, object]", item) for item in value[:20] if isinstance(item, dict)
-    ]
+    sample = [item for item in value[:20] if is_str_dict(item)]
     if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
@@ -1522,9 +1514,7 @@ def _looks_like_host_list(value: list[object]) -> bool:
 
 
 def _looks_like_model_list(value: list[object]) -> bool:
-    sample = [
-        cast("dict[str, object]", item) for item in value[:20] if isinstance(item, dict)
-    ]
+    sample = [item for item in value[:20] if is_str_dict(item)]
     if len(sample) < MIN_SAMPLE_SIZE:
         return False
 
@@ -1542,14 +1532,13 @@ def _looks_like_model_list(value: list[object]) -> bool:
     return hit >= max(MIN_SAMPLE_SIZE, len(sample) // 2)
 
 
-def endpoint_slugs(hosts_models: list[object]) -> list[str]:
+def endpoint_slugs(hosts_models: Iterable[object]) -> list[str]:
     """Return sorted endpoint slugs from provider/model rows."""
     slugs: set[str] = set()
     for item in hosts_models:
-        if not isinstance(item, dict):
+        if not is_str_dict(item):
             continue
-        dict_item = cast("dict[str, object]", item)
-        slug = dict_item.get("slug")
+        slug = item.get("slug")
         if isinstance(slug, str) and "_" in slug and not _is_non_endpoint_slug(slug):
             slugs.add(slug)
     return sorted(slugs)
@@ -1585,33 +1574,30 @@ def _attach_row_diagnostics(
     values = [item.to_dict() for item in diagnostics]
     for row in rows:
         metadata = row.get("raw_metadata")
-        if not isinstance(metadata, dict):
+        if not is_str_dict(metadata):
             metadata_dict: dict[str, object] = {}
             row["raw_metadata"] = metadata_dict
         else:
-            metadata_dict = cast("dict[str, object]", metadata)
+            metadata_dict = metadata
         metadata_dict["diagnostics"] = values
 
 
-def _diagnostics_from_rows(rows: list[object]) -> list[Diagnostic]:
+def _diagnostics_from_rows(rows: Iterable[object]) -> list[Diagnostic]:
     result: list[Diagnostic] = []
     for row in rows:
-        if not isinstance(row, dict):
+        if not is_str_dict(row):
             continue
-        dict_row = cast("dict[str, object]", row)
-        metadata = dict_row.get("raw_metadata")
-        if not isinstance(metadata, dict):
+        metadata = row.get("raw_metadata")
+        if not is_str_dict(metadata):
             continue
-        metadata_dict = cast("dict[str, object]", metadata)
-        values = metadata_dict.get("diagnostics")
-        if not isinstance(values, list):
+        values = metadata.get("diagnostics")
+        if not is_object_list(values):
             continue
-        values_list = cast("list[object]", values)
-        for value in values_list:
+        for value in values:
             if isinstance(value, Diagnostic):
                 result.append(value)
-            elif isinstance(value, dict):
-                dict_value = cast("dict[str, object]", value)
+            elif is_str_dict(value):
+                dict_value = value
                 result.append(
                     Diagnostic(
                         code=str(dict_value.get("code", "")),
@@ -1680,11 +1666,9 @@ def build_snapshot_payload(  # noqa: PLR0913
         diagnostics=collected_diagnostics,
         source_path=source_path,
     )
-    slugs = endpoint_slugs(cast("list[object]", slim_endpoints))
+    slugs = endpoint_slugs(slim_endpoints)
     providers_by_prefix = sorted({provider_from_slug(slug) for slug in slugs})
-    providers_by_host = sorted(
-        _provider_slugs_from_hosts_models(cast("list[object]", slim_endpoints))
-    )
+    providers_by_host = sorted(_provider_slugs_from_hosts_models(slim_endpoints))
     api_url = redact_query(os.environ.get(MODEL_API_BASE_URL_ENV) or MODEL_API_URL)
     freshness = rsc_freshness or (
         "cache-revalidated" if rsc_reused_cached_payload else "fresh"
@@ -1770,14 +1754,13 @@ def build_snapshot_payload(  # noqa: PLR0913
 def _slim_endpoints(hosts_models: list[object]) -> list[dict[str, object]]:
     endpoints: list[dict[str, object]] = []
     for endpoint in hosts_models:
-        if not isinstance(endpoint, dict):
+        if not is_str_dict(endpoint):
             continue
-        dict_endpoint = cast("dict[str, object]", endpoint)
+        dict_endpoint = endpoint
         model = dict_endpoint.get("model")
         model_slug = (
-            cast("dict[str, object]", model).get("slug")
-            if isinstance(model, dict)
-            and isinstance(cast("dict[str, object]", model).get("slug"), str)
+            model.get("slug")
+            if is_str_dict(model) and isinstance(model.get("slug"), str)
             else dict_endpoint.get("model_slug")
         )
         if not isinstance(model_slug, str) or not model_slug:
@@ -1794,9 +1777,8 @@ def _slim_endpoints(hosts_models: list[object]) -> list[dict[str, object]]:
         )
         host = dict_endpoint.get("host")
         host_slug = (
-            cast("dict[str, object]", host).get("slug")
-            if isinstance(host, dict)
-            and isinstance(cast("dict[str, object]", host).get("slug"), str)
+            host.get("slug")
+            if is_str_dict(host) and isinstance(host.get("slug"), str)
             else (
                 endpoint_slug.split("_", 1)[0]
                 if endpoint_slug is not None and "_" in endpoint_slug
@@ -1875,16 +1857,12 @@ def _rsc_models_by_slug(
     values: dict[str, dict[str, object]] = {}
     candidates: list[object] = [
         *rsc_models,
-        *[
-            cast("dict[str, object]", item).get("model")
-            for item in rsc_endpoints
-            if isinstance(item, dict)
-        ],
+        *[item.get("model") for item in rsc_endpoints if is_str_dict(item)],
     ]
     for candidate in candidates:
-        if not isinstance(candidate, dict):
+        if not is_str_dict(candidate):
             continue
-        dict_candidate = cast("dict[str, object]", candidate)
+        dict_candidate = candidate
         slug = dict_candidate.get("slug")
         if not isinstance(slug, str) or not slug:
             continue
@@ -1913,7 +1891,7 @@ def _rsc_models_by_slug(
     return values
 
 
-def _merge_canonical_model(  # noqa: C901, PLR0912
+def _merge_canonical_model(  # noqa: C901
     rsc_model: dict[str, object] | None,
     official_model: dict[str, object] | None,
     *,
@@ -1923,8 +1901,7 @@ def _merge_canonical_model(  # noqa: C901, PLR0912
     if rsc_model is None and official_model is None:
         return {}
     if rsc_model is None:
-        dict_off = cast("dict[str, object]", official_model)
-        return dict(dict_off)
+        return dict(official_model) if official_model is not None else {}
     merged = dict(rsc_model)
     if official_model is None:
         if "creator" not in merged and isinstance(merged.get("model_creators"), dict):
@@ -1950,18 +1927,16 @@ def _merge_canonical_model(  # noqa: C901, PLR0912
         if key in official_model:
             merged[key] = official_model[key]
     evaluations = official_model.get("evaluations")
-    if isinstance(evaluations, dict):
-        dict_evals = cast("dict[str, object]", evaluations)
+    if is_str_dict(evaluations):
         merged.update(
-            {name: value for name, value in dict_evals.items() if value is not None}
+            {name: value for name, value in evaluations.items() if value is not None}
         )
     rsc_raw = merged.get("raw_fields")
     official_raw = official_model.get("raw_fields")
-    if isinstance(official_raw, dict):
-        dict_official_raw = cast("dict[str, object]", official_raw)
-        if isinstance(rsc_raw, dict):
-            dict_rsc_raw = cast("dict[str, object]", rsc_raw)
-            combined = dict(dict_rsc_raw)
+    if is_str_dict(official_raw):
+        dict_official_raw = official_raw
+        if is_str_dict(rsc_raw):
+            combined = dict(rsc_raw)
             for key, value in dict_official_raw.items():
                 if (
                     key in combined
@@ -1993,17 +1968,15 @@ def _merge_canonical_model(  # noqa: C901, PLR0912
     return merged
 
 
-def _provider_slugs_from_hosts_models(hosts_models: list[object]) -> set[str]:
+def _provider_slugs_from_hosts_models(hosts_models: Iterable[object]) -> set[str]:
     values: set[str] = set()
     for item in hosts_models:
-        if not isinstance(item, dict):
+        if not is_str_dict(item):
             continue
-        dict_item = cast("dict[str, object]", item)
+        dict_item = item
         host = dict_item.get("host")
-        if isinstance(host, dict) and isinstance(
-            cast("dict[str, object]", host).get("slug"), str
-        ):
-            values.add(str(cast("dict[str, object]", host)["slug"]))
+        if is_str_dict(host) and isinstance(host.get("slug"), str):
+            values.add(str(host["slug"]))
             continue
         slug = dict_item.get("slug")
         if isinstance(slug, str) and "_" in slug:
@@ -2079,23 +2052,23 @@ def write_outputs(  # noqa: PLR0913
 def load_snapshot(path: Path) -> dict[str, object]:
     """Load and validate a JSON snapshot object."""
     try:
-        parsed = cast("object", json.loads(path.read_text(encoding="utf-8")))
+        parsed = parse_json(path.read_text(encoding="utf-8"))
     except OSError as exc:
         _raise_extraction_error(f"Cannot read snapshot: {path}", exc)
     except json.JSONDecodeError as exc:
         _raise_extraction_error(f"Invalid JSON snapshot: {path}", exc)
 
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         _raise_extraction_error(f"Snapshot root must be an object: {path}")
-    return cast("dict[str, object]", parsed)
+    return parsed
 
 
 def snapshot_slugs(snapshot: dict[str, object]) -> list[str]:
     """Return endpoint slugs from any supported snapshot key."""
     for key in ("hosts_models", "hostsModels", "host_models", "endpoints"):
         value = snapshot.get(key)
-        if isinstance(value, list):
-            return endpoint_slugs(cast("list[object]", value))
+        if is_object_list(value):
+            return endpoint_slugs(value)
     _raise_extraction_error("Snapshot missing hosts_models-compatible list")
 
 
@@ -2113,12 +2086,12 @@ def load_cache_metadata(cache_dir: Path) -> CacheMetadata | None:
     if not meta_path.exists():
         return None
     try:
-        parsed = cast("object", json.loads(meta_path.read_text(encoding="utf-8")))
-    except (OSError, json.JSONDecodeError):
+        parsed = parse_json(meta_path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
         return None
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         return None
-    dict_parsed = cast("dict[str, object]", parsed)
+    dict_parsed = parsed
     body_file = _text_or_none(dict_parsed.get("body_file")) or CACHE_BODY_FILE
     return CacheMetadata(
         etag=_text_or_none(dict_parsed.get("etag")),
@@ -2158,9 +2131,7 @@ def _record_metadata(
     body_file: str = CACHE_BODY_FILE,
 ) -> CacheMetadata:
     nested = record.get("metadata")
-    metadata: Mapping[str, object] = (
-        cast("Mapping[str, object]", nested) if isinstance(nested, Mapping) else {}
-    )
+    metadata: Mapping[str, object] = nested if is_str_mapping(nested) else {}
     return CacheMetadata(
         etag=_text_or_none(metadata.get("etag")),
         fetched_at=_text_or_none(metadata.get("fetched_at")),
@@ -2303,12 +2274,12 @@ def load_last_good_snapshot(cache_dir: Path) -> dict[str, object] | None:
     if not path.exists():
         return None
     try:
-        parsed = cast("object", json.loads(path.read_text(encoding="utf-8")))
-    except (OSError, json.JSONDecodeError):
+        parsed = parse_json(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
         return None
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         return None
-    return cast("dict[str, object]", parsed)
+    return parsed
 
 
 __all__ = [

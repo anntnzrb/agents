@@ -1,19 +1,24 @@
 """Select canonical model releases and their published effort variants."""
 
-from __future__ import annotations
-
 import re
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict
+
+from .contracts import as_dict, is_object_list, is_str_dict
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
+class ReleaseRecord(TypedDict):
+    """Group of canonical models sharing a published release identity."""
+
+    slug: str
+    name: str | None
+    models: list[dict[str, object]]
+
+
 def _as_dict(value: object) -> dict[str, object]:
-    if isinstance(value, dict):
-        mapping = cast("dict[object, object]", value)
-        return {str(k): v for k, v in mapping.items()}
-    return {}
+    return as_dict(value)
 
 
 def _normalized(value: object) -> str:
@@ -75,34 +80,38 @@ def get_model_effort_info(model: dict[str, object]) -> dict[str, object]:
     }
 
 
-def extract_releases(models: list[dict[str, object]]) -> dict[str, dict[str, object]]:
+def extract_releases(models: list[dict[str, object]]) -> dict[str, ReleaseRecord]:
     """Group only models with published release metadata."""
-    releases: dict[str, dict[str, object]] = {}
+    releases: dict[str, ReleaseRecord] = {}
     for model in models:
-        release = _as_dict(_as_dict(model.get("raw_fields")).get("release"))
+        release = as_dict(as_dict(model.get("raw_fields")).get("release"))
         slug = release.get("slug")
         name = release.get("name")
         if not isinstance(slug, str) or not slug.strip():
             continue
         if slug not in releases:
-            releases[slug] = {"slug": slug, "name": name, "models": []}
-        cast("list[dict[str, object]]", releases[slug]["models"]).append(model)
+            releases[slug] = {
+                "slug": slug,
+                "name": str(name) if isinstance(name, str) else None,
+                "models": [],
+            }
+        releases[slug]["models"].append(model)
     return releases
 
 
 def match_family(
     family_query: str,
-    releases: dict[str, dict[str, object]],
+    releases: dict[str, ReleaseRecord],
     *,
     usage_error_factory: type[Exception] = ValueError,
-) -> dict[str, object]:
+) -> ReleaseRecord:
     """Resolve an exact or unique whole-token published release name."""
     query = _normalized(family_query)
     if not query:
         msg = "Family selector must not be empty"
         raise usage_error_factory(msg)
-    exact: list[dict[str, object]] = []
-    partial: list[dict[str, object]] = []
+    exact: list[ReleaseRecord] = []
+    partial: list[ReleaseRecord] = []
     for release in releases.values():
         names = [_normalized(release.get(key)) for key in ("slug", "name")]
         if query in names:
@@ -176,15 +185,10 @@ def compare_models(
 ) -> dict[str, object]:
     """Select all requested variants, failing instead of returning partial matches."""
     values = snapshot.get("models")
-    if not isinstance(values, list) or not selectors:
+    if not is_object_list(values) or not selectors:
         msg = "compare requires canonical models and at least one selector"
         raise usage_error_factory(msg)
-    raw_models = cast("list[object]", values)
-    models = [
-        cast("dict[str, object]", value)
-        for value in raw_models
-        if isinstance(value, dict)
-    ]
+    models = [value for value in values if is_str_dict(value)]
     releases = extract_releases(models)
     rows: list[dict[str, object]] = []
     selections: list[dict[str, object]] = []
@@ -197,7 +201,7 @@ def compare_models(
         release = match_family(
             family, releases, usage_error_factory=usage_error_factory
         )
-        family_models = cast("list[dict[str, object]]", release["models"])
+        family_models = release["models"]
         variants = [(model, get_model_effort_info(model)) for model in family_models]
         available = sorted(
             {str(info["slug"]) for _, info in variants if info["slug"] is not None}

@@ -1,19 +1,17 @@
 """RSC and official API contract tests."""
 
 # ruff: noqa: E501
-from __future__ import annotations
 
 import gzip
 import hashlib
 import json
 import unittest
-from typing import TYPE_CHECKING, cast
-
-if TYPE_CHECKING:
-    from artificial_analysis.diagnostics import Diagnostic
 
 import pytest
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from artificial_analysis.contracts import as_dict, as_list
+from artificial_analysis.diagnostics import Diagnostic
 from artificial_analysis.rsc import (
     ExtractionError,
     FetchResult,
@@ -190,24 +188,24 @@ class TestRscExtraction(unittest.TestCase):
         assert first["slug"] == "provider-one_model-a"
         assert first["name"] == "Provider One / Model A"
         assert first["host_api_id"] == "provider-one-api"
-        first_model = cast("dict[str, object]", first["model"])
+        first_model = as_dict(first["model"])
         assert first_model["model_creator_id"] == "creator-a"
-        first_host = cast("dict[str, object]", first["host"])
+        first_host = as_dict(first["host"])
         assert first_host["website_url"] == "https://provider-one.example"
         assert first["context_window_tokens"] == 128000
         assert first["supports_function_calling"] is True
         assert first["price_1m_input_tokens"] == 0.25
         assert first["price_1m_output_tokens"] == 1.25
         assert first["price_1m_blended_3_to_1"] == 0.5
-        timescale = cast("dict[str, object]", first["timescaleData"])
+        timescale = as_dict(first["timescaleData"])
         assert timescale["median_output_speed"] == 82.4
         assert timescale["median_time_to_first_chunk"] == 0.37
-        e2e = cast("dict[str, object]", first["end_to_end_response_time_metrics"])
+        e2e = as_dict(first["end_to_end_response_time_metrics"])
         assert e2e["total_time"] == 2.8
 
         second = hosts_models[1]
         assert second["slug"] == "provider-two_model-b"
-        second_model = cast("dict[str, object]", second["model"])
+        second_model = as_dict(second["model"])
         assert second_model["model_creator_id"] == "creator-b"
 
     def test_parse_next_payload_extracts_embedded_flight_frames(self) -> None:
@@ -239,10 +237,9 @@ class TestRscExtraction(unittest.TestCase):
         ]
 
     def test_extract_evaluation_rows_rejects_unrelated_lists(self) -> None:
+        frames_sample: list[tuple[str, object]] = [("0", {"rows": [{"value": 1}]})]
         with pytest.raises(ExtractionError, match="recognizable model rows"):
-            _ = extract_evaluation_rows(
-                cast("list[tuple[str, object]]", [("0", {"rows": [{"value": 1}]})])
-            )
+            _ = extract_evaluation_rows(frames_sample)
 
     def test_extract_evaluation_rows_supports_dynamic_metrics_and_breakdowns(
         self,
@@ -289,11 +286,8 @@ class TestRscExtraction(unittest.TestCase):
         assert len(rows) == 2
         assert rows[0]["slug"] == "claude-fable-5-1"
         assert rows[0]["terminalbenchV40"] == 0.5202
-        assert (
-            cast("dict[str, object]", rows[0]["automationBenchBreakdown"])["completion"]
-            == 0.8808
-        )
-        assert cast("dict[str, object]", rows[0]["creator"])["slug"] == "anthropic"
+        assert as_dict(rows[0]["automationBenchBreakdown"])["completion"] == 0.8808
+        assert as_dict(rows[0]["creator"])["slug"] == "anthropic"
 
     def test_extract_evaluation_manifest_locates_path_and_key(self) -> None:
         frames: list[tuple[str, object]] = [
@@ -315,7 +309,6 @@ class TestRscExtraction(unittest.TestCase):
         assert extract_evaluation_manifest(frames_without_manifest) is None
 
     def test_decode_manifest_payload_roundtrip_and_tamper_rejection(self) -> None:
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
         raw_payload: dict[str, object] = {
             "models": [
@@ -459,27 +452,27 @@ class TestRscExtraction(unittest.TestCase):
             official_models=api,
         )
         models: dict[str, dict[str, object]] = {
-            str(model["slug"]): model
-            for model in cast("list[dict[str, object]]", payload["models"])
+            str(as_dict(model)["slug"]): as_dict(model)
+            for model in as_list(payload["models"])
         }
         assert set(payload) == {"meta", "models", "hosts", "hosts_models"}
-        meta = cast("dict[str, object]", payload["meta"])
+        meta = as_dict(payload["meta"])
         assert meta["schema_version"] == 2
         assert payload["hosts"] == [{"slug": "host", "name": "Host"}]
         assert set(models) == {"api-only", "shared"}
         assert models["shared"]["name"] == "API name"
         assert models["shared"]["coding_index"] == 42
         assert models["shared"]["intelligence_index"] == 11
-        pricing = cast("dict[str, object]", models["shared"]["pricing"])
+        pricing = as_dict(models["shared"]["pricing"])
         assert pricing["price_1m_blended_3_to_1"] == 3
-        hosts_models_list = cast("list[dict[str, object]]", payload["hosts_models"])
-        endpoint = hosts_models_list[0]
+        hosts_models_list = as_list(payload["hosts_models"])
+        endpoint = as_dict(hosts_models_list[0])
         assert endpoint["model_slug"] == "shared"
         assert endpoint["price_1m_blended_7_to_2_to_1"] == 4
         assert "model" not in endpoint
-        sources = cast("dict[str, dict[str, object]]", meta["sources"])
-        assert sources["official_api"]["unmatched_rsc_model_slugs"] == []
-        assert sources["rsc"]["unmatched_api_model_slugs"] == ["api-only"]
+        sources = as_dict(meta["sources"])
+        assert as_dict(sources["official_api"])["unmatched_rsc_model_slugs"] == []
+        assert as_dict(sources["rsc"])["unmatched_api_model_slugs"] == ["api-only"]
 
     def test_official_model_envelope_validation_rejects_malformed_rows(self) -> None:
         with pytest.raises(ExtractionError, match="requires integer status"):
@@ -503,12 +496,12 @@ class TestRscExtraction(unittest.TestCase):
             source_path="api.data",
             diagnostics=diagnostics,
         )
-        raw_fields = cast("dict[str, object]", models[0]["raw_fields"])
+        raw_fields = as_dict(models[0]["raw_fields"])
         assert raw_fields["newField"] == 1
         assert raw_fields["new_field"] == 1
-        identity = cast("dict[str, object]", models[0]["identity"])
+        identity = as_dict(models[0]["identity"])
         assert identity["model_slug"] == "model-a"
-        raw_metadata = cast("dict[str, object]", models[0]["raw_metadata"])
+        raw_metadata = as_dict(models[0]["raw_metadata"])
         assert raw_metadata["source_path"] == "api.data.data[0]"
         assert any(item.code == "DUPLICATE_SOURCE_FIELD" for item in diagnostics)
 

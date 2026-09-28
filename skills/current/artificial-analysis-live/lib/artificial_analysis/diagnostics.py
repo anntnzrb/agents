@@ -1,10 +1,7 @@
 # Copyright (c) 2026 anntnzrb
 """Stable diagnostics and credential-safe projections for Artificial Analysis."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping
-from typing import cast
 
 from .contracts import (
     DIAGNOSTIC_CODES,
@@ -12,6 +9,7 @@ from .contracts import (
     REDACTED,
     Diagnostic,
     compact_json,
+    is_object_mapping,
     redact,
     redact_query,
 )
@@ -51,8 +49,10 @@ def merge_diagnostics(
     merged: list[Diagnostic] = []
     seen: set[str] = set()
     for group in groups:
-        if isinstance(group, (Diagnostic, Mapping)):
-            items = cast("Iterable[Diagnostic | Mapping[object, object]]", (group,))
+        if isinstance(group, Diagnostic):
+            items: Iterable[Diagnostic | Mapping[object, object]] = (group,)
+        elif is_object_mapping(group):
+            items = (group,)
         else:
             items = group
         for item in items:

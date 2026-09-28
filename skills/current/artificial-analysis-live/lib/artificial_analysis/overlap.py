@@ -7,10 +7,9 @@ caller.  The module never infers overlap from names, scores, or similar
 strings, and it never changes a published value.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping, Sequence
-from typing import cast
+
+from .contracts import is_str_mapping
 
 OVERLAP_DOUBLE_COUNTING_RISK = "OVERLAP_DOUBLE_COUNTING_RISK"
 REQUIREMENTS_CLAIM_CERTAINTY = "requirements_claim"
@@ -19,9 +18,7 @@ UNKNOWN_CERTAINTY = "unknown"
 
 def _as_mapping(value: object) -> Mapping[str, object] | None:
     """Narrow an arbitrary value to a string-keyed mapping."""
-    if not isinstance(value, Mapping):
-        return None
-    return cast("Mapping[str, object]", value)
+    return value if is_str_mapping(value) else None
 
 
 def _text(value: object) -> str | None:
@@ -126,8 +123,8 @@ def _claim_is_overlap(claim: object) -> bool:
 
 
 def _iter_claims(value: object) -> Iterable[object]:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    if is_str_mapping(value):
+        mapping = value
         for key in (
             "declared_overlaps",
             "overlap_claims",

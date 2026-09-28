@@ -1,11 +1,8 @@
 """Offline tests for the Artificial Analysis contract primitives."""
 
-from __future__ import annotations
-
 import math
 from enum import StrEnum
 from http import HTTPStatus
-from typing import cast
 
 import pytest
 
@@ -73,13 +70,11 @@ def test_numeric_evidence_keeps_independent_statuses_and_raw_values() -> None:
         raw_value="source-token",
         normalized_value=42,
         unit="count",
-        value_status=cast("ValueStatus", cast("object", "missing")),
-        metric_semantics_status=cast(
-            "MetricSemanticsStatus", cast("object", "unknown")
-        ),
-        comparison_eligibility=cast("ComparisonEligibility", cast("object", "blocked")),
+        value_status="missing",
+        metric_semantics_status="unknown",
+        comparison_eligibility="blocked",
         blocked_reasons=("PLACEHOLDER_VALUE", "PLACEHOLDER_VALUE"),
-        input_paths=cast("tuple[str, ...]", cast("object", (1, "$.rows[0].value"))),
+        input_paths=(1, "$.rows[0].value"),
     )
 
     assert evidence.normalized_value is None
@@ -108,9 +103,7 @@ def test_numeric_evidence_keeps_independent_statuses_and_raw_values() -> None:
 @pytest.mark.parametrize("value", [True, False, math.nan, math.inf, -math.inf, "42"])
 def test_numeric_evidence_rejects_unsafe_normalized_values(value: object) -> None:
     with pytest.raises((TypeError, ValueError)):
-        _ = NumericEvidence(
-            raw_value=value, normalized_value=cast("int | float | None", value)
-        )
+        _ = NumericEvidence(raw_value=value, normalized_value=value)
 
 
 def test_compact_json_is_deterministic_finite_and_collision_safe() -> None:

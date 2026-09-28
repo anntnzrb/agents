@@ -1,7 +1,5 @@
 """Contract tests for diagnostic redaction and stable merging."""
 
-from __future__ import annotations
-
 from artificial_analysis.diagnostics import (
     REDACTED,
     Diagnostic,

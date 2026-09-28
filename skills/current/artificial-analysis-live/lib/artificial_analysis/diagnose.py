@@ -1,13 +1,19 @@
 # Copyright (c) 2026 anntnzrb
 """Offline health reports for Artificial Analysis snapshots and caches."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import re
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+from .contracts import (
+    is_object_list,
+    is_object_mapping,
+    is_str_dict,
+    is_str_mapping,
+    parse_json,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,12 +46,10 @@ def _safe_text(value: str) -> str:
 
 
 def _safe(value: object) -> object:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        return {str(key): _safe(item) for key, item in mapping.items()}
-    if isinstance(value, list):
-        items = cast("list[object]", value)
-        return [_safe(item) for item in items]
+    if is_str_mapping(value):
+        return {str(key): _safe(item) for key, item in value.items()}
+    if is_object_list(value):
+        return [_safe(item) for item in value]
     if (
         isinstance(value, float)
         and not value.is_integer()
@@ -70,7 +74,7 @@ def _path(path: Path | None) -> str | None:
 def _digest(path: Path) -> tuple[str | None, int | None]:
     try:
         raw = path.read_bytes()
-    except (OSError, UnicodeError):
+    except OSError, UnicodeError:
         return None, None
     return hashlib.sha256(raw).hexdigest(), len(raw)
 
@@ -100,13 +104,12 @@ def _diagnostic(  # noqa: PLR0913
 def _read_object(path: Path) -> tuple[dict[str, object] | None, str | None]:
     try:
         raw = path.read_text(encoding="utf-8")
-        parsed = cast("object", json.loads(raw))
+        parsed = parse_json(raw)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         return None, type(exc).__name__
-    if not isinstance(parsed, dict):
+    if not is_str_dict(parsed):
         return None, "not_object"
-    parsed_dict = cast("dict[str, object]", parsed)
-    return {str(k): v for k, v in parsed_dict.items()}, None
+    return {str(k): v for k, v in parsed.items()}, None
 
 
 def _metadata(value: Mapping[str, object]) -> dict[str, object]:
@@ -138,7 +141,7 @@ def _metadata(value: Mapping[str, object]) -> dict[str, object]:
     return result
 
 
-def _cache_report(  # noqa: C901, PLR0912
+def _cache_report(  # noqa: C901
     cache_dir: Path | None, diagnostics: list[dict[str, object]]
 ) -> dict[str, object]:
     if cache_dir is None:
@@ -195,8 +198,8 @@ def _cache_report(  # noqa: C901, PLR0912
                     entries: list[dict[str, object]] = []
                     for source_key in sorted(parsed, key=str):
                         entry_raw = parsed[source_key]
-                        if isinstance(entry_raw, Mapping):
-                            entry = cast("Mapping[str, object]", entry_raw)
+                        if is_str_mapping(entry_raw):
+                            entry = entry_raw
                             raw_path = entry.get("raw_path")
                             entries.append(
                                 {
@@ -223,9 +226,7 @@ def _cache_report(  # noqa: C901, PLR0912
     ]
     raw_cache_meta = metadata_rows[0] if metadata_rows else None
     cache_metadata: Mapping[str, object] = (
-        cast("Mapping[str, object]", raw_cache_meta)
-        if isinstance(raw_cache_meta, Mapping)
-        else {}
+        raw_cache_meta if is_str_mapping(raw_cache_meta) else {}
     )
     etag = cache_metadata.get("etag")
     last_modified = cache_metadata.get("last_modified")
@@ -305,9 +306,7 @@ def _snapshot_report(
         )
         return report, None
     meta = parsed.get("meta")
-    meta_mapping: Mapping[str, object] = (
-        cast("Mapping[str, object]", meta) if isinstance(meta, Mapping) else {}
-    )
+    meta_mapping: Mapping[str, object] = meta if is_str_mapping(meta) else {}
     schema_version = meta_mapping.get("schema_version")
     if not isinstance(schema_version, int) or isinstance(schema_version, bool):
         schema_version = 1
@@ -333,8 +332,8 @@ def _snapshot_report(
         )
     freshness = meta_mapping.get("freshness")
     freshness_mapping: dict[str, object] = (
-        {str(k): v for k, v in cast("Mapping[object, object]", freshness).items()}
-        if isinstance(freshness, Mapping)
+        {str(k): v for k, v in freshness.items()}
+        if is_object_mapping(freshness)
         else {}
     )
     mode = freshness_mapping.get("mode")
@@ -366,17 +365,9 @@ def _snapshot_report(
     models_val = parsed.get("models")
     hosts_val = parsed.get("hosts")
     hosts_models_val = parsed.get("hosts_models")
-    models_list = (
-        cast("list[object]", models_val) if isinstance(models_val, list) else None
-    )
-    hosts_list = (
-        cast("list[object]", hosts_val) if isinstance(hosts_val, list) else None
-    )
-    hosts_models_list = (
-        cast("list[object]", hosts_models_val)
-        if isinstance(hosts_models_val, list)
-        else None
-    )
+    models_list = models_val if is_object_list(models_val) else None
+    hosts_list = hosts_val if is_object_list(hosts_val) else None
+    hosts_models_list = hosts_models_val if is_object_list(hosts_models_val) else None
     report.update(
         {
             "counts": {
@@ -400,9 +391,7 @@ def diagnose(
     snapshot_report, snapshot = _snapshot_report(snapshot_path, diagnostics)
     cache_report = _cache_report(cache_dir, diagnostics)
     raw_meta = snapshot.get("meta") if isinstance(snapshot, Mapping) else None
-    meta_mapping: Mapping[str, object] = (
-        cast("Mapping[str, object]", raw_meta) if isinstance(raw_meta, Mapping) else {}
-    )
+    meta_mapping: Mapping[str, object] = raw_meta if is_str_mapping(raw_meta) else {}
     raw_schema_version = meta_mapping.get("schema_version", 1)
     schema_version = (
         raw_schema_version
@@ -413,19 +402,18 @@ def diagnose(
     parser_version = meta_mapping.get("parser_version")
     raw_freshness = meta_mapping.get("freshness")
     freshness: Mapping[str, object] = (
-        cast("Mapping[str, object]", raw_freshness)
-        if isinstance(raw_freshness, Mapping)
+        raw_freshness
+        if is_str_mapping(raw_freshness)
         else {"mode": "snapshot", "historical": True, "stale": False}
     )
     for diagnostic_source in (
         snapshot.get("diagnostics") if isinstance(snapshot, Mapping) else None,
         meta_mapping.get("diagnostics"),
     ):
-        if isinstance(diagnostic_source, list):
-            source_list = cast("list[object]", diagnostic_source)
-            for item in source_list:
-                if isinstance(item, Mapping):
-                    safe_item = _safe_dict(cast("Mapping[str, object]", item))
+        if is_object_list(diagnostic_source):
+            for item in diagnostic_source:
+                if is_str_mapping(item):
+                    safe_item = _safe_dict(item)
                     diagnostics.append(safe_item)
     report: dict[str, object] = {
         "snapshot": snapshot_report,
@@ -446,16 +434,18 @@ def diagnose(
             "snapshot": snapshot_report.get("sha256"),
             "cache": cache_report.get("artifacts", []),
         },
-        "diagnostics": sorted(
-            [_safe_dict(item) for item in diagnostics],
-            key=lambda item: (
-                str(item.get("code", "")),
-                str(item.get("stage", "")),
-                str(item.get("message", "")),
-            ),
+        "diagnostics": (
+            sorted_diagnostics := sorted(
+                [_safe_dict(item) for item in diagnostics],
+                key=lambda item: (
+                    str(item.get("code", "")),
+                    str(item.get("stage", "")),
+                    str(item.get("message", "")),
+                ),
+            )
         ),
     }
-    diagnostic_rows = cast("list[dict[str, object]]", report["diagnostics"])
+    diagnostic_rows = sorted_diagnostics
     error_count = sum(1 for item in diagnostic_rows if item.get("severity") == "error")
     warning_count = sum(
         1 for item in diagnostic_rows if item.get("severity") == "warning"

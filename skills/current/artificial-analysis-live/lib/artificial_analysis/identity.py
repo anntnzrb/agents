@@ -8,14 +8,17 @@ are never rewritten in that raw projection, which makes drift and reconciliation
 observable without making consumers depend on a particular page revision.
 """
 
-from __future__ import annotations
-
 import copy
 import hashlib
 import math
 from collections.abc import Callable, Iterable, Mapping, MutableSequence
-from typing import cast
 
+from .contracts import (
+    is_object_list,
+    is_object_tuple,
+    is_str_dict,
+    is_str_mapping,
+)
 from .diagnostics import Diagnostic
 
 DUPLICATE_SOURCE_FIELD = "DUPLICATE_SOURCE_FIELD"
@@ -92,7 +95,7 @@ def _safe_equal(left: object, right: object) -> bool:
         return False
     try:
         return left == right
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
 
 
@@ -134,7 +137,7 @@ def _field_collision_diagnostic(
 
 
 def normalize_mapping(  # noqa: PLR0913
-    value: Mapping[object, object],
+    value: Mapping[str, object] | Mapping[object, object],
     *,
     known_fields: Iterable[str] | None = None,
     path: str = "",
@@ -202,9 +205,8 @@ def normalize_mapping(  # noqa: PLR0913
 
     if raw_fields:
         existing = result.get("raw_fields")
-        if isinstance(existing, dict):
-            merged = cast("dict[str, object]", existing)
-            result["raw_fields"] = dict(merged) | raw_fields
+        if is_str_dict(existing):
+            result["raw_fields"] = dict(existing) | raw_fields
         else:
             result["raw_fields"] = raw_fields
 
@@ -293,19 +295,16 @@ canonical_endpoint_identity = endpoint_identity
 
 
 def _comparable(value: object) -> object:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    if is_str_mapping(value):
         return {
             key: _comparable(item)
-            for key, item in mapping.items()
+            for key, item in value.items()
             if key not in {"raw_metadata", "source"}
         }
-    if isinstance(value, list):
-        items = cast("list[object]", cast("object", value))
-        return [_comparable(item) for item in items]
-    if isinstance(value, tuple):
-        entries = cast("tuple[object, ...]", cast("object", value))
-        return tuple(_comparable(item) for item in entries)
+    if is_object_list(value):
+        return [_comparable(item) for item in value]
+    if is_object_tuple(value):
+        return tuple(_comparable(item) for item in value)
     return value
 
 

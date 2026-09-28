@@ -1,7 +1,5 @@
 """Exact-declaration overlap contracts."""
 
-from __future__ import annotations
-
 from artificial_analysis.overlap import (
     OVERLAP_DOUBLE_COUNTING_RISK,
     declarative_dependencies,

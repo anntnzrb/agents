@@ -3,26 +3,55 @@ name = "artificial-analysis-live"
 version = "0.1.0"
 description = "Live Artificial Analysis benchmark data via CLI"
 readme = "SKILL.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.14"
+dependencies = [
+    "cryptography>=44",
+]
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+    # Template ignores from docs/skills.md
+    "A002",
+    "COM812",
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TC003",   # PEP 649 evaluates annotations at runtime without __future__ annotations
+    "TRY301",
+    # Existing skill-specific justified ignores
+    "ISC001",  # Formatter conflict with single-line implicit string concat
+    "ISC003",  # Explicit string concatenation preferred in multi-line patterns
+    "CPY001",  # No copyright headers in skill code per policy
+    "FBT001",  # Boolean positional parameters in CLI helper interfaces
+    "FBT002",  # Boolean default positional parameters in CLI helper interfaces
+    "TD002",   # Missing author in TODO comments
+    "TD003",   # Missing issue link in TODO comments
+    "FIX002",  # Line contains TODO
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
   "PLR2004", "PLR0913", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
+  "E402", "S603", "S607", "TC001", "TC002"]
 "scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
 
 [tool.ruff.lint.pydocstyle]
@@ -36,7 +65,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["lib", "scripts", "tests"]
 extraPaths = ["lib", "scripts"]
@@ -44,6 +73,10 @@ reportUnusedCallResult = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 reportUnusedVariable = "error"
 reportPrivateUsage = "error"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = false  # Deliberately exercise private helpers in tests
 
 [tool.pytest.ini_options]
 minversion = "8.0"

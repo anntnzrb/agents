@@ -1,15 +1,13 @@
 """Explicitly gated live smoke for rotated process credentials only."""
 
-from __future__ import annotations
-
 import json
 import os
 import subprocess
 from pathlib import Path
-from typing import cast
 
 import pytest
 
+from artificial_analysis.contracts import as_dict, parse_json
 from artificial_analysis.diagnostics import redact_query
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -35,8 +33,8 @@ def _run_cli(args: list[str], *, env: dict[str, str]) -> dict[str, object]:
     assert completed.returncode == 0
     lines = completed.stdout.splitlines()
     assert len(lines) == 1
-    payload = cast("dict[str, object]", json.loads(lines[0]))
-    assert isinstance(payload, dict)
+    payload = as_dict(parse_json(lines[0]))
+    assert payload
     return payload
 
 
@@ -69,31 +67,33 @@ def test_live_fetch_and_stats_smoke_are_shape_only(tmp_path: Path) -> None:
     )
     assert fetch["ok"] is True
     assert fetch["version"] == "1"
-    data = cast("dict[str, object]", fetch["data"])
-    assert isinstance(data, dict)
-    freshness = cast("dict[str, object]", data["freshness"])
+    data = as_dict(fetch["data"])
+    assert data
+    freshness = as_dict(data["freshness"])
     assert freshness["mode"] in {"fresh", "cache-revalidated"}
     assert freshness["stale"] is False
 
     stats = _run_cli(["stats", "--snapshot", str(snapshot)], env=env)
     assert stats["ok"] is True
-    stats_data = cast("dict[str, object]", stats["data"])
-    assert isinstance(stats_data, dict)
-    counts = cast("dict[str, object]", stats_data["counts"])
-    assert isinstance(counts, dict)
+    stats_data = as_dict(stats["data"])
+    assert stats_data
+    counts = as_dict(stats_data["counts"])
+    assert counts
 
-    sources = cast("dict[str, dict[str, object]]", data["sources"])
+    sources = as_dict(data["sources"])
     evidence: dict[str, object] = {
         "fetch": {
             "freshness": data["freshness"],
             "sources": {
                 name: {
-                    "url": redact_query(str(source.get("url", ""))),
-                    "status_code": source.get("status_code"),
-                    "etag_present": bool(source.get("etag_received")),
-                    "last_modified_present": bool(source.get("last_modified_received")),
-                    "sha256": source.get("sha256"),
-                    "byte_length": source.get("byte_length"),
+                    "url": redact_query(str(as_dict(source).get("url", ""))),
+                    "status_code": as_dict(source).get("status_code"),
+                    "etag_present": bool(as_dict(source).get("etag_received")),
+                    "last_modified_present": bool(
+                        as_dict(source).get("last_modified_received")
+                    ),
+                    "sha256": as_dict(source).get("sha256"),
+                    "byte_length": as_dict(source).get("byte_length"),
                 }
                 for name, source in sources.items()
             },

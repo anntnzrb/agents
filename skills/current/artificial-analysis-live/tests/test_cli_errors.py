@@ -1,18 +1,15 @@
 """Staged compact CLI and RPC error protocol tests."""
 
-# ruff: noqa: TC003, S105
-from __future__ import annotations
-
+# ruff: noqa: S105
 import contextlib
 import io
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+
+import pytest
 
 from artificial_analysis import cli
-
-if TYPE_CHECKING:
-    import pytest
+from artificial_analysis.contracts import as_dict, parse_json
 
 
 def _capture_main(argv: list[str]) -> tuple[int, str, str]:
@@ -31,11 +28,11 @@ def test_json_errors_emit_exactly_one_compact_redacted_object(tmp_path: Path) ->
 
     assert code == 2
     assert len(stdout.splitlines()) == 1
-    payload = cast("dict[str, object]", json.loads(stdout))
+    payload = as_dict(parse_json(stdout))
     assert payload["ok"] is False
     assert payload["version"] == "1"
     assert payload["command"] == "stats"
-    err = cast("dict[str, object]", payload["error"])
+    err = as_dict(payload["error"])
     assert err["code"] == "extraction_error"
     assert secret not in stdout
     assert secret not in stderr
@@ -62,14 +59,9 @@ def test_rpc_keeps_one_response_per_line_and_stable_codes() -> None:
     output = io.StringIO()
     _ = cli.run_rpc(stdin=io.StringIO(requests + "\n"), stdout=output)
 
-    responses = [
-        cast("dict[str, object]", json.loads(line))
-        for line in output.getvalue().splitlines()
-    ]
+    responses = [as_dict(parse_json(line)) for line in output.getvalue().splitlines()]
     assert len(responses) == 3
-    assert [
-        cast("dict[str, object]", response["error"])["code"] for response in responses
-    ] == [
+    assert [as_dict(response["error"])["code"] for response in responses] == [
         "invalid_json",
         "usage_error",
         "unknown_command",
@@ -89,8 +81,8 @@ def test_rpc_catches_type_and_value_errors_without_secret_details(
         stdin=io.StringIO(json.dumps({"id": "x", "type": "stats", "args": {}}) + "\n"),
         stdout=output,
     )
-    response = cast("dict[str, object]", json.loads(output.getvalue()))
-    err = cast("dict[str, object]", response["error"])
+    response = as_dict(parse_json(output.getvalue()))
+    err = as_dict(response["error"])
     assert err["code"] == "invalid_args"
     assert "do-not-leak" not in output.getvalue()
 
@@ -111,8 +103,8 @@ def test_rpc_serialization_failures_keep_one_response_and_request_id(
     )
     lines = output.getvalue().splitlines()
     assert len(lines) == 1
-    response = cast("dict[str, object]", json.loads(lines[0]))
+    response = as_dict(parse_json(lines[0]))
     assert response["id"] == "serialization-1"
-    err = cast("dict[str, object]", response["error"])
+    err = as_dict(response["error"])
     assert err["code"] == "internal_error"
     assert "inf" not in lines[0]

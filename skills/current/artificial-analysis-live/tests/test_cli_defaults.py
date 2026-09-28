@@ -1,7 +1,6 @@
 """CLI default-path regression tests."""
 
 # ruff: noqa: E501
-from __future__ import annotations
 
 import argparse
 import os
@@ -10,27 +9,27 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
 from unittest.mock import patch
 
 import pytest
 
 from artificial_analysis import cli
 from artificial_analysis.cli import (
-    _capability_schema,  # pyright: ignore[reportPrivateUsage]
-    _ensure_default_snapshot_fresh,  # pyright: ignore[reportPrivateUsage]
-    _envelope,  # pyright: ignore[reportPrivateUsage]
-    _evaluation_namespace,  # pyright: ignore[reportPrivateUsage]
-    _evaluation_payload,  # pyright: ignore[reportPrivateUsage]
-    _fetch_namespace,  # pyright: ignore[reportPrivateUsage]
-    _fetch_payload,  # pyright: ignore[reportPrivateUsage]
-    _handle_fetch,  # pyright: ignore[reportPrivateUsage]
-    _load_dotenv,  # pyright: ignore[reportPrivateUsage]
-    _normalize_argv,  # pyright: ignore[reportPrivateUsage]
-    _query_payload,  # pyright: ignore[reportPrivateUsage]
-    _required_api_key,  # pyright: ignore[reportPrivateUsage]
-    _stats_namespace,  # pyright: ignore[reportPrivateUsage]
+    _capability_schema,
+    _ensure_default_snapshot_fresh,
+    _envelope,
+    _evaluation_namespace,
+    _evaluation_payload,
+    _fetch_namespace,
+    _fetch_payload,
+    _handle_fetch,
+    _load_dotenv,
+    _normalize_argv,
+    _query_payload,
+    _required_api_key,
+    _stats_namespace,
 )
+from artificial_analysis.contracts import as_dict, as_list, is_str_dict
 from artificial_analysis.rsc import ExtractionError
 
 TMP_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
@@ -40,7 +39,7 @@ TMP_URL = TMP_ARTIFACT_DIR / "full-url.txt"
 
 
 def _ns_dict(namespace: argparse.Namespace) -> dict[str, object]:
-    return cast("dict[str, object]", vars(namespace))
+    return as_dict(vars(namespace))
 
 
 class TestCliDefaultPaths(unittest.TestCase):
@@ -52,13 +51,11 @@ class TestCliDefaultPaths(unittest.TestCase):
 
     def test_cli_command_set_remains_present(self) -> None:
         parser = cli.build_parser()
-        subparsers = next(
-            cast("argparse._SubParsersAction[argparse.ArgumentParser]", action)  # pyright: ignore[reportPrivateUsage]
-            for action in parser._actions
-            if isinstance(action, argparse._SubParsersAction)  # pyright: ignore[reportPrivateUsage]
-        )
-
-        choices = cast("dict[str, object]", subparsers.choices)
+        choices: set[str] = set()
+        for action in parser._actions:
+            raw_choices: object = getattr(action, "choices", None)
+            if is_str_dict(raw_choices):
+                choices.update(raw_choices.keys())
         assert set(choices) == {
             "fetch",
             "stats",
@@ -142,8 +139,9 @@ class TestCliDefaultPaths(unittest.TestCase):
 
     def test_capability_schema_reports_tmp_fetch_defaults(self) -> None:
         schema = _capability_schema()
-        commands = cast("dict[str, dict[str, dict[str, str]]]", schema["commands"])
-        flags = commands["fetch"]["flags"]
+        commands = as_dict(schema["commands"])
+        fetch_cmd = as_dict(commands["fetch"])
+        flags = as_dict(fetch_cmd["flags"])
 
         assert (
             flags["output_json"]
@@ -231,9 +229,10 @@ class TestCliDefaultPaths(unittest.TestCase):
                     limit=10,
                 ),
             )
-        query_rows = cast("list[dict[str, object]]", query["rows"])
-        assert query_rows[0]["model_name"] == "Model A"
-        assert query_rows[0]["price_blended"] == 4
+        query_rows = as_list(query["rows"])
+        row0 = as_dict(query_rows[0])
+        assert row0["model_name"] == "Model A"
+        assert row0["price_blended"] == 4
 
     def test_fetch_uses_last_good_snapshot_when_required_source_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -260,10 +259,10 @@ class TestCliDefaultPaths(unittest.TestCase):
                 patch.object(cli, "fetch_rsc", side_effect=OSError("HTTP 503")),
             ):
                 payload = _fetch_payload(args)
-        fallback = cast("dict[str, object]", payload["fallback"])
+        fallback = as_dict(payload["fallback"])
         assert fallback["used"]
-        sources = cast("dict[str, dict[str, object]]", payload["sources"])
-        assert sources["rsc"]["status_code"] is None
+        sources = as_dict(payload["sources"])
+        assert as_dict(sources["rsc"])["status_code"] is None
 
     def test_fetch_falls_back_when_official_api_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -295,10 +294,10 @@ class TestCliDefaultPaths(unittest.TestCase):
                 patch.object(cli, "fetch_models", side_effect=OSError("HTTP 503")),
             ):
                 payload = _fetch_payload(args)
-        fallback = cast("dict[str, object]", payload["fallback"])
+        fallback = as_dict(payload["fallback"])
         assert fallback["used"]
-        sources = cast("dict[str, dict[str, object]]", payload["sources"])
-        assert sources["official_api"]["status_code"] is None
+        sources = as_dict(payload["sources"])
+        assert as_dict(sources["official_api"])["status_code"] is None
 
     def test_evaluation_payload_reads_saved_next_response(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -317,10 +316,10 @@ class TestCliDefaultPaths(unittest.TestCase):
             )
             payload = _evaluation_payload(args)
 
-        counts = cast("dict[str, object]", payload["counts"])
+        counts = as_dict(payload["counts"])
         assert counts["matched_rows"] == 2
-        rows = cast("list[dict[str, object]]", payload["rows"])
-        assert [row["name"] for row in rows] == ["B", "A"]
+        rows = as_list(payload["rows"])
+        assert [as_dict(row)["name"] for row in rows] == ["B", "A"]
 
 
 if __name__ == "__main__":

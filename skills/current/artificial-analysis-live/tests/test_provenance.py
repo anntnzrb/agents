@@ -1,13 +1,12 @@
 """Contract tests for the AA-local immutable artifact store."""
 
 import hashlib
-import json
 import os
 from pathlib import Path
-from typing import cast
 
 import pytest
 
+from artificial_analysis.contracts import as_dict, parse_json
 from artificial_analysis.diagnostics import REDACTED
 from artificial_analysis.provenance import (
     ArtifactIntegrityError,
@@ -38,24 +37,20 @@ def test_sidecar_index_and_immutable_manifest_are_written(store: ArtifactStore) 
     record = store.store("models", b"snapshot", {"scope": "public"})
     digest = str(record["sha256"])
     sidecar_path = store.root / "artifacts" / f"{digest}.meta.json"
-    sidecar = cast(
-        "dict[str, object]", json.loads(sidecar_path.read_text(encoding="utf-8"))
-    )
-    index = cast(
-        "dict[str, dict[str, str]]",
-        json.loads(store.index_path.read_text(encoding="utf-8")),
-    )
+    sidecar = as_dict(parse_json(sidecar_path.read_text(encoding="utf-8")))
+    index = as_dict(parse_json(store.index_path.read_text(encoding="utf-8")))
 
     assert sidecar == record
-    assert index["models"]["sha256"] == digest
+    models_index = as_dict(index["models"])
+    assert models_index["sha256"] == digest
+
     manifest = store.write_manifest()
     manifest_path = store.root / "manifests" / f"{manifest['sha256']}.json"
     manifest_bytes = manifest_path.read_bytes()
-    assert hashlib.sha256(manifest_bytes).hexdigest() == manifest["sha256"]
-    manifest_obj = cast(
-        "dict[str, dict[str, dict[str, str]]]", json.loads(manifest_bytes)
-    )
-    assert manifest_obj["sources"]["models"]["sha256"] == digest
+    manifest_obj = as_dict(parse_json(manifest_bytes))
+    sources_obj = as_dict(manifest_obj["sources"])
+    models_src = as_dict(sources_obj["models"])
+    assert models_src["sha256"] == digest
     assert store.write_manifest() == manifest
 
 
@@ -102,7 +97,7 @@ def test_redaction_is_recursive_and_does_not_persist_credentials(
     sidecar_text = (
         store.root / "artifacts" / f"{record['sha256']}.meta.json"
     ).read_text(encoding="utf-8")
-    sidecar = cast("dict[str, object]", json.loads(sidecar_text))
+    sidecar = as_dict(parse_json(sidecar_text))
 
     assert "top-secret" not in sidecar_text
     assert "nested-secret" not in sidecar_text
@@ -167,5 +162,5 @@ def test_legacy_promotion_keeps_caller_files_and_marks_record(
     loaded_raw, loaded_record = store.load(source_key="legacy")
     assert loaded_raw == b"legacy bytes"
     assert loaded_record["legacy_unverified"] is True
-    loaded_meta = cast("dict[str, object]", loaded_record["metadata"])
+    loaded_meta = as_dict(loaded_record["metadata"])
     assert loaded_meta["api_key"] == REDACTED

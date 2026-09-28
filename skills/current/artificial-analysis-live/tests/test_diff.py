@@ -1,14 +1,11 @@
 """Schema-aware Artificial Analysis diff tests."""
 
-# ruff: noqa: TC003
-from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
-from typing import cast
 
 from artificial_analysis import cli
+from artificial_analysis.contracts import as_dict, as_list
 from artificial_analysis.diff import schema_aware_diff
 
 
@@ -46,10 +43,10 @@ def test_schema_aware_diff_is_opt_in_and_preserves_legacy_keys(tmp_path: Path) -
         json.dumps(_snapshot(model_slug="model-a", model_name="Model A", score=72))
     )
 
-    legacy = cli._diff_payload(  # pyright: ignore[reportPrivateUsage]
+    legacy = cli._diff_payload(
         argparse.Namespace(old_snapshot=old, new_snapshot=new, schema_aware=False)
     )
-    aware = cli._diff_payload(  # pyright: ignore[reportPrivateUsage]
+    aware = cli._diff_payload(
         argparse.Namespace(old_snapshot=old, new_snapshot=new, schema_aware=True),
     )
 
@@ -57,10 +54,10 @@ def test_schema_aware_diff_is_opt_in_and_preserves_legacy_keys(tmp_path: Path) -
     assert aware["added_endpoint_slugs"] == legacy["added_endpoint_slugs"]
     assert aware["removed_endpoint_slugs"] == legacy["removed_endpoint_slugs"]
     assert aware["provider_deltas"] == legacy["provider_deltas"]
-    schema_diff = cast("dict[str, object]", aware["schema_diff"])
-    metrics = cast("dict[str, object]", schema_diff["metrics"])
-    changed = cast("list[dict[str, object]]", metrics["changed"])
-    assert changed[0]["metric"] == "intelligence_index"
+    schema_diff = as_dict(aware["schema_diff"])
+    metrics = as_dict(schema_diff["metrics"])
+    changed = as_list(metrics["changed"])
+    assert as_dict(changed[0])["metric"] == "intelligence_index"
 
 
 def test_schema_diff_keeps_stable_ids_and_reports_possible_rename_without_merge() -> (
@@ -71,11 +68,11 @@ def test_schema_diff_keeps_stable_ids_and_reports_possible_rename_without_merge(
 
     result = schema_aware_diff(old, new)
 
-    model_identities = cast("dict[str, object]", result["model_identities"])
+    model_identities = as_dict(result["model_identities"])
     assert model_identities["removed"] == ["model:old-slug"]
     assert model_identities["added"] == ["model:new-slug"]
-    possible_renames = cast("list[dict[str, object]]", result["possible_renames"])
-    rename = possible_renames[0]
+    possible_renames = as_list(result["possible_renames"])
+    rename = as_dict(possible_renames[0])
     assert rename["merge"] is False
     assert rename["before_id"] == "model:old-slug"
     assert rename["after_id"] == "model:new-slug"
@@ -87,9 +84,9 @@ def test_schema_diff_reports_conflicting_duplicates_deterministically() -> None:
         _snapshot(model_slug="model-a", model_name="Model A", score=1),
     )
 
-    duplicates = cast("dict[str, object]", result["duplicates"])
-    before = cast("list[dict[str, object]]", duplicates["before"])
-    removed = cast("list[dict[str, object]]", duplicates["removed"])
-    assert before[0]["id"] == "model:model-a"
-    assert before[0]["conflict"] is True
-    assert removed[0]["id"] == "model:model-a"
+    duplicates = as_dict(result["duplicates"])
+    before = as_list(duplicates["before"])
+    removed = as_list(duplicates["removed"])
+    assert as_dict(before[0])["id"] == "model:model-a"
+    assert as_dict(before[0])["conflict"] is True
+    assert as_dict(removed[0])["id"] == "model:model-a"

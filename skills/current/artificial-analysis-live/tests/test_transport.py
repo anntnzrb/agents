@@ -1,25 +1,22 @@
 # Copyright (c) 2026 anntnzrb
 """Deterministic transport and cache-policy coverage for Artificial Analysis."""
 
-from __future__ import annotations
-
 import argparse
 import json
-from typing import TYPE_CHECKING, Self, cast, final
+from pathlib import Path
+from typing import Self, final
 from unittest.mock import patch
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 import pytest
 
 from artificial_analysis import cli, rsc
 from artificial_analysis.cli import (
-    _evaluation_namespace,  # pyright: ignore[reportPrivateUsage]
-    _evaluation_payload,  # pyright: ignore[reportPrivateUsage]
-    _fetch_payload,  # pyright: ignore[reportPrivateUsage]
-    _validate_304,  # pyright: ignore[reportPrivateUsage]
+    _evaluation_namespace,
+    _evaluation_payload,
+    _fetch_payload,
+    _validate_304,
 )
+from artificial_analysis.contracts import as_dict, is_str_mapping, parse_json
 
 
 @final
@@ -86,8 +83,10 @@ class QueueOpener:
 
 
 def _request_headers(request: object) -> dict[str, str]:
-    raw = cast("dict[str, str]", getattr(request, "headers", {}))
-    return {str(key).lower(): str(value) for key, value in raw.items()}
+    raw: object = getattr(request, "headers", {})
+    if is_str_mapping(raw):
+        return {key.lower(): str(value) for key, value in raw.items()}
+    return {}
 
 
 def test_200_then_304_reuses_exact_bytes_and_sends_both_validators(
@@ -175,11 +174,9 @@ def test_tampered_artifact_fails_closed(tmp_path: Path) -> None:
         etag='"known"',
         body="payload",
     )
-    index = cast(
-        "dict[str, dict[str, str]]",
-        json.loads((tmp_path / "index.json").read_text(encoding="utf-8")),
-    )
-    digest = str(index[rsc.BASE_URL]["sha256"])
+    index = as_dict(parse_json((tmp_path / "index.json").read_text(encoding="utf-8")))
+    base_index = as_dict(index[rsc.BASE_URL])
+    digest = str(base_index["sha256"])
     _ = (tmp_path / "artifacts" / f"{digest}.raw").write_bytes(b"tampered")
     assert rsc.load_cached_artifact(tmp_path) is None
 
@@ -232,7 +229,7 @@ def test_refresh_outage_is_error_by_default(tmp_path: Path) -> None:
 
 def test_explicit_stale_marks_fallback_without_writing_cache(tmp_path: Path) -> None:
     args = _fetch_args(tmp_path, allow_stale=True)
-    cache_dir = cast("Path", args.cache_dir)
+    cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     _ = (cache_dir / rsc.CACHE_LAST_GOOD_FILE).write_text(
         json.dumps(
@@ -248,9 +245,9 @@ def test_explicit_stale_marks_fallback_without_writing_cache(tmp_path: Path) -> 
         patch.object(cli, "fetch_rsc", side_effect=OSError("offline")),
     ):
         payload = _fetch_payload(args)
-    freshness = cast("dict[str, object]", payload["freshness"])
+    freshness = as_dict(payload["freshness"])
     assert freshness["mode"] == "stale-last-good"
-    fallback = cast("dict[str, object]", payload["fallback"])
+    fallback = as_dict(payload["fallback"])
     assert fallback["used"] is True
     assert not (cache_dir / rsc.CACHE_META_FILE).exists()
 

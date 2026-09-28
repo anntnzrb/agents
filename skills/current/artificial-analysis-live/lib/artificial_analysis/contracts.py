@@ -6,20 +6,15 @@ values which are useful to both the parser and callers without importing any
 other skill or transport implementation.
 """
 
-from __future__ import annotations
-
 import json
 import math
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, field, fields, is_dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, fields, is_dataclass
 from decimal import Decimal
 from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Final, NoReturn, cast, overload
+from typing import Final, NoReturn, Protocol, TypeIs, overload, runtime_checkable
 from urllib.parse import quote, unquote_plus, urlsplit, urlunsplit
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 # Keep these values in sync with the established Artificial Analysis protocol.
 PROTOCOL_VERSION: Final[str] = "1"
@@ -128,7 +123,7 @@ class SourceEvidence:
         """Return the stable provenance fields for serialization."""
         status: object = self.status
         if isinstance(status, Enum):
-            status = cast("object", status.value)
+            status = getattr(status, "value", None)
         return {
             "source_url": self.source_url,
             "final_url": self.final_url,
@@ -174,54 +169,85 @@ def _normalise_numeric(value: object) -> int | float | None:
     _raise_type("normalized_value must be a finite number or None")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class NumericEvidence:
     """A numeric observation with independent value, meaning, and eligibility."""
 
     raw_value: object
-    normalized_value: int | float | Decimal | None = None
-    unit: str | None = None
-    normalization: str | None = None
-    source_path: str | None = None
-    source_field: str | None = None
-    value_status: ValueStatus = ValueStatus.MISSING
-    metric_semantics_status: MetricSemanticsStatus = MetricSemanticsStatus.UNKNOWN
-    comparison_eligibility: ComparisonEligibility = ComparisonEligibility.BLOCKED
-    blocked_reasons: tuple[str, ...] = field(default_factory=tuple)
-    parser: str = "numeric"
-    parser_version: str = "1"
-    artifact_id: str | None = None
-    sha256: str | None = None
-    formula: str | None = None
-    input_paths: tuple[str, ...] = field(default_factory=tuple)
+    normalized_value: int | float | None
+    unit: str | None
+    normalization: str | None
+    source_path: str | None
+    source_field: str | None
+    value_status: ValueStatus
+    metric_semantics_status: MetricSemanticsStatus
+    comparison_eligibility: ComparisonEligibility
+    blocked_reasons: tuple[str, ...]
+    parser: str
+    parser_version: str
+    artifact_id: str | None
+    sha256: str | None
+    formula: str | None
+    input_paths: tuple[str, ...]
 
-    def __post_init__(self) -> None:
+    def __init__(  # noqa: PLR0913, PLR0917
+        self,
+        raw_value: object,
+        normalized_value: object = None,
+        unit: str | None = None,
+        normalization: str | None = None,
+        source_path: str | None = None,
+        source_field: str | None = None,
+        value_status: ValueStatus | str = ValueStatus.MISSING,
+        metric_semantics_status: MetricSemanticsStatus
+        | str = MetricSemanticsStatus.UNKNOWN,
+        comparison_eligibility: ComparisonEligibility
+        | str = ComparisonEligibility.BLOCKED,
+        blocked_reasons: tuple[str, ...] | list[str] = (),
+        parser: str = "numeric",
+        parser_version: str = "1",
+        artifact_id: str | None = None,
+        sha256: str | None = None,
+        formula: str | None = None,
+        input_paths: tuple[object, ...] | list[object] = (),
+    ) -> None:
         """Normalize enum fields, numbers, and stable blocker ordering."""
-        object.__setattr__(self, "value_status", ValueStatus(self.value_status))
+        object.__setattr__(self, "raw_value", raw_value)
+        object.__setattr__(self, "unit", unit)
+        object.__setattr__(self, "normalization", normalization)
+        object.__setattr__(self, "source_path", source_path)
+        object.__setattr__(self, "source_field", source_field)
+        val_status = ValueStatus(value_status)
+        object.__setattr__(self, "value_status", val_status)
         object.__setattr__(
             self,
             "metric_semantics_status",
-            MetricSemanticsStatus(self.metric_semantics_status),
+            MetricSemanticsStatus(metric_semantics_status),
         )
         object.__setattr__(
             self,
             "comparison_eligibility",
-            ComparisonEligibility(self.comparison_eligibility),
+            ComparisonEligibility(comparison_eligibility),
         )
-        normalized = _normalise_numeric(self.normalized_value)
-        if self.value_status in NON_NORMALIZED_VALUE_STATUSES:
+        normalized = _normalise_numeric(normalized_value)
+        if val_status in NON_NORMALIZED_VALUE_STATUSES:
             normalized = None
         object.__setattr__(self, "normalized_value", normalized)
         reasons: list[str] = []
         seen: set[str] = set()
-        for reason in self.blocked_reasons:
+        for reason in blocked_reasons:
             stable = str(reason)
             if stable and stable not in seen:
                 seen.add(stable)
                 reasons.append(stable)
         object.__setattr__(self, "blocked_reasons", tuple(reasons))
+        object.__setattr__(self, "parser", parser)
+        object.__setattr__(self, "parser_version", parser_version)
+        object.__setattr__(self, "artifact_id", artifact_id)
+        object.__setattr__(self, "sha256", sha256)
+        object.__setattr__(self, "formula", formula)
         object.__setattr__(
-            self, "input_paths", tuple(str(path) for path in self.input_paths)
+            self, "input_paths", tuple(str(path) for path in input_paths)
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -402,24 +428,19 @@ def redact(value: object, *, _sensitive: bool = False) -> object:
     """Recursively redact credential keys and values without hiding metrics."""
     if _sensitive:
         value = REDACTED
-    elif isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    elif is_str_mapping(value):
         value = {
-            key: redact(item, _sensitive=_sensitive_key(key))
-            for key, item in mapping.items()
+            str(key): redact(item, _sensitive=_sensitive_key(str(key)))
+            for key, item in value.items()
         }
-    elif isinstance(value, list):
-        items = cast("list[object]", cast("object", value))
-        value = [redact(item) for item in items]
-    elif isinstance(value, tuple):
-        entries = cast("tuple[object, ...]", cast("object", value))
-        value = tuple(redact(item) for item in entries)
-    elif isinstance(value, set):
-        members = cast("set[object]", cast("object", value))
-        value = {redact(item) for item in members}
-    elif isinstance(value, frozenset):
-        members = cast("frozenset[object]", cast("object", value))
-        value = frozenset(redact(item) for item in members)
+    elif is_object_list(value):
+        value = [redact(item) for item in value]
+    elif is_object_tuple(value):
+        value = tuple(redact(item) for item in value)
+    elif is_object_set(value):
+        value = {redact(item) for item in value}
+    elif is_object_frozenset(value):
+        value = frozenset(redact(item) for item in value)
     elif isinstance(value, str):
         value = _redact_string(value)
     return value
@@ -459,25 +480,20 @@ class Diagnostic:
 
 
 def _plain_json(value: object) -> object:
-    """Project common Python values to finite, JSON-compatible values."""
-    to_dict = cast("Callable[[], object] | None", getattr(value, "to_dict", None))
     if isinstance(value, Enum):
-        value = _plain_json(cast("object", value.value))
-    elif callable(to_dict):
-        value = _plain_json(to_dict())
+        value = _plain_json(getattr(value, "value", None))
+    elif isinstance(value, _HasToDict):
+        value = _plain_json(value.to_dict())
     elif is_dataclass(value) and not isinstance(value, type):
         value = _plain_json(
             {item.name: getattr(value, item.name) for item in fields(value)}
         )
-    elif isinstance(value, Mapping):
-        value = _plain_mapping(cast("Mapping[object, object]", value))
-    elif isinstance(value, (list, tuple)):
-        items = cast("list[object]", cast("object", value))
-        value = [_plain_json(item) for item in items]
-    elif isinstance(value, (set, frozenset)):
-        value = _plain_set(
-            cast("set[object] | frozenset[object]", cast("object", value))
-        )
+    elif is_object_mapping(value):
+        value = _plain_mapping(value)
+    elif is_object_list(value) or is_object_tuple(value):
+        value = [_plain_json(item) for item in value]
+    elif is_object_set(value) or is_object_frozenset(value):
+        value = _plain_set(value)
     elif isinstance(value, Decimal):
         value = _plain_decimal(value)
     elif isinstance(value, float) and not math.isfinite(value):
@@ -513,7 +529,7 @@ def _plain_set(value: set[object] | frozenset[object]) -> list[object]:
                 sort_keys=True,
             ),
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return sorted(projected, key=repr)
 
 
@@ -544,6 +560,66 @@ def compact_json(value: object) -> str:
     )
 
 
+@runtime_checkable
+class _HasToDict(Protocol):
+    def to_dict(self) -> object: ...
+
+
+def is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    """Narrow an arbitrary value to a string-keyed dictionary."""
+    return isinstance(val, dict)
+
+
+def is_object_list(val: object) -> TypeIs[list[object]]:
+    """Narrow an arbitrary value to a list."""
+    return isinstance(val, list)
+
+
+def is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    """Narrow an arbitrary value to a string-keyed mapping."""
+    return isinstance(val, Mapping)
+
+
+def is_object_mapping(val: object) -> TypeIs[Mapping[object, object]]:
+    """Narrow an arbitrary value to an object-keyed mapping."""
+    return isinstance(val, Mapping)
+
+
+def is_object_tuple(val: object) -> TypeIs[tuple[object, ...]]:
+    """Narrow an arbitrary value to a tuple."""
+    return isinstance(val, tuple)
+
+
+def is_object_set(val: object) -> TypeIs[set[object]]:
+    """Narrow an arbitrary value to a set."""
+    return isinstance(val, set)
+
+
+def is_object_frozenset(val: object) -> TypeIs[frozenset[object]]:
+    """Narrow an arbitrary value to a frozenset."""
+    return isinstance(val, frozenset)
+
+
+def as_dict(val: object) -> dict[str, object]:
+    """Return the value if it is a dictionary, else an empty dictionary."""
+    if is_str_dict(val):
+        return val
+    return {}
+
+
+def as_list(val: object) -> list[object]:
+    """Return the value if it is a list, else an empty list."""
+    if is_object_list(val):
+        return val
+    return []
+
+
+def parse_json(source: str | bytes) -> object:
+    """Parse JSON text or bytes to an unconstrained object tree."""
+    fn: Callable[..., object] = json.loads
+    return fn(source)
+
+
 __all__ = [
     "COMPARISON_ELIGIBILITIES",
     "DIAGNOSTIC_CODES",
@@ -558,5 +634,15 @@ __all__ = [
     "NumericEvidence",
     "SourceEvidence",
     "ValueStatus",
+    "as_dict",
+    "as_list",
     "compact_json",
+    "is_object_frozenset",
+    "is_object_list",
+    "is_object_mapping",
+    "is_object_set",
+    "is_object_tuple",
+    "is_str_dict",
+    "is_str_mapping",
+    "parse_json",
 ]
