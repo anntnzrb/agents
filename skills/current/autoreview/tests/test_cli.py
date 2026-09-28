@@ -1,7 +1,5 @@
 """Comprehensive unit and integration test suite for AutoReview."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 import sys
@@ -96,11 +94,10 @@ def test_filter_diff_paths() -> None:
 
 def test_redact_sensitive_text() -> None:
     """Verify regex redacting of private keys and tokens."""
-    payload = (
-        "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----\n"
-        "api_key = 'abcdef12345678901234567890'\n"
-        "normal_code = true\n"
-    )
+    line1 = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+    line2 = "api_key = 'abcdef12345678901234567890'"
+    line3 = "normal_code = true"
+    payload = f"{line1}\n{line2}\n{line3}\n"
     redacted = redact_sensitive_text(payload)
     assert "[REDACTED PRIVATE KEY BLOCK]" in redacted
     assert "api_key = [REDACTED]" in redacted
@@ -109,7 +106,7 @@ def test_redact_sensitive_text() -> None:
 
 def test_validate_finding_structure_valid() -> None:
     """Verify validation passes for compliant findings."""
-    valid_finding = {
+    valid_finding: dict[str, object] = {
         "title": "Unchecked error return",
         "body": "Function may throw without catch block.",
         "priority": "P1",
@@ -122,7 +119,7 @@ def test_validate_finding_structure_valid() -> None:
 
 def test_validate_finding_structure_invalid() -> None:
     """Verify validation rejects malformed findings."""
-    invalid_finding = {
+    invalid_finding: dict[str, object] = {
         "title": "Missing category",
         "priority": "P5",
         "confidence": 1.5,
@@ -136,7 +133,7 @@ def test_verify_physical_line_exists() -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         repo = Path(tmp_dir)
         test_file = repo / "foo.py"
-        test_file.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+        _ = test_file.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
 
         assert verify_physical_line_exists(repo, "foo.py", 2) is True
         assert verify_physical_line_exists(repo, "foo.py", 10) is False
@@ -145,7 +142,7 @@ def test_verify_physical_line_exists() -> None:
 
 def test_filter_findings_by_priority() -> None:
     """Verify severity threshold filtering logic."""
-    findings = [
+    findings: list[dict[str, object]] = [
         {"title": "P0 Blocker", "priority": "P0"},
         {"title": "P1 High", "priority": "P1"},
         {"title": "P2 Med", "priority": "P2"},
@@ -174,7 +171,11 @@ def test_invoke_engine_review_empty_diff() -> None:
 
 def test_invoke_engine_review_missing_engine(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify that a missing review engine raises SystemExit with clear error instructions."""
-    monkeypatch.setattr("shutil.which", lambda _: None)
+
+    def _no_which(_cmd: str) -> str | None:
+        return None
+
+    monkeypatch.setattr("shutil.which", _no_which)
     bundle = ReviewBundle(
         mode="local",
         base_ref=None,
@@ -184,7 +185,7 @@ def test_invoke_engine_review_missing_engine(monkeypatch: pytest.MonkeyPatch) ->
         diff_text="diff --git a/src/foo.py b/src/foo.py\n+new_code()",
     )
     with pytest.raises(SystemExit) as exc_info:
-        invoke_engine_review(bundle)
+        _ = invoke_engine_review(bundle)
     err_msg = str(exc_info.value)
     assert "review engine not available" in err_msg
     assert "omp" in err_msg
@@ -192,9 +193,13 @@ def test_invoke_engine_review_missing_engine(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_invoke_engine_review_engine_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify that a failing engine execution raises SystemExit instead of fabricating a pass."""
-    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/omp")
 
-    def mock_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def _which_omp(_cmd: str) -> str:
+        return "/usr/local/bin/omp"
+
+    monkeypatch.setattr("shutil.which", _which_omp)
+
+    def mock_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
             args=["omp"],
             returncode=1,
@@ -212,7 +217,7 @@ def test_invoke_engine_review_engine_failure(monkeypatch: pytest.MonkeyPatch) ->
         diff_text="diff --git a/src/foo.py b/src/foo.py\n+new_code()",
     )
     with pytest.raises(SystemExit) as exc_info:
-        invoke_engine_review(bundle)
+        _ = invoke_engine_review(bundle)
     assert "review engine failed" in str(exc_info.value)
 
 
@@ -222,31 +227,31 @@ def test_cli_execution_fails_when_engine_missing(tmp_path: Path) -> None:
     env["PATH"] = "/usr/bin:/bin"
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
-    subprocess.run(
+    _ = subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    _ = subprocess.run(
         ["git", "config", "user.name", "Tester"],
         cwd=repo,
         check=True,
         capture_output=True,
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "config", "user.email", "tester@example.com"],
         cwd=repo,
         check=True,
         capture_output=True,
     )
-    (repo / "test.txt").write_text("hello world\n", encoding="utf-8")
-    subprocess.run(
+    _ = (repo / "test.txt").write_text("hello world\n", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "add", "test.txt"], cwd=repo, check=True, capture_output=True
     )
-    subprocess.run(
+    _ = subprocess.run(
         ["git", "commit", "-m", "Initial commit"],
         cwd=repo,
         check=True,
         capture_output=True,
     )
-    (repo / "test.txt").write_text("hello world\nnew change\n", encoding="utf-8")
-    subprocess.run(
+    _ = (repo / "test.txt").write_text("hello world\nnew change\n", encoding="utf-8")
+    _ = subprocess.run(
         ["git", "commit", "-am", "Second commit"],
         cwd=repo,
         check=True,
@@ -268,7 +273,7 @@ def test_cli_execution_fails_when_engine_missing(tmp_path: Path) -> None:
 
 def test_format_human_report() -> None:
     """Verify human report string formatting."""
-    report = {
+    report: dict[str, object] = {
         "overall_correctness": "patch is correct",
         "overall_explanation": "All good",
         "findings": [

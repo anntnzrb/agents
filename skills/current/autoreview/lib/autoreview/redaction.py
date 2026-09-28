@@ -1,7 +1,5 @@
 """Path filtering, credential redaction, and sensitive pattern masking."""
 
-from __future__ import annotations
-
 import re
 from pathlib import PurePosixPath
 
@@ -32,13 +30,11 @@ def redact_sensitive_text(text: str) -> str:
     )
 
     # Redact standard AWS / GitHub / Generic secret assignments
-    text = re.sub(
+    return re.sub(
         r"(?i)\b(aws_secret_access_key|api_key|token|secret|password|auth_token)\b\s*[:=]\s*['\"]?[A-Za-z0-9_\-\.\/]{16,}['\"]?",
         r"\1 = [REDACTED]",
         text,
     )
-
-    return text
 
 
 def filter_diff_paths(paths: list[str]) -> tuple[list[str], list[str]]:

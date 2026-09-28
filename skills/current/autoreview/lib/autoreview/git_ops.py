@@ -1,7 +1,5 @@
 """Git execution and environment sanitization primitives for AutoReview."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess
@@ -14,7 +12,7 @@ from autoreview.models import (
 )
 
 
-def safe_git_env(repo: Path) -> dict[str, str]:
+def safe_git_env(_repo: Path) -> dict[str, str]:
     """Construct an isolated, deterministic Git environment blocking user/system config."""
     platform_keys = (
         "COMSPEC",
@@ -105,9 +103,10 @@ def git_run(
         check=False,
     )
     if check and result.returncode != 0:
+        cmd_str = " ".join(args)
+        out_str = result.stderr or result.stdout
         raise SystemExit(
-            f"Git command failed ({result.returncode}): git {' '.join(args)}\n"
-            f"{result.stderr or result.stdout}"
+            f"Git command failed ({result.returncode}): git {cmd_str}\n{out_str}"
         )
     return result
 
@@ -124,7 +123,7 @@ def current_branch(repo: Path) -> str | None:
     """Return the name of the current branch or None if detached."""
     proc = git_run(repo, ["branch", "--show-current"], check=False)
     out = proc.stdout.strip()
-    return out if out else None
+    return out or None
 
 
 def validate_git_ref(repo: Path, ref: str, label: str = "ref") -> str:

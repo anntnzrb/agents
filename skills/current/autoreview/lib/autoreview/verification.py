@@ -1,14 +1,17 @@
 """Validation and physical verification of review findings against actual disk files."""
 
-from __future__ import annotations
-
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TypeIs
 
 from autoreview.models import CATEGORIES, PRIORITIES, PRIORITY_ORDER
 
 
-def validate_finding_structure(finding: dict[str, Any], index: int) -> None:
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
+
+def validate_finding_structure(finding: Mapping[str, object], index: int) -> None:
     """Check that a finding matches the expected schema and type constraints."""
     required_keys = {
         "title",
@@ -37,11 +40,12 @@ def validate_finding_structure(finding: dict[str, Any], index: int) -> None:
         raise ValueError(f"finding {index} has invalid confidence: {confidence}")
 
     loc = finding["code_location"]
-    if not isinstance(loc, dict) or "file_path" not in loc or "line" not in loc:
+    if not _is_dict(loc) or "file_path" not in loc or "line" not in loc:
         raise ValueError(f"finding {index} has invalid code_location structure: {loc}")
 
-    if not isinstance(loc["line"], int) or loc["line"] < 1:
-        raise ValueError(f"finding {index} has invalid line number: {loc.get('line')}")
+    line_val = loc["line"]
+    if not isinstance(line_val, int) or isinstance(line_val, bool) or line_val < 1:
+        raise ValueError(f"finding {index} has invalid line number: {line_val}")
 
 
 def verify_physical_line_exists(repo: Path, file_path: str, line_number: int) -> bool:
@@ -59,19 +63,19 @@ def verify_physical_line_exists(repo: Path, file_path: str, line_number: int) ->
 
 
 def filter_findings_by_priority(
-    findings: list[dict[str, Any]],
+    findings: Sequence[dict[str, object]],
     max_priority: str,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Partition findings into accepted (>= max_priority) and filtered lower-severity findings."""
     limit_rank = PRIORITY_ORDER.get(max_priority, 0)
-    kept: list[dict[str, Any]] = []
-    filtered: list[dict[str, Any]] = []
+    kept: list[dict[str, object]] = []
+    filtered: list[dict[str, object]] = []
 
     for finding in findings:
-        rank = PRIORITY_ORDER.get(finding.get("priority", "P3"), 3)
+        prio = str(finding.get("priority", "P3"))
+        rank = PRIORITY_ORDER.get(prio, 3)
         if rank <= limit_rank:
             kept.append(finding)
         else:
             filtered.append(finding)
-
     return kept, filtered

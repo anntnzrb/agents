@@ -1,13 +1,17 @@
 """LLM inference dispatch and Reviewer Engine bindings for AutoReview."""
 
-from __future__ import annotations
-
 import json
 import shutil
 import subprocess
-from typing import Any
+from collections.abc import Callable
+from typing import TypeIs
 
 from autoreview.targets import ReviewBundle
+
+
+def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
+    return isinstance(obj, dict)
+
 
 REVIEW_SYSTEM_PROMPT = """You are an elite, highly skeptical Staff Systems Engineer and Security Architect conducting a rigorous automated differential code review.
 
@@ -37,7 +41,9 @@ You MUST respond strictly with a single JSON object matching this schema:
 """
 
 
-def invoke_engine_review(bundle: ReviewBundle, engine: str = "codex") -> dict[str, Any]:
+def invoke_engine_review(
+    bundle: ReviewBundle, _engine: str = "codex"
+) -> dict[str, object]:
     """Dispatch the review bundle to an LLM engine via OMP CLI or available backend."""
     if not bundle.diff_text.strip():
         return {
@@ -61,10 +67,9 @@ Diff Payload:
     # Check for omp binary in PATH
     omp_bin = shutil.which("omp")
     if omp_bin is None:
-        raise SystemExit(
-            "review engine not available: 'omp' executable not found on PATH. "
-            "AutoReview requires a review engine (currently the 'omp' CLI); ensure 'omp' is installed and available on PATH."
-        )
+        msg1 = "review engine not available: 'omp' executable not found on PATH."
+        msg2 = "AutoReview requires a review engine (currently the 'omp' CLI); ensure 'omp' is installed and available on PATH."
+        raise SystemExit(f"{msg1} {msg2}")
 
     try:
         cmd = [
@@ -87,8 +92,11 @@ Diff Payload:
                 stripped = line.strip()
                 if stripped.startswith("{") and stripped.endswith("}"):
                     try:
-                        parsed = json.loads(stripped)
-                        if "findings" in parsed or "overall_correctness" in parsed:
+                        loads_fn: Callable[..., object] = json.loads
+                        parsed = loads_fn(stripped)
+                        if _is_dict(parsed) and (
+                            "findings" in parsed or "overall_correctness" in parsed
+                        ):
                             return parsed
                     except json.JSONDecodeError:
                         continue

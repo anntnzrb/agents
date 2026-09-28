@@ -1,7 +1,5 @@
 """Target selection, Git diff extraction, multi-state capture, and bundle preparation."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,24 +113,23 @@ def capture_diff_bundle(
                 )
                 if proc.stdout:
                     diff_text_parts.append(proc.stdout)
-        else:
-            # Staged (Index) + Unstaged (Working Tree)
-            if kept_paths:
-                staged_proc = git_run(
-                    repo,
-                    [*diff_cmd_base, "--cached", "HEAD", "--", *kept_paths],
-                    check=False,
-                )
-                if staged_proc.stdout:
-                    diff_text_parts.append(staged_proc.stdout)
+        # Staged (Index) + Unstaged (Working Tree)
+        elif kept_paths:
+            staged_proc = git_run(
+                repo,
+                [*diff_cmd_base, "--cached", "HEAD", "--", *kept_paths],
+                check=False,
+            )
+            if staged_proc.stdout:
+                diff_text_parts.append(staged_proc.stdout)
 
-                unstaged_proc = git_run(
-                    repo,
-                    [*diff_cmd_base, "--", *kept_paths],
-                    check=False,
-                )
-                if unstaged_proc.stdout:
-                    diff_text_parts.append(unstaged_proc.stdout)
+            unstaged_proc = git_run(
+                repo,
+                [*diff_cmd_base, "--", *kept_paths],
+                check=False,
+            )
+            if unstaged_proc.stdout:
+                diff_text_parts.append(unstaged_proc.stdout)
 
         # Include untracked files as synthetic diffs
         for untracked in kept_paths:

@@ -1,9 +1,7 @@
 """Core data models, schema definitions, and constant configuration for AutoReview."""
 
-from __future__ import annotations
-
 import re
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 ENGINES = ("codex", "claude", "amp", "pi", "kimi")
 PRIORITIES = ("P0", "P1", "P2", "P3")
@@ -58,7 +56,7 @@ SENSITIVE_NAME_PATTERNS = [
     re.compile(r"(^|/).*\.(pem|key|pkcs12|pfx|p12|kdbx|keystore)$", re.IGNORECASE),
 ]
 
-SCHEMA: dict[str, Any] = {
+SCHEMA: dict[str, object] = {
     "type": "object",
     "required": [
         "findings",
@@ -130,7 +128,7 @@ class Finding(NamedTuple):
 
 
 class ReviewReport(NamedTuple):
-    findings: list[dict[str, Any]]
+    findings: list[dict[str, object]]
     overall_correctness: str
     overall_explanation: str
     overall_confidence: float
