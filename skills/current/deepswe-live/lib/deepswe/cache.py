@@ -7,7 +7,6 @@ projection beside them.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import contextlib
 import hashlib
@@ -15,12 +14,20 @@ import json
 import os
 import tempfile
 import threading
-from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
 
-from .contracts import compact_json
+from .contracts import (
+    compact_json,
+    is_dict,
+    is_mapping,
+    parse_json,
+    parse_json_object,
+)
 from .diagnostics import redact
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _DIGEST_LENGTH = 64
 
@@ -89,7 +96,7 @@ class ArtifactStore:
         """
         return self._store(source_key, raw, metadata, legacy_unverified=True)
 
-    def load(  # noqa: C901, PLR0912, PLR0915
+    def load(  # noqa: C901, PLR0915
         self,
         source_key: str | None = None,
         artifact_hash: str | None = None,
@@ -112,10 +119,10 @@ class ArtifactStore:
             safe_source_key = _safe_source_key(source_key)
             index = self._read_index(required=True)
             candidate = index.get(safe_source_key)
-            if not isinstance(candidate, Mapping):
+            if not is_mapping(candidate):
                 msg = f"source key not found: {source_key}"
                 raise ArtifactNotFoundError(msg)
-            indexed = _plain_mapping(cast("Mapping[str, object]", candidate))
+            indexed = _plain_mapping(candidate)
             selected_hash = _valid_hash(indexed.get("sha256"))
             if selected_hash is None:
                 msg = f"invalid index entry for source: {source_key}"
@@ -174,15 +181,15 @@ class ArtifactStore:
         if snapshot is None:
             snapshot_value: object = self._read_index(required=False)
         else:
-            if not isinstance(snapshot, Mapping):
+            if not is_mapping(snapshot):
                 msg = "snapshot must be a mapping"
                 raise TypeError(msg)
-            snapshot_value = cast("object", snapshot)
+            snapshot_value = snapshot
         payload_value = _plain_json({"sources": snapshot_value})
-        if not isinstance(payload_value, dict):  # pragma: no cover - defensive
+        if not is_dict(payload_value):  # pragma: no cover - defensive
             msg = "manifest projection is not an object"
             raise ArtifactIntegrityError(msg)
-        payload = compact_json(cast("object", payload_value)).encode("utf-8")
+        payload = compact_json(payload_value).encode("utf-8")
         digest = hashlib.sha256(payload).hexdigest()
         path = self.manifests / f"{digest}.json"
         with self._write_lock:
@@ -204,21 +211,18 @@ class ArtifactStore:
         legacy_unverified: bool,
     ) -> dict[str, object]:
         _require_source_key(source_key)
-        if metadata is not None and not isinstance(metadata, Mapping):
+        if metadata is not None and not is_mapping(metadata):
             msg = "metadata must be a mapping"
             raise TypeError(msg)
         raw = _as_bytes(raw_value)
         digest = hashlib.sha256(raw).hexdigest()
         length = len(raw)
-        redacted_metadata = _plain_json(
-            cast("object", ({} if metadata is None else metadata))
-        )
-        if not isinstance(redacted_metadata, dict):  # pragma: no cover - defensive
+        meta_obj: object = {} if metadata is None else metadata
+        redacted_metadata = _plain_json(meta_obj)
+        if not is_dict(redacted_metadata):  # pragma: no cover - defensive
             msg = "metadata projection is not an object"
             raise ArtifactIntegrityError(msg)
-        _verify_declared_metadata(
-            cast("Mapping[str, object]", redacted_metadata), digest, length
-        )
+        _verify_declared_metadata(redacted_metadata, digest, length)
         safe_source_key = _safe_source_key(source_key)
 
         raw_path = self.artifacts / f"{digest}.raw"
@@ -290,14 +294,11 @@ class ArtifactStore:
     @staticmethod
     def _read_json_object(path: Path, label: str) -> dict[str, object]:
         try:
-            value = cast("object", json.loads(path.read_text(encoding="utf-8")))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raw_text = path.read_text(encoding="utf-8")
+            return parse_json_object(raw_text)
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
             msg = f"invalid {label}: {path}"
             raise ArtifactIntegrityError(msg) from exc
-        if not isinstance(value, dict):
-            msg = f"invalid {label}: {path}"
-            raise ArtifactIntegrityError(msg)
-        return cast("dict[str, object]", value)
 
     @staticmethod
     def _verify_record(  # noqa: C901
@@ -317,12 +318,10 @@ class ArtifactStore:
             msg = f"artifact hash mismatch: {digest}"
             raise ArtifactIntegrityError(msg)
         metadata = record.get("metadata")
-        if not isinstance(metadata, Mapping):
+        if not is_mapping(metadata):
             msg = f"metadata projection is invalid: {digest}"
             raise ArtifactIntegrityError(msg)
-        _verify_declared_metadata(
-            cast("Mapping[str, object]", metadata), digest, len(raw)
-        )
+        _verify_declared_metadata(metadata, digest, len(raw))
         source_key = record.get("source_key")
         if not isinstance(source_key, str) or not source_key:
             msg = f"metadata source key is invalid: {digest}"
@@ -427,7 +426,7 @@ def _plain_json(value: object) -> object:
     """Redact recursively and round-trip to ordinary JSON values."""
     projected = redact(value)
     try:
-        return cast("object", json.loads(compact_json(projected)))
+        return parse_json(compact_json(projected))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         msg = "metadata must be JSON-compatible after redaction"
         raise TypeError(msg) from exc
@@ -435,10 +434,10 @@ def _plain_json(value: object) -> object:
 
 def _plain_mapping(value: Mapping[str, object]) -> dict[str, object]:
     projected = _plain_json(value)
-    if not isinstance(projected, dict):  # pragma: no cover - defensive
+    if not is_dict(projected):  # pragma: no cover - defensive
         msg = "mapping projection is not an object"
         raise ArtifactIntegrityError(msg)
-    return cast("dict[str, object]", projected)
+    return projected
 
 
 def _relative(path: Path, root: Path) -> str:

@@ -7,14 +7,14 @@ numeric observations are projected into ``metrics``.  Unknown fields remain in
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal, InvalidOperation
-from typing import Final, TypeGuard, cast
+from typing import Final, TypeIs
 
+from .contracts import is_items, is_mapping, is_sequence
 from .provenance import value_evidence
 from .semantics import MetricSemantics, metric_semantics
 
@@ -127,16 +127,16 @@ def _as_number(value: Decimal) -> int | float | None:
     if value == value.to_integral_value():
         try:
             return int(value)
-        except (OverflowError, ValueError):
+        except OverflowError, ValueError:
             return None
     try:
         result = float(value)
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     return result if math.isfinite(result) else None
 
 
-def _decimal_number(  # noqa: C901, PLR0911, PLR0912
+def _decimal_number(  # noqa: C901
     value: object,
 ) -> tuple[Decimal | None, str | None]:
     if isinstance(value, bool):
@@ -178,7 +178,7 @@ def _decimal_number(  # noqa: C901, PLR0911, PLR0912
             suffix_unit = "ratio"
     try:
         decimal = Decimal(text)
-    except (InvalidOperation, ValueError):
+    except InvalidOperation, ValueError:
         return None, "MALFORMED_PAYLOAD"
     if not decimal.is_finite():
         return None, "NON_FINITE_VALUE"
@@ -191,9 +191,8 @@ def _marker_is_chart_zero(marker: object) -> bool:
     if isinstance(marker, str):
         folded = marker.casefold().replace("-", "_")
         return "chart" in folded and ("zero" in folded or "placeholder" in folded)
-    if isinstance(marker, Mapping):
-        mapping = cast("Mapping[str, object]", marker)
-        for key, value in mapping.items():
+    if is_mapping(marker):
+        for key, value in marker.items():
             folded = str(key).casefold().replace("-", "_")
             if (
                 folded
@@ -220,7 +219,7 @@ def _source_chart_zero(
     if isinstance(raw_value, (int, float, Decimal)):
         try:
             return float(raw_value) == 0.0
-        except (OverflowError, ValueError):
+        except OverflowError, ValueError:
             return False
     if isinstance(raw_value, str):
         return raw_value.strip().casefold() in {"0%", "0.0%", "0.00%"}
@@ -299,7 +298,7 @@ def _evidence(  # noqa: PLR0913
     return result
 
 
-def parse_numeric(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
+def parse_numeric(  # noqa: C901, PLR0913, PLR0915
     raw_value: object,
     *,
     metric: str | None = None,
@@ -324,8 +323,8 @@ def parse_numeric(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0915
     spec = metric_semantics(metric or field or "")
     path = source_path or (f"$.{selected_field}" if selected_field else None)
     marker = source_marker
-    if isinstance(source_marker, Mapping):
-        marker = dict(cast("Mapping[str, object]", source_marker))
+    if is_mapping(source_marker):
+        marker = dict(source_marker)
     selected_unit = unit or (spec.unit if spec is not None else None)
 
     if raw_value is None:
@@ -571,8 +570,8 @@ def normalize_metric(  # noqa: PLR0913
 ) -> dict[str, object]:
     """Normalize one named DeepSWE metric into value evidence."""
     value = raw_value
-    if isinstance(raw_value, Mapping):
-        mapping = cast("Mapping[str, object]", raw_value)
+    if is_mapping(raw_value):
+        mapping = raw_value
         for key in ("value", "raw_value", "score", "value_raw"):
             if key in mapping:
                 value = mapping.get(key)
@@ -612,18 +611,27 @@ def normalize_numeric(raw_value: object, **kwargs: object) -> dict[str, object]:
         "normalization",
     }
     options = {key: value for key, value in kwargs.items() if key in allowed}
+
+    def _opt_str(key: str) -> str | None:
+        v = options.get(key)
+        return str(v) if isinstance(v, str) else None
+
+    raw_status = options.get("value_status", "published")
+    value_status = str(raw_status) if isinstance(raw_status, str) else "published"
+    raw_blocked = options.get("blocked_reasons", ())
+    blocked_reasons = raw_blocked if is_items(raw_blocked) else ()
     return parse_numeric(
         raw_value,
-        metric=cast("str | None", options.get("metric")),
-        field=cast("str | None", options.get("field")),
-        unit=cast("str | None", options.get("unit")),
-        source_path=cast("str | None", options.get("source_path")),
-        source_field=cast("str | None", options.get("source_field")),
+        metric=_opt_str("metric"),
+        field=_opt_str("field"),
+        unit=_opt_str("unit"),
+        source_path=_opt_str("source_path"),
+        source_field=_opt_str("source_field"),
         source_marker=options.get("source_marker"),
-        chart_zero=cast("bool", options.get("chart_zero", False)),
-        value_status=cast("str", options.get("value_status", "published")),
-        blocked_reasons=cast("Iterable[object]", options.get("blocked_reasons", ())),
-        normalization=cast("str | None", options.get("normalization")),
+        chart_zero=bool(options.get("chart_zero", False)),
+        value_status=value_status,
+        blocked_reasons=blocked_reasons,
+        normalization=_opt_str("normalization"),
     )
 
 
@@ -650,12 +658,8 @@ def _looks_like_metric(field: str, value: object) -> bool:
     )
 
 
-def _evidence_like(value: object) -> TypeGuard[Mapping[str, object]]:
-    return (
-        isinstance(value, Mapping)
-        and "normalized_value" in value
-        and "raw_value" in value
-    )
+def _evidence_like(value: object) -> TypeIs[Mapping[str, object]]:
+    return is_mapping(value) and "normalized_value" in value and "raw_value" in value
 
 
 def normalize_row(
@@ -667,9 +671,8 @@ def normalize_row(
     result: dict[str, object] = dict(row)
     metrics: dict[str, object] = {}
     existing_metrics = row.get("metrics")
-    if isinstance(existing_metrics, Mapping):
-        metrics_map = cast("Mapping[str, object]", existing_metrics)
-        for key, value in metrics_map.items():
+    if is_mapping(existing_metrics):
+        for key, value in existing_metrics.items():
             name = str(key)
             if _evidence_like(value):
                 metrics[name] = dict(value)
@@ -681,9 +684,7 @@ def normalize_row(
                 )
     existing_raw = row.get("raw_fields")
     raw_fields: dict[str, object] = (
-        dict(cast("Mapping[str, object]", existing_raw))
-        if isinstance(existing_raw, Mapping)
-        else {}
+        dict(existing_raw) if is_mapping(existing_raw) else {}
     )
     known_names = set(SEMANTIC_FIELDS)
     for key, value in row.items():
@@ -786,9 +787,7 @@ def normalize_payload(  # noqa: C901
     result: dict[str, object] = dict(payload)
     raw_metadata_value = payload.get("raw_metadata")
     raw_metadata: dict[str, object] = (
-        dict(cast("Mapping[str, object]", raw_metadata_value))
-        if isinstance(raw_metadata_value, Mapping)
-        else {}
+        dict(raw_metadata_value) if is_mapping(raw_metadata_value) else {}
     )
     for key, value in payload.items():
         name = str(key)
@@ -801,24 +800,21 @@ def normalize_payload(  # noqa: C901
                 "records",
                 "trials",
             }:
-                if isinstance(value, Sequence) and not isinstance(
-                    value, (str, bytes, bytearray)
-                ):
+                if is_sequence(value):
+                    rows_seq = [item for item in value if is_mapping(item)]
                     result[name] = normalize_rows(
-                        cast("Sequence[Mapping[str, object]]", value),
+                        rows_seq,
                         source_path=f"{source_path}.{name}",
                     )
-                elif isinstance(value, Mapping):
+                elif is_mapping(value):
                     nested = normalize_payload(
-                        cast("Mapping[str, object]", value),
+                        value,
                         source_path=f"{source_path}.{name}",
                     )
                     result[name] = nested
-            elif name in {"data", "payload", "content", "json"} and isinstance(
-                value, Mapping
-            ):
+            elif name in {"data", "payload", "content", "json"} and is_mapping(value):
                 result[name] = normalize_payload(
-                    cast("Mapping[str, object]", value),
+                    value,
                     source_path=f"{source_path}.{name}",
                 )
             continue

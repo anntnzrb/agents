@@ -6,10 +6,12 @@ DeepSWE leaderboard artifact and are used only when that artifact is selected.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final, cast
+from typing import TYPE_CHECKING, Final
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +49,7 @@ class MetricSemantics:
 
 # Ratios are represented as fractions in [0, 1] in the canonical aggregate.
 # Percent strings are accepted by the normalizer and converted to this ratio.
-_RATIO_FIELDS: Final[dict[str, dict[str, object]]] = {
+_RATIO_FIELDS: Final[dict[str, dict[str, str]]] = {
     "pass_rate": {
         "scope": "attempts",
         "denominator": "n_attempted",
@@ -77,7 +79,7 @@ _RATIO_FIELDS: Final[dict[str, dict[str, object]]] = {
     },
 }
 
-_COUNT_FIELDS: Final[dict[str, dict[str, object]]] = {
+_COUNT_FIELDS: Final[dict[str, dict[str, str]]] = {
     "n_passed": {"scope": "attempts"},
     "n_attempted": {"scope": "attempts"},
     "n_tasks_attempted": {"scope": "tasks"},
@@ -93,29 +95,29 @@ _COUNT_FIELDS: Final[dict[str, dict[str, object]]] = {
 }
 
 
-def _ratio(field: str, metadata: dict[str, object]) -> MetricSemantics:
+def _ratio(field: str, metadata: Mapping[str, str]) -> MetricSemantics:
     return MetricSemantics(
         field=field,
         unit="ratio",
         minimum=0,
         maximum=1,
         comparator="max",
-        scope=cast("str | None", metadata.get("scope")),
-        denominator=cast("str | None", metadata.get("denominator")),
-        family=cast("str | None", metadata.get("family")),
+        scope=metadata.get("scope"),
+        denominator=metadata.get("denominator"),
+        family=metadata.get("family"),
     )
 
 
-def _count(field: str, metadata: dict[str, object]) -> MetricSemantics:
+def _count(field: str, metadata: Mapping[str, str]) -> MetricSemantics:
     return MetricSemantics(
         field=field,
         unit="count",
         minimum=0,
         maximum=None,
         comparator="max",
-        scope=cast("str | None", metadata.get("scope")),
-        denominator=cast("str | None", metadata.get("denominator")),
-        family=cast("str | None", metadata.get("family")),
+        scope=metadata.get("scope"),
+        denominator=metadata.get("denominator"),
+        family=metadata.get("family"),
     )
 
 

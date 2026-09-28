@@ -5,13 +5,10 @@ wire constants and pure JSON/envelope helpers that later callers can adopt.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import TypeIs
 
 # The envelope is the existing DeepSWE protocol.  Keep this an integer: it is
 # intentionally distinct from parser and artifact versions.
@@ -151,6 +148,72 @@ def ensure_eligibility(status: str) -> str:
     return status
 
 
+def is_mapping(value: object) -> TypeIs[Mapping[str, object]]:
+    """Narrow an arbitrary value to a string-keyed mapping."""
+    return isinstance(value, Mapping)
+
+
+def is_dict(value: object) -> TypeIs[dict[str, object]]:
+    """Narrow an arbitrary value to a string-keyed dictionary."""
+    return isinstance(value, dict)
+
+
+def is_list(value: object) -> TypeIs[list[object]]:
+    """Narrow an arbitrary value to a list of objects."""
+    return isinstance(value, list)
+
+
+def is_sequence(value: object) -> TypeIs[Sequence[object]]:
+    """Narrow to a non-string, non-bytes sequence."""
+    return isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    )
+
+
+def is_items(value: object) -> TypeIs[Iterable[object]]:
+    """Narrow an arbitrary value to an iterable collection of objects."""
+    return isinstance(value, (list, tuple, set, frozenset))
+
+
+def parse_json(raw: str | bytes) -> object:
+    """Parse JSON and narrow to object."""
+    loader: Callable[..., object] = json.loads
+    return loader(raw)
+
+
+def parse_json_object(raw: str | bytes) -> dict[str, object]:
+    """Parse JSON and narrow to dict[str, object]."""
+    return as_dict(parse_json(raw))
+
+
+def parse_json_list(raw: str | bytes) -> list[object]:
+    """Parse JSON and narrow to list[object]."""
+    return as_list(parse_json(raw))
+
+
+def as_dict(value: object) -> dict[str, object]:
+    """Extract a dictionary from a mapping or raise TypeError."""
+    if is_dict(value):
+        return value
+    if is_mapping(value):
+        return dict(value)
+    msg = f"expected mapping, got {type(value).__name__}"
+    raise TypeError(msg)
+
+
+def as_list(value: object) -> list[object]:
+    """Extract a list or raise TypeError."""
+    if is_list(value):
+        return value
+    msg = f"expected list, got {type(value).__name__}"
+    raise TypeError(msg)
+
+
+def as_dict_list(value: object) -> list[dict[str, object]]:
+    """Extract a list of dictionaries or raise TypeError."""
+    return [as_dict(item) for item in as_list(value)]
+
+
 __all__ = [
     "COMPARISON_ELIGIBILITY_STATUSES",
     "COMPARISON_SEMANTIC_FIELDS",
@@ -167,11 +230,22 @@ __all__ = [
     "SEMANTIC_STATES",
     "SEMANTIC_STATUSES",
     "VALUE_STATUSES",
+    "as_dict",
+    "as_dict_list",
+    "as_list",
     "compact_json",
     "ensure_eligibility",
     "ensure_scope_status",
     "ensure_semantic_status",
     "ensure_value_status",
     "error_envelope",
+    "is_dict",
+    "is_items",
+    "is_list",
+    "is_mapping",
+    "is_sequence",
+    "parse_json",
+    "parse_json_list",
+    "parse_json_object",
     "success_envelope",
 ]

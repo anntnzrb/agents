@@ -5,17 +5,15 @@ keeps HTTP/cache concerns here so callers can consume validated payloads without
 having to infer which release or URL was used.
 """
 
-from __future__ import annotations
-
 import contextlib
 import json
 import os
 import re
 import tempfile
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, runtime_checkable
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
@@ -26,11 +24,18 @@ from .cache import (
     ArtifactNotFoundError,
     ArtifactStore,
 )
+from .contracts import (
+    is_items,
+    is_mapping,
+    is_sequence,
+    parse_json_object,
+)
 from .validation import PayloadValidationError, inspect_payload
 
 
 # A module-level hook keeps the transport injectable while still following any
 # later monkeypatch of ``urllib.request.urlopen``.
+@runtime_checkable
 class _ResponseLike(Protocol):
     status: int
     headers: object
@@ -47,15 +52,12 @@ def urlopen(
     timeout: float | None = None,
 ) -> _ResponseLike:
     """Open a request through the injectable stdlib transport."""
-    if timeout is None:
-        return cast(
-            "_ResponseLike",
-            urllib_request.urlopen(request),  # noqa: S310 - injectable stdlib transport
-        )
-    return cast(
-        "_ResponseLike",
-        urllib_request.urlopen(request, timeout=timeout),  # noqa: S310 - injectable stdlib transport
-    )
+    opener: Callable[..., object] = urllib_request.urlopen
+    resp = opener(request) if timeout is None else opener(request, timeout=timeout)
+    if isinstance(resp, _ResponseLike):
+        return resp
+    msg = f"transport returned unexpected response type: {type(resp).__name__}"
+    raise TypeError(msg)
 
 
 DEFAULT_VERSION = "v1.1"
@@ -569,14 +571,9 @@ def _read_legacy_cached(
     if not cache_path.is_file() or not metadata_path.is_file():
         return None
     try:
-        metadata_value = cast(
-            "object", json.loads(metadata_path.read_text(encoding="utf-8"))
-        )
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        metadata = parse_json_object(metadata_path.read_text(encoding="utf-8"))
+    except OSError, UnicodeError, ValueError, json.JSONDecodeError:
         return None
-    if not isinstance(metadata_value, dict):
-        return None
-    metadata = cast("dict[str, object]", metadata_value)
     if (
         metadata.get("benchmark_version") != version
         or metadata.get("artifact") != artifact_name
@@ -587,9 +584,11 @@ def _read_legacy_cached(
         raw = cache_path.read_bytes()
         payload = _decode_payload(raw, cache_path)
         _validate_payload(payload, artifact_name, version, cache_path)
-    except (OSError, UnicodeError, SourceError, ValueError):
+    except OSError, UnicodeError, SourceError, ValueError:
         return None
-    _ = metadata.setdefault("row_count", len(cast("list[object]", payload["rows"])))
+    rows_val = payload.get("rows")
+    row_count = len(rows_val) if is_sequence(rows_val) else 0
+    _ = metadata.setdefault("row_count", row_count)
     _ = metadata.setdefault("status", metadata.get("http_status"))
     return _CachedArtifact(payload, raw, metadata, cache_path)
 
@@ -624,10 +623,10 @@ def _read_immutable_cached(
         message = f"immutable cache payload is invalid for {url}: {exc}"
         raise SourceError(message, code="cache_invalid") from exc
     nested = record.get("metadata")
-    if not isinstance(nested, Mapping):
+    if not is_mapping(nested):
         message = f"immutable cache metadata is invalid for {url}"
         raise SourceError(message, code="cache_invalid")
-    metadata = dict(cast("Mapping[str, object]", nested))
+    metadata = dict(nested)
     if (
         metadata.get("benchmark_version") not in {None, version}
         or metadata.get("artifact") not in {None, artifact_name}
@@ -665,10 +664,7 @@ def _promote_legacy(  # noqa: PLR0913
         message = f"promoted cache payload is invalid for {url}: {exc}"
         raise SourceError(message, code="cache_invalid") from exc
     nested = persisted.get("metadata")
-    if isinstance(nested, Mapping):
-        merged = dict(cast("Mapping[str, object]", nested))
-    else:
-        merged = metadata
+    merged = dict(nested) if is_mapping(nested) else metadata
     immutable = _immutable_fields(record, manifest)
     merged.update(immutable)
     return _CachedArtifact(payload, raw, merged, cache_path, immutable)
@@ -799,6 +795,8 @@ def _new_metadata(  # noqa: PLR0913
     stale: bool,
 ) -> dict[str, object]:
     generated_at = payload.get("generated_at")
+    rows_raw = payload.get("rows")
+    row_count = len(rows_raw) if is_sequence(rows_raw) else 0
     metadata: dict[str, object] = {
         "schema_version": 1,
         "benchmark": "DeepSWE",
@@ -813,8 +811,8 @@ def _new_metadata(  # noqa: PLR0913
         "last_modified": last_modified,
         "Last-Modified": last_modified,
         "generated_at": generated_at if isinstance(generated_at, str) else None,
-        "row_count": len(cast("list[object]", payload["rows"])),
-        "n_rows": len(cast("list[object]", payload["rows"])),
+        "row_count": row_count,
+        "n_rows": row_count,
         "local_path": str(local_path),
         "cache_path": str(cache_path),
         "cache_reused": cache_reused,
@@ -825,14 +823,20 @@ def _new_metadata(  # noqa: PLR0913
 
 def _decode_payload(raw: bytes, path: Path) -> dict[str, object]:
     try:
-        decoded = cast("object", json.loads(raw.decode("utf-8")))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        text = raw.decode("utf-8")
+        return parse_json_object(text)
+    except UnicodeDecodeError as exc:
         message = f"malformed JSON artifact {path}: {exc}"
         raise SourceError(message, code="malformed_json") from exc
-    if not isinstance(decoded, dict):
+    except json.JSONDecodeError as exc:
+        message = f"malformed JSON artifact {path}: {exc}"
+        raise SourceError(message, code="malformed_json") from exc
+    except TypeError as exc:
         message = f"artifact {path} must contain a JSON object"
-        raise SourceError(message, code="invalid_artifact_shape")
-    return cast("dict[str, object]", decoded)
+        raise SourceError(message, code="invalid_artifact_shape") from exc
+    except ValueError as exc:
+        message = f"artifact {path} must contain a JSON object: {exc}"
+        raise SourceError(message, code="invalid_artifact_shape") from exc
 
 
 def _validate_payload(
@@ -952,9 +956,9 @@ def _validate_response_url(
 
 
 def _response_status(response: object) -> int:
-    value = cast("object", getattr(response, "status", None))
+    value: object = getattr(response, "status", None)
     if value is None:
-        raw_getcode = cast("object", getattr(response, "getcode", None))
+        raw_getcode: object = getattr(response, "getcode", None)
         value = raw_getcode() if callable(raw_getcode) else None
     if value is None:
         return HTTP_OK
@@ -969,25 +973,26 @@ def _response_status(response: object) -> int:
 
 
 def _response_headers(response: object) -> Mapping[str, str]:
-    headers = cast("object", getattr(response, "headers", None))
+    headers: object = getattr(response, "headers", None)
     return _message_headers(headers)
 
 
 def _message_headers(headers: object) -> Mapping[str, str]:
     if headers is None:
         return {}
-    if isinstance(headers, Mapping):
-        mapping = cast("Mapping[str, object]", headers)
-        return {str(key): str(value) for key, value in mapping.items()}
-    raw_items = cast("object", getattr(headers, "items", None))
+    if is_mapping(headers):
+        return {str(key): str(value) for key, value in headers.items()}
+    raw_items: object = getattr(headers, "items", None)
     if not callable(raw_items):
         return {}
-    pairs = cast("Iterable[object]", raw_items())
+    pairs_raw: object = raw_items()
+    if not is_items(pairs_raw):
+        return {}
     result: dict[str, str] = {}
-    for pair in pairs:
-        if not isinstance(pair, Sequence):
+    for pair in pairs_raw:
+        if not is_sequence(pair):
             continue
-        seq = cast("list[object]", cast("object", list(pair)))
+        seq = list(pair)
         if len(seq) != _PAIR_LENGTH:
             continue
         result[str(seq[0])] = str(seq[1])

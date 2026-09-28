@@ -1,11 +1,9 @@
 """Contract tests for conservative DeepSWE normalization."""
 # ruff: noqa: FBT003
 
-from __future__ import annotations
-
 import math
-from typing import cast
 
+from deepswe.contracts import as_dict, as_dict_list, as_list
 from deepswe.normalization import normalize_payload, normalize_row, parse_numeric
 
 
@@ -44,7 +42,7 @@ def test_numeric_strings_bool_nonfinite_and_out_of_range() -> None:
     assert parse_numeric(float("nan"), metric="n_attempted")["normalized_value"] is None
     out_of_range = parse_numeric("101%", metric="pass_at_1")
     assert out_of_range["normalized_value"] is None
-    assert "OUT_OF_RANGE" in cast("list[object]", out_of_range["blocked_reasons"])
+    assert "OUT_OF_RANGE" in as_list(out_of_range["blocked_reasons"])
 
 
 def test_chart_zero_is_placeholder_but_true_zero_is_preserved() -> None:
@@ -60,26 +58,26 @@ def test_unknown_metrics_and_raw_row_preservation() -> None:
     row = normalize_row({"model": "m", "mystery_metric": 3, "label": "future"})
     assert row["model"] == "m"
     assert row["mystery_metric"] == 3
-    raw_fields = cast("dict[str, object]", row["raw_fields"])
+    raw_fields = as_dict(row["raw_fields"])
     assert raw_fields["mystery_metric"] == 3
     assert raw_fields["label"] == "future"
-    metrics = cast("dict[str, dict[str, object]]", row["metrics"])
-    assert metrics["mystery_metric"]["metric_semantics_status"] == "unknown"
-    assert metrics["mystery_metric"]["comparison_eligibility"] == "blocked"
+    metrics = as_dict(row["metrics"])
+    mystery_meta = as_dict(metrics["mystery_metric"])
+    assert mystery_meta["metric_semantics_status"] == "unknown"
+    assert mystery_meta["comparison_eligibility"] == "blocked"
 
 
 def test_payload_unknown_metadata_is_retained() -> None:
-    payload = cast(
-        "dict[str, object]",
+    payload = as_dict(
         normalize_payload(
             {"rows": [{"config": "c", "pass_at_1": 0.2}], "future_field": {"x": 1}}
-        ),
+        )
     )
-    raw_metadata = cast("dict[str, object]", payload["raw_metadata"])
+    raw_metadata = as_dict(payload["raw_metadata"])
     assert raw_metadata["future_field"] == {"x": 1}
-    rows = cast("list[dict[str, object]]", payload["rows"])
-    row0_metrics = cast("dict[str, dict[str, object]]", rows[0]["metrics"])
-    assert row0_metrics["pass_at_1"]["normalized_value"] == 0.2
+    rows = as_dict_list(payload["rows"])
+    row0_metrics = as_dict(rows[0]["metrics"])
+    assert as_dict(row0_metrics["pass_at_1"])["normalized_value"] == 0.2
 
 
 def test_nonfinite_string_is_not_json_numeric() -> None:

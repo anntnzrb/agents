@@ -1,10 +1,8 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Run the DeepSWE metrics CLI without installing the skill package."""
-
-from __future__ import annotations
 
 import sys
 from pathlib import Path

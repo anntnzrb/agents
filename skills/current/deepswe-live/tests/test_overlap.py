@@ -1,7 +1,5 @@
 """DeepSWE overlap-kernel contract tests."""
 
-from __future__ import annotations
-
 from deepswe.overlap import dependency_summary, detect_overlap
 
 

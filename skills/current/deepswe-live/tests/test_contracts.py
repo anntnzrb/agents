@@ -1,11 +1,7 @@
 """Offline tests for the DeepSWE Phase 1 contract helpers."""
 
-from __future__ import annotations
-
 import hashlib
-import json
 import math
-from typing import cast
 
 import pytest
 
@@ -19,6 +15,7 @@ from deepswe.contracts import (
     VALUE_STATUSES,
     compact_json,
     error_envelope,
+    parse_json_object,
     success_envelope,
 )
 from deepswe.provenance import artifact_evidence, value_evidence
@@ -153,4 +150,4 @@ def test_missing_and_unparsed_evidence_preserve_raw_values_without_zero() -> Non
 def test_evidence_is_json_serializable_when_values_are_finite() -> None:
     evidence = value_evidence(raw_value=3, normalized_value=3, unit="count")
     encoded = compact_json(evidence)
-    assert cast("dict[str, object]", json.loads(encoded))["normalized_value"] == 3
+    assert parse_json_object(encoded)["normalized_value"] == 3

@@ -1,36 +1,37 @@
 """Source and value evidence projections for DeepSWE artifacts."""
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
-from typing import Final, cast
+from typing import TYPE_CHECKING, Final
 
+from .contracts import is_mapping
 from .diagnostics import redact
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 _UNSET = object()
 
 
 def _read(value: object, *names: str) -> object | None:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    if is_mapping(value):
         for name in names:
-            if name in mapping:
-                return mapping[name]
+            if name in value:
+                return value[name]
         return None
     if value is not None:
         for name in names:
-            candidate = getattr(value, name, None)
+            candidate: object = getattr(value, name, None)
             if candidate is not None:
-                return cast("object", candidate)
+                return candidate
     return None
 
 
 def _mapping(value: object) -> Mapping[str, object] | None:
-    if not isinstance(value, Mapping):
+    if not is_mapping(value):
         return None
-    return cast("Mapping[str, object]", value)
+    return value
 
 
 def _text(value: object) -> str | None:
@@ -102,7 +103,7 @@ def sha256_bytes(body: bytes | bytearray | memoryview) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def artifact_evidence(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def artifact_evidence(  # noqa: C901, PLR0913, PLR0915
     artifact: object = None,
     *,
     metadata: Mapping[str, object] | None = None,
@@ -309,9 +310,9 @@ def artifact_evidence(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if selected_stale_reason is not None:
         result["stale_reason"] = selected_stale_reason
     redacted = redact(result)
-    if not isinstance(redacted, Mapping):
+    if not is_mapping(redacted):
         return result
-    return dict(cast("Mapping[str, object]", redacted))
+    return dict(redacted)
 
 
 def value_evidence(  # noqa: PLR0913
@@ -376,9 +377,9 @@ def value_evidence(  # noqa: PLR0913
 
     _copy_artifact_keys(result, artifact_projection)
     redacted = redact(result)
-    if not isinstance(redacted, Mapping):
+    if not is_mapping(redacted):
         return result
-    return dict(cast("Mapping[str, object]", redacted))
+    return dict(redacted)
 
 
 _ARTIFACT_COPY_KEYS: Final[tuple[str, ...]] = (

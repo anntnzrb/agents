@@ -1,14 +1,12 @@
 """Deterministic source/version/cache contract tests (no live network)."""
 # ruff: noqa: RUF043
 
-from __future__ import annotations
-
 import hashlib
 import io
 import json
 from email.message import Message
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, Self, cast, final
+from typing import TYPE_CHECKING, NoReturn, Self, final
 from urllib.error import HTTPError, URLError
 
 if TYPE_CHECKING:
@@ -17,6 +15,7 @@ if TYPE_CHECKING:
 import pytest
 
 from deepswe import sources
+from deepswe.contracts import as_dict, parse_json_object
 
 LEADERBOARD = {
     "generated_at": "2026-07-25T03:13:49Z",
@@ -141,12 +140,8 @@ def patch_urlopen(monkeypatch: pytest.MonkeyPatch, opener: QueueOpener) -> None:
 
 def artifact_meta(result: dict[str, object], filename: str) -> dict[str, object]:
     """Return one artifact metadata mapping from a fetch result."""
-    artifacts = result.get("artifacts")
-    assert isinstance(artifacts, dict), result
-    artifacts_dict = cast("dict[str, object]", artifacts)
-    metadata = artifacts_dict.get(filename)
-    assert isinstance(metadata, dict), result
-    return cast("dict[str, object]", metadata)
+    artifacts = as_dict(result.get("artifacts"))
+    return as_dict(artifacts.get(filename))
 
 
 def test_resolve_latest_uses_one_configured_default(
@@ -258,17 +253,14 @@ def test_fetch_stores_immutable_hash_refs_and_manifest(
     assert raw_path.read_bytes() == body
     assert sidecar_path.is_file()
     assert manifest_path.is_file()
-    index = cast(
-        "dict[str, dict[str, object]]",
-        json.loads((cache_dir / "index.json").read_text(encoding="utf-8")),
-    )
+    index = parse_json_object((cache_dir / "index.json").read_text(encoding="utf-8"))
     source_key = str(metadata["url"])
-    assert index[source_key]["sha256"] == digest
-    manifest = cast(
-        "dict[str, dict[str, dict[str, object]]]",
-        json.loads(manifest_path.read_text(encoding="utf-8")),
-    )
-    assert manifest["sources"][source_key]["sha256"] == digest
+    index_entry = as_dict(index[source_key])
+    assert index_entry["sha256"] == digest
+    manifest = parse_json_object(manifest_path.read_text(encoding="utf-8"))
+    manifest_sources = as_dict(manifest["sources"])
+    manifest_entry = as_dict(manifest_sources[source_key])
+    assert manifest_entry["sha256"] == digest
     assert Path(str(metadata["cache_path"])).read_bytes() == body
     assert Path(str(metadata["local_path"])).read_bytes() == body
 
@@ -616,7 +608,7 @@ def test_trials_are_opt_in_and_malformed_payloads_are_errors(
         timeout=3,
         allow_stale=False,
     )
-    artifacts_map = cast("dict[str, object]", result["artifacts"])
+    artifacts_map = as_dict(result["artifacts"])
     assert "trials.json" in artifacts_map
 
     malformed = tmp_path / "malformed.json"

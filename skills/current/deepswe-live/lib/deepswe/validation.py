@@ -6,19 +6,19 @@ remain in the returned payload and are never interpreted as task or trial data.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final, NoReturn, cast
+from typing import TYPE_CHECKING, Final, NoReturn
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
+from .contracts import is_dict, is_list, is_mapping
 from .diagnostics import merge_diagnostics, redact, warning
 from .provenance import artifact_evidence
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+    from pathlib import Path
 
 BENCHMARK: Final[str] = "DeepSWE"
 LEADERBOARD_ARTIFACT: Final[str] = "leaderboard-live.json"
@@ -253,9 +253,8 @@ def _declared_version(
 
 def _schema_number(key: str, value: object, *, path: str | Path | None) -> int:
     candidate = value
-    if isinstance(candidate, Mapping):
-        mapping = cast("Mapping[str, object]", candidate)
-        candidate = mapping.get("version", mapping.get("schema_version"))
+    if is_mapping(candidate):
+        candidate = candidate.get("version", candidate.get("schema_version"))
     if isinstance(candidate, bool):
         candidate = None
     if isinstance(candidate, int):
@@ -304,24 +303,24 @@ def _schema_version(payload: Mapping[str, object], *, path: str | Path | None) -
 def _validate_shape(  # noqa: C901
     payload: object, *, path: str | Path | None
 ) -> tuple[dict[str, object], list[Mapping[str, object]]]:
-    if not isinstance(payload, Mapping):
+    if not is_dict(payload):
         _fail(
             f"artifact {_label(path)} must contain a JSON object",
             code="invalid_artifact_shape",
             path=path,
         )
-    root = cast("dict[str, object]", payload)
-    if "rows" not in root or not isinstance(root["rows"], list):
+    root = payload
+    rows_raw = root.get("rows")
+    if not is_list(rows_raw):
         _fail(
             f"artifact {_label(path)} must contain a rows array",
             code="invalid_artifact_shape",
             path=path,
             field="rows",
         )
-    rows_value = cast("list[object]", cast("object", root["rows"]))
     rows: list[Mapping[str, object]] = []
-    for index, row in enumerate(rows_value):
-        if not isinstance(row, Mapping):
+    for index, row in enumerate(rows_raw):
+        if not is_mapping(row):
             _fail(
                 f"artifact {_label(path)} rows must be JSON objects",
                 code="invalid_artifact_shape",
@@ -329,7 +328,7 @@ def _validate_shape(  # noqa: C901
                 field=f"rows[{index}]",
                 value=row,
             )
-        rows.append(cast("Mapping[str, object]", row))
+        rows.append(row)
     for key in _COUNT_KEYS:
         if key not in root:
             continue
@@ -545,15 +544,9 @@ def diagnose_payload(
         path=path,
     )
     rows_value = facts.payload.get("rows")
-    rows_list = (
-        cast("list[object]", cast("object", rows_value))
-        if isinstance(rows_value, list)
-        else []
-    )
+    rows_list = rows_value if is_list(rows_value) else []
     row_mappings: list[Mapping[str, object]] = [
-        cast("Mapping[str, object]", row)
-        for row in rows_list
-        if isinstance(row, Mapping)
+        row for row in rows_list if is_mapping(row)
     ]
     diagnostics: list[Mapping[str, object]] = []
     if facts.unknown_top_level_fields or facts.unknown_row_fields:
@@ -608,9 +601,9 @@ def diagnose_payload(
         "evidence": evidence,
     }
     redacted = redact(result)
-    if not isinstance(redacted, Mapping):
+    if not is_mapping(redacted):
         return result
-    return dict(cast("Mapping[str, object]", redacted))
+    return dict(redacted)
 
 
 __all__ = [

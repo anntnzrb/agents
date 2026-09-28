@@ -6,12 +6,12 @@ Warnings are observations only and never alter scores or dependencies.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Iterable, Mapping, Sequence
-from typing import cast
+from collections.abc import Mapping, Sequence
+
+from .contracts import is_items, is_mapping, is_sequence
 
 _COMPONENT_FIELDS: tuple[str, ...] = (
     "canonical_component_id",
@@ -53,36 +53,16 @@ def _json(value: object) -> str:
 def _claims(value: object) -> list[Mapping[str, object]]:
     if value is None:
         return []
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        dependencies = mapping.get("dependencies")
-        if isinstance(dependencies, Sequence) and not isinstance(
-            dependencies, (str, bytes, bytearray)
-        ):
-            items = dependencies
-            return [
-                cast("Mapping[str, object]", item)
-                for item in items
-                if isinstance(item, Mapping)
-            ]
-        claims = mapping.get("claims")
-        if isinstance(claims, Sequence) and not isinstance(
-            claims, (str, bytes, bytearray)
-        ):
-            claim_items = claims
-            return [
-                cast("Mapping[str, object]", item)
-                for item in claim_items
-                if isinstance(item, Mapping)
-            ]
-        return [mapping]
-    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray)):
-        entries = value
-        return [
-            cast("Mapping[str, object]", item)
-            for item in entries
-            if isinstance(item, Mapping)
-        ]
+    if is_mapping(value):
+        dependencies = value.get("dependencies")
+        if is_sequence(dependencies):
+            return [item for item in dependencies if is_mapping(item)]
+        claims = value.get("claims")
+        if is_sequence(claims):
+            return [item for item in claims if is_mapping(item)]
+        return [value]
+    if is_items(value) and not isinstance(value, (str, bytes, bytearray)):
+        return [item for item in value if is_mapping(item)]
     return []
 
 
@@ -124,21 +104,15 @@ def dependency_summary(claims: object = None) -> dict[str, object]:
     """
     if claims is None:
         return {"dependencies": [], "independence_class": "unknown"}
-    if isinstance(claims, Mapping):
-        mapping = cast("Mapping[str, object]", claims)
-        dependencies_value = mapping.get("dependencies")
-        if isinstance(dependencies_value, Sequence) and not isinstance(
-            dependencies_value, (str, bytes, bytearray)
-        ):
-            entries = dependencies_value
+    if is_mapping(claims):
+        dependencies_value = claims.get("dependencies")
+        if is_sequence(dependencies_value):
             dependencies = [
-                copy.deepcopy(cast("Mapping[str, object]", item))
-                for item in entries
-                if isinstance(item, Mapping)
+                copy.deepcopy(item) for item in dependencies_value if is_mapping(item)
             ]
         else:
             dependencies = []
-        independence = mapping.get("independence_class", "unknown")
+        independence = claims.get("independence_class", "unknown")
         return {
             "dependencies": dependencies,
             "independence_class": independence

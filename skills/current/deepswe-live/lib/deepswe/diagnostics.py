@@ -1,13 +1,16 @@
 """Stable, redacted diagnostics for the local DeepSWE contract layer."""
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import cast
+from typing import TYPE_CHECKING
+
+from .contracts import is_items, is_mapping
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 # Diagnostic codes are intentionally local to DeepSWE.  Command error codes
 # remain the lower-case strings used by the existing CLI.
@@ -62,19 +65,17 @@ def redact(value: object) -> object:
     This function is intended for diagnostic and provenance projections only.
     It deliberately leaves ordinary metric strings and numeric values untouched.
     """
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
+    if is_mapping(value):
         result: dict[str, object] = {}
-        for key, item in mapping.items():
+        for key, item in value.items():
             name = str(key)
             if _SECRET_KEY.fullmatch(name):
                 result[name] = "<redacted>"
             else:
                 result[name] = redact(item)
         return result
-    if isinstance(value, (list, tuple, set, frozenset)):
-        items = cast("list[object]", cast("object", value))
-        return [redact(item) for item in items]
+    if is_items(value):
+        return [redact(item) for item in value]
     if isinstance(value, str):
         if _SECRET_VALUE.search(value):
             return "<redacted>"
@@ -95,9 +96,7 @@ class Diagnostic:
     message: str = ""
     source_path: str | None = None
     artifact_id: str | None = None
-    details: Mapping[str, object] = field(
-        default_factory=lambda: cast("dict[str, object]", {})
-    )
+    details: Mapping[str, object] = field(default_factory=dict[str, object])
 
     def __post_init__(self) -> None:
         """Normalize and validate this diagnostic."""
@@ -171,11 +170,7 @@ def _normalise(item: Diagnostic | Mapping[str, object]) -> dict[str, object]:
     source_path_value = raw.pop("source_path", None)
     artifact_id_value = raw.pop("artifact_id", None)
     details_value = raw.pop("details", {})
-    details = (
-        dict(cast("Mapping[str, object]", details_value))
-        if isinstance(details_value, Mapping)
-        else {}
-    )
+    details = dict(details_value) if is_mapping(details_value) else {}
     result: dict[str, object] = {
         "code": code,
         "severity": severity,
@@ -201,7 +196,7 @@ def _canonical(value: object) -> str:
             separators=(",", ":"),
             allow_nan=False,
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         # A later compact JSON emission still rejects non-finite values; this
         # fallback only keeps merge ordering deterministic for diagnostics that
         # are being collected before that final boundary.
@@ -216,9 +211,8 @@ def merge_diagnostics(
     """Redact, deduplicate, and deterministically order diagnostic groups."""
     unique: dict[str, dict[str, object]] = {}
     for group in groups:
-        if isinstance(group, (Diagnostic, Mapping)):
-            single = cast("Diagnostic | Mapping[str, object]", group)
-            items: Iterable[Diagnostic | Mapping[str, object]] = (single,)
+        if isinstance(group, Diagnostic) or is_mapping(group):
+            items: Iterable[Diagnostic | Mapping[str, object]] = (group,)
         else:
             items = group
         for item in items:

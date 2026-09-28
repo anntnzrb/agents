@@ -6,15 +6,15 @@ before touching metric values, and keeps unavailable source states visible.
 """
 
 # Copyright 2026 DeepSWE contributors.
-from __future__ import annotations
 
 import copy
 import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from numbers import Real
-from typing import NamedTuple, cast
+from typing import NamedTuple
 
+from .contracts import is_mapping, is_sequence
 from .identity import canonical_identity, identity_json
 
 _DEFAULT_METRIC = "pass_at_1"
@@ -43,7 +43,7 @@ def _json(value: object) -> str:
             separators=(",", ":"),
             allow_nan=False,
         )
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return repr(value)
 
 
@@ -54,13 +54,12 @@ def _nested_candidates(
     yield snapshot
     for key in ("data", "metadata", "scope", "provenance", "artifact", "schema"):
         value = snapshot.get(key)
-        if isinstance(value, Mapping):
-            nested_mapping = cast("Mapping[str, object]", value)
-            yield nested_mapping
+        if is_mapping(value):
+            yield value
             for nested_key in ("data", "metadata", "scope", "artifact", "schema"):
-                nested = nested_mapping.get(nested_key)
-                if isinstance(nested, Mapping):
-                    yield cast("Mapping[str, object]", nested)
+                nested = value.get(nested_key)
+                if is_mapping(nested):
+                    yield nested
 
 
 def _declared_version(snapshot: Mapping[str, object]) -> str | None:
@@ -88,9 +87,8 @@ def _declared_schema(snapshot: Mapping[str, object]) -> str | int | float | None
             if isinstance(value, (str, int, float)) and not isinstance(value, bool):
                 values.append(value)
         artifact_schema = container.get("artifact_schema")
-        if isinstance(artifact_schema, Mapping):
-            schema_map = cast("Mapping[str, object]", artifact_schema)
-            value = schema_map.get("version")
+        if is_mapping(artifact_schema):
+            value = artifact_schema.get("version")
             if isinstance(value, (str, int, float)) and not isinstance(value, bool):
                 values.append(value)
     unique = {_json(value): value for value in values}
@@ -102,33 +100,18 @@ def _declared_schema(snapshot: Mapping[str, object]) -> str | int | float | None
 
 
 def _rows(snapshot: object) -> list[Mapping[str, object]]:
-    if isinstance(snapshot, Sequence) and not isinstance(
-        snapshot, (str, bytes, bytearray)
-    ):
-        entries = cast("list[object]", cast("object", snapshot))
-        return [
-            cast("Mapping[str, object]", row)
-            for row in entries
-            if isinstance(row, Mapping)
-        ]
-    if not isinstance(snapshot, Mapping):
+    if is_sequence(snapshot):
+        return [row for row in snapshot if is_mapping(row)]
+    if not is_mapping(snapshot):
         msg = "snapshot must be a mapping or a sequence of row mappings"
         raise TypeError(msg)
-    snapshot = cast("Mapping[str, object]", snapshot)
     rows_value = snapshot.get("rows")
-    if isinstance(rows_value, Sequence) and not isinstance(
-        rows_value, (str, bytes, bytearray)
-    ):
-        row_entries = cast("list[object]", cast("object", rows_value))
-        return [
-            cast("Mapping[str, object]", row)
-            for row in row_entries
-            if isinstance(row, Mapping)
-        ]
+    if is_sequence(rows_value):
+        return [row for row in rows_value if is_mapping(row)]
     for key in ("data", "payload", "artifact", "leaderboard-live.json"):
         nested = snapshot.get(key)
-        if isinstance(nested, Mapping):
-            found = _rows(cast("Mapping[str, object]", nested))
+        if is_mapping(nested):
+            found = _rows(nested)
             if found:
                 return found
     # A lone row mapping is useful for pure-kernel callers and is harmless for
@@ -146,7 +129,7 @@ def _numeric(value: object) -> Real | None:
     try:
         if not math.isfinite(float(value)):
             return None
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     return value
 
@@ -168,15 +151,14 @@ def _metric_entry(
     row: Mapping[str, object], metric: str
 ) -> Mapping[str, object] | None:
     metrics = row.get("metrics")
-    if isinstance(metrics, Mapping):
-        metrics_map = cast("Mapping[str, object]", metrics)
-        candidate = metrics_map.get(metric)
-        if isinstance(candidate, Mapping):
-            return cast("Mapping[str, object]", candidate)
+    if is_mapping(metrics):
+        candidate = metrics.get(metric)
+        if is_mapping(candidate):
+            return candidate
     candidate = row.get(metric)
-    if not isinstance(candidate, Mapping):
+    if not is_mapping(candidate):
         return None
-    return cast("Mapping[str, object]", candidate)
+    return candidate
 
 
 def _semantic_projection(value: Mapping[str, object] | None) -> dict[str, object]:
@@ -184,15 +166,13 @@ def _semantic_projection(value: Mapping[str, object] | None) -> dict[str, object
         return {}
     result: dict[str, object] = {}
     nested = value.get("semantics")
-    if isinstance(nested, Mapping):
-        semantics = cast("Mapping[str, object]", nested)
-        for key, item in semantics.items():
+    if is_mapping(nested):
+        for key, item in nested.items():
             if key in _SEMANTIC_FIELDS or key in {"family", "comparator"}:
                 result[str(key)] = copy.deepcopy(item)
     nested = value.get("metric_semantics")
-    if isinstance(nested, Mapping):
-        metric_semantics_map = cast("Mapping[str, object]", nested)
-        for key, item in metric_semantics_map.items():
+    if is_mapping(nested):
+        for key, item in nested.items():
             if key in _SEMANTIC_FIELDS or key in {"family", "comparator"}:
                 result[str(key)] = copy.deepcopy(item)
     for key in _SEMANTIC_FIELDS:
@@ -208,25 +188,25 @@ def _snapshot_metric_semantics(
     for container in _nested_candidates(snapshot):
         for key in ("metric_semantics", "semantics", "metrics"):
             candidate = container.get(key)
-            if not isinstance(candidate, Mapping):
+            if not is_mapping(candidate):
                 continue
-            candidate_map = cast("Mapping[str, object]", candidate)
+            candidate_map = candidate
             if key == "metrics":
                 nested = candidate_map.get(metric)
-                if not isinstance(nested, Mapping):
+                if not is_mapping(nested):
                     continue
-                candidate_map = cast("Mapping[str, object]", nested)
+                candidate_map = nested
             else:
                 nested = candidate_map.get(metric)
-                if isinstance(nested, Mapping):
-                    candidate_map = cast("Mapping[str, object]", nested)
+                if is_mapping(nested):
+                    candidate_map = nested
             projection = _semantic_projection(candidate_map)
-            for field, value in projection.items():
-                _ = result.setdefault(field, value)
+            for field, val in projection.items():
+                _ = result.setdefault(field, val)
     return result
 
 
-def _semantic_difference(  # noqa: PLR0911
+def _semantic_difference(
     before: Mapping[str, object], after: Mapping[str, object]
 ) -> str | None:
     if not before and not after:
@@ -245,7 +225,7 @@ def _semantic_difference(  # noqa: PLR0911
     return None
 
 
-def _observation(  # noqa: C901, PLR0911, PLR0912
+def _observation(  # noqa: C901
     row: Mapping[str, object] | None, metric: str
 ) -> _Observation:
     if row is None:

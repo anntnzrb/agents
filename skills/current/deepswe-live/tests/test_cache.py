@@ -1,15 +1,12 @@
 """Immutable DeepSWE cache and provenance contract tests."""
 
-from __future__ import annotations
-
 import hashlib
-import json
 from pathlib import Path
-from typing import cast
 
 import pytest
 
 from deepswe import cache
+from deepswe.contracts import as_dict, as_dict_list, parse_json_object
 
 SOURCE_KEY = "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json"
 BODY = b'{"benchmark":"DeepSWE","rows":[{"model":"fixture"}]}'
@@ -39,22 +36,18 @@ def test_store_writes_exact_content_addressed_bytes_and_provenance(
     assert raw_path.exists()
     assert sidecar_path.exists()
 
-    sidecar = cast(
-        "dict[str, object]", json.loads(sidecar_path.read_text(encoding="utf-8"))
-    )
+    sidecar = parse_json_object(sidecar_path.read_text(encoding="utf-8"))
     assert sidecar["sha256"] == digest
     assert sidecar["length"] == len(BODY)
-    sidecar_meta = cast("dict[str, object]", sidecar["metadata"])
+    sidecar_meta = as_dict(sidecar["metadata"])
     assert sidecar_meta["release"] == "v1.1"
     assert sidecar_meta["artifact"] == "leaderboard-live.json"
     assert sidecar_meta["etag"] == '"fixture-etag"'
 
-    index = cast(
-        "dict[str, dict[str, object]]",
-        json.loads((tmp_path / "index.json").read_text(encoding="utf-8")),
-    )
-    assert index[SOURCE_KEY]["sha256"] == digest
-    assert index[SOURCE_KEY]["metadata"] == sidecar["metadata"]
+    index = parse_json_object((tmp_path / "index.json").read_text(encoding="utf-8"))
+    index_source = as_dict(index[SOURCE_KEY])
+    assert index_source["sha256"] == digest
+    assert index_source["metadata"] == sidecar["metadata"]
 
     loaded_body, loaded = store.load(source_key=SOURCE_KEY)
     assert loaded_body == BODY
@@ -87,7 +80,7 @@ def test_metadata_urls_and_nested_credentials_are_redacted_everywhere(
     sidecar_text = sidecar_path.read_text(encoding="utf-8")
     index_text = (tmp_path / "index.json").read_text(encoding="utf-8")
     manifest = store.write_manifest()
-    manifest_path_val = cast("str", manifest["path"])
+    manifest_path_val = str(manifest["path"])
     manifest_text = (tmp_path / manifest_path_val).read_text(encoding="utf-8")
 
     for persisted in (sidecar_text, index_text, manifest_text):
@@ -96,18 +89,18 @@ def test_metadata_urls_and_nested_credentials_are_redacted_everywhere(
         assert "header-secret" not in persisted
         assert "cookie-secret" not in persisted
         assert "nested-secret" not in persisted
-    sidecar = cast("dict[str, object]", json.loads(sidecar_text))
+    sidecar = parse_json_object(sidecar_text)
     assert sidecar["source_key"] == (
         "https://example.test/data.json?access_token=<redacted>&keep=value"
     )
-    sidecar_meta = cast("dict[str, object]", sidecar["metadata"])
+    sidecar_meta = as_dict(sidecar["metadata"])
     assert (
         sidecar_meta["url"]
         == "https://example.test/data.json?api_key=<redacted>&keep=value"
     )
-    sidecar_headers = cast("dict[str, object]", sidecar_meta["headers"])
+    sidecar_headers = as_dict(sidecar_meta["headers"])
     assert sidecar_headers["Authorization"] == "<redacted>"
-    sidecar_nested = cast("list[dict[str, object]]", sidecar_meta["nested"])
+    sidecar_nested = as_dict_list(sidecar_meta["nested"])
     assert sidecar_nested[0]["token"] == "<redacted>"  # noqa: S105
 
 
@@ -191,7 +184,7 @@ def test_legacy_promotion_preserves_caller_file_and_marks_record(
     loaded, metadata = store.load(source_key=SOURCE_KEY)
     assert loaded == BODY
     assert metadata["legacy_unverified"] is True
-    metadata_inner = cast("dict[str, object]", metadata["metadata"])
+    metadata_inner = as_dict(metadata["metadata"])
     assert metadata_inner["legacy_path"] == str(legacy_path)
 
 
@@ -202,14 +195,14 @@ def test_manifest_is_content_addressed_and_immutable(tmp_path: Path) -> None:
     first = store.write_manifest()
     second = store.write_manifest()
     assert first == second
-    manifest_path_val = cast("str", first["path"])
+    manifest_path_val = str(first["path"])
     manifest_path = tmp_path / manifest_path_val
     manifest_bytes = manifest_path.read_bytes()
     digest = hashlib.sha256(manifest_bytes).hexdigest()
     assert first["sha256"] == digest
     assert first["manifest_sha256"] == digest
     assert first["length"] == len(manifest_bytes)
-    payload = cast(
-        "dict[str, dict[str, dict[str, object]]]", json.loads(manifest_bytes)
-    )
-    assert payload["sources"][SOURCE_KEY]["sha256"] == hashlib.sha256(BODY).hexdigest()
+    payload = parse_json_object(manifest_bytes.decode("utf-8"))
+    sources = as_dict(payload["sources"])
+    source_entry = as_dict(sources[SOURCE_KEY])
+    assert source_entry["sha256"] == hashlib.sha256(BODY).hexdigest()

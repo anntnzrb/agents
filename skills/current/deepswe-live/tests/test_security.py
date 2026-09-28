@@ -1,20 +1,22 @@
 """Security and metrics-only fixture checks for DeepSWE release artifacts."""
 
-from __future__ import annotations
-
 import io
 import json
 import re
 import socket
 import urllib.request
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
 
 import pytest
 
 from deepswe import cli
+from deepswe.contracts import as_dict, as_dict_list, parse_json_object
 from deepswe.diagnostics import redact
 from deepswe.provenance import artifact_evidence
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 FIXTURES = Path(__file__).parent / "fixtures"
 _SECRET_TEXT = re.compile(
@@ -58,7 +60,7 @@ def test_redaction_removes_credentials_but_preserves_metrics_and_safe_urls() -> 
         "value": "tokens",
         "url": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
     }
-    safe = cast("dict[str, object]", redact(payload))
+    safe = as_dict(redact(payload))
     encoded = json.dumps(safe, sort_keys=True)
     for secret in (
         "fixture-secret-token",
@@ -96,8 +98,9 @@ def test_provenance_redacts_nested_transport_metadata() -> None:
 
 def test_offline_guard_blocks_url_and_socket_calls() -> None:
     """The autouse policy rejects accidental transport in deterministic tests."""
+    opener: Callable[..., object] = urllib.request.urlopen
     with pytest.raises(AssertionError, match="network access is disabled"):
-        _ = cast("object", urllib.request.urlopen("https://example.test"))
+        _ = opener("https://example.test")
     with pytest.raises(AssertionError, match="network access is disabled"):
         _ = socket.create_connection(("example.test", 443))
 
@@ -118,10 +121,10 @@ def test_phase6_fixtures_cover_evidence_and_schema_diff() -> None:
         )
         == 0
     )
-    diagnose = cast("dict[str, object]", json.loads(diagnose_out.getvalue()))
+    diagnose = parse_json_object(diagnose_out.getvalue())
     assert diagnose["ok"] is True
-    diagnose_data = cast("dict[str, object]", diagnose["data"])
-    diagnose_scope = cast("dict[str, object]", diagnose_data["scope"])
+    diagnose_data = as_dict(diagnose["data"])
+    diagnose_scope = as_dict(diagnose_data["scope"])
     assert diagnose_scope["benchmark"] == "DeepSWE"
     assert "task-body" not in diagnose_out.getvalue()
 
@@ -142,8 +145,8 @@ def test_phase6_fixtures_cover_evidence_and_schema_diff() -> None:
         )
         == 0
     )
-    comparison = cast("dict[str, object]", json.loads(compare_out.getvalue()))
-    comparison_data = cast("dict[str, object]", comparison["data"])
-    comparison_blocked = cast("list[dict[str, object]]", comparison_data["blocked"])
+    comparison = parse_json_object(compare_out.getvalue())
+    comparison_data = as_dict(comparison["data"])
+    comparison_blocked = as_dict_list(comparison_data["blocked"])
     assert comparison_blocked[0]["reason"] == "schema_mismatch"
     assert comparison_data["changes"] == []

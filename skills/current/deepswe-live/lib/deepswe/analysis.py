@@ -5,20 +5,19 @@ reinterpret benchmark data.  Leaderboard rows are copied and selected for
 ranking; values calculated by this module are kept in ``derived``.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from numbers import Real
-from typing import cast
 
+from .contracts import is_mapping, is_sequence, parse_json_list
 from .diagnostics import merge_diagnostics
 from .identity import classify_duplicates
 from .normalization import normalize_rows
 
 type JsonValue = object
 type JsonRow = dict[str, JsonValue]
+type Numeric = int | float | Real
 type RowsLike = Sequence[Mapping[str, JsonValue]] | Mapping[str, JsonValue] | None
 
 _IDENTITY_FIELDS: tuple[str, ...] = (
@@ -67,25 +66,18 @@ LEGACY_IDENTITY_COMPONENT_COUNT = 3
 
 def _rows(value: object, *, normalize: bool = True) -> list[JsonRow]:
     """Return shallow row copies from either rows or a common artifact wrapper."""
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        if "rows" in mapping:
-            value = mapping.get("rows")
+    if is_mapping(value):
+        if "rows" in value:
+            value = value.get("rows")
         else:
             for key in ("leaderboard", "trials", "payload", "data"):
-                nested = mapping.get(key)
-                if isinstance(nested, Mapping) and "rows" in nested:
-                    nested_mapping = cast("Mapping[str, object]", nested)
-                    value = nested_mapping.get("rows")
+                nested = value.get(key)
+                if is_mapping(nested) and "rows" in nested:
+                    value = nested.get("rows")
                     break
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+    if not is_sequence(value):
         return []
-    entries = cast("list[object]", cast("object", value))
-    rows = [
-        dict(cast("Mapping[str, object]", row))
-        for row in entries
-        if isinstance(row, Mapping)
-    ]
+    rows = [dict(row) for row in value if is_mapping(row)]
     if not normalize:
         return rows
     return normalize_rows(rows, source_path="$.rows")
@@ -95,13 +87,12 @@ def _evidence(
     row: Mapping[str, JsonValue], metric: str
 ) -> Mapping[str, JsonValue] | None:
     metrics = row.get("metrics")
-    if not isinstance(metrics, Mapping):
+    if not is_mapping(metrics):
         return None
-    mapping = cast("Mapping[str, object]", metrics)
-    value = mapping.get(metric)
-    if not isinstance(value, Mapping):
+    value = metrics.get(metric)
+    if not is_mapping(value):
         return None
-    return cast("Mapping[str, JsonValue]", value)
+    return value
 
 
 def _metric_value(
@@ -120,11 +111,8 @@ def _metric_blockers(row: Mapping[str, JsonValue], metric: str) -> list[JsonValu
     if evidence is None:
         return ["MISSING_REQUIRED_INPUT"]
     reasons = evidence.get("blocked_reasons")
-    if isinstance(reasons, Sequence) and not isinstance(
-        reasons, (str, bytes, bytearray)
-    ):
-        items = cast("list[object]", cast("object", reasons))
-        return list(items)
+    if is_sequence(reasons):
+        return list(reasons)
     reason = evidence.get("comparison_eligibility")
     return [reason or "COMPARISON_INCOMPARABLE"]
 
@@ -136,7 +124,7 @@ def _number(value: object) -> Real | None:
     try:
         if not isfinite(float(value)):
             return None
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     return value
 
@@ -232,12 +220,9 @@ def _axis_metadata(axes: Sequence[tuple[str, str]]) -> list[JsonRow]:
 def _value_at_path(row: Mapping[str, JsonValue], path: str) -> object:
     current: object = row
     for part in path.split("."):
-        if not isinstance(current, Mapping):
+        if not is_mapping(current):
             return None
-        entries = cast(  # pyright: ignore[reportUnnecessaryCast]
-            "Mapping[str, object]", current
-        )
-        current = entries.get(part)
+        current = current.get(part)
     return current
 
 
@@ -308,11 +293,7 @@ def _decorate(
     """Copy a published row and append only module-derived fields under ``derived``."""
     item = dict(row)
     existing = item.get("derived")
-    derived: JsonRow = (
-        dict(cast("Mapping[str, object]", existing))
-        if isinstance(existing, Mapping)
-        else {}
-    )
+    derived: JsonRow = dict(existing) if is_mapping(existing) else {}
     derived["value_status"] = "derived"
     derived["ci_width"] = _ci_width(row, strict_semantics=strict_semantics)
     if rank is not None or strict_semantics:
@@ -367,18 +348,16 @@ def _safe_duplicate_identity(value: object) -> str:
     if not isinstance(value, str):
         return "<anonymous>"
     try:
-        parsed = cast("object", json.loads(value))
-    except (TypeError, ValueError):
+        parsed = parse_json_list(value)
+    except TypeError, ValueError:
         return "<anonymous>"
-    if isinstance(parsed, list):
-        entries = cast("list[object]", cast("object", parsed))
-        if len(entries) == IDENTITY_COMPONENT_COUNT:
-            return json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
-        if len(entries) == LEGACY_IDENTITY_COMPONENT_COUNT and entries[:2] != [
-            "published_id",
-            "row",
-        ]:
-            return json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
+    if len(parsed) == IDENTITY_COMPONENT_COUNT:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed[:2] != [
+        "published_id",
+        "row",
+    ]:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
     return "<anonymous>"
 
 
@@ -394,12 +373,9 @@ def _duplicate_facts(
         for group in groups:
             indexes = group.get("row_indexes")
             row_indexes: list[int] = []
-            if isinstance(indexes, Sequence) and not isinstance(
-                indexes, (str, bytes, bytearray)
-            ):
-                index_list = cast("list[object]", cast("object", indexes))
+            if is_sequence(indexes):
                 row_indexes = sorted(
-                    index for index in index_list if isinstance(index, int)
+                    index for index in indexes if isinstance(index, int)
                 )
             if bucket == "conflicting":
                 conflicting_indexes.update(row_indexes)
@@ -427,14 +403,19 @@ def _duplicate_facts(
     return conflicting_indexes, report, merge_diagnostics(diagnostics)
 
 
-def rank_rows(  # noqa: C901, PLR0912, PLR0913
+def _safe_group_indexes(group: Mapping[str, object]) -> list[object]:
+    raw = group.get("row_indexes")
+    return list(raw) if is_sequence(raw) else []
+
+
+def rank_rows(  # noqa: C901, PLR0913
     rows: RowsLike,
     metric: str,
     order: str,
     *,
-    min_pass_at_1: Real | None = None,
-    min_attempted: Real | None = None,
-    min_tasks: Real | None = None,
+    min_pass_at_1: Numeric | None = None,
+    min_attempted: Numeric | None = None,
+    min_tasks: Numeric | None = None,
     limit: int | None = 10,
     strict_semantics: object = False,
     strict_duplicates: object = False,
@@ -531,10 +512,8 @@ def rank_rows(  # noqa: C901, PLR0912, PLR0913
             bucket: [
                 {
                     "identity": _safe_duplicate_identity(group.get("identity")),
-                    "row_indexes": list(
-                        cast("list[object]", group.get("row_indexes", []))
-                    ),
-                    "count": len(cast("list[object]", group.get("row_indexes", []))),
+                    "row_indexes": _safe_group_indexes(group),
+                    "count": len(_safe_group_indexes(group)),
                 }
                 for group in groups
             ]
@@ -740,11 +719,7 @@ def derive_efficiency(
     for row in _rows(rows):
         item = dict(row)
         existing = item.get("derived")
-        derived: JsonRow = (
-            dict(cast("Mapping[str, object]", existing))
-            if isinstance(existing, Mapping)
-            else {}
-        )
+        derived: JsonRow = dict(existing) if is_mapping(existing) else {}
         efficiency: JsonRow = {}
         for name, numerator_field, denominator_field in normalized_specs:
             numerator = (
@@ -806,9 +781,9 @@ def derive_efficiency(
 def build_report(  # noqa: PLR0913
     payload: Mapping[str, JsonValue] | Sequence[Mapping[str, JsonValue]] | None,
     *,
-    min_pass_at_1: Real | None = None,
-    min_attempted: Real | None = None,
-    min_tasks: Real | None = None,
+    min_pass_at_1: Numeric | None = None,
+    min_attempted: Numeric | None = None,
+    min_tasks: Numeric | None = None,
     limit: int | None = 10,
     pareto_axes: Sequence[str | Mapping[str, object]] | None = None,
     efficiency_specs: Sequence[str | Mapping[str, object]] | None = None,
@@ -863,7 +838,9 @@ def build_report(  # noqa: PLR0913
         "counts": {
             "input": len(source_rows),
             "eligible": len(eligible),
-            "recommendations": cast("int", recommendations["count"]),
+            "recommendations": recommendations.get("count")
+            if isinstance(recommendations.get("count"), int)
+            else 0,
             "pareto": len(pareto),
         },
         "filters_applied": filters,
@@ -880,12 +857,12 @@ def build_report(  # noqa: PLR0913
             strict_semantics=strict_semantics,
         )
         filters["efficiency"] = list(efficiency_specs)
-    if isinstance(payload, Mapping):
+    if is_mapping(payload):
         for key in ("scope", "provenance", "generated_at", "raw_metadata"):
             value = payload.get(key)
             if value is not None:
-                if isinstance(value, Mapping):
-                    copied = dict(cast("Mapping[str, object]", value))
+                if is_mapping(value):
+                    copied = dict(value)
                     if key == "scope":
                         copied["value_status"] = "derived"
                     report[key] = copied

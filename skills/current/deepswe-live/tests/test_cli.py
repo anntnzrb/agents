@@ -1,19 +1,18 @@
 """CLI envelope tests use injected fixture payloads and never access the network."""
 # ruff: noqa: E501
 
-from __future__ import annotations
-
 import io
 import json
-from typing import TYPE_CHECKING, NoReturn, cast
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-    from pathlib import Path
+from typing import TYPE_CHECKING, NoReturn
 
 import pytest
 
 from deepswe import cli
+from deepswe.contracts import as_dict, as_dict_list, as_list, parse_json_object
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
 
 EXPECTED_CHANGE_COUNT = 2
 USAGE_EXIT_STATUS = 2
@@ -119,7 +118,7 @@ def invoke(
     code = cli.main(argv, stdout=stdout, stderr=stderr)
     lines = stdout.getvalue().splitlines()
     assert len(lines) == 1, stdout.getvalue()
-    envelope = cast("dict[str, object]", json.loads(lines[0]))
+    envelope = parse_json_object(lines[0])
     assert isinstance(envelope, dict)
     return code, envelope, stderr.getvalue()
 
@@ -195,14 +194,14 @@ def test_report_success_is_one_json_envelope_with_scope_and_provenance(
     assert envelope["ok"] is True
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "report"
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["benchmark"] == "DeepSWE"
     assert scope["benchmark_version"] == "v1.1"
     assert scope["value_status"] == "derived"
-    scope_filters = cast("dict[str, object]", scope["filters_applied"])
+    scope_filters = as_dict(scope["filters_applied"])
     assert scope_filters["quality_exclusion"] == "none"
-    provenance = cast("dict[str, object]", data["provenance"])
+    provenance = as_dict(data["provenance"])
     assert provenance["url"] == "fixture://deepswe/v1.1"
     assert provenance["fetched_at"] == "2026-07-25T04:00:00Z"
 
@@ -216,17 +215,17 @@ def test_report_preserves_identity_tuple_and_sections(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert {"recommendations", "raw_extrema", "pareto"} <= data.keys()
-    recs = cast("dict[str, list[dict[str, object]]]", data["recommendations"])
-    row = recs["rows"][0]
+    recs = as_dict(data["recommendations"])
+    row = as_dict_list(recs["rows"])[0]
     assert tuple(row[field] for field in IDENTITY_FIELDS) == (
         "fixture-model",
         "high",
         "fixture-harness",
         "fixture-config",
     )
-    row_derived = cast("dict[str, object]", row["derived"])
+    row_derived = as_dict(row["derived"])
     assert row_derived["value_status"] == "derived"
 
 
@@ -251,17 +250,15 @@ def test_report_supports_custom_pareto_axes_and_efficiency(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert data["pareto_axes"] == [
         {"metric": "pass_at_1", "order": "desc"},
         {"metric": "mean_cost_usd", "order": "asc"},
     ]
-    eff = cast("dict[str, list[dict[str, object]]]", data["efficiency"])
-    eff_row0 = eff["rows"][0]
-    eff_derived = cast("dict[str, dict[str, dict[str, object]]]", eff_row0["derived"])
-    assert (
-        eff_derived["efficiency"]["cost_per_attempt"]["value"] == VALID_COST_PER_ATTEMPT
-    )
+    eff = as_dict(data["efficiency"])
+    eff_row0 = as_dict_list(eff["rows"])[0]
+    eff_derived = as_dict(as_dict(eff_row0["derived"])["efficiency"])
+    assert as_dict(eff_derived["cost_per_attempt"])["value"] == VALID_COST_PER_ATTEMPT
 
 
 def test_stats_prefers_artifact_provenance_over_wrapper(
@@ -275,8 +272,8 @@ def test_stats_prefers_artifact_provenance_over_wrapper(
     }
     source.update(wrapper_provenance)
     source["provenance"] = dict(wrapper_provenance)
-    artifacts = cast("dict[str, dict[str, object]]", source["artifacts"])
-    artifacts["leaderboard-live.json"].update(
+    artifacts = as_dict(source["artifacts"])
+    as_dict(artifacts["leaderboard-live.json"]).update(
         {
             "url": "fixture://artifact/deepswe/v1.1/leaderboard-live.json",
             "fetched_at": "2026-07-25T06:00:00Z",
@@ -289,8 +286,8 @@ def test_stats_prefers_artifact_provenance_over_wrapper(
 
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
-    provenance = cast("dict[str, object]", data["provenance"])
+    data = as_dict(envelope["data"])
+    provenance = as_dict(data["provenance"])
     assert provenance["url"] == "fixture://artifact/deepswe/v1.1/leaderboard-live.json"
     assert provenance["fetched_at"] == "2026-07-25T06:00:00Z"
 
@@ -305,14 +302,14 @@ def test_trials_success_exposes_default_filter_and_raw_status(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["value_status"] == "published_raw"
-    filters = cast("dict[str, object]", scope["filters_applied"])
+    filters = as_dict(scope["filters_applied"])
     assert filters["source"] == "deep-swe"
     assert filters["eval_scope"] == "full"
     assert filters["included_in_score"] is True
-    trials_rows = cast("list[dict[str, object]]", TRIALS["rows"])
+    trials_rows = as_dict_list(TRIALS["rows"])
     assert data["rows"] == [trials_rows[0]]
 
 
@@ -326,8 +323,8 @@ def test_stats_over_published_leaderboard_rows_is_derived(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["value_status"] == "derived"
     assert data["row_count"] == len(LEADERBOARD["rows"])
 
@@ -350,8 +347,8 @@ def test_stats_copies_published_leaderboard_stats_mapping(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["value_status"] == "published"
     assert data["row_count"] == published_stats["row_count"]
     assert data["fields"] == published_stats["fields"]
@@ -371,10 +368,10 @@ def test_rank_accepts_zero_limit_with_empty_rows(
     assert envelope["ok"] is True
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "rank"
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert data["rows"] == []
     assert data["count"] == 0
-    filters = cast("dict[str, object]", data["filters_applied"])
+    filters = as_dict(data["filters_applied"])
     assert filters["limit"] == 0
 
 
@@ -437,10 +434,10 @@ def test_snapshot_is_explicit_and_historical_without_fetch(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["benchmark_version"] == "v1.1"
-    provenance = cast("dict[str, object]", data["provenance"])
+    provenance = as_dict(data["provenance"])
     assert provenance["freshness"] == "snapshot"
     assert provenance["snapshot"] is True
 
@@ -521,8 +518,8 @@ def test_compare_keeps_delimiter_colliding_configuration_identities(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    changes = cast("list[dict[str, object]]", data["changes"])
+    data = as_dict(envelope["data"])
+    changes = as_dict_list(data["changes"])
     assert len(changes) == EXPECTED_CHANGE_COUNT
     assert [change["config"] for change in changes] == [
         '["model","high","runner|config",""]',
@@ -562,10 +559,10 @@ def test_compare_uses_version_from_snapshot_path_when_payload_unversioned(
     assert code == 0
     assert diagnostics == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    scope = cast("dict[str, object]", data["scope"])
+    data = as_dict(envelope["data"])
+    scope = as_dict(data["scope"])
     assert scope["benchmark_version"] == "v1.1"
-    changes = cast("list[dict[str, object]]", data["changes"])
+    changes = as_dict_list(data["changes"])
     assert changes[0]["delta"] == 1
 
 
@@ -600,7 +597,7 @@ def test_usage_failure_still_uses_error_envelope(
     assert envelope["ok"] is False
     assert envelope["schema_version"] == 1
     assert envelope["command"] == "unknown"
-    envelope_error = cast("dict[str, object]", envelope["error"])
+    envelope_error = as_dict(envelope["error"])
     assert envelope_error["code"] == "usage"
     assert diagnostics
 
@@ -617,25 +614,25 @@ def test_schema_is_json_only_and_declares_future_additive_contract(
 
     monkeypatch.setattr(cli, "_now", _now)
     code = cli.main(["schema", "--version", "v1.1"], stdout=stdout, stderr=stderr)
-    envelope = cast("dict[str, object]", json.loads(stdout.getvalue()))
+    envelope = parse_json_object(stdout.getvalue())
     assert code == 0
     assert stderr.getvalue() == ""
     assert envelope["ok"] is True
-    data = cast("dict[str, object]", envelope["data"])
-    schema = cast("dict[str, object]", data["schema"])
+    data = as_dict(envelope["data"])
+    schema = as_dict(data["schema"])
     assert schema["commands"] == list(PUBLIC_COMMANDS)
-    scope_schema = cast("dict[str, object]", schema["scope"])
+    scope_schema = as_dict(schema["scope"])
     assert scope_schema["value_status"] == ["published", "published_raw", "derived"]
-    comp_schema = cast("dict[str, object]", schema["comparison"])
+    comp_schema = as_dict(schema["comparison"])
     assert comp_schema["strict_compare"] == "--strict-compare"
     assert comp_schema["strict_semantics"] == "--strict-semantics"
-    diag_schema = cast("dict[str, object]", schema["diagnostics"])
+    diag_schema = as_dict(schema["diagnostics"])
     assert diag_schema["field"] == "diagnostics"
-    ev_schema = cast("dict[str, object]", schema["evidence"])
-    assert "comparison_eligibility" in cast("list[object]", ev_schema["fields"])
-    overlap_schema = cast("dict[str, object]", schema["overlap"])
+    ev_schema = as_dict(schema["evidence"])
+    assert "comparison_eligibility" in as_list(ev_schema["fields"])
+    overlap_schema = as_dict(schema["overlap"])
     assert overlap_schema["dependencies"] == []
-    scope = cast("dict[str, object]", data["scope"])
+    scope = as_dict(data["scope"])
     assert scope["benchmark_version"] == "v1.1"
 
 
@@ -692,11 +689,11 @@ def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
-    changes = cast("list[dict[str, object]]", data["changes"])
+    data = as_dict(envelope["data"])
+    changes = as_dict_list(data["changes"])
     assert changes[0]["before"] == 0.2
     assert changes[0]["after"] == 0.4
-    warnings = cast("list[dict[str, object]]", data["warnings"])
+    warnings = as_dict_list(data["warnings"])
     assert any(item["code"] == "DUPLICATE_CONFLICT" for item in warnings)
 
     code, envelope, diagnostics = invoke(
@@ -705,11 +702,11 @@ def test_compare_duplicate_conflict_warns_legacy_and_blocks_strict(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert data["changes"] == []
-    blocked = cast("list[dict[str, object]]", data["blocked"])
+    blocked = as_dict_list(data["blocked"])
     assert blocked[0]["reason"] == "duplicate_conflict"
-    diags = cast("list[dict[str, object]]", data["diagnostics"])
+    diags = as_dict_list(data["diagnostics"])
     assert any(item["code"] == "DUPLICATE_CONFLICT" for item in diags)
 
 
@@ -774,11 +771,11 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert data["changes"] == []
-    blocked = cast("list[dict[str, object]]", data["blocked"])
+    blocked = as_dict_list(data["blocked"])
     assert blocked[0]["reason"] == "schema_mismatch"
-    diags = cast("list[dict[str, object]]", data["diagnostics"])
+    diags = as_dict_list(data["diagnostics"])
     assert diags[0]["code"] == "SCHEMA_DRIFT"
     right_semantic = {**right, "artifact_schema_version": 1}
 
@@ -799,8 +796,8 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
-    blocked = cast("list[dict[str, object]]", data["blocked"])
+    data = as_dict(envelope["data"])
+    blocked = as_dict_list(data["blocked"])
     assert blocked[0]["reason"] == "denominator_mismatch"
 
 
@@ -838,12 +835,12 @@ def test_diagnose_snapshot_is_offline_and_metrics_only(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
+    data = as_dict(envelope["data"])
     assert "rows" not in data
-    summary = cast("dict[str, object]", data["summary"])
+    summary = as_dict(data["summary"])
     assert summary["row_count"] == 1
-    summary_metrics = cast("dict[str, dict[str, object]]", summary["metrics"])
-    assert summary_metrics["pass_at_1"]["max"] == 0.5
+    summary_metrics = as_dict(summary["metrics"])
+    assert as_dict(summary_metrics["pass_at_1"])["max"] == 0.5
     assert "task-body" not in json.dumps(envelope)
 
 
@@ -876,8 +873,8 @@ def test_diagnose_trials_is_explicit_and_body_free(
     )
     assert code == 0
     assert diagnostics == ""
-    data = cast("dict[str, object]", envelope["data"])
-    summary = cast("dict[str, object]", data["summary"])
+    data = as_dict(envelope["data"])
+    summary = as_dict(data["summary"])
     assert summary["artifact"] == "trials.json"
     assert "rows" not in data
     assert "trial-body" not in json.dumps(envelope)

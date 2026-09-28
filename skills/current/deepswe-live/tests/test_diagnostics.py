@@ -1,9 +1,6 @@
 """Offline tests for deterministic DeepSWE diagnostics and redaction."""
 
-from __future__ import annotations
-
-from typing import cast
-
+from deepswe.contracts import as_dict, as_list
 from deepswe.diagnostics import Diagnostic, merge_diagnostics, redact
 
 
@@ -17,15 +14,15 @@ def test_recursive_redaction_removes_secret_keys_and_query_credentials() -> None
         "headers": {"Cookie": "session=secret"},
     }
     redacted = redact(value)
-    assert isinstance(redacted, dict)
-    assert redacted["authorization"] == "<redacted>"
-    nested = cast("list[object]", redacted["nested"])
+    red_dict = as_dict(redacted)
+    assert red_dict["authorization"] == "<redacted>"
+    nested = as_list(red_dict["nested"])
     assert isinstance(nested, list)
-    item0 = cast("dict[str, object]", nested[0])
+    item0 = as_dict(nested[0])
     assert item0["api_key"] == "<redacted>"
     assert item0["safe"] == "metric latency"
     assert nested[1] == ("https://example.test/report?token=<redacted>&metric=0.5")
-    headers = cast("dict[str, object]", redacted["headers"])
+    headers = as_dict(red_dict["headers"])
     assert headers["Cookie"] == "<redacted>"
 
 

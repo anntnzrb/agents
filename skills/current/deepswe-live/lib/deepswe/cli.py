@@ -1,21 +1,15 @@
 """Command-line interface for published DeepSWE benchmark artifacts."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import math
 import os
 import re
 import sys
-from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, TextIO, cast, override
+from typing import TYPE_CHECKING, NoReturn, TextIO, override
 from urllib.parse import quote as url_quote
-
-if TYPE_CHECKING:
-    from numbers import Real
 
 from .analysis import build_report, filter_trials, rank_rows
 from .contracts import (
@@ -24,6 +18,10 @@ from .contracts import (
     EVIDENCE_FIELDS,
     SEMANTIC_STATUSES,
     VALUE_STATUSES,
+    is_list,
+    is_mapping,
+    is_sequence,
+    parse_json_list,
 )
 from .contracts import SCHEMA_VERSION as CONTRACT_SCHEMA_VERSION
 from .diagnostics import merge_diagnostics, redact
@@ -34,6 +32,9 @@ from .overlap import dependency_summary
 from .sources import DEFAULT_VERSION as SOURCE_DEFAULT_VERSION
 from .sources import fetch_artifacts, load_artifact, resolve_version
 from .validation import diagnose_payload
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
 
 EXPECTED_SNAPSHOT_COUNT = 2
 
@@ -418,20 +419,61 @@ def _error(command: str, code: str, message: str) -> dict[str, object]:
     }
 
 
+def _arg_obj(args: argparse.Namespace, name: str, default: object = None) -> object:
+    getter: Callable[..., object] = getattr
+    return getter(args, name, default)
+
+
+def _arg_str(args: argparse.Namespace, name: str, default: str = "") -> str:
+    val = _arg_obj(args, name, default)
+    return str(val) if isinstance(val, (str, int, float)) else default
+
+
+def _arg_opt_str(args: argparse.Namespace, name: str) -> str | None:
+    val = _arg_obj(args, name, None)
+    return str(val) if isinstance(val, str) else None
+
+
+def _arg_opt_int(
+    args: argparse.Namespace, name: str, default: int | None = None
+) -> int | None:
+    val = _arg_obj(args, name, default)
+    if isinstance(val, bool) or not isinstance(val, int):
+        return default
+    return val
+
+
+def _arg_opt_real(args: argparse.Namespace, name: str) -> int | float | None:
+    val = _arg_obj(args, name, None)
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        return None
+    return val
+
+
+def _arg_bool(args: argparse.Namespace, name: str, *, default: bool = False) -> bool:
+    return bool(_arg_obj(args, name, default))
+
+
+def _arg_float(args: argparse.Namespace, name: str, default: float = 0.0) -> float:
+    val = _arg_obj(args, name, default)
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return float(val)
+    return default
+
+
 def _as_mapping(value: object) -> Mapping[str, object] | None:
-    if isinstance(value, Mapping):
-        return cast("Mapping[str, object]", value)
+    if is_mapping(value):
+        return value
     return None
 
 
 def _unwrap(value: object) -> object:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        if mapping.get("ok") is True:
-            data = mapping.get("data")
-            if isinstance(data, Mapping):
-                return cast("Mapping[str, object]", data)
-        return mapping
+    if is_mapping(value):
+        if value.get("ok") is True:
+            data = value.get("data")
+            if is_mapping(data):
+                return data
+        return value
     return value
 
 
@@ -443,19 +485,15 @@ def _first(mapping: Mapping[str, object], *keys: str) -> object:
 
 
 def _version_from(value: object, fallback: str | None = None) -> str | None:
-    if isinstance(value, Mapping):
-        mapping = cast("Mapping[str, object]", value)
-        candidate = _first(mapping, "benchmark_version", "version", "release")
-        if isinstance(candidate, Mapping):
-            candidate_mapping = cast("Mapping[str, object]", candidate)
-            candidate = _first(
-                candidate_mapping, "benchmark_version", "version", "name"
-            )
+    if is_mapping(value):
+        candidate = _first(value, "benchmark_version", "version", "release")
+        if is_mapping(candidate):
+            candidate = _first(candidate, "benchmark_version", "version", "name")
         if candidate is not None:
             value = candidate
         else:
             for key in ("scope", "metadata", "provenance"):
-                nested = mapping.get(key)
+                nested = value.get(key)
                 found = _version_from(nested, None)
                 if found:
                     return found
@@ -500,7 +538,7 @@ def _artifact_url(version: str | None, artifact: str) -> str:
     return f"{ARTIFACT_BASE}/{version}/{artifact}"
 
 
-def _provenance(  # noqa: C901, PLR0912
+def _provenance(  # noqa: C901
     *,
     source: object = None,
     payload: object = None,
@@ -630,9 +668,8 @@ def _with_scope(  # noqa: PLR0913
 ) -> dict[str, object]:
     del command
     mapping: dict[str, object]
-    if isinstance(value, Mapping):
-        val_map = cast("Mapping[object, object]", value)
-        mapping = {str(k): v for k, v in val_map.items()}
+    if is_mapping(value):
+        mapping = {str(k): v for k, v in value.items()}
     else:
         mapping = {"result": value}
     existing_scope = _as_mapping(mapping.get("scope")) or {}
@@ -683,8 +720,8 @@ def _value_payload(value: object, *, artifact: str) -> object:
     if mapping is not None:
         for key in ("payload", "data", "content", "json"):
             nested = mapping.get(key)
-            if isinstance(nested, (Mapping, list)):
-                return _unwrap(cast("object", nested))
+            if is_mapping(nested) or is_list(nested):
+                return _unwrap(nested)
         path = _first(mapping, "path", "local_path", "file")
         if isinstance(path, (str, Path)):
             candidate = Path(path).expanduser()
@@ -710,10 +747,10 @@ def _select_from_aliases(
             selected = _value_payload(value, artifact=artifact)
             if selected is not value or isinstance(selected, Path):
                 return selected
-            if isinstance(selected, list):
-                return cast("list[object]", selected)
-            if isinstance(selected, Mapping) and selected is not source:
-                return cast("Mapping[str, object]", selected)
+            if is_list(selected):
+                return selected
+            if is_mapping(selected) and selected is not source:
+                return selected
     return None
 
 
@@ -721,9 +758,9 @@ def _select_artifact(
     source: object, *, artifact: str, version: str | None = None
 ) -> object:
     del version
-    if not isinstance(source, Mapping):
+    if not is_mapping(source):
         return source
-    src_map = cast("Mapping[str, object]", source)
+    src_map = source
     stem = artifact.removesuffix(".json")
     aliases = (
         artifact,
@@ -736,7 +773,7 @@ def _select_artifact(
         for key in aliases:
             if key in artifacts:
                 return _value_payload(artifacts[key], artifact=artifact)
-    selected = _select_from_aliases(src_map, aliases, artifact, cast("object", source))
+    selected = _select_from_aliases(src_map, aliases, artifact, source)
     if selected is not None:
         return selected
     path = _first(
@@ -756,11 +793,9 @@ def _rows(
 ) -> list[dict[str, object]]:
     should_normalize = not trials if normalize is None else normalize
     unwrapped = _unwrap(value)
-    if isinstance(unwrapped, list):
+    if is_list(unwrapped):
         rows: list[dict[str, object]] = [
-            {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
-            for row in cast("list[object]", unwrapped)
-            if isinstance(row, Mapping)
+            {str(k): v for k, v in row.items()} for row in unwrapped if is_mapping(row)
         ]
         return normalize_rows(rows, source_path="$.rows") if should_normalize else rows
     mapping = _as_mapping(unwrapped)
@@ -773,29 +808,27 @@ def _rows(
     )
     for key in preferred:
         candidate = mapping.get(key)
-        if isinstance(candidate, list):
+        if is_list(candidate):
             rows = [
-                {str(k): v for k, v in cast("Mapping[object, object]", row).items()}
-                for row in cast("list[object]", candidate)
-                if isinstance(row, Mapping)
+                {str(k): v for k, v in row.items()}
+                for row in candidate
+                if is_mapping(row)
             ]
             return (
                 normalize_rows(rows, source_path=f"$.{key}")
                 if should_normalize
                 else rows
             )
-        if isinstance(candidate, Mapping):
+        if is_mapping(candidate):
             nested = _rows(
-                cast("Mapping[str, object]", candidate),
+                candidate,
                 trials=trials,
                 normalize=should_normalize,
             )
             if nested:
                 return nested
     if any(key in mapping for key in ("model", "config", "pass_at_1", "trial_id")):
-        rows = [
-            {str(k): v for k, v in cast("Mapping[object, object]", mapping).items()}
-        ]
+        rows = [{str(k): v for k, v in mapping.items()}]
         return normalize_rows(rows, source_path="$") if should_normalize else rows
     return []
 
@@ -804,23 +837,20 @@ def _context_payload(payload: object, *, artifact: str) -> object:
     """Normalize leaderboard payloads while preserving raw trial payloads."""
     if artifact == "trials.json":
         return payload
-    if isinstance(payload, Mapping):
-        return normalize_payload(cast("Mapping[str, object]", payload))
-    if isinstance(payload, Sequence) and not isinstance(
-        payload, (str, bytes, bytearray)
-    ):
-        return normalize_payload(cast("Sequence[Mapping[str, object]]", payload))
+    if is_mapping(payload):
+        return normalize_payload(payload)
+    if is_sequence(payload):
+        return normalize_payload([item for item in payload if is_mapping(item)])
     return normalize_payload(None)
 
 
 def _fetch_context(
     args: argparse.Namespace, *, artifact: str, include_trials: bool
 ) -> dict[str, object]:
-    raw_version = cast("object", getattr(args, "version", "latest"))
-    version_str = str(raw_version) if isinstance(raw_version, str) else "latest"
+    version_str = _arg_str(args, "version", "latest") or "latest"
     version, resolved = _resolve(version_str)
 
-    raw_out = cast("object", getattr(args, "output_dir", None))
+    raw_out = _arg_obj(args, "output_dir", None)
     output_dir = (
         raw_out
         if isinstance(raw_out, Path)
@@ -831,7 +861,7 @@ def _fetch_context(
         )
     )
 
-    raw_cache = cast("object", getattr(args, "cache_dir", None))
+    raw_cache = _arg_obj(args, "cache_dir", None)
     cache_dir = (
         raw_cache
         if isinstance(raw_cache, Path)
@@ -842,14 +872,8 @@ def _fetch_context(
         )
     )
 
-    raw_timeout = cast("object", getattr(args, "timeout", 30.0))
-    timeout = (
-        float(raw_timeout)
-        if isinstance(raw_timeout, (int, float)) and not isinstance(raw_timeout, bool)
-        else 30.0
-    )
-
-    allow_stale = bool(cast("object", getattr(args, "allow_stale", False)))
+    timeout = _arg_float(args, "timeout", 30.0)
+    allow_stale = _arg_bool(args, "allow_stale", default=False)
     try:
         source = fetch_artifacts(
             version,
@@ -875,9 +899,9 @@ def _fetch_context(
 
 
 def _snapshot_context(args: argparse.Namespace, *, artifact: str) -> dict[str, object]:
-    path_value = cast("object", getattr(args, "snapshot", None))
+    path_value = _arg_obj(args, "snapshot", None)
     if path_value is None:
-        cmd_val = cast("object", getattr(args, "command", "command"))
+        cmd_val = _arg_obj(args, "command", "command")
         message = f"{cmd_val} requires --snapshot when loading a local artifact"
         raise CliUsageError(message)
     path = (
@@ -898,7 +922,7 @@ def _snapshot_context(args: argparse.Namespace, *, artifact: str) -> dict[str, o
     if version is None:
         path_match = _VERSION_IN_PATH_RE.search(str(path))
         version = path_match.group(1) if path_match else None
-    requested_val = cast("object", getattr(args, "version", "latest"))
+    requested_val = _arg_obj(args, "version", "latest")
     requested = str(requested_val) if isinstance(requested_val, str) else "latest"
     if version is None:
         code = "version"
@@ -931,7 +955,7 @@ def _snapshot_context(args: argparse.Namespace, *, artifact: str) -> dict[str, o
 def _context(
     args: argparse.Namespace, *, artifact: str, include_trials: bool
 ) -> dict[str, object]:
-    if getattr(args, "snapshot", None) is not None:
+    if _arg_obj(args, "snapshot", None) is not None:
         return _snapshot_context(args, artifact=artifact)
     return _fetch_context(args, artifact=artifact, include_trials=include_trials)
 
@@ -943,20 +967,20 @@ def _quality_filters(args: argparse.Namespace) -> dict[str, object]:
         ("min_attempted", "min_attempted"),
         ("min_tasks", "min_tasks"),
     ):
-        value = cast("object", getattr(args, name, None))
+        value = _arg_obj(args, name, None)
         if value is not None:
             filters[key] = value
     if len(filters) > 1:
         filters["quality_exclusion"] = "explicit_thresholds"
-    pareto_axes = cast("object", getattr(args, "pareto_axis", None))
-    efficiencies = cast("object", getattr(args, "efficiency", None))
+    pareto_axes = _arg_obj(args, "pareto_axis", None)
+    efficiencies = _arg_obj(args, "efficiency", None)
     if pareto_axes is not None:
         filters["pareto_axes"] = pareto_axes
     if efficiencies is not None:
         filters["efficiency"] = efficiencies
-    if bool(getattr(args, "strict_semantics", False)):
+    if _arg_bool(args, "strict_semantics", default=False):
         filters["strict_semantics"] = True
-    if bool(getattr(args, "strict_duplicates", False)):
+    if _arg_bool(args, "strict_duplicates", default=False):
         filters["strict_duplicates"] = True
     if pareto_axes is not None or efficiencies is not None:
         filters["analysis_options"] = "explicit"
@@ -964,14 +988,13 @@ def _quality_filters(args: argparse.Namespace) -> dict[str, object]:
 
 
 def _analysis_result(value: object) -> dict[str, object]:
-    if isinstance(value, Mapping):
-        val_map = cast("Mapping[object, object]", value)
-        return {str(k): v for k, v in val_map.items()}
+    if is_mapping(value):
+        return {str(k): v for k, v in value.items()}
     return {"result": value}
 
 
 def _handle_fetch(args: argparse.Namespace) -> dict[str, object]:
-    is_trials = bool(getattr(args, "trials", False))
+    is_trials = _arg_bool(args, "trials", default=False)
     context = _fetch_context(
         args,
         artifact="trials.json" if is_trials else "leaderboard-live.json",
@@ -1008,27 +1031,29 @@ def _handle_fetch(args: argparse.Namespace) -> dict[str, object]:
 
 def _handle_report(args: argparse.Namespace) -> dict[str, object]:
     context = _context(args, artifact="leaderboard-live.json", include_trials=False)
-    min_pass = cast("Real | None", getattr(args, "min_pass_at_1", None))
-    min_att = cast("Real | None", getattr(args, "min_attempted", None))
-    min_tsk = cast("Real | None", getattr(args, "min_tasks", None))
-    lim = cast("int | None", getattr(args, "limit", None))
-    p_axes = cast(
-        "Sequence[str | Mapping[str, object]] | None",
-        getattr(args, "pareto_axis", None),
+    min_pass = _arg_opt_real(args, "min_pass_at_1")
+    min_att = _arg_opt_real(args, "min_attempted")
+    min_tsk = _arg_opt_real(args, "min_tasks")
+    lim = _arg_opt_int(args, "limit")
+    raw_p_axes = _arg_obj(args, "pareto_axis", None)
+    p_axes: Sequence[str | Mapping[str, object]] | None = (
+        [item for item in raw_p_axes if isinstance(item, str) or is_mapping(item)]
+        if is_sequence(raw_p_axes)
+        else None
     )
-    eff_specs = cast(
-        "Sequence[str | Mapping[str, object]] | None",
-        getattr(args, "efficiency", None),
+    raw_eff_specs = _arg_obj(args, "efficiency", None)
+    eff_specs: Sequence[str | Mapping[str, object]] | None = (
+        [item for item in raw_eff_specs if isinstance(item, str) or is_mapping(item)]
+        if is_sequence(raw_eff_specs)
+        else None
     )
-    strict_sem = bool(getattr(args, "strict_semantics", False))
+    strict_sem = _arg_bool(args, "strict_semantics", default=False)
     raw_payload = context["payload"]
     payload_arg: Mapping[str, object] | Sequence[Mapping[str, object]] | None = None
-    if isinstance(raw_payload, Mapping):
-        payload_arg = cast("Mapping[str, object]", raw_payload)
-    elif isinstance(raw_payload, Sequence) and not isinstance(
-        raw_payload, (str, bytes, bytearray)
-    ):
-        payload_arg = cast("Sequence[Mapping[str, object]]", raw_payload)
+    if is_mapping(raw_payload):
+        payload_arg = raw_payload
+    elif is_sequence(raw_payload):
+        payload_arg = [item for item in raw_payload if is_mapping(item)]
     try:
         result = build_report(
             payload_arg,
@@ -1063,20 +1088,17 @@ def _handle_report(args: argparse.Namespace) -> dict[str, object]:
 
 def _fetch_output(source: object) -> dict[str, object]:
     """Project fetch metadata without dumping the optional raw trial payload."""
-    if not isinstance(source, Mapping):
+    if not is_mapping(source):
         return {"artifacts": source}
-    src_map = cast("Mapping[object, object]", source)
-    data: dict[str, object] = {str(k): v for k, v in src_map.items()}
+    data: dict[str, object] = {str(k): v for k, v in source.items()}
     artifacts = data.get("artifacts")
-    if isinstance(artifacts, Mapping):
-        art_map = cast("Mapping[object, object]", artifacts)
+    if is_mapping(artifacts):
         projected: dict[str, object] = {}
-        for name, value in art_map.items():
-            if isinstance(value, Mapping):
-                val_map = cast("Mapping[object, object]", value)
+        for name, value in artifacts.items():
+            if is_mapping(value):
                 projected[str(name)] = {
                     str(key): item
-                    for key, item in val_map.items()
+                    for key, item in value.items()
                     if key
                     not in {"data", "payload", "raw", "body", "raw_body", "raw_bytes"}
                 }
@@ -1104,9 +1126,7 @@ def _fetch_output(source: object) -> dict[str, object]:
     if unknown:
         existing = data.get("raw_metadata")
         merged = (
-            {str(k): v for k, v in cast("Mapping[object, object]", existing).items()}
-            if isinstance(existing, Mapping)
-            else {}
+            {str(k): v for k, v in existing.items()} if is_mapping(existing) else {}
         )
         merged.update(unknown)
         data["raw_metadata"] = merged
@@ -1117,16 +1137,16 @@ def _fetch_output(source: object) -> dict[str, object]:
 
 def _handle_rank(args: argparse.Namespace) -> dict[str, object]:
     context = _context(args, artifact="leaderboard-live.json", include_trials=False)
-    metric_opt = cast("str | None", getattr(args, "metric_opt", None))
-    metric_pos = cast("str | None", getattr(args, "metric_pos", None))
+    metric_opt = _arg_opt_str(args, "metric_opt")
+    metric_pos = _arg_opt_str(args, "metric_pos")
     metric = metric_opt or metric_pos or "pass_at_1"
-    order = str(getattr(args, "order", "desc"))
-    min_pass = cast("Real | None", getattr(args, "min_pass_at_1", None))
-    min_att = cast("Real | None", getattr(args, "min_attempted", None))
-    min_tsk = cast("Real | None", getattr(args, "min_tasks", None))
-    lim = cast("int | None", getattr(args, "limit", None))
-    strict_sem = bool(getattr(args, "strict_semantics", False))
-    strict_dup = bool(getattr(args, "strict_duplicates", False))
+    order = _arg_str(args, "order", "desc")
+    min_pass = _arg_opt_real(args, "min_pass_at_1")
+    min_att = _arg_opt_real(args, "min_attempted")
+    min_tsk = _arg_opt_real(args, "min_tasks")
+    lim = _arg_opt_int(args, "limit")
+    strict_sem = _arg_bool(args, "strict_semantics", default=False)
+    strict_dup = _arg_bool(args, "strict_duplicates", default=False)
     rows = _rows(context["payload"])
     try:
         result = rank_rows(
@@ -1166,10 +1186,10 @@ def _handle_rank(args: argparse.Namespace) -> dict[str, object]:
 def _handle_trials(args: argparse.Namespace) -> dict[str, object]:
     context = _context(args, artifact="trials.json", include_trials=True)
     rows = _rows(context["payload"], trials=True)
-    source_val = str(getattr(args, "source", "deep-swe"))
-    eval_scope_val = str(getattr(args, "eval_scope", "full"))
-    included_only_val = bool(getattr(args, "included_only", True))
-    limit_val = cast("int | None", getattr(args, "limit", None))
+    source_val = _arg_str(args, "source", "deep-swe")
+    eval_scope_val = _arg_str(args, "eval_scope", "full")
+    included_only_val = _arg_bool(args, "included_only", default=True)
+    limit_val = _arg_opt_int(args, "limit")
     try:
         result = filter_trials(
             rows,
@@ -1225,19 +1245,12 @@ def _stats_for_rows(
         for row in rows:
             if strict_semantics:
                 metrics = row.get("metrics")
-                evidence = (
-                    cast("Mapping[str, object]", metrics).get(field)
-                    if isinstance(metrics, Mapping)
-                    else None
-                )
-                if isinstance(evidence, Mapping):
-                    evidence_map = cast("Mapping[str, object]", evidence)
-                    value = evidence_map.get("normalized_value")
-                    if evidence_map.get("comparison_eligibility") != "eligible":
-                        reasons = evidence_map.get("blocked_reasons")
-                        if isinstance(reasons, Sequence) and not isinstance(
-                            reasons, (str, bytes, bytearray)
-                        ):
+                evidence = metrics.get(field) if is_mapping(metrics) else None
+                if is_mapping(evidence):
+                    value = evidence.get("normalized_value")
+                    if evidence.get("comparison_eligibility") != "eligible":
+                        reasons = evidence.get("blocked_reasons")
+                        if is_sequence(reasons):
                             blocked.setdefault(field, []).extend(
                                 str(reason) for reason in reasons
                             )
@@ -1266,27 +1279,29 @@ def _stats_for_rows(
 
 
 def _handle_stats(args: argparse.Namespace) -> dict[str, object]:
-    is_trials = bool(getattr(args, "trials", False))
+    is_trials = _arg_bool(args, "trials", default=False)
     artifact = "trials.json" if is_trials else "leaderboard-live.json"
     context = _context(args, artifact=artifact, include_trials=is_trials)
     payload = context["payload"]
-    strict_sem = bool(getattr(args, "strict_semantics", False))
-    source_val = str(getattr(args, "source", "deep-swe"))
-    eval_scope_val = str(getattr(args, "eval_scope", "full"))
-    included_only_val = bool(getattr(args, "included_only", True))
-    limit_val = cast("int | None", getattr(args, "limit", None))
+    strict_sem = _arg_bool(args, "strict_semantics", default=False)
+    source_val = _arg_str(args, "source", "deep-swe")
+    eval_scope_val = _arg_str(args, "eval_scope", "full")
+    included_only_val = _arg_bool(args, "included_only", default=True)
+    limit_val = _arg_opt_int(args, "limit")
 
     result: dict[str, object]
     status: str
     payload_map = _as_mapping(payload)
     if (
         payload_map is not None
-        and isinstance(payload_map.get("stats"), Mapping)
+        and is_mapping(payload_map.get("stats"))
         and not is_trials
         and not strict_sem
     ):
-        stats_map = cast("Mapping[object, object]", payload_map["stats"])
-        result = {str(k): v for k, v in stats_map.items()}
+        stats_raw = payload_map.get("stats")
+        result = (
+            {str(k): v for k, v in stats_raw.items()} if is_mapping(stats_raw) else {}
+        )
         status = "published"
     elif is_trials:
         rows = _rows(
@@ -1341,22 +1356,19 @@ def _diagnose_metadata(
     context: Mapping[str, object], *, artifact: str
 ) -> tuple[Mapping[str, object] | None, Path | None]:
     source = context.get("source")
-    if isinstance(source, Mapping):
-        source_map = cast("Mapping[str, object]", source)
-        artifacts = source_map.get("artifacts")
-        if isinstance(artifacts, Mapping):
-            art_map = cast("Mapping[str, object]", artifacts)
-            candidate = art_map.get(artifact)
-            if isinstance(candidate, Mapping):
-                cand_map = cast("Mapping[str, object]", candidate)
-                local_path = cand_map.get("local_path")
+    if is_mapping(source):
+        artifacts = source.get("artifacts")
+        if is_mapping(artifacts):
+            candidate = artifacts.get(artifact)
+            if is_mapping(candidate):
+                local_path = candidate.get("local_path")
                 path = (
                     Path(str(local_path)).expanduser()
                     if isinstance(local_path, (str, Path))
                     else None
                 )
-                return cand_map, path
-        return source_map, None
+                return candidate, path
+        return source, None
     return None, None
 
 
@@ -1374,19 +1386,17 @@ def _diagnose_duplicates(
     for bucket, bucket_groups in projected.items():
         groups = report.get(bucket, bucket_groups)
         for group in groups:
-            group_map = cast("Mapping[str, object]", group)
-            indexes = group_map.get("row_indexes")
+            indexes = group.get("row_indexes")
             row_indexes = (
                 sorted(
                     int(index)
                     for index in indexes
                     if isinstance(index, (int, float, str))
                 )
-                if isinstance(indexes, Sequence)
-                and not isinstance(indexes, (str, bytes, bytearray))
+                if is_sequence(indexes)
                 else []
             )
-            identity = group_map.get("identity")
+            identity = group.get("identity")
             safe_identity = identity if isinstance(identity, str) else "<anonymous>"
             if safe_identity.startswith('["published_id","row",'):
                 safe_identity = "<anonymous>"
@@ -1422,7 +1432,7 @@ def _diagnose_duplicates(
 
 
 def _handle_diagnose(args: argparse.Namespace) -> dict[str, object]:
-    is_trials = bool(getattr(args, "trials", False))
+    is_trials = _arg_bool(args, "trials", default=False)
     artifact = "trials.json" if is_trials else "leaderboard-live.json"
     context = _context(args, artifact=artifact, include_trials=is_trials)
     metadata, materialized_path = _diagnose_metadata(context, artifact=artifact)
@@ -1448,13 +1458,8 @@ def _handle_diagnose(args: argparse.Namespace) -> dict[str, object]:
     if duplicate_diagnostics:
         existing_diags = result.get("diagnostics")
         diags_list = (
-            [
-                cast("Mapping[str, object]", item)
-                for item in existing_diags
-                if isinstance(item, Mapping)
-            ]
-            if isinstance(existing_diags, Sequence)
-            and not isinstance(existing_diags, (str, bytes, bytearray))
+            [item for item in existing_diags if is_mapping(item)]
+            if is_sequence(existing_diags)
             else []
         )
         result["diagnostics"] = merge_diagnostics(diags_list, duplicate_diagnostics)
@@ -1568,7 +1573,7 @@ def _schema_data(version: str) -> dict[str, object]:
 
 
 def _handle_schema(args: argparse.Namespace) -> dict[str, object]:
-    raw_ver = cast("object", getattr(args, "version", "latest"))
+    raw_ver = _arg_obj(args, "version", "latest")
     version, _ = _resolve(str(raw_ver) if isinstance(raw_ver, str) else "latest")
     data = {"schema": _schema_data(version)}
     return _with_scope(
@@ -1583,21 +1588,19 @@ def _handle_schema(args: argparse.Namespace) -> dict[str, object]:
 
 def _compare_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     values: list[str | Path] = []
-    snapshots = getattr(args, "snapshots", None)
-    if isinstance(snapshots, Sequence) and not isinstance(
-        snapshots, (str, bytes, bytearray)
-    ):
+    snapshots = _arg_obj(args, "snapshots", None)
+    if is_sequence(snapshots):
         values.extend(snap for snap in snapshots if isinstance(snap, (str, Path)))
-    left_opt = getattr(args, "left_opt", None)
+    left_opt = _arg_obj(args, "left_opt", None)
     if left_opt is not None and isinstance(left_opt, (str, Path)):
         values.append(left_opt)
-    right_opt = getattr(args, "right_opt", None)
+    right_opt = _arg_obj(args, "right_opt", None)
     if right_opt is not None and isinstance(right_opt, (str, Path)):
         values.append(right_opt)
-    left_pos = getattr(args, "left_pos", None)
+    left_pos = _arg_obj(args, "left_pos", None)
     if left_pos is not None and isinstance(left_pos, (str, Path)):
         values.append(left_pos)
-    right_pos = getattr(args, "right_pos", None)
+    right_pos = _arg_obj(args, "right_pos", None)
     if right_pos is not None and isinstance(right_pos, (str, Path)):
         values.append(right_pos)
     if len(values) != EXPECTED_SNAPSHOT_COUNT:
@@ -1611,18 +1614,16 @@ def _safe_compare_identity(value: object) -> str:
     if not isinstance(value, str):
         return "<anonymous>"
     try:
-        parsed = cast("object", json.loads(value))
-    except (TypeError, ValueError):
+        parsed = parse_json_list(value)
+    except TypeError, ValueError:
         return "<anonymous>"
-    if isinstance(parsed, list):
-        parsed_list = cast("list[object]", parsed)
-        if len(parsed_list) == IDENTITY_COMPONENT_COUNT:
-            return json.dumps(parsed_list, ensure_ascii=False, separators=(",", ":"))
-        if len(parsed_list) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed_list[2] != [
-            "published_id",
-            "row",
-        ]:
-            return json.dumps(parsed_list, ensure_ascii=False, separators=(",", ":"))
+    if len(parsed) == IDENTITY_COMPONENT_COUNT:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed[:2] != [
+        "published_id",
+        "row",
+    ]:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
     return "<anonymous>"
 
 
@@ -1634,10 +1635,8 @@ def _safe_compare_diagnostics(
     for item in diagnostics:
         projected: dict[str, object] = dict(item)
         details = item.get("details")
-        if isinstance(details, Mapping):
-            details_copy: dict[str, object] = {
-                str(k): v for k, v in cast("Mapping[object, object]", details).items()
-            }
+        if is_mapping(details):
+            details_copy: dict[str, object] = {str(k): v for k, v in details.items()}
             if "identity" in details_copy:
                 details_copy["identity"] = _safe_compare_identity(
                     details_copy["identity"]
@@ -1673,19 +1672,17 @@ def _duplicate_facts_for_compare(
     for bucket, bucket_groups in projected.items():
         groups = report.get(bucket, bucket_groups)
         for group in groups:
-            group_map = cast("Mapping[str, object]", group)
-            indexes = group_map.get("row_indexes")
+            indexes = group.get("row_indexes")
             row_indexes = (
                 sorted(
                     int(index)
                     for index in indexes
                     if isinstance(index, (int, float, str))
                 )
-                if isinstance(indexes, Sequence)
-                and not isinstance(indexes, (str, bytes, bytearray))
+                if is_sequence(indexes)
                 else []
             )
-            identity = _safe_compare_identity(group_map.get("identity"))
+            identity = _safe_compare_identity(group.get("identity"))
             bucket_groups.append(
                 {
                     "identity": identity,
@@ -1718,14 +1715,13 @@ def _duplicate_facts_for_compare(
 
 
 def _metadata_candidates(value: object) -> list[Mapping[str, object]]:
-    if not isinstance(value, Mapping):
+    if not is_mapping(value):
         return []
-    val_map = cast("Mapping[str, object]", value)
-    candidates: list[Mapping[str, object]] = [val_map]
+    candidates: list[Mapping[str, object]] = [value]
     for key in ("metadata", "scope", "provenance", "artifact", "data", "payload"):
-        nested = val_map.get(key)
-        if isinstance(nested, Mapping):
-            candidates.append(cast("Mapping[str, object]", nested))
+        nested = value.get(key)
+        if is_mapping(nested):
+            candidates.append(nested)
     return candidates
 
 
@@ -1738,9 +1734,8 @@ def _artifact_schema_declaration(value: object) -> object:
         for key in ("artifact_schema_version", "schema_version"):
             if key in candidate and candidate[key] is not None:
                 schema = candidate.get("artifact_schema")
-                if isinstance(schema, Mapping):
-                    schema_map = cast("Mapping[str, object]", schema)
-                    ver = schema_map.get("version")
+                if is_mapping(schema):
+                    ver = schema.get("version")
                     if ver is not None:
                         declarations.append(ver)
     unique = {
@@ -1755,21 +1750,17 @@ def _artifact_schema_declaration(value: object) -> object:
 
 
 def _semantic_projection(value: object, metric: str) -> dict[str, object]:
-    if not isinstance(value, Mapping):
+    if not is_mapping(value):
         return {}
-    val_map = cast("Mapping[str, object]", value)
-    candidates: list[Mapping[str, object]] = [val_map]
+    candidates: list[Mapping[str, object]] = [value]
     for key in ("metric_semantics", "semantics", "metrics"):
-        nested = val_map.get(key)
-        if isinstance(nested, Mapping):
-            nested_map = cast("Mapping[str, object]", nested)
+        nested = value.get(key)
+        if is_mapping(nested):
             cand_obj = (
-                nested_map.get(metric)
-                if key in ("metric_semantics", "metrics")
-                else nested_map
+                nested.get(metric) if key in ("metric_semantics", "metrics") else nested
             )
-            if isinstance(cand_obj, Mapping):
-                candidates.append(cast("Mapping[str, object]", cand_obj))
+            if is_mapping(cand_obj):
+                candidates.append(cand_obj)
     projection: dict[str, object] = {}
     for candidate in candidates:
         for key in (
@@ -1871,23 +1862,15 @@ def _comparison_numeric(
         return None, ["MISSING_ROW"]
     if strict_semantics:
         metrics = row.get("metrics")
-        evidence = (
-            cast("Mapping[str, object]", metrics).get(metric)
-            if isinstance(metrics, Mapping)
-            else None
-        )
-        if isinstance(evidence, Mapping):
-            evidence_map = cast("Mapping[str, object]", evidence)
-            reasons = evidence_map.get("blocked_reasons")
+        evidence = metrics.get(metric) if is_mapping(metrics) else None
+        if is_mapping(evidence):
+            reasons = evidence.get("blocked_reasons")
             blockers = (
-                [str(reason) for reason in reasons]
-                if isinstance(reasons, Sequence)
-                and not isinstance(reasons, (str, bytes, bytearray))
-                else []
+                [str(reason) for reason in reasons] if is_sequence(reasons) else []
             )
-            if evidence_map.get("comparison_eligibility") != "eligible":
+            if evidence.get("comparison_eligibility") != "eligible":
                 return None, blockers or ["COMPARISON_INCOMPARABLE"]
-            value = _numeric(evidence_map.get("normalized_value"))
+            value = _numeric(evidence.get("normalized_value"))
             return (value, []) if value is not None else (None, ["UNPARSED_VALUE"])
         return None, ["MISSING_REQUIRED_INPUT"]
     return _numeric(row.get(metric)), []
@@ -1969,24 +1952,19 @@ def _strict_snapshot(
     value: object,
 ) -> Mapping[str, object] | Sequence[Mapping[str, object]]:
     """Add normalized rows while preserving every snapshot metadata field."""
-    if isinstance(value, Mapping):
-        val_map = cast("Mapping[object, object]", value)
-        projected: dict[str, object] = {str(k): v for k, v in val_map.items()}
-        selected = _select_artifact(
-            cast("object", value), artifact="leaderboard-live.json"
-        )
+    if is_mapping(value):
+        projected: dict[str, object] = {str(k): v for k, v in value.items()}
+        selected = _select_artifact(value, artifact="leaderboard-live.json")
         projected["rows"] = _rows(selected, normalize=True)
         return projected
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+    if is_sequence(value):
         return [
-            {str(k): v for k, v in cast("Mapping[object, object]", item).items()}
-            for item in value
-            if isinstance(item, Mapping)
+            {str(k): v for k, v in item.items()} for item in value if is_mapping(item)
         ]
     return {}
 
 
-def _handle_compare(  # noqa: C901, PLR0912, PLR0915
+def _handle_compare(  # noqa: C901, PLR0915
     args: argparse.Namespace,
 ) -> dict[str, object]:
     left_path, right_path = _compare_paths(args)
@@ -2023,7 +2001,7 @@ def _handle_compare(  # noqa: C901, PLR0912, PLR0915
             + f"and {right_version!r}"
         )
         raise CliError(msg, detail)
-    requested = cast("object", getattr(args, "version", "latest"))
+    requested = _arg_obj(args, "version", "latest")
     if requested and requested != "latest":
         expected, _ = _resolve(str(requested))
         if expected != left_version:
@@ -2034,11 +2012,11 @@ def _handle_compare(  # noqa: C901, PLR0912, PLR0915
             )
             raise CliError(msg, detail)
 
-    strict_semantics = bool(getattr(args, "strict_semantics", False))
-    strict_compare = bool(getattr(args, "strict_compare", False))
+    strict_semantics = _arg_bool(args, "strict_semantics", default=False)
+    strict_compare = _arg_bool(args, "strict_compare", default=False)
     strict_mode = strict_compare
-    metric = str(getattr(args, "metric", "pass_at_1"))
-    limit_val = cast("int | None", getattr(args, "limit", 10))
+    metric = _arg_str(args, "metric", "pass_at_1")
+    limit_val = _arg_opt_int(args, "limit", 10)
     limit = limit_val if limit_val is not None else 10
 
     result: dict[str, object]
@@ -2062,23 +2040,13 @@ def _handle_compare(  # noqa: C901, PLR0912, PLR0915
             len(_rows(_select_artifact(right, artifact="leaderboard-live.json"))),
         )
         diagnostics_value = result.get("diagnostics", [])
-        if isinstance(diagnostics_value, Sequence) and not isinstance(
-            diagnostics_value, (str, bytes, bytearray)
-        ):
+        if is_sequence(diagnostics_value):
             result["diagnostics"] = _safe_compare_diagnostics(
-                [
-                    cast("Mapping[str, object]", item)
-                    for item in diagnostics_value
-                    if isinstance(item, Mapping)
-                ]
+                [item for item in diagnostics_value if is_mapping(item)]
             )
         changes_val = result.get("changes")
-        if isinstance(changes_val, list):
-            changes_list = [
-                cast("Mapping[str, object]", item)
-                for item in cast("list[object]", changes_val)
-                if isinstance(item, Mapping)
-            ]
+        if is_list(changes_val):
+            changes_list = [item for item in changes_val if is_mapping(item)]
 
             def diff_change_sort_key(
                 row: Mapping[str, object],
@@ -2115,8 +2083,8 @@ def _handle_compare(  # noqa: C901, PLR0912, PLR0915
         if strict_semantics:
             result["strict_semantics"] = True
         changes_val = result.get("changes")
-        if isinstance(changes_val, list):
-            result["changes"] = cast("list[object]", changes_val)[:limit]
+        if is_list(changes_val):
+            result["changes"] = changes_val[:limit]
 
     provenance = {
         "url": _uri_for(left_path),
@@ -2229,10 +2197,10 @@ def main(
     command = next((value for value in values if value in known_commands), "unknown")
     try:
         args = parser.parse_args(values)
-        if getattr(args, "command", None) is None:
+        if _arg_obj(args, "command", None) is None:
             message = "a command is required"
-            raise CliUsageError(message)  # noqa: TRY301
-        cmd_val = getattr(args, "command", None)
+            raise CliUsageError(message)
+        cmd_val = _arg_obj(args, "command", None)
         command = str(cmd_val) if isinstance(cmd_val, str) else command
         data = _dispatch(args)
     except CliUsageError as exc:
@@ -2244,7 +2212,7 @@ def main(
         # --help remains argparse-compatible. Invalid parser errors are
         # converted by _ArgumentParser.error before reaching this branch.
         return int(exc.code) if isinstance(exc.code, int) else 2
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - process boundary exception handler
         code = _exception_code(exc)
         message = _safe_error_message(str(exc) or type(exc).__name__)
         _emit(_error(command, code, message), stdout=output)

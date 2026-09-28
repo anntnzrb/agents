@@ -1,13 +1,11 @@
 """Pytest policy: deterministic DeepSWE tests must not use the network."""
 
-from __future__ import annotations
-
 import os
 import socket
 import sys
 import urllib.request
 from pathlib import Path
-from typing import NoReturn, cast
+from typing import NoReturn
 
 import pytest
 
@@ -21,7 +19,7 @@ from deepswe import sources
 
 def _live_smoke_allowed(request: pytest.FixtureRequest) -> bool:
     """Allow network only for the explicit opt-in smoke module."""
-    node: object = cast("object", request.node)
+    node: object = getattr(request, "node", None)
     module: object = getattr(node, "module", None)
     name: object = getattr(module, "__name__", "")
     return (

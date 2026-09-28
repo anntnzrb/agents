@@ -1,9 +1,6 @@
 """DeepSWE identity-kernel contract tests."""
 
-from __future__ import annotations
-
-from typing import cast
-
+from deepswe.contracts import as_list
 from deepswe.identity import canonical_identity, classify_duplicates, identity_json
 
 
@@ -68,8 +65,8 @@ def test_duplicate_groups_keep_raw_rows_and_classify_identical_conflicts() -> No
     assert len(result["conflicting"]) == 1
     assert result["identical"][0]["row_indexes"] == [0, 1]
     assert result["conflicting"][0]["row_indexes"] == [2, 3]
-    assert len(cast("list[object]", result["identical"][0]["rows"])) == 2
-    assert len(cast("list[object]", result["conflicting"][0]["rows"])) == 2
+    assert len(as_list(result["identical"][0]["rows"])) == 2
+    assert len(as_list(result["conflicting"][0]["rows"])) == 2
     assert {item["code"] for item in result["diagnostics"]} == {
         "DUPLICATE_IDENTITY",
         "DUPLICATE_CONFLICT",
@@ -89,8 +86,8 @@ def test_duplicate_classification_order_is_independent() -> None:
         return tuple(
             (
                 group["identity"],
-                tuple(cast("list[object]", group["signatures"])),
-                len(cast("list[object]", group["rows"])),
+                tuple(as_list(group["signatures"])),
+                len(as_list(group["rows"])),
             )
             for bucket in ("identical", "conflicting")
             for group in result[bucket]
