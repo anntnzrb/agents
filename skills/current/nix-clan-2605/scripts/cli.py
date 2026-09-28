@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Public entrypoint for the Clan documentation updater."""

@@ -1,16 +1,13 @@
 """Fetch, transform, and stage pinned Clan documentation snapshots."""
 
-from __future__ import annotations
-
 import hashlib
 import json
-import os
 import posixpath
 import re
 import shutil
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
@@ -72,7 +69,7 @@ class ConflictError(UpdaterError):
     """Report that an update would overwrite an existing path."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceInfo:
     """Describe the fetched branch checkout used for one update."""
 
@@ -82,7 +79,7 @@ class SourceInfo:
     checkout: Path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileDelta:
     """Describe one path-level change between source and candidate trees."""
 
@@ -92,7 +89,7 @@ class FileDelta:
     new_sha256: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _Frontmatter:
     """Store validated SKILL frontmatter values and line locations."""
 
@@ -103,7 +100,7 @@ class _Frontmatter:
     fields: dict[str, int]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Summary:
     """Summarize a planned or applied snapshot update."""
 
@@ -142,7 +139,7 @@ class Summary:
             "source_embeds": self.source_embeds,
             "excluded": self.excluded,
             "counts": counts,
-            "files": [delta.__dict__ for delta in self.files],
+            "files": [asdict(delta) for delta in self.files],
             "warnings": self.warnings,
             "source_tree_sha256": self.source_tree_sha256,
             "candidate_tree_sha256": self.candidate_tree_sha256,
@@ -1252,7 +1249,7 @@ def _compatibility_patches(
     return text
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TransformContext:
     checkout: Path
     copied: set[str]
@@ -1434,7 +1431,7 @@ def build_candidate(
 def _move_tree_contents(candidate: Path, target: Path) -> None:
     for child in sorted(candidate.iterdir()):
         destination = target / child.name
-        if os.path.lexists(destination):
+        if destination.exists(follow_symlinks=False):
             msg = f"target path appeared during apply: {destination}"
             raise ConflictError(msg)
         if child.is_symlink():
@@ -1444,7 +1441,7 @@ def _move_tree_contents(candidate: Path, target: Path) -> None:
             destination.mkdir()
             _publish_candidate(child, destination)
         else:
-            os.link(child, destination)
+            destination.hardlink_to(child)
             child.unlink()
     candidate.rmdir()
 
@@ -1455,7 +1452,7 @@ def _publish_candidate(candidate: Path, target: Path) -> None:
         raise ConflictError(msg)
     try:
         _move_tree_contents(candidate, target)
-    except (ConflictError, UpdaterError):
+    except ConflictError, UpdaterError:
         raise
     except OSError as exc:
         msg = f"could not publish candidate tree: {target}"
@@ -1486,7 +1483,7 @@ def _resolve_target_dir(
     apply: bool,
 ) -> Path:
     requested_target = (target_dir or source_dir.parent / skill_name).expanduser()
-    target_exists = os.path.lexists(requested_target)
+    target_exists = requested_target.exists(follow_symlinks=False)
     try:
         resolved = requested_target.resolve()
     except OSError as exc:
@@ -1532,7 +1529,7 @@ def _apply_candidate_tree(
             + f"{target.commit}, now {latest}"
         )
         raise UpdaterError(msg)
-    if not os.path.lexists(target_dir) or target_dir.is_symlink():
+    if not target_dir.exists(follow_symlinks=False) or target_dir.is_symlink():
         msg = f"target reservation disappeared: {target_dir}"
         raise ConflictError(msg)
     _publish_candidate(candidate, target_dir)
@@ -1606,7 +1603,7 @@ def update(
             if apply:
                 _apply_candidate_tree(repo, branch, target, candidate, resolved_target)
                 reserved = False
-                summary.applied = True
+                summary = replace(summary, applied=True)
             return summary
     except OSError as exc:
         msg = "filesystem failure during update"

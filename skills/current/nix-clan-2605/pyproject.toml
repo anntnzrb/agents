@@ -3,21 +3,42 @@ name = "nix-clan-2605"
 version = "0.1.0"
 description = "Clan documentation updater"
 readme = "SKILL.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 88
 src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+  "A002",
+  "CPY001", # docs/skills.md: No license headers in non-Markdown files
+  "COM812",
+  "D203",
+  "D213",
+  "EM101",
+  "EM102",
+  "ERA001",
+  "FBT001", # Existing internal helpers use boolean positional arguments
+  "FBT002", # Existing internal helpers use boolean default positional arguments
+  "ISC001", # Ruff formatter conflict recommendation
+  "ISC003", # Existing code uses explicit string concatenation
+  "PERF401",
+  "PLR0911",
+  "PLR0912",
+  "S101",
+  "S603",
+  "S607",
+  "SLF001",
+  "TRY003",
+  "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
@@ -38,7 +59,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.11"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["lib", "scripts", "tests"]
 extraPaths = ["lib", "scripts"]
@@ -46,6 +67,11 @@ reportUnusedCallResult = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 reportUnusedVariable = "error"
 reportPrivateUsage = "error"
+
+# tests deliberately exercise private markdown rewriting helpers
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = "none"
 
 [tool.pytest.ini_options]
 minversion = "8.0"

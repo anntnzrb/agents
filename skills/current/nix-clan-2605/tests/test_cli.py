@@ -1,9 +1,6 @@
 """Regression tests for the Clan documentation snapshot updater CLI."""
 
-from __future__ import annotations
-
 import contextlib
-import importlib
 import io
 import json
 import shutil
@@ -12,36 +9,43 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs, override
 
 import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from nix_clan_updater.core import UpdaterError
-
 ROOT = Path(__file__).resolve().parents[1]
 SUCCESS_RETURN_CODE = 0
 UPDATER_ERROR_CODE = 2
 SHA_HEX_LENGTH = 40
 TempDir = tempfile.TemporaryDirectory[str]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+LIB_DIR = ROOT / "lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
 
-_cli_module = importlib.import_module("lib.nix_clan_updater.cli")
-_core_module = importlib.import_module("lib.nix_clan_updater.core")
-main = cast("Callable[..., int]", _cli_module.main)
-updater_error = cast("type[UpdaterError]", _core_module.UpdaterError)
-_pin_clan_urls = cast("Callable[..., str]", _core_module._pin_clan_urls)
-_rewrite_markdown_line = cast("Callable[..., str]", _core_module._rewrite_markdown_line)
-_rewrite_markdown_links = cast(
-    "Callable[..., str]", _core_module._rewrite_markdown_links
+from nix_clan_updater.cli import main
+from nix_clan_updater.core import (
+    UpdaterError,
+    _pin_clan_urls,
+    _rewrite_markdown_line,
+    _rewrite_markdown_links,
+    _toc_for,
+    update_index,
+    update_notice,
+    update_skill,
 )
-_toc_for = cast("Callable[..., str]", _core_module._toc_for)
-update_index = cast("Callable[..., str]", _core_module.update_index)
-update_notice = cast("Callable[..., bytes]", _core_module.update_notice)
-update_skill = cast("Callable[..., tuple[str, str, str]]", _core_module.update_skill)
+
+updater_error = UpdaterError
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -75,26 +79,29 @@ def _write(root: Path, relative: str, text: str) -> None:
 class UpdaterCliTests(unittest.TestCase):
     """Exercise the updater through its public command-line entrypoint."""
 
-    # Attributes are initialized in setUp (unittest lifecycle).
-    temp: TempDir  # pyright: ignore[reportUninitializedInstanceVariable]
-    root: Path  # pyright: ignore[reportUninitializedInstanceVariable]
-    source: Path  # pyright: ignore[reportUninitializedInstanceVariable]
-    repo: Path  # pyright: ignore[reportUninitializedInstanceVariable]
-    target: Path  # pyright: ignore[reportUninitializedInstanceVariable]
+    def __init__(self, method_name: str = "runTest") -> None:
+        super().__init__(method_name)
+        self.temp: TempDir | None = None
+        self.root: Path = Path()
+        self.source: Path = Path()
+        self.repo: Path = Path()
+        self.target: Path = Path()
 
-    # Intentional TestCase override; typing.override needs 3.11+ (floor is 3.10).
-    def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
-        self.temp = tempfile.TemporaryDirectory(prefix="nix-clan-updater-test-")
-        self.root = Path(self.temp.name)
+    @override
+    def setUp(self) -> None:
+        temp = tempfile.TemporaryDirectory(prefix="nix-clan-updater-test-")
+        self.temp = temp
+        self.root = Path(temp.name)
         self.source = self.root / "nix-clan-2605"
         self.repo = self.root / "clan-core"
         self.target = self.root / "nix-clan-2611"
         self._make_source()
         self._make_repo()
 
-    # Intentional TestCase override; typing.override needs 3.11+ (floor is 3.10).
-    def tearDown(self) -> None:  # pyright: ignore[reportImplicitOverride]
-        self.temp.cleanup()
+    @override
+    def tearDown(self) -> None:
+        if self.temp is not None:
+            self.temp.cleanup()
 
     def _make_source(self) -> None:
         skill_text = (
@@ -240,7 +247,10 @@ github:clan/clan-core
         assert code == SUCCESS_RETURN_CODE, stderr
         assert before == _tree(self.source)
         assert not self.target.exists()
-        summary = cast("dict[str, object]", json.loads(stdout))
+        loads_fn: Callable[..., object] = json.loads
+        raw_summary = loads_fn(stdout)
+        assert _is_str_dict(raw_summary)
+        summary = raw_summary
         assert summary["release"] == "26.11"
         assert summary["skill_name"] == "nix-clan-2611"
         assert summary["excluded"] == [
@@ -249,13 +259,17 @@ github:clan/clan-core
             "docs/src/test.md",
             "docs/embeds/test.nix",
         ]
-        assert "changed" in cast("dict[str, object]", summary["counts"])
+        counts = summary.get("counts")
+        assert _is_str_dict(counts)
+        assert "changed" in counts
         transient_names = ("__pycache__", ".pytest_cache", ".ruff_cache", ".pyc")
-        for delta in cast("list[object]", summary["files"]):
-            entry = cast("dict[str, object]", delta)
-            assert not any(
-                name in cast("str", entry["path"]) for name in transient_names
-            )
+        files = summary.get("files")
+        assert _is_object_list(files)
+        for delta in files:
+            assert _is_str_dict(delta)
+            path_val = delta.get("path")
+            assert isinstance(path_val, str)
+            assert not any(name in path_val for name in transient_names)
 
     def test_same_release_dry_run_is_allowed_but_apply_is_refused(self) -> None:
         before = _tree(self.source)

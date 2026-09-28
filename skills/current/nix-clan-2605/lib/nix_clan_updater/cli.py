@@ -1,11 +1,8 @@
 """Command-line interface for the Clan documentation snapshot updater."""
 
-from __future__ import annotations
-
 import argparse
 import sys
 from pathlib import Path
-from typing import cast
 
 from .core import UpdaterError, render_summary, update
 
@@ -69,7 +66,7 @@ def main(argv: list[str] | None = None, *, skill_root: Path | None = None) -> in
 
 def _required_str(args: argparse.Namespace, field: str) -> str:
     """Narrow a required string argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     if not isinstance(value, str):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -78,7 +75,7 @@ def _required_str(args: argparse.Namespace, field: str) -> str:
 
 def _required_path(args: argparse.Namespace, field: str) -> Path:
     """Narrow a required path argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     if not isinstance(value, Path):
         message = f"Missing required argument: {field}."
         raise TypeError(message)
@@ -87,11 +84,11 @@ def _required_path(args: argparse.Namespace, field: str) -> Path:
 
 def _optional_path(args: argparse.Namespace, field: str) -> Path | None:
     """Narrow an optional path argument to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, Path) else None
 
 
 def _flag(args: argparse.Namespace, field: str) -> bool:
     """Narrow a boolean flag to a typed value."""
-    value = cast("object", getattr(args, field))
+    value = getattr(args, field, None)
     return value if isinstance(value, bool) else False
