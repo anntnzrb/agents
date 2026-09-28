@@ -211,7 +211,6 @@ def test_gateway_unit_changes_when_its_launcher_changes(home: Path) -> None:
     assert gateway_unit() != old
 
 
-
 def test_auth_gateway_unit_changes_when_its_env_changes(home: Path) -> None:
     """A rotated token must restart the gateway, so the unit tracks its env."""
     (home / ".config" / "agents").mkdir(parents=True)
