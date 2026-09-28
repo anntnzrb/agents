@@ -9,7 +9,7 @@ license: AGPL-3.0-or-later
 
 Fan out N parallel workers. They may cover separate slices, race the same brief, or mix both. The parent waits, aggregates, and returns one report.
 
-Adapted from pstack (Lauren Tan, MIT): Cursor cloud workers replaced with local Task subagents.
+Adapted from pstack (Lauren Tan, MIT): cloud workers replaced with local subagents.
 
 ## Start
 
@@ -29,7 +29,7 @@ Open a todolist with one entry per phase before launching anything.
 
 ## Phase B: Fan out
 
-Spawn all N workers in one message as Task subagents (`subagent_type: general`). Each brief stands alone. Include the goal, scope, exact slice or race arm, how to verify, and what to report. Reports use `PASS`, `ISSUES`, or `BLOCKED` with evidence.
+Spawn all N workers in parallel when the harness supports concurrent subagents; otherwise execute the briefs sequentially yourself. Each brief stands alone. Include the goal, scope, exact slice or race arm, how to verify, and what to report. Reports use `PASS`, `ISSUES`, or `BLOCKED` with evidence.
 
 If a worker drops out, proceed with N-1 and note it.
 

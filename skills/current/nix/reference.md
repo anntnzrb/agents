@@ -161,22 +161,10 @@ Read this reference before selecting Context7 repositories or query patterns.
 
 ## Parallel Context7 Queries
 
-Launch subagents to query relevant library IDs simultaneously:
+Spawn read-only subagents in parallel when the harness supports them to query relevant library IDs simultaneously; otherwise do the passes sequentially yourself:
 
-```
-// Single message with multiple parallel Task calls:
-task(
-  subagent_type="general",
-  description="Query nixpkgs docs",
-  prompt="Use `context7 docs /NixOS/nixpkgs \"<USER_QUESTION>\"` and return the key findings."
-)
-
-task(
-  subagent_type="general",
-  description="Query nix.dev docs",
-  prompt="Use `context7 docs /NixOS/nix.dev \"<USER_QUESTION>\"` and return the key findings."
-)
-```
+- Query `NixOS/nixpkgs`: `context7 docs /NixOS/nixpkgs "<USER_QUESTION>"` and extract key findings.
+- Query `NixOS/nix.dev`: `context7 docs /NixOS/nix.dev "<USER_QUESTION>"` and extract key findings.
 
 ### Example Query Patterns
 

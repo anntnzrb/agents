@@ -54,7 +54,7 @@ Capture file paths, symbols, commits, PR numbers, and linked issue ids. Every in
 
 ## Step 3. Spawn parallel investigators
 
-Launch all matching investigators in a single message so they run concurrently. One investigator per source, each read-only (`subagent_type: explore`).
+Launch all matching investigators concurrently as read-only subagents when the harness supports them; otherwise run the investigations sequentially yourself. Assign one investigator per source.
 
 Available sources in this environment:
 

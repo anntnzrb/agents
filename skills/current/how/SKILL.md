@@ -45,7 +45,7 @@ Decompose the question into 2-4 parallel exploration angles, each a distinct sli
 
 The right decomposition depends on the question. Use your judgment. Narrow questions: 2 explorers is fine. Broad subsystems: up to 4.
 
-Spawn all explorers in a single message with `subagent_type: explore` (read-only). Each explorer gets the same base instructions plus a specific angle naming its slice. Each explorer should:
+Spawn read-only explorer subagents in parallel when the harness supports them; otherwise do the passes sequentially yourself. Each explorer gets the same base instructions plus a specific angle naming its slice. Each explorer should:
 
 - Start broad: Glob for relevant directories, Grep for key types/interfaces/class names
 - Follow the thread: from an entry point, trace the call chain (callers, callees, data flow, type definitions)
@@ -59,7 +59,7 @@ Then proceed to Step 3.
 
 ### Step 2b. Direct Explain (simple questions)
 
-Spawn a single read-only subagent (`subagent_type: explore`) that explores and explains in one pass. It does its own exploration (Glob, Grep, Read) and writes the explanation directly in the output format below. Same structure, just no explorer findings as input.
+Explore and explain in one pass, either in a dedicated read-only subagent when supported or directly. Run exploration (Glob, Grep, Read) and write the explanation directly in the output format below. Same structure, just no explorer findings as input.
 
 Proceed to Step 4.
 
@@ -95,7 +95,7 @@ Run the full explain flow above. You must understand the architecture before cri
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn 2-3 independent critics in parallel (`subagent_type: general`, read-only). Each critic gets:
+After the explanation is complete, spawn 2-3 independent read-only critics in parallel when supported; otherwise run the critique passes sequentially yourself. Each critic gets:
 
 1. The explanation from Step 1 (so they don't re-explore)
 2. The relevant file paths (so they can read the actual code)

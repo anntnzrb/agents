@@ -25,18 +25,9 @@ For specific options/features or complex, unfamiliar requests:
    curl -s https://raw.githubusercontent.com/yt-dlp/yt-dlp/refs/heads/master/README.md -o <temp-dir>/yt-dlp-docs.md
    ```
 
-2. Use a **subagent** to search the docs (preserves context window):
-
-   ```
-   task(
-     subagent_type="explore",
-     description="Search yt-dlp docs",
-     prompt="Thoroughness: quick
-
-   Read <temp-dir>/yt-dlp-docs.md and find information about [SPECIFIC TOPIC].
-   Return only the relevant options and examples."
-   )
-   ```
+2. Search the docs using a read-only subagent to preserve the context window when supported, or inspect the file directly:
+   - Read `<temp-dir>/yt-dlp-docs.md` to find information about `[SPECIFIC TOPIC]`.
+   - Extract only the relevant options and examples.
 
 ## Workflow
 
