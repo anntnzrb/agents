@@ -1,7 +1,5 @@
 """Product-detail page parsing for Amazon live search."""
 
-from __future__ import annotations
-
 import re
 
 from selectolax.parser import HTMLParser

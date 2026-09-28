@@ -1,15 +1,13 @@
-from __future__ import annotations
-
 import json
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 from amz_live.cli import main
 from amz_live.protocol import serialize_results
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from decimal import Decimal
 
     import pytest
@@ -25,14 +23,29 @@ class _FakeScore(TypedDict):
     reasons: list[str]
 
 
-class _ResultItem(TypedDict):
-    asin: str
-
-
 class _ScoredResult(TypedDict):
     asin: str
     score: float
     reasons: list[str]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_search_results_payload(val: object) -> TypeIs[SearchResultsPayload]:
+    return isinstance(val, dict)
+
+
+def _is_scored_result_list(val: object) -> TypeIs[list[_ScoredResult]]:
+    return isinstance(val, list)
+
+
+def _parse_json_obj(line: str) -> dict[str, object]:
+    fn: Callable[..., object] = json.loads
+    raw = fn(line)
+    assert _is_str_dict(raw)
+    return raw
 
 
 def test_rpc_search_type_emits_llm_payload() -> None:
@@ -59,13 +72,15 @@ def test_rpc_search_type_emits_llm_payload() -> None:
     lines = stdout.getvalue().splitlines()
     assert len(lines) == 1
 
-    response = cast("dict[str, object]", json.loads(lines[0]))
+    response = _parse_json_obj(lines[0])
     assert response["id"] == "search-1"
     assert response["type"] == "response"
     assert response["command"] == "search"
     assert response["success"] is True
 
-    payload = cast("SearchResultsPayload", response["data"])
+    raw_payload = response.get("data")
+    assert _is_search_results_payload(raw_payload)
+    payload = raw_payload
     assert payload["type"] == "amz-live.search_results"
     assert payload["version"] == "1"
     assert payload["ok"] is True
@@ -87,8 +102,7 @@ def test_rpc_search_type_emits_llm_payload() -> None:
         "limit": 2,
     }
     assert payload["summary"] == {"raw_result_count": 3, "returned_result_count": 2}
-    results = cast("list[_ResultItem]", payload["results"])
-    assert [item["asin"] for item in results] == ["B0CG1LGWR6", "B07CWC39TL"]
+    assert [item["asin"] for item in payload["results"]] == ["B0CG1LGWR6", "B07CWC39TL"]
 
 
 def test_rpc_search_accepts_zip_code() -> None:
@@ -110,11 +124,13 @@ def test_rpc_search_accepts_zip_code() -> None:
 
     assert exit_code == 0
 
-    response = cast("dict[str, object]", json.loads(stdout.getvalue().strip()))
+    response = _parse_json_obj(stdout.getvalue().strip())
     assert response["id"] == "search-zip-1"
     assert response["success"] is True
-    data = cast("dict[str, object]", response["data"])
-    query = cast("dict[str, object]", data["query"])
+    data = response.get("data")
+    assert _is_str_dict(data)
+    query = data.get("query")
+    assert _is_str_dict(query)
     assert query["zip_code"] == "33101"
 
 
@@ -131,7 +147,7 @@ def test_rpc_accepts_legacy_command_and_prefers_type() -> None:
 
     assert exit_code == 0
 
-    responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+    responses = [_parse_json_obj(line) for line in stdout.getvalue().splitlines()]
     assert responses == [
         {
             "id": "legacy-1",
@@ -158,7 +174,7 @@ def test_rpc_parse_unknown_command_and_whitespace_only_line_errors() -> None:
 
     assert exit_code == 0
 
-    responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+    responses = [_parse_json_obj(line) for line in stdout.getvalue().splitlines()]
     assert responses == [
         {
             "type": "response",
@@ -268,13 +284,16 @@ def test_rpc_search_scoring_mode_emits_scores_and_reasons(
 
     assert exit_code == 0
 
-    response = cast("dict[str, object]", json.loads(stdout.getvalue().strip()))
+    response = _parse_json_obj(stdout.getvalue().strip())
     assert response["id"] == "search-score-1"
     assert response["type"] == "response"
     assert response["command"] == "search"
     assert response["success"] is True
-    data = cast("dict[str, object]", response["data"])
-    results = cast("list[_ScoredResult]", data["results"])
+    data = response.get("data")
+    assert _is_str_dict(data)
+    raw_results = data.get("results")
+    assert _is_scored_result_list(raw_results)
+    results = raw_results
     assert [item["asin"] for item in results] == [
         "B07CWC39TL",
         "B0CG1LGWR6",

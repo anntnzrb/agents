@@ -1,7 +1,5 @@
 """Amazon search URL construction."""
 
-from __future__ import annotations
-
 from urllib.parse import urlencode
 
 from .models import SearchQuery

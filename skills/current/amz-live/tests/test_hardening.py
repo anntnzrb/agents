@@ -1,17 +1,17 @@
-from __future__ import annotations
-
 import json
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pytest
 
     from amz_live.models import ProductDetailPayload
 
-import httpx
+import httpx2
 
 from amz_live.cli import main
 from amz_live.client import AmazonSearchClient
@@ -27,6 +27,15 @@ class _EnrichedResult(TypedDict):
     reasons: list[str]
     details: ProductDetailPayload
     signal_scores: dict[str, float]
+
+
+def _is_enriched_list(val: object) -> TypeIs[list[_EnrichedResult]]:
+    return isinstance(val, list)
+
+
+def _loads_json(text: str) -> object:
+    fn: Callable[..., object] = json.loads
+    return fn(text)
 
 
 def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(
@@ -68,7 +77,9 @@ def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(
 
     assert exit_code == 0
 
-    payload = cast("list[_EnrichedResult]", json.loads(stdout.getvalue()))
+    raw_payload = _loads_json(stdout.getvalue())
+    assert _is_enriched_list(raw_payload)
+    payload = raw_payload
     assert [item["asin"] for item in payload] == ["USBC1", "USBA1"]
     assert payload[0]["score"] > payload[1]["score"]
 
@@ -76,11 +87,11 @@ def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(
 def test_client_fetch_html_reuses_lightweight_cache_for_same_url() -> None:
     calls: list[str] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         calls.append(str(request.url))
-        return httpx.Response(200, text="<html>cached once</html>", request=request)
+        return httpx2.Response(200, text="<html>cached once</html>", request=request)
 
-    with httpx.Client(transport=httpx.MockTransport(handler)) as http_client:
+    with httpx2.Client(transport=httpx2.MockTransport(handler)) as http_client:
         client = AmazonSearchClient(client=http_client)
         url = "https://www.amazon.com/s?k=usb+c+to+usb+c+cable"
 
@@ -188,7 +199,9 @@ def test_scoring_output_includes_merchant_trust_from_detail_page(
 
     assert exit_code == 0
 
-    payload = cast("list[_EnrichedResult]", json.loads(stdout.getvalue()))
+    raw_payload = _loads_json(stdout.getvalue())
+    assert _is_enriched_list(raw_payload)
+    payload = raw_payload
     details = payload[0]["details"]
     assert details["ships_from"] == "Amazon.com"
     assert details["sold_by"] == "Amazon.com"

@@ -1,7 +1,5 @@
 """Sync HTTP client for live Amazon search pages."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
@@ -10,7 +8,7 @@ if TYPE_CHECKING:
 
 import http
 
-import httpx
+import httpx2
 
 from .models import AmazonAntiBotError, AmazonClientError, SearchQuery, SearchResult
 from .parser import parse_search_results
@@ -56,13 +54,13 @@ class AmazonSearchClient:
         base_url: str = AMAZON_BASE_URL,
         timeout: float = 20.0,
         headers: Mapping[str, str] | None = None,
-        client: httpx.Client | None = None,
+        client: httpx2.Client | None = None,
     ) -> None:
         """Configure base URL, timeout, headers, and transport."""
         self.base_url: str = base_url.rstrip("/")
         self._owns_client: bool = client is None
         merged_headers = {**DEFAULT_HEADERS, **(dict(headers) if headers else {})}
-        self._client: httpx.Client = client or httpx.Client(
+        self._client: httpx2.Client = client or httpx2.Client(
             headers=merged_headers,
             timeout=timeout,
             follow_redirects=True,
@@ -95,7 +93,7 @@ class AmazonSearchClient:
 
         try:
             response = self._client.get(url)
-        except httpx.HTTPError as exc:
+        except httpx2.HTTPError as exc:
             msg = f"Amazon request failed: {exc}"
             raise AmazonClientError(msg) from exc
 
@@ -135,7 +133,7 @@ class AmazonSearchClient:
                 _ = deduped.setdefault(result.asin, result)
         return list(deduped.values())
 
-    def _raise_for_bad_response(self, response: httpx.Response) -> None:
+    def _raise_for_bad_response(self, response: httpx2.Response) -> None:
         body = response.text.casefold()
         url = str(response.url)
         lowered_url = url.casefold()

@@ -1,11 +1,9 @@
 """Command-line interface for live Amazon search."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
-from typing import TYPE_CHECKING, TextIO, cast
+from typing import TYPE_CHECKING, TextIO, TypeIs
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -110,37 +108,62 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _config_str(args: argparse.Namespace, field: str) -> str:
     """Extract a required str option from parsed args."""
-    return cast("str", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, str):
+        return val
+    msg = f"expected string for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def _optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Extract an optional str option from parsed args."""
-    return cast("str | None", getattr(args, field))
+    val = getattr(args, field, None)
+    return val if isinstance(val, str) else None
 
 
 def _config_int(args: argparse.Namespace, field: str) -> int:
     """Extract a required int option from parsed args."""
-    return cast("int", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, int):
+        return val
+    msg = f"expected int for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def _optional_int(args: argparse.Namespace, field: str) -> int | None:
     """Extract an optional int option from parsed args."""
-    return cast("int | None", getattr(args, field))
+    val = getattr(args, field, None)
+    return val if isinstance(val, int) else None
 
 
 def _optional_float(args: argparse.Namespace, field: str) -> float | None:
     """Extract an optional float option from parsed args."""
-    return cast("float | None", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, (int, float)):
+        return float(val)
+    return None
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 def _config_str_list(args: argparse.Namespace, field: str) -> list[str]:
     """Extract a required string-list option from parsed args."""
-    return cast("list[str]", getattr(args, field))
+    val = getattr(args, field, None)
+    if _is_object_list(val) and all(isinstance(x, str) for x in val):
+        return [x for x in val if isinstance(x, str)]
+    msg = f"expected list[str] for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def _config_bool(args: argparse.Namespace, field: str) -> bool:
     """Extract a required bool flag from parsed args."""
-    return cast("bool", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, bool):
+        return val
+    msg = f"expected bool for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def main(

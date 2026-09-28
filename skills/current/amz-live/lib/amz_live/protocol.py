@@ -1,9 +1,9 @@
 """Protocol layer: loading, enrichment, serialization, and schemas."""
 
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+
+import httpx2
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -172,7 +172,7 @@ def enrich_results(
             try:
                 html = client.fetch_product_page(result.url)
                 enriched[result.asin] = parse_product_detail(html)
-            except Exception:
+            except httpx2.HTTPError, OSError, ValueError, TypeError:
                 continue
     return enriched, limit
 
@@ -330,7 +330,7 @@ def serialize_results(
     scores_by_asin = scores_by_asin or {}
     serialized: list[SerializedSearchResultPayload] = []
     for index, result in enumerate(results, start=1):
-        item = cast("SerializedSearchResultPayload", result.to_dict())
+        item: SerializedSearchResultPayload = {**result.to_dict()}
         if details:
             detail = details_by_asin.get(result.asin)
             item["details"] = detail.to_dict() if detail is not None else None

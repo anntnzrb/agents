@@ -1,20 +1,18 @@
-from __future__ import annotations
-
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 from amz_live.cli import main
 from amz_live.protocol import serialize_results
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from decimal import Decimal
 
     import pytest
 
     from amz_live.models import SearchResult
-    from amz_live.protocol import SearchResultsPayload, SerializedSearchResultPayload
+    from amz_live.protocol import SearchResultsPayload
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "search_results_fragment.html"
 
@@ -50,6 +48,31 @@ class _SchemaDocument(TypedDict):
     llm_json: dict[str, object]
 
 
+def _is_dict_list(val: object) -> TypeIs[list[dict[str, object]]]:
+    return isinstance(val, list)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_schema_document(val: object) -> TypeIs[_SchemaDocument]:
+    return isinstance(val, dict)
+
+
+def _is_search_results_payload(val: object) -> TypeIs[SearchResultsPayload]:
+    return isinstance(val, dict)
+
+
+def _is_scored_result_list(val: object) -> TypeIs[list[_ScoredResult]]:
+    return isinstance(val, list)
+
+
+def _loads_json(text: str) -> object:
+    fn: Callable[..., object] = json.loads
+    return fn(text)
+
+
 def test_cli_parses_fixture_filters_results_and_emits_json(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -70,7 +93,9 @@ def test_cli_parses_fixture_filters_results_and_emits_json(
 
     assert exit_code == 0
 
-    payload = cast("list[SerializedSearchResultPayload]", json.loads(capsys.readouterr().out))
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_dict_list(raw_payload)
+    payload = raw_payload
     assert [item["asin"] for item in payload] == ["B0CG1LGWR6", "B07CWC39TL"]
 
 
@@ -92,7 +117,9 @@ def test_cli_parses_fixture_include_filter_and_emits_json(
 
     assert exit_code == 0
 
-    payload = cast("list[SerializedSearchResultPayload]", json.loads(capsys.readouterr().out))
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_dict_list(raw_payload)
+    payload = raw_payload
     assert [item["asin"] for item in payload] == ["B07CWC39TL"]
 
 
@@ -116,7 +143,9 @@ def test_cli_emits_llm_json_envelope(
 
     assert exit_code == 0
 
-    payload = cast("SearchResultsPayload", json.loads(capsys.readouterr().out))
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_search_results_payload(raw_payload)
+    payload = raw_payload
     assert payload["type"] == "amz-live.search_results"
     assert payload["version"] == "1"
     assert payload["ok"] is True
@@ -148,7 +177,9 @@ def test_cli_schema_output_shape(
 
     assert exit_code == 0
 
-    payload = cast("_SchemaDocument", json.loads(capsys.readouterr().out))
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_schema_document(raw_payload)
+    payload = raw_payload
     assert payload["type"] == "amz-live.schema"
     assert payload["version"] == "1"
     assert payload["name"] == "amz-live"
@@ -257,8 +288,12 @@ def test_cli_llm_json_scoring_mode_emits_scores_and_reasons(
 
     assert exit_code == 0
 
-    payload = cast("dict[str, object]", json.loads(capsys.readouterr().out))
-    results = cast("list[_ScoredResult]", payload["results"])
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_str_dict(raw_payload)
+    payload = raw_payload
+    raw_results = payload.get("results")
+    assert _is_scored_result_list(raw_results)
+    results = raw_results
     assert [item["asin"] for item in results] == [
         "B07CWC39TL",
         "B0CG1LGWR6",

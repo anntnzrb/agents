@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
-dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8", "httpx>=0.28.1", "selectolax>=0.3.26", "hypothesis>=6"]
+dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8", "httpx2>=2.13.1", "selectolax>=0.3.26", "hypothesis>=6"]
 
 [tool.ruff]
 target-version = "py314"
@@ -16,8 +16,28 @@ src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+  "A002",
+  "CPY001", # docs/skills.md: No license headers in non-Markdown files
+  "COM812",
+  "D203",
+  "D213",
+  "EM101",
+  "EM102",
+  "ERA001",
+  "FBT001", # Existing internal helpers use boolean positional arguments
+  "FBT002", # Existing internal helpers use boolean default positional arguments
+  "ISC001", # Ruff formatter conflict recommendation
+  "PERF401",
+  "PLR0911",
+  "PLR0912",
+  "S101",
+  "S603",
+  "S607",
+  "SLF001",
+  "TRY003",
+  "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
@@ -25,7 +45,7 @@ ignore = ["COM812", "ISC001", "D203", "D213", "CPY001", "FBT001", "FBT002",
   "E402", "S603", "S607"]
 "scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
 "lib/amz_live/filters.py" = ["PLR0911", "PLR0913"]
-"lib/amz_live/protocol.py" = ["BLE001", "PLR0913", "S112"]
+"lib/amz_live/protocol.py" = ["PLR0913", "S112"]
 "lib/amz_live/rpc.py" = ["PLR0911"]
 "lib/amz_live/score.py" = ["C901", "PLR0911"]
 

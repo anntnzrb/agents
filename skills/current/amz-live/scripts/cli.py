@@ -1,13 +1,12 @@
 # /// script
-# requires-python = ">=3.14,<3.15"
+# requires-python = ">=3.14"
 # dependencies = [
-#   "httpx>=0.28.1",
+#   "httpx2>=2.13.1",
 #   "selectolax>=0.3.26",
+#   "hypothesis>=6",
 # ]
 # ///
 """Thin PEP 723 entrypoint for the amz-live CLI."""
-
-from __future__ import annotations
 
 import sys
 from pathlib import Path

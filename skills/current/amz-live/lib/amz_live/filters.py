@@ -1,7 +1,5 @@
 """Rating, price, and text filters for Amazon search results."""
 
-from __future__ import annotations
-
 from decimal import Decimal
 from typing import TYPE_CHECKING
 

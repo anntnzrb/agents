@@ -1,10 +1,8 @@
 """JSONL RPC interface for Amazon live search."""
 
-from __future__ import annotations
-
 import json
-from collections.abc import Mapping, Sequence
-from typing import Literal, NotRequired, TextIO, TypedDict, cast, overload
+from collections.abc import Callable, Mapping, Sequence
+from typing import Literal, NotRequired, TextIO, TypedDict, TypeIs, overload
 
 from .models import AmazonLiveSearchError
 from .protocol import (
@@ -22,6 +20,10 @@ class PingPayload(TypedDict):
 
     ok: bool
     version: str
+
+
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
 
 
 class RpcErrorPayload(TypedDict):
@@ -69,7 +71,8 @@ def run_rpc(*, stdin: TextIO, stdout: TextIO) -> int:
 def handle_rpc_line(line: str) -> RpcResponse:
     """Handle one JSONL RPC request line."""
     try:
-        parsed = cast("object", json.loads(line))
+        loads_fn: Callable[..., object] = json.loads
+        parsed = loads_fn(line)
     except json.JSONDecodeError:
         return _error_response(
             command="unknown",
@@ -77,14 +80,14 @@ def handle_rpc_line(line: str) -> RpcResponse:
             message="Invalid JSON request.",
         )
 
-    if not isinstance(parsed, Mapping):
+    if not _is_str_mapping(parsed):
         return _error_response(
             command="unknown",
             code="parse_error",
             message="JSON request must be an object.",
         )
 
-    request = cast("Mapping[str, object]", parsed)
+    request = parsed
     request_id = _read_request_id(request.get("id"))
     try:
         command = _read_command(request)

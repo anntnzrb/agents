@@ -1,15 +1,13 @@
-from __future__ import annotations
-
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 from amz_live.cli import main
 from amz_live.parser import parse_search_results
 from amz_live.protocol import get_schema_document
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     import pytest
 
@@ -44,11 +42,32 @@ class _DetailsSchema(TypedDict):
     cli: _CliSchema
 
 
+def _is_product_detail_payload(val: object) -> TypeIs[ProductDetailPayload]:
+    return isinstance(val, dict)
+
+
+def _is_asin_list(val: object) -> TypeIs[list[_AsinItem]]:
+    return isinstance(val, list)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_details_schema(val: object) -> TypeIs[_DetailsSchema]:
+    return isinstance(val, dict)
+
+
+def _loads_json(text: str) -> object:
+    fn: Callable[..., object] = json.loads
+    return fn(text)
+
+
 def _detail_payload(item: Mapping[str, object]) -> ProductDetailPayload | None:
     details = item.get("details")
-    if not isinstance(details, dict):
+    if not _is_product_detail_payload(details):
         return None
-    return cast("ProductDetailPayload", cast("object", details))
+    return details
 
 
 def _patch_detail_fetch(monkeypatch: pytest.MonkeyPatch, detail_html: str) -> list[str]:
@@ -114,7 +133,9 @@ def test_cli_json_details_enriches_only_up_to_detail_limit(
 
     assert exit_code == 0
 
-    payload = cast("list[_AsinItem]", json.loads(capsys.readouterr().out))
+    raw_payload = _loads_json(capsys.readouterr().out)
+    assert _is_asin_list(raw_payload)
+    payload = raw_payload
     assert [item["asin"] for item in payload] == ["B07CWC39TL", "B0CG1LGWR6"]
     assert fetched == ["B07CWC39TL"]
 
@@ -162,20 +183,27 @@ def test_rpc_search_details_enriches_only_up_to_detail_limit(
 
     assert exit_code == 0
 
-    response = cast("dict[str, object]", json.loads(stdout.getvalue()))
+    raw_response = _loads_json(stdout.getvalue())
+    assert _is_str_dict(raw_response)
+    response = raw_response
     assert response["id"] == "details-1"
     assert response["success"] is True
     assert fetched == ["B07CWC39TL"]
 
-    payload = cast("dict[str, object]", response["data"])
-    results = cast("list[_AsinItem]", payload["results"])
+    raw_payload = response.get("data")
+    assert _is_str_dict(raw_payload)
+    raw_results = raw_payload.get("results")
+    assert _is_asin_list(raw_results)
+    results = raw_results
     assert [item["asin"] for item in results] == ["B07CWC39TL", "B0CG1LGWR6"]
     assert _detail_payload(results[0]) is not None
     assert _detail_payload(results[1]) is None
 
 
 def test_schema_advertises_details_and_detail_limit_support() -> None:
-    schema = cast("_DetailsSchema", cast("object", get_schema_document()))
+    raw_schema = _loads_json(json.dumps(get_schema_document()))
+    assert _is_details_schema(raw_schema)
+    schema = raw_schema
 
     search_properties = schema["rpc"]["commands"]["search"]["request"]["properties"]
     assert search_properties["details"] == {"type": ["boolean", "null"]}

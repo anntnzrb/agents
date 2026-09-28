@@ -1,7 +1,5 @@
 """Search-results page parsing for Amazon live search."""
 
-from __future__ import annotations
-
 import re
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin

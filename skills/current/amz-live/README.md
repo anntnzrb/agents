@@ -18,8 +18,8 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py --help
-uv run --with pytest --with hypothesis --with httpx --with selectolax pytest
-uv run --with pyright --with httpx --with selectolax pyright
+uv run --with pytest --with hypothesis --with httpx2 --with selectolax pytest
+uv run --with basedpyright --with httpx2 --with selectolax basedpyright
 ```
 
 ## CLI
