@@ -1,15 +1,11 @@
 """Resolve the model endpoint configuration for autommit."""
 
-from __future__ import annotations
-
 import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final, cast
+from typing import Final
 
 from autommit.errors import AutommitError
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
 
 # owner defaults; flags and environment variables override each one
 DEFAULT_MODEL: Final[str] = "gemini-3.8-flash-high"
@@ -65,12 +61,17 @@ def _first_text(candidates: Sequence[object], default: str) -> str:
 def _parse_timeout(candidate: object) -> float | None:
     if candidate is None:
         return None
-    try:
-        value = float(cast("float", candidate))
-    except (TypeError, ValueError) as error:
+    if isinstance(candidate, int | float | str | bytes | bytearray):
+        try:
+            value = float(candidate)
+        except ValueError as error:
+            raise AutommitError(
+                "invalid_config", f"Autommit timeout must be a number: {candidate}."
+            ) from error
+    else:
         raise AutommitError(
             "invalid_config", f"Autommit timeout must be a number: {candidate}."
-        ) from error
+        )
     if value <= 0:
         raise AutommitError("invalid_config", "Autommit timeout must be positive.")
     return value

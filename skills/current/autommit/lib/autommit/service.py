@@ -1,13 +1,12 @@
 """Transactional autommit workflow independent of any model provider."""
 
-from __future__ import annotations
-
 import contextlib
 import json
 import os
 import shlex
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -40,6 +39,7 @@ from autommit.transaction import (
     write_recovery_point,
 )
 
+_json_loads: Callable[..., object] = json.loads
 MAX_POLICY_FILE_BYTES = 32 * 1024
 MAX_PLAN_FILE_BYTES = 1024 * 1024
 MAX_LOG_ENTRIES = 8
@@ -166,8 +166,7 @@ def _cas_ref(cwd: Path, ref: str, target: str, expected_before: str) -> None:
     if result.returncode != 0:
         raise RefusalError(
             "ref_conflict",
-            f"Ref update failed via CAS ({expected_before} -> {target}): "
-            f"{result.stderr.strip()}",
+            f"Ref update failed via CAS ({expected_before} -> {target}): {result.stderr.strip()}",
         )
 
 
@@ -244,8 +243,7 @@ def _recover_receipt(cwd: Path, git_dir: Path, receipt: Receipt) -> dict[str, ob
         }
     raise RefusalError(
         "recovery_conflict",
-        f"Cannot recover receipt: ref {receipt.ref} is at {current_ref}, "
-        f"expected {receipt.before} or {receipt.after}.",
+        f"Cannot recover receipt: ref {receipt.ref} is at {current_ref}, expected {receipt.before} or {receipt.after}.",
     )
 
 
@@ -274,7 +272,7 @@ def prepare(
             return recovered
         staged = _staged_files(cwd)
         if scope == "all" or (scope == "auto" and not staged):
-            run_git(cwd, "add", "--all")
+            _ = run_git(cwd, "add", "--all")
             staged = _staged_files(cwd)
         elif not staged:
             raise AutommitError(
@@ -329,7 +327,7 @@ def read_json_file(path: Path, kind: str) -> object:
             f"Autommit {kind} file exceeds {limit} bytes; reduce the scope and re-run.",
         )
     try:
-        return json.loads(content.decode("utf-8"))
+        return _json_loads(content.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise AutommitError(
             "invalid_json", f"Autommit {kind} is not valid JSON: {error}."
@@ -428,16 +426,14 @@ def _run_smoke(worktree: Path, command: str, ref: str, before: str) -> None:
     except (OSError, subprocess.TimeoutExpired) as error:
         raise AutommitError(
             "smoke_failed",
-            f"Smoke validation could not run: {error}. "
-            f"Recovery point: {ref} at {before}.",
+            f"Smoke validation could not run: {error}. Recovery point: {ref} at {before}.",
             4,
         ) from error
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip() or "no output"
         raise AutommitError(
             "smoke_failed",
-            f"Smoke validation failed ({completed.returncode}): {detail}. "
-            f"Recovery point: {ref} at {before}.",
+            f"Smoke validation failed ({completed.returncode}): {detail}. Recovery point: {ref} at {before}.",
             4,
         )
 
@@ -455,11 +451,11 @@ def apply(
     with operation_lock(git_dir):
         if blocking := _blocking_state(git_dir):
             raise RefusalError("in_progress_state", blocking)
-        _consume_or_recover(cwd, git_dir)
+        _ = _consume_or_recover(cwd, git_dir)
         expected, proposal, _, staged_diff, review = _load_validated_plan(
             cwd, snapshot, plan_file
         )
-        _require_atomicity_decision(review, decision_file)
+        _ = _require_atomicity_decision(review, decision_file)
         zero_context_diff = _staged_diff(cwd, zero_context=True)
         created: list[dict[str, str]] = []
 
@@ -469,7 +465,9 @@ def apply(
         ):
             worktree = Path(worktree_name)
             message = Path(patch_name) / "message.txt"
-            run_git(cwd, "worktree", "add", "--detach", str(worktree), expected.before)
+            _ = run_git(
+                cwd, "worktree", "add", "--detach", str(worktree), expected.before
+            )
             try:
                 for commit_index in compute_apply_order(proposal.commits):
                     group = proposal.commits[commit_index]
@@ -486,8 +484,8 @@ def apply(
                     _ = apply_with_fallback(work, group)
                     if smoke is not None:
                         _run_smoke(worktree, smoke, expected.ref, expected.before)
-                    message.write_text(_commit_message(group), encoding="utf-8")
-                    run_git(
+                    _ = message.write_text(_commit_message(group), encoding="utf-8")
+                    _ = run_git(
                         worktree,
                         "-c",
                         "core.hooksPath=",
@@ -504,8 +502,8 @@ def apply(
                 _record_recovery_point(git_dir, expected.ref, expected.before)
                 raise
             finally:
-                try_git(cwd, "worktree", "remove", "--force", str(worktree))
-                try_git(cwd, "worktree", "prune")
+                _ = try_git(cwd, "worktree", "remove", "--force", str(worktree))
+                _ = try_git(cwd, "worktree", "prune")
             current_evidence = _current_evidence(cwd)
             if (
                 current_evidence.ref != expected.ref
@@ -547,3 +545,12 @@ def apply(
                 "commit_count": len(created),
                 "commits": created,
             }
+
+
+blocking_state = _blocking_state
+cas_ref = _cas_ref
+commit_message = _commit_message
+resolve_git_dir = _git_dir
+repository_policy = _repository_policy
+require_atomicity_decision = _require_atomicity_decision
+run_smoke = _run_smoke

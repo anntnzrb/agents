@@ -1,11 +1,18 @@
 """Parse and validate untrusted LLM commit proposals."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, TypeIs
 
 from autommit.errors import AutommitError
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 MAX_SUBJECT_LENGTH = 72
 MAX_DETAIL_LENGTH = 2048
@@ -106,9 +113,9 @@ def _invalid_decision(message: str) -> AutommitError:
 
 
 def _mapping(value: object, label: str) -> dict[str, object]:
-    if not isinstance(value, dict):
+    if not _is_dict(value):
         raise _invalid(f"{label} must be a JSON object")
-    return cast("dict[str, object]", value)
+    return dict(value)
 
 
 def _record(
@@ -122,9 +129,9 @@ def _record(
 
 
 def _list(value: object, label: str) -> list[object]:
-    if not isinstance(value, list):
+    if not _is_list(value):
         raise _invalid(f"{label} must be an array")
-    return cast("list[object]", value)
+    return list(value)
 
 
 def _str(value: object, label: str, max_len: int) -> str:
@@ -145,7 +152,7 @@ def _integer(value: object, label: str) -> int:
 
 
 def _parse_indices_list(raw_indices: object, empty_error: str) -> tuple[int, ...]:
-    if not isinstance(raw_indices, list) or not raw_indices:
+    if not _is_list(raw_indices) or not raw_indices:
         raise _invalid(empty_error)
     ind_list: list[int] = []
     for idx, item in enumerate(raw_indices):
@@ -161,22 +168,24 @@ def _parse_indices_list(raw_indices: object, empty_error: str) -> tuple[int, ...
 def _normalize_selector(value: object) -> HunkSelector:
     if value == "all":
         return AllSelector()
-    if isinstance(value, list):
+    if _is_list(value):
         return IndicesSelector(
             _parse_indices_list(value, "hunk indices array must not be empty")
         )
-    if isinstance(value, dict):
+    if _is_dict(value):
         obj = _mapping(value, "hunks selector")
         sel_type = obj.get("type") or obj.get("kind")
         if sel_type in ("indices", "index") or "indices" in obj:
-            _record(obj, "indices selector", frozenset({"indices", "type", "kind"}))
+            _ = _record(obj, "indices selector", frozenset({"indices", "type", "kind"}))
             return IndicesSelector(
                 _parse_indices_list(
                     obj.get("indices"), "hunk indices must be a non-empty array"
                 )
             )
         if "start" in obj or "end" in obj or sel_type == "lines":
-            _record(obj, "lines selector", frozenset({"start", "end", "type", "kind"}))
+            _ = _record(
+                obj, "lines selector", frozenset({"start", "end", "type", "kind"})
+            )
             start = _integer(obj.get("start"), "lines.start")
             end = _integer(obj.get("end"), "lines.end")
             if start < 1:
@@ -193,7 +202,7 @@ def _normalize_selector(value: object) -> HunkSelector:
 
 def _normalize_change(value: object, label: str) -> CommitChange:
     obj = _mapping(value, label)
-    _record(obj, label, frozenset({"path", "hunks"}))
+    _ = _record(obj, label, frozenset({"path", "hunks"}))
     path = _str(obj.get("path"), f"{label}.path", MAX_PATH_LENGTH)
     path = path.removeprefix("./")
     if not path or path.startswith("/") or ".." in path.split("/"):
@@ -208,7 +217,9 @@ def _normalize_change(value: object, label: str) -> CommitChange:
 def _normalize_commit(value: object, index: int) -> CommitGroup:
     label = f"commits[{index}]"
     obj = _mapping(value, label)
-    _record(obj, label, frozenset({"summary", "details", "changes", "dependencies"}))
+    _ = _record(
+        obj, label, frozenset({"summary", "details", "changes", "dependencies"})
+    )
     summary = _str(obj.get("summary"), f"{label}.summary", MAX_SUBJECT_LENGTH)
     raw_details = obj.get("details", [])
     details_list = _list(raw_details, f"{label}.details")
@@ -261,7 +272,7 @@ def _validate_dependencies(commits: tuple[CommitGroup, ...]) -> None:
 
 def compute_apply_order(commits: tuple[CommitGroup, ...]) -> tuple[int, ...]:
     """Return a stable dependency order for the plan commits."""
-    dependents: dict[int, list[int]] = {index: [] for index in range(len(commits))}
+    dependents: dict[int, list[int]] = {index: [] for index, _ in enumerate(commits)}
     pending = [len(commit.dependencies) for commit in commits]
     for index, commit in enumerate(commits):
         for dependency in commit.dependencies:
@@ -284,7 +295,7 @@ def compute_apply_order(commits: tuple[CommitGroup, ...]) -> tuple[int, ...]:
 def normalize_proposal(value: object) -> CommitProposal:
     """Validate and normalize an untrusted proposal JSON value."""
     obj = _mapping(value, "proposal")
-    _record(obj, "proposal", frozenset({"commits"}))
+    _ = _record(obj, "proposal", frozenset({"commits"}))
     raw_commits = obj.get("commits")
     if raw_commits is None:
         raise _invalid("proposal missing required field 'commits'")
@@ -299,7 +310,7 @@ def normalize_proposal(value: object) -> CommitProposal:
 
 def normalize_atomicity_decision(value: object) -> AtomicityDecision:
     """Validate and normalize an untrusted critic decision JSON object."""
-    if not isinstance(value, dict):
+    if not _is_dict(value):
         raise _invalid_decision("atomicity decision must be a JSON object")
     keys = set(value.keys())
     allowed = {"decision", "concerns", "rationale"}
@@ -312,7 +323,7 @@ def normalize_atomicity_decision(value: object) -> AtomicityDecision:
     if raw_decision not in ("accept", "split"):
         raise _invalid_decision("decision must be either 'accept' or 'split'")
     raw_concerns = value.get("concerns", [])
-    if not isinstance(raw_concerns, list):
+    if not _is_list(raw_concerns):
         raise _invalid_decision("concerns must be an array")
     concerns = tuple(
         _str(c, f"concerns[{i}]", MAX_CONCERN_LENGTH)
@@ -469,20 +480,18 @@ def _selected_hunk_indices(
         return {h.index for h in parsed.hunks} if parsed else set()
     if isinstance(selector, IndicesSelector):
         return set(selector.indices)
-    if isinstance(selector, LinesSelector):
-        if not parsed:
-            return set()
-        matched: set[int] = set()
-        for hunk in parsed.hunks:
-            hunk_end = (
-                hunk.new_start
-                if hunk.new_lines == 0
-                else hunk.new_start + hunk.new_lines - 1
-            )
-            if hunk.new_start <= selector.end and selector.start <= hunk_end:
-                matched.add(hunk.index)
-        return matched
-    return set()
+    if not parsed:
+        return set()
+    matched: set[int] = set()
+    for hunk in parsed.hunks:
+        hunk_end = (
+            hunk.new_start
+            if hunk.new_lines == 0
+            else hunk.new_start + hunk.new_lines - 1
+        )
+        if hunk.new_start <= selector.end and selector.start <= hunk_end:
+            matched.add(hunk.index)
+    return matched
 
 
 def _selections_overlap(
@@ -583,10 +592,7 @@ def validate_proposal_coverage(
                 for right in selections[left_index + 1 :]
             ):
                 errors.append(
-                    "Overlapping hunk selections across commits: "
-                    f"{filename} ({_describe_selector(left)} "
-                    "overlaps another selection); "
-                    "line ranges are inclusive and must be disjoint"
+                    f"Overlapping hunk selections across commits: {filename} ({_describe_selector(left)} overlaps another selection); line ranges are inclusive and must be disjoint"
                 )
                 break
         if parsed is None:
@@ -618,8 +624,7 @@ def validate_proposal_coverage(
             )
             if not covered:
                 errors.append(
-                    "Staged hunk missing from split plan: "
-                    f"{filename} (hunk {hunk.index})"
+                    f"Staged hunk missing from split plan: {filename} (hunk {hunk.index})"
                 )
     return tuple(dict.fromkeys(errors))
 
@@ -713,8 +718,7 @@ def select_patch(file: ParsedFile, selector: HunkSelector) -> str:
     if _is_rename(file) and not isinstance(selector, AllSelector):
         raise AutommitError(
             "invalid_plan",
-            f"Cannot partially select renamed file {file.filename}; "
-            "entire file change must be committed together.",
+            f"Cannot partially select renamed file {file.filename}; entire file change must be committed together.",
         )
     if isinstance(selector, AllSelector):
         return file.content

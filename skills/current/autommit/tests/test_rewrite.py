@@ -1,6 +1,5 @@
+# pyright: reportUninitializedInstanceVariable=false
 """Tests for the rewrite mode: history rebuilding with a frozen target tree."""
-
-from __future__ import annotations
 
 import json
 import os
@@ -8,7 +7,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
@@ -66,26 +67,33 @@ def _reply(payload: object) -> HttpResponse:
 class _RewriteSandbox(unittest.TestCase):
     """Repository with two commits since a base revision plus uncommitted work."""
 
+    temporary_directory: tempfile.TemporaryDirectory[str]
+    repo: Path
+    base: str
+    before: str
+
+    @override
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.repo = Path(self.temporary_directory.name) / "repo"
         self.repo.mkdir()
-        self.git("init", "-b", "main")
-        self.git("config", "user.email", "autommit@example.test")
-        self.git("config", "user.name", "Autommit Test")
+        _ = self.git("init", "-b", "main")
+        _ = self.git("config", "user.email", "autommit@example.test")
+        _ = self.git("config", "user.name", "Autommit Test")
         _ = (self.repo / "README.md").write_text("readme\n", encoding="utf-8")
-        self.git("add", "README.md")
-        self.git("commit", "-m", "base commit")
+        _ = self.git("add", "README.md")
+        _ = self.git("commit", "-m", "base commit")
         self.base = self.git("rev-parse", "HEAD").strip()
         _ = (self.repo / "alpha.txt").write_text("alpha\n", encoding="utf-8")
-        self.git("add", "alpha.txt")
-        self.git("commit", "-m", "wip alpha")
+        _ = self.git("add", "alpha.txt")
+        _ = self.git("commit", "-m", "wip alpha")
         _ = (self.repo / "bravo.txt").write_text("bravo\n", encoding="utf-8")
-        self.git("add", "bravo.txt")
-        self.git("commit", "-m", "wip bravo")
+        _ = self.git("add", "bravo.txt")
+        _ = self.git("commit", "-m", "wip bravo")
         self.before = self.git("rev-parse", "HEAD").strip()
         _ = (self.repo / "README.md").write_text("readme\nmore\n", encoding="utf-8")
 
+    @override
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
@@ -99,23 +107,34 @@ class _RewriteSandbox(unittest.TestCase):
         )
         return completed.stdout
 
-    def options(self, **overrides: object) -> RunOptions:
-        values: dict[str, object] = {
-            "repo": self.repo,
-            "base": self.base,
-            "api_key": "test-key",
-            "model": "test-model",
-            "base_url": "https://model.test/v1",
-        }
-        values.update(overrides)
-        return RunOptions(**values)  # type: ignore[arg-type]
+    def options(
+        self,
+        *,
+        api_key: str | None = "test-key",
+        base: str | None = None,
+        dry_run: bool = False,
+        json_output: bool = False,
+        post: Callable[[dict[str, object]], HttpResponse] | None = None,
+    ) -> RunOptions:
+        return RunOptions(
+            repo=self.repo,
+            base=self.base if base is None else base,
+            api_key=api_key,
+            model="test-model",
+            base_url="https://model.test/v1",
+            dry_run=dry_run,
+            json_output=json_output,
+            post=post,
+        )
 
     def frozen_tree(self) -> str:
         """Recompute the current worktree tree with a temporary index."""
         index = Path(self.temporary_directory.name) / "probe-index"
         env = {**os.environ, "GIT_INDEX_FILE": str(index)}
-        subprocess.run(["git", "read-tree", "HEAD"], cwd=self.repo, check=True, env=env)
-        subprocess.run(["git", "add", "--all"], cwd=self.repo, check=True, env=env)
+        _ = subprocess.run(
+            ["git", "read-tree", "HEAD"], cwd=self.repo, check=True, env=env
+        )
+        _ = subprocess.run(["git", "add", "--all"], cwd=self.repo, check=True, env=env)
         completed = subprocess.run(
             ["git", "write-tree"],
             cwd=self.repo,
@@ -161,6 +180,7 @@ class RewriteTests(_RewriteSandbox):
         target = self.frozen_tree()
 
         def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
             return _reply(REORDERED)
 
         code = run_rewrite(self.options(post=post))
@@ -221,12 +241,12 @@ class RewriteTests(_RewriteSandbox):
         self.assertEqual(self.git("rev-parse", "HEAD^{tree}").strip(), target)
 
     def test_non_ancestor_base_is_refused(self) -> None:
-        self.git("checkout", "-q", "-b", "side", self.base)
+        _ = self.git("checkout", "-q", "-b", "side", self.base)
         _ = (self.repo / "side.txt").write_text("side\n", encoding="utf-8")
-        self.git("add", "side.txt")
-        self.git("commit", "-m", "side work")
+        _ = self.git("add", "side.txt")
+        _ = self.git("commit", "-m", "side work")
         side = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "main")
+        _ = self.git("checkout", "-q", "main")
 
         def post(payload: dict[str, object]) -> HttpResponse:
             del payload

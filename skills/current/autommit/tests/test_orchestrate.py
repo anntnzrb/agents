@@ -1,6 +1,5 @@
+# pyright: reportUninitializedInstanceVariable=false
 """End-to-end tests for the autommit orchestrator, inventory, and fallback rungs."""
-
-from __future__ import annotations
 
 import contextlib
 import io
@@ -11,8 +10,9 @@ import sys
 import tempfile
 import time
 import unittest
+from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import TypeIs, override
 from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -70,25 +70,54 @@ def _model_reply(payload: object) -> HttpResponse:
     )
 
 
+_json_loads: Callable[..., object] = json.loads
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _as_dict(val: object) -> dict[str, object]:
+    assert _is_dict(val)
+    return val
+
+
+def _str_tuple(val: object) -> tuple[str, ...]:
+    assert _is_list(val)
+    return tuple(item for item in val if isinstance(item, str))
+
+
 def _system_of(request: dict[str, object]) -> str:
-    messages = cast("list[dict[str, object]]", request["messages"])
-    return str(messages[0]["content"])
+    messages = request.get("messages")
+    assert _is_list(messages)
+    first = messages[0]
+    assert _is_dict(first)
+    return str(first["content"])
 
 
 class _Sandbox(unittest.TestCase):
     """Shared disposable repository fixture."""
 
+    temporary_directory: tempfile.TemporaryDirectory[str]
+    repo: Path
+
+    @override
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.repo = Path(self.temporary_directory.name) / "repo"
         self.repo.mkdir()
-        self.git("init", "-b", "main")
-        self.git("config", "user.email", "autommit@example.test")
-        self.git("config", "user.name", "Autommit Test")
+        _ = self.git("init", "-b", "main")
+        _ = self.git("config", "user.email", "autommit@example.test")
+        _ = self.git("config", "user.name", "Autommit Test")
         _ = (self.repo / "tracked.txt").write_text("base\n", encoding="utf-8")
-        self.git("add", "tracked.txt")
-        self.git("commit", "-m", "initial")
+        _ = self.git("add", "tracked.txt")
+        _ = self.git("commit", "-m", "initial")
 
+    @override
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
@@ -104,7 +133,7 @@ class _Sandbox(unittest.TestCase):
 
     def stage(self, content: str = "changed\n") -> None:
         _ = (self.repo / "tracked.txt").write_text(content, encoding="utf-8")
-        self.git("add", "tracked.txt")
+        _ = self.git("add", "tracked.txt")
 
     def prepare(self) -> dict[str, object]:
         """Run the public prepare command so the environment pins apply."""
@@ -125,19 +154,27 @@ class _Sandbox(unittest.TestCase):
             text=True,
             env={**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "LC_ALL": "C"},
         )
-        payload = cast("dict[str, object]", json.loads(completed.stdout))
-        return cast("dict[str, object]", payload["result"])
+        payload = _as_dict(_json_loads(completed.stdout))
+        return _as_dict(payload["result"])
 
-    def options(self, **overrides: object) -> RunOptions:
-        values: dict[str, object] = {
-            "repo": self.repo,
-            "scope": "auto",
-            "api_key": "test-key",
-            "model": "test-model",
-            "base_url": "https://model.test/v1",
-        }
-        values.update(overrides)
-        return RunOptions(**values)  # type: ignore[arg-type]
+    def options(
+        self,
+        *,
+        api_key: str | None = "test-key",
+        dry_run: bool = False,
+        json_output: bool = False,
+        post: Callable[[dict[str, object]], HttpResponse] | None = None,
+    ) -> RunOptions:
+        return RunOptions(
+            repo=self.repo,
+            scope="auto",
+            model="test-model",
+            base_url="https://model.test/v1",
+            api_key=api_key,
+            dry_run=dry_run,
+            json_output=json_output,
+            post=post,
+        )
 
 
 class OrchestratorTests(_Sandbox):
@@ -161,6 +198,7 @@ class OrchestratorTests(_Sandbox):
         self.stage()
 
         def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
             return _model_reply(PLAN)
 
         code = run_orchestrated(self.options(json_output=True, post=post))
@@ -254,7 +292,7 @@ class InventoryTests(_Sandbox):
     def test_planner_prompt_is_inventory_only(self) -> None:
         self.stage()
         prepared = self.prepare()
-        staged = tuple(cast("list[str]", prepared["staged_files"]))
+        staged = _str_tuple(prepared["staged_files"])
         inventory = build_inventory(self.repo, staged, str(prepared["diff"]))
         self.assertEqual(inventory[0].path, "tracked.txt")
         self.assertEqual(inventory[0].status, "M")
@@ -302,12 +340,12 @@ class LargeRefactorTests(_Sandbox):
         path = self.repo / name
         path.parent.mkdir(parents=True, exist_ok=True)
         _ = path.write_text(content, encoding="utf-8")
-        self.git("add", name)
-        self.git("commit", "-m", f"add {name}")
+        _ = self.git("add", name)
+        _ = self.git("commit", "-m", f"add {name}")
 
     def move(self, source: str, target: str) -> None:
         (self.repo / target).parent.mkdir(parents=True, exist_ok=True)
-        self.git("mv", source, target)
+        _ = self.git("mv", source, target)
 
     def test_pure_renames_skip_the_model_and_commit_as_one_move(self) -> None:
         self.commit_file("old/moved.txt", "same\n")
@@ -364,15 +402,15 @@ class LargeRefactorTests(_Sandbox):
 
     def test_partial_rename_renders_its_source(self) -> None:
         self.commit_file("original.txt", "".join(f"line {n}\n" for n in range(20)))
-        self.git("mv", "original.txt", "renamed.txt")
+        _ = self.git("mv", "original.txt", "renamed.txt")
         path = self.repo / "renamed.txt"
         _ = path.write_text(
             path.read_text(encoding="utf-8").replace("line 3\n", "line three\n"),
             encoding="utf-8",
         )
-        self.git("add", "renamed.txt")
+        _ = self.git("add", "renamed.txt")
         prepared = self.prepare()
-        staged = tuple(cast("list[str]", prepared["staged_files"]))
+        staged = _str_tuple(prepared["staged_files"])
         inventory = build_inventory(self.repo, staged, str(prepared["diff"]))
         prompt = render_planner_prompt(
             PlannerEvidence(
@@ -391,7 +429,7 @@ class LargeRefactorTests(_Sandbox):
 
     def test_hunkless_file_selector_is_coerced_to_all(self) -> None:
         _ = (self.repo / "marker").write_text("", encoding="utf-8")
-        self.git("add", "marker")
+        _ = self.git("add", "marker")
         partial = {
             "commits": [
                 {
@@ -421,7 +459,7 @@ class LargeRefactorTests(_Sandbox):
             path.read_text(encoding="utf-8").replace("line 3\n", "line three\n"),
             encoding="utf-8",
         )
-        self.git("add", "renamed.txt")
+        _ = self.git("add", "renamed.txt")
         diff = self.git("diff", "--cached")
         proposal = normalize_proposal(
             {
@@ -559,7 +597,7 @@ class ProgressAndEfficiencyTests(_Sandbox):
 
     def test_whole_file_selected_twice_is_kept_once(self) -> None:
         _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
-        self.git("add", "other.txt")
+        _ = self.git("add", "other.txt")
         self.stage()
         duplicated = {
             "commits": [
@@ -599,7 +637,7 @@ class ProgressAndEfficiencyTests(_Sandbox):
 
     def test_apply_count_reports_the_critic_replan(self) -> None:
         _ = (self.repo / "other.txt").write_text("other\n", encoding="utf-8")
-        self.git("add", "other.txt")
+        _ = self.git("add", "other.txt")
         self.stage()
         broad = {
             "commits": [
@@ -649,9 +687,9 @@ class ProgressAndEfficiencyTests(_Sandbox):
     def test_planner_diff_keeps_only_the_head_of_a_deleted_file(self) -> None:
         lines = "".join(f"line {n}\n" for n in range(200))
         _ = (self.repo / "gone.txt").write_text(lines, encoding="utf-8")
-        self.git("add", "gone.txt")
-        self.git("commit", "-m", "add gone")
-        self.git("rm", "-q", "gone.txt")
+        _ = self.git("add", "gone.txt")
+        _ = self.git("commit", "-m", "add gone")
+        _ = self.git("rm", "-q", "gone.txt")
         diff = self.git("diff", "--cached")
         trimmed = planner_diff(diff, frozenset())
         self.assertIn("-line 39\n", trimmed)
@@ -664,15 +702,15 @@ class PlumbingRungTests(_Sandbox):
 
     def test_plumbing_rung_reproduces_the_staged_snapshot(self) -> None:
         _ = (self.repo / "doomed.txt").write_text("doomed\n", encoding="utf-8")
-        self.git("add", "doomed.txt")
-        self.git("commit", "-m", "add doomed")
+        _ = self.git("add", "doomed.txt")
+        _ = self.git("commit", "-m", "add doomed")
         (self.repo / "doomed.txt").unlink()
         _ = (self.repo / "added.txt").write_text("added\n", encoding="utf-8")
         self.stage("changed\n")
-        self.git("add", "--all")
+        _ = self.git("add", "--all")
         index_tree = self.git("write-tree").strip()
         worktree = Path(self.temporary_directory.name) / "wt"
-        self.git("worktree", "add", "--detach", str(worktree), "HEAD")
+        _ = self.git("worktree", "add", "--detach", str(worktree), "HEAD")
         work = CommitWork(
             repo=self.repo,
             worktree=worktree,

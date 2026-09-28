@@ -1,13 +1,12 @@
 """Command-line boundary for the portable autommit protocol."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal, NoReturn, cast
+from typing import Final, Literal, NoReturn, TypeIs, override
 
 from autommit.client import ModelRequest, list_models
 from autommit.config import ConfigOverrides, load_config
@@ -16,8 +15,10 @@ from autommit.orchestrate import RunOptions, run_orchestrated
 from autommit.rewrite import run_rewrite
 from autommit.service import apply, prepare, validate_plan
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 SCHEMA = "autommit/v1"
 DEBUG_COMMANDS = ("prepare", "validate-plan", "apply", "schema")
@@ -26,6 +27,7 @@ DEBUG_COMMANDS = ("prepare", "validate-plan", "apply", "schema")
 class Parser(argparse.ArgumentParser):
     """Map parse failures into the structured protocol."""
 
+    @override
     def error(self, message: str) -> NoReturn:
         raise AutommitError("usage_error", message, 2)
 
@@ -36,26 +38,26 @@ def build_parser() -> Parser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prepare_cmd = subparsers.add_parser("prepare")
-    prepare_cmd.add_argument("--repo", type=Path, default=Path.cwd())
-    prepare_cmd.add_argument(
+    _ = prepare_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    _ = prepare_cmd.add_argument(
         "--scope", choices=["auto", "staged", "all"], default="auto", type=str
     )
-    prepare_cmd.add_argument("--context", action="append", default=[])
-    prepare_cmd.add_argument("positional_context", nargs="*", default=[])
+    _ = prepare_cmd.add_argument("--context", action="append", default=[])
+    _ = prepare_cmd.add_argument("positional_context", nargs="*", default=[])
 
     validate_cmd = subparsers.add_parser("validate-plan")
-    validate_cmd.add_argument("--repo", type=Path, default=Path.cwd())
-    validate_cmd.add_argument("--snapshot", required=True)
-    validate_cmd.add_argument("--plan-file", type=Path, required=True)
-    validate_cmd.add_argument("--require-split", action="store_true")
+    _ = validate_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    _ = validate_cmd.add_argument("--snapshot", required=True)
+    _ = validate_cmd.add_argument("--plan-file", type=Path, required=True)
+    _ = validate_cmd.add_argument("--require-split", action="store_true")
 
     apply_cmd = subparsers.add_parser("apply")
-    apply_cmd.add_argument("--repo", type=Path, default=Path.cwd())
-    apply_cmd.add_argument("--snapshot", required=True)
-    apply_cmd.add_argument("--plan-file", type=Path, required=True)
-    apply_cmd.add_argument("--decision-file", type=Path)
+    _ = apply_cmd.add_argument("--repo", type=Path, default=Path.cwd())
+    _ = apply_cmd.add_argument("--snapshot", required=True)
+    _ = apply_cmd.add_argument("--plan-file", type=Path, required=True)
+    _ = apply_cmd.add_argument("--decision-file", type=Path)
 
-    subparsers.add_parser("schema")
+    _ = subparsers.add_parser("schema")
     return parser
 
 
@@ -68,39 +70,109 @@ def _run_parser() -> Parser:
         prog="autommit",
         description="Plan and create atomic commits from the staged snapshot.",
     )
-    parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument(
+    _ = parser.add_argument("--repo", type=Path, default=Path.cwd())
+    _ = parser.add_argument(
         "--scope", choices=["auto", "staged", "all"], default="auto", type=str
     )
-    parser.add_argument("--context", action="append", default=[])
-    parser.add_argument("--model", type=str, default=None)
-    parser.add_argument("--base-url", type=str, default=None)
-    parser.add_argument("--api-key", type=str, default=None)
-    parser.add_argument("--timeout", type=float, default=None)
-    parser.add_argument("--reasoning-effort", type=str, default=None)
-    parser.add_argument("--smoke", type=str, default=None)
-    parser.add_argument("--base", type=str, default=None)
-    parser.add_argument("--filter", type=str, default=None)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--json", action="store_true", dest="json_output")
-    parser.add_argument("positional_context", nargs="*", default=[])
+    _ = parser.add_argument("--context", action="append", default=[])
+    _ = parser.add_argument("--model", type=str, default=None)
+    _ = parser.add_argument("--base-url", type=str, default=None)
+    _ = parser.add_argument("--api-key", type=str, default=None)
+    _ = parser.add_argument("--timeout", type=float, default=None)
+    _ = parser.add_argument("--reasoning-effort", type=str, default=None)
+    _ = parser.add_argument("--smoke", type=str, default=None)
+    _ = parser.add_argument("--base", type=str, default=None)
+    _ = parser.add_argument("--filter", type=str, default=None)
+    _ = parser.add_argument("--dry-run", action="store_true")
+    _ = parser.add_argument("--json", action="store_true", dest="json_output")
+    _ = parser.add_argument("positional_context", nargs="*", default=[])
     return parser
+
+
+def _arg_path(
+    args: argparse.Namespace, field: str, default: Path | None = None
+) -> Path:
+    val: object = getattr(args, field, None)
+    if isinstance(val, Path):
+        return val.resolve()
+    if isinstance(val, str) and val:
+        return Path(val).resolve()
+    if default is not None:
+        return default.resolve()
+    raise AutommitError("usage_error", f"Missing or invalid --{field}")
+
+
+def _arg_optional_path(args: argparse.Namespace, field: str) -> Path | None:
+    val: object = getattr(args, field, None)
+    if isinstance(val, Path):
+        return val.resolve()
+    if isinstance(val, str) and val:
+        return Path(val).resolve()
+    return None
+
+
+def _arg_str(args: argparse.Namespace, field: str, default: str = "") -> str:
+    val: object = getattr(args, field, None)
+    return val if isinstance(val, str) else default
+
+
+def _arg_optional_str(args: argparse.Namespace, field: str) -> str | None:
+    val: object = getattr(args, field, None)
+    return val if isinstance(val, str) else None
+
+
+def _arg_float(args: argparse.Namespace, field: str) -> float | None:
+    val: object = getattr(args, field, None)
+    return float(val) if isinstance(val, (int, float)) else None
+
+
+def _arg_bool(args: argparse.Namespace, field: str) -> bool:
+    val: object = getattr(args, field, False)
+    return bool(val)
+
+
+def _arg_context(args: argparse.Namespace) -> tuple[str, ...]:
+    context: list[str] = []
+    c_val: object = getattr(args, "context", None)
+    if _is_list(c_val):
+        for item in c_val:
+            if isinstance(item, str):
+                context.append(item)
+    p_val: object = getattr(args, "positional_context", None)
+    if _is_list(p_val):
+        for item in p_val:
+            if isinstance(item, str):
+                context.append(item)
+    return tuple(context)
+
+
+def _arg_scope(args: argparse.Namespace) -> Literal["auto", "staged", "all"]:
+    val: object = getattr(args, "scope", "auto")
+    match val:
+        case "auto":
+            return "auto"
+        case "staged":
+            return "staged"
+        case "all":
+            return "all"
+        case _:
+            raise AutommitError("usage_error", f"Invalid scope: {val!r}")
 
 
 def _run_options(arguments: argparse.Namespace) -> RunOptions:
     return RunOptions(
-        repo=arguments.repo.resolve(),
-        scope=cast('Literal["auto", "staged", "all"]', arguments.scope),
-        context=tuple(arguments.context + arguments.positional_context),
-        model=arguments.model,
-        base_url=arguments.base_url,
-        api_key=arguments.api_key,
-        timeout=arguments.timeout,
-        reasoning_effort=arguments.reasoning_effort,
-        smoke=arguments.smoke,
-        base=arguments.base,
-        dry_run=bool(arguments.dry_run),
-        json_output=bool(arguments.json_output),
+        repo=_arg_path(arguments, "repo", default=Path.cwd()),
+        scope=_arg_scope(arguments),
+        context=_arg_context(arguments),
+        model=_arg_optional_str(arguments, "model"),
+        base_url=_arg_optional_str(arguments, "base_url"),
+        api_key=_arg_optional_str(arguments, "api_key"),
+        timeout=_arg_float(arguments, "timeout"),
+        reasoning_effort=_arg_optional_str(arguments, "reasoning_effort"),
+        smoke=_arg_optional_str(arguments, "smoke"),
+        base=_arg_optional_str(arguments, "base"),
+        dry_run=_arg_bool(arguments, "dry_run"),
+        json_output=_arg_bool(arguments, "json_output"),
     )
 
 
@@ -242,36 +314,35 @@ def _failure(command: str, error: AutommitError) -> dict[str, object]:
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
-    stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    stream.flush()
+    _ = stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    _ = stream.flush()
 
 
 def _dispatch(arguments: argparse.Namespace) -> object:
-    command: str = arguments.command
+    command = _arg_str(arguments, "command")
     if command == "schema":
         return _schema()
     if command == "prepare":
-        repo: Path = arguments.repo.resolve()
-        scope = cast('Literal["auto", "staged", "all"]', arguments.scope)
-        context = tuple(arguments.context + arguments.positional_context)
+        repo = _arg_path(arguments, "repo", default=Path.cwd())
+        scope = _arg_scope(arguments)
+        context = _arg_context(arguments)
         return prepare(repo, context, scope=scope)
     if command == "validate-plan":
-        repo = arguments.repo.resolve()
+        repo = _arg_path(arguments, "repo", default=Path.cwd())
+        snapshot = _arg_str(arguments, "snapshot")
+        plan_file = _arg_path(arguments, "plan_file")
+        require_split = _arg_bool(arguments, "require_split")
         return validate_plan(
             repo,
-            arguments.snapshot,
-            arguments.plan_file.resolve(),
-            require_split=arguments.require_split,
+            snapshot,
+            plan_file,
+            require_split=require_split,
         )
     if command == "apply":
-        repo = arguments.repo.resolve()
-        snapshot: str = arguments.snapshot
-        plan_file: Path = arguments.plan_file.resolve()
-        decision_file: Path | None = (
-            arguments.decision_file.resolve()
-            if arguments.decision_file is not None
-            else None
-        )
+        repo = _arg_path(arguments, "repo", default=Path.cwd())
+        snapshot = _arg_str(arguments, "snapshot")
+        plan_file = _arg_path(arguments, "plan_file")
+        decision_file = _arg_optional_path(arguments, "decision_file")
         return apply(repo, snapshot, plan_file, decision_file)
     raise AutommitError("usage_error", "Unknown command.")
 
@@ -283,11 +354,11 @@ def _print_models(arguments: argparse.Namespace) -> int:
     """
     config = load_config(
         overrides=ConfigOverrides(
-            model=arguments.model or MODELS_DISCOVERY_MODEL,
-            base_url=arguments.base_url,
-            api_key=arguments.api_key,
-            timeout=arguments.timeout,
-            reasoning_effort=arguments.reasoning_effort,
+            model=_arg_optional_str(arguments, "model") or MODELS_DISCOVERY_MODEL,
+            base_url=_arg_optional_str(arguments, "base_url"),
+            api_key=_arg_optional_str(arguments, "api_key"),
+            timeout=_arg_float(arguments, "timeout"),
+            reasoning_effort=_arg_optional_str(arguments, "reasoning_effort"),
         ),
         environ=os.environ,
     )
@@ -300,14 +371,14 @@ def _print_models(arguments: argparse.Namespace) -> int:
         system="",
         user="",
     )
-    pattern = (arguments.filter or "").lower()
+    pattern = _arg_str(arguments, "filter").lower()
     ids = [item for item in list_models(request) if pattern in item.lower()]
-    if arguments.json_output:
+    if _arg_bool(arguments, "json_output"):
         _emit(_success("models", {"base_url": config.base_url, "models": ids}))
     else:
         for item in ids:
-            sys.stdout.write(item + "\n")
-        sys.stdout.flush()
+            _ = sys.stdout.write(item + "\n")
+        _ = sys.stdout.flush()
     return 0
 
 
@@ -334,7 +405,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except AutommitError as err:
         _emit(_failure(command or "run", err), error=True)
         return err.exit_code
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 - boundary catch to map error
         unknown = AutommitError("internal_error", f"Unexpected failure: {err}", 1)
         _emit(_failure(command or "run", unknown), error=True)
         return 1

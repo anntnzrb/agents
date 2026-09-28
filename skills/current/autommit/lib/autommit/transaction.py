@@ -1,18 +1,22 @@
 """Durable receipts and exclusive operation locking scoped to the Git worktree."""
 
-from __future__ import annotations
-
 import contextlib
 import json
 import os
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Literal, TypeIs
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
 from autommit.errors import AutommitError, RefusalError
+
+_json_loads: Callable[..., object] = json.loads
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
 
 AUTOMMIT_DIRECTORY = "autommit"
 RECEIPT_FILENAME = "receipt.json"
@@ -95,7 +99,7 @@ def _bounded_string(value: object, field: str) -> str:
 
 def _validate_receipt(value: object) -> Receipt:
     keys = {"version", "state", "ref", "before", "after", "indexTree"}
-    if not isinstance(value, dict) or set(value.keys()) != keys:
+    if not _is_dict(value) or set(value.keys()) != keys:
         raise AutommitError(
             "invalid_receipt", "Receipt payload does not match expected schema."
         )
@@ -134,8 +138,8 @@ def read_receipt(git_dir: Path) -> Receipt | None:
             "invalid_receipt", f"Receipt payload exceeds maximum size: {receipt_path}"
         )
     try:
-        payload = json.loads(raw.decode("utf-8"))
-    except Exception as err:
+        payload = _json_loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as err:
         raise AutommitError(
             "invalid_receipt", f"Receipt payload is not valid JSON: {receipt_path}"
         ) from err
@@ -180,8 +184,8 @@ def write_receipt(git_dir: Path, receipt: Receipt) -> None:
     ).encode("utf-8")
     temp_path = directory / f"receipt.{os.getpid()}.tmp"
     try:
-        temp_path.write_bytes(payload)
-        temp_path.replace(receipt_path)
+        _ = temp_path.write_bytes(payload)
+        _ = temp_path.replace(receipt_path)
         _sync_directory(directory)
     except OSError as err:
         with contextlib.suppress(OSError):
@@ -238,8 +242,8 @@ def write_recovery_point(git_dir: Path, point: RecoveryPoint) -> None:
     ).encode("utf-8")
     temp_path = directory / f"recovery.{os.getpid()}.tmp"
     try:
-        temp_path.write_bytes(payload)
-        temp_path.replace(target)
+        _ = temp_path.write_bytes(payload)
+        _ = temp_path.replace(target)
         _sync_directory(directory)
     except OSError as err:
         with contextlib.suppress(OSError):
@@ -262,10 +266,10 @@ def read_recovery_point(git_dir: Path) -> RecoveryPoint | None:
     if len(raw) > MAX_RECOVERY_BYTES:
         return None
     try:
-        payload = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+        payload = _json_loads(raw.decode("utf-8"))
+    except UnicodeDecodeError, json.JSONDecodeError:
         return None
-    if not isinstance(payload, dict):
+    if not _is_dict(payload):
         return None
     ref = payload.get("ref")
     before = payload.get("before")
@@ -305,9 +309,9 @@ def describe_operation_lock(git_dir: Path) -> str | None:
         return None
     try:
         raw = lock_path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        pid = data.get("pid")
-    except Exception:
+        data = _json_loads(raw)
+        pid = data.get("pid") if _is_dict(data) else None
+    except OSError, json.JSONDecodeError:
         return f"operation lock is unreadable at {lock_path}; remove it if no autommit run is active."
     if not isinstance(pid, int) or pid <= 0:
         return f"operation lock at {lock_path} has no usable PID; remove it if no autommit run is active."
@@ -324,7 +328,7 @@ def describe_operation_lock(git_dir: Path) -> str | None:
 
 
 @contextmanager
-def operation_lock(git_dir: Path) -> Generator[None, None, None]:
+def operation_lock(git_dir: Path) -> Generator[None]:
     """Serialize autommit operations for the target worktree; no stale lock guessing."""
     directory = _ensure_directory(git_dir)
     lock_path = directory / LOCK_FILENAME
@@ -338,7 +342,7 @@ def operation_lock(git_dir: Path) -> Generator[None, None, None]:
     )
     temp_path = directory / f"lock.{os.getpid()}.tmp"
     try:
-        temp_path.write_bytes(payload)
+        _ = temp_path.write_bytes(payload)
     except OSError as err:
         raise AutommitError(
             "write_failed", f"Failed to prepare lock file at {temp_path}: {err}"
@@ -361,7 +365,7 @@ def operation_lock(git_dir: Path) -> Generator[None, None, None]:
             ) from err
 
         try:
-            os.write(lock_fd, payload)
+            _ = os.write(lock_fd, payload)
         finally:
             os.close(lock_fd)
         _sync_directory(directory)

@@ -1,7 +1,5 @@
 """Deterministic evidence rendering for the planner and the atomicity critic."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -283,7 +281,7 @@ def render_planner_prompt(evidence: PlannerEvidence) -> str:
     sections.append("STAGED PATHS:\n" + "\n".join(evidence.staged_files))
     lines = ["STAGED INVENTORY (1-based hunk ids):"]
     for file in evidence.inventory:
-        flags = []
+        flags: list[str] = []
         if file.is_binary:
             flags.append("binary")
         if file.is_rename:

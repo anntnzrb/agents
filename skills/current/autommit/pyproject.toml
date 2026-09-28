@@ -1,52 +1,54 @@
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
     "A002",
-    "ANN401",
-    "BLE001",
     "COM812",
-    "CPY001",
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
+    "CPY001",  # No copyright headers in non-Markdown files per repo policy
+    "D100",  # Docstring coverage not required for all internal modules
+    "D101",  # Docstring coverage not required for all internal classes
+    "D102",  # Docstring coverage not required for all internal methods
+    "D103",  # Docstring coverage not required for all internal functions
+    "D104",  # Docstring coverage not required for all internal packages
     "D203",
     "D213",
-    "E501",
+    "E501",  # Line length handled by ruff format
     "EM101",
     "EM102",
     "ERA001",
-    "FBT001",
-    "FBT002",
+    "FBT001",  # Boolean parameters used in existing internal CLI/service signatures
+    "FBT002",  # Boolean default parameters used in existing internal signatures
     "PERF401",
     "PLR0911",
     "PLR0912",
-    "PLR0915",
-    "C901",
+    "PLR0915",  # Orchestration and parsing state machines exceed statement limit
+    "C901",  # Multi-branch parsing and orchestration logic
     "S101",
     "S603",
     "S607",
     "SLF001",
-    "TC003",
+    "TC003",  # Keep imports at module level
     "TRY003",
     "TRY301",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["T201", "INP001"]
-"tests/**/*.py" = ["S101", "PT009", "PT027", "ANN", "ARG", "E402", "INP001", "FBT001"]
+"tests/**/*.py" = ["S101", "PT009", "PT027", "ANN", "ARG", "E402", "INP001", "FBT001", "PLR0913"]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "lib", "tests"]
 extraPaths = ["lib"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = "none"

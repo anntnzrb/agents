@@ -1,16 +1,15 @@
 """OpenAI-compatible model client with an explicit transport ladder."""
 
-from __future__ import annotations
-
 import json
 import ssl
 import threading
 import time
 import urllib.error
 import urllib.request
-from contextlib import contextmanager
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final, cast
+from typing import Final, TypeIs
 
 from autommit.errors import AutommitError
 from autommit.proposal import (
@@ -23,8 +22,17 @@ from autommit.proposal import (
     normalize_proposal,
 )
 
-if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+_json_loads: Callable[..., object] = json.loads
+_urlopen: Callable[..., AbstractContextManager[object]] = urllib.request.urlopen
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 USER_AGENT: Final[str] = "autommit/1.0"
 MAX_ATTEMPTS: Final[int] = 3
@@ -181,34 +189,34 @@ def _create_secure_ssl_context() -> ssl.SSLContext:
 
 def _decode_body(raw: str) -> dict[str, object]:
     try:
-        value = json.loads(raw)
+        raw_val = _json_loads(raw)
     except json.JSONDecodeError:
         return {}
-    if not isinstance(value, dict):
+    if not _is_dict(raw_val):
         return {}
-    return cast("dict[str, object]", value)
+    return dict(raw_val)
 
 
 def _error_detail(body: dict[str, object]) -> str:
     error = body.get("error")
-    if isinstance(error, dict):
-        message = cast("dict[str, object]", error).get("message")
-        if isinstance(message, str) and message.strip():
-            return message.strip()
+    if _is_dict(error):
+        msg_val = error.get("message")
+        if isinstance(msg_val, str) and msg_val.strip():
+            return msg_val.strip()
     return "no error detail"
 
 
 def _extract_content(body: dict[str, object]) -> str:
     choices = body.get("choices")
-    if not isinstance(choices, list) or not choices:
+    if not _is_list(choices) or not choices:
         raise AutommitError("invalid_response", "Model response contains no choices.")
     first = choices[0]
-    if not isinstance(first, dict):
+    if not _is_dict(first):
         raise AutommitError("invalid_response", "Model choice is not an object.")
-    message = cast("dict[str, object]", first).get("message")
-    if not isinstance(message, dict):
+    message = first.get("message")
+    if not _is_dict(message):
         raise AutommitError("invalid_response", "Model response contains no message.")
-    content = cast("dict[str, object]", message).get("content")
+    content = message.get("content")
     if not isinstance(content, str) or not content.strip():
         raise AutommitError("invalid_response", "Model response contains no content.")
     return content
@@ -216,24 +224,24 @@ def _extract_content(body: dict[str, object]) -> str:
 
 def _extract_tool_arguments(body: dict[str, object]) -> str:
     choices = body.get("choices")
-    if not isinstance(choices, list) or not choices:
+    if not _is_list(choices) or not choices:
         raise AutommitError("invalid_response", "Model response contains no choices.")
     first = choices[0]
-    if not isinstance(first, dict):
+    if not _is_dict(first):
         raise AutommitError("invalid_response", "Model choice is not an object.")
-    message = cast("dict[str, object]", first).get("message")
-    if not isinstance(message, dict):
+    message = first.get("message")
+    if not _is_dict(message):
         raise AutommitError("invalid_response", "Model response contains no message.")
-    tool_calls = cast("dict[str, object]", message).get("tool_calls")
-    if not isinstance(tool_calls, list) or not tool_calls:
+    tool_calls = message.get("tool_calls")
+    if not _is_list(tool_calls) or not tool_calls:
         raise AutommitError("invalid_response", "Model response contains no tool call.")
     call = tool_calls[0]
-    if not isinstance(call, dict):
+    if not _is_dict(call):
         raise AutommitError("invalid_response", "Model tool call is not an object.")
-    function = cast("dict[str, object]", call).get("function")
-    if not isinstance(function, dict):
+    function = call.get("function")
+    if not _is_dict(function):
         raise AutommitError("invalid_response", "Model tool call has no function.")
-    arguments = cast("dict[str, object]", function).get("arguments")
+    arguments = function.get("arguments")
     if not isinstance(arguments, str) or not arguments.strip():
         raise AutommitError("invalid_response", "Model tool call has no arguments.")
     return arguments
@@ -244,7 +252,7 @@ def _loads(text: str) -> object:
     if stripped.startswith("```"):
         stripped = stripped.removeprefix("```json").removeprefix("```")
         stripped = stripped.removesuffix("```").strip()
-    return json.loads(stripped)
+    return _json_loads(stripped)
 
 
 def _schema_rung(name: str, schema: dict[str, object]) -> _Rung:
@@ -304,12 +312,19 @@ def _http_post(request: ModelRequest) -> Callable[[dict[str, object]], HttpRespo
             method="POST",
         )
         try:
-            with urllib.request.urlopen(  # noqa: S310
+            with _urlopen(
                 http_request, timeout=request.timeout, context=ssl_context
-            ) as response:
-                return HttpResponse(
-                    response.status, _decode_body(response.read().decode("utf-8"))
+            ) as resp:
+                status_val: object = getattr(resp, "status", 200)
+                status: int = status_val if isinstance(status_val, int) else 200
+                read_fn: object = getattr(resp, "read", None)
+                body_raw: object = read_fn() if callable(read_fn) else b""
+                raw_text: str = (
+                    body_raw.decode("utf-8")
+                    if isinstance(body_raw, bytes | bytearray)
+                    else ""
                 )
+                return HttpResponse(status, _decode_body(raw_text))
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")
             return HttpResponse(error.code, _decode_body(detail))
@@ -331,7 +346,7 @@ class _CallOptions:
 @contextmanager
 def _heartbeat(
     notify: Callable[[str], None] | None, label: str, interval: float
-) -> Iterator[None]:
+) -> Generator[None]:
     """Report elapsed time while one request waits on the model."""
     if notify is None:
         yield
@@ -388,9 +403,7 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
                     # the same prompt would time out again; never resend it
                     raise AutommitError(
                         "provider_error",
-                        f"{request.base_url} did not answer within "
-                        f"{request.timeout:.0f}s; raise --timeout or lower "
-                        "--reasoning-effort.",
+                        f"{request.base_url} did not answer within {request.timeout:.0f}s; raise --timeout or lower --reasoning-effort.",
                         1,
                     ) from error
                 if attempt + 1 < attempts:
@@ -407,8 +420,7 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
                     continue
                 raise AutommitError(
                     "provider_error",
-                    f"{request.base_url} returned HTTP {response.status}: "
-                    f"{_error_detail(response.body)}.",
+                    f"{request.base_url} returned HTTP {response.status}: {_error_detail(response.body)}.",
                     1,
                 )
             if response.status in UNSUPPORTED_RUNG_STATUSES:
@@ -416,8 +428,7 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
             if response.status != OK_STATUS:
                 raise AutommitError(
                     "provider_error",
-                    f"{request.base_url} returned HTTP {response.status}: "
-                    f"{_error_detail(response.body)}.",
+                    f"{request.base_url} returned HTTP {response.status}: {_error_detail(response.body)}.",
                     1,
                 )
             try:
@@ -428,8 +439,7 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
                 )
                 if request.notify is not None:
                     request.notify(
-                        f"{request.label}: {rung.name} reply was not JSON; "
-                        "trying the next format"
+                        f"{request.label}: {rung.name} reply was not JSON; trying the next format"
                     )
                 break
             # parseable but invalid: the caller corrects the model with this error
@@ -440,17 +450,16 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
 
 
 def _validate(payload: object, invalid_code: str) -> dict[str, object]:
-    if not isinstance(payload, dict):
+    if not _is_dict(payload):
         raise AutommitError(invalid_code, "Model result must be a JSON object.")
-    record = cast("dict[str, object]", payload)
     try:
         if invalid_code == "invalid_plan":
-            _ = normalize_proposal(record)
+            _ = normalize_proposal(payload)
         else:
-            _ = normalize_atomicity_decision(record)
+            _ = normalize_atomicity_decision(payload)
     except AutommitError as error:
         raise AutommitError(invalid_code, error.message) from error
-    return record
+    return payload
 
 
 def _http_get(request: ModelRequest) -> Callable[[str], HttpResponse]:
@@ -464,12 +473,19 @@ def _http_get(request: ModelRequest) -> Callable[[str], HttpResponse]:
     def fetch(url: str) -> HttpResponse:
         http_request = urllib.request.Request(url, headers=headers)  # noqa: S310
         try:
-            with urllib.request.urlopen(  # noqa: S310
+            with _urlopen(
                 http_request, timeout=request.timeout, context=ssl_context
-            ) as response:
-                return HttpResponse(
-                    response.status, _decode_body(response.read().decode("utf-8"))
+            ) as resp:
+                status_val: object = getattr(resp, "status", 200)
+                status: int = status_val if isinstance(status_val, int) else 200
+                read_fn: object = getattr(resp, "read", None)
+                body_raw: object = read_fn() if callable(read_fn) else b""
+                raw_text: str = (
+                    body_raw.decode("utf-8")
+                    if isinstance(body_raw, bytes | bytearray)
+                    else ""
                 )
+                return HttpResponse(status, _decode_body(raw_text))
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")
             return HttpResponse(error.code, _decode_body(detail))
@@ -503,13 +519,14 @@ def list_models(
             1,
         )
     data = response.body.get("data")
-    if not isinstance(data, list):
+    if not _is_list(data):
         raise AutommitError("invalid_response", f"{url} returned no model list.")
-    ids = {
-        entry["id"]
-        for entry in cast("list[object]", data)
-        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
-    }
+    ids: set[str] = set()
+    for entry in data:
+        if _is_dict(entry):
+            entry_id = entry.get("id")
+            if isinstance(entry_id, str):
+                ids.add(entry_id)
     return tuple(sorted(ids))
 
 

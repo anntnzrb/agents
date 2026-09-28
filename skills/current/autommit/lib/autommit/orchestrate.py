@@ -1,18 +1,18 @@
 """Own the autommit loop: prepare, plan, validate, critique, apply."""
 
-from __future__ import annotations
-
 import json
 import os
 import re
 import signal
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal, cast
+from types import FrameType
+from typing import Final, Literal, TypeIs
 
-from autommit.client import ModelRequest, call_critic, call_planner
+from autommit.client import HttpResponse, ModelRequest, call_critic, call_planner
 from autommit.config import ConfigOverrides, load_config
 from autommit.errors import AutommitError, CancelledError
 from autommit.git import try_git
@@ -36,10 +36,36 @@ from autommit.proposal import (
 from autommit.service import apply, prepare, validate_plan
 from autommit.transaction import format_recovery_hint, read_recovery_point
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+_json_loads: Callable[..., object] = json.loads
 
-    from autommit.client import HttpResponse
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _list_val(val: object) -> list[object]:
+    return val if _is_list(val) else []
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _str_tuple(val: object) -> tuple[str, ...]:
+    if _is_list(val):
+        return tuple(item for item in val if isinstance(item, str))
+    return ()
+
+
+def _dict_list(val: object) -> list[dict[str, object]]:
+    if not _is_list(val):
+        return []
+    return [item for item in val if _is_dict(item)]
+
+
+def _int_val(val: object, default: int = 0) -> int:
+    return val if isinstance(val, int) and not isinstance(val, bool) else default
+
 
 SCHEMA: Final[str] = "autommit/v1"
 MAX_PLAN_ATTEMPTS: Final[int] = 3
@@ -107,30 +133,36 @@ def _raise_cancelled(signum: int, frame: object) -> None:
     raise CancelledError
 
 
-def _install_signal_handlers() -> dict[int, signal.Handlers]:
-    previous: dict[int, signal.Handlers] = {}
+type _SignalHandler = (
+    Callable[[int, FrameType | None], object] | int | signal.Handlers | None
+)
+
+
+def _install_signal_handlers() -> dict[int, _SignalHandler]:
+    previous: dict[int, _SignalHandler] = {}
     for name in ("SIGINT", "SIGTERM"):
-        signum = getattr(signal, name, None)
-        if signum is None:
+        signum: object = getattr(signal, name, None)
+        if not isinstance(signum, int):
             continue
-        previous[signum] = cast("signal.Handlers", signal.getsignal(signum))
-        signal.signal(signum, _raise_cancelled)
+        previous[signum] = signal.getsignal(signum)
+        _ = signal.signal(signum, _raise_cancelled)
     return previous
 
 
-def _restore_signal_handlers(previous: dict[int, signal.Handlers]) -> None:
+def _restore_signal_handlers(previous: dict[int, _SignalHandler]) -> None:
     for signum, handler in previous.items():
-        signal.signal(signum, handler)
+        if handler is not None:
+            _ = signal.signal(signum, handler)
 
 
 def _write(message: str) -> None:
-    sys.stdout.write(message + "\n")
-    sys.stdout.flush()
+    _ = sys.stdout.write(message + "\n")
+    _ = sys.stdout.flush()
 
 
 def _write_error(message: str) -> None:
-    sys.stderr.write(message + "\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(message + "\n")
+    _ = sys.stderr.flush()
 
 
 def _note(options: RunOptions, message: str) -> None:
@@ -141,8 +173,8 @@ def _note(options: RunOptions, message: str) -> None:
 
 
 def _stderr_line(message: str) -> None:
-    sys.stderr.write(message + "\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(message + "\n")
+    _ = sys.stderr.flush()
 
 
 def _progress(options: RunOptions, message: str) -> None:
@@ -153,8 +185,8 @@ def _progress(options: RunOptions, message: str) -> None:
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
-    stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    stream.flush()
+    _ = stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    _ = stream.flush()
 
 
 def _success(data: object) -> dict[str, object]:
@@ -280,7 +312,7 @@ def _attempt_plan(
                     "Atomicity review requires at least two commits.",
                 )
             payload = _with_move_commit(planned, context.move_commit)
-            context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
+            _ = context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
             _ = validate_plan(context.options.repo, context.snapshot, context.plan_path)
         except AutommitError as error:
             if error.code not in RETRYABLE_PLAN_CODES:
@@ -301,11 +333,12 @@ def _plan(
     """Plan the staged snapshot; a moves-only snapshot needs no model."""
     if not evidence.staged_files and context.move_commit is not None:
         payload: dict[str, object] = {"commits": [context.move_commit]}
-        context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
+        _ = context.plan_path.write_text(json.dumps(payload), encoding="utf-8")
         _ = validate_plan(context.options.repo, context.snapshot, context.plan_path)
         return (payload, False), ""
     if context.move_commit is not None:
-        moved = len(cast("list[object]", context.move_commit["changes"]))
+        changes_raw = context.move_commit.get("changes")
+        moved = len(changes_raw) if _is_list(changes_raw) else 0
         _progress(
             context.options,
             f"Committing {moved} pure rename(s) as one move-only commit.",
@@ -320,37 +353,37 @@ def _whole_file_selectors(
 ) -> dict[str, object]:
     """Select hunkless files whole: no other selector can apply to them."""
     commits = planned.get("commits")
-    if not whole_files or not isinstance(commits, list):
+    if not whole_files or not _is_list(commits):
         return planned
-    return {
-        **planned,
-        "commits": [
-            {
-                **commit,
-                "changes": [
+    new_commits: list[object] = []
+    for commit in commits:
+        if _is_dict(commit):
+            raw_changes = commit.get("changes", [])
+            if _is_list(raw_changes):
+                new_changes: list[object] = [
                     {**change, "hunks": "all"}
-                    if isinstance(change, dict) and change.get("path") in whole_files
+                    if _is_dict(change) and change.get("path") in whole_files
                     else change
-                    for change in commit.get("changes", [])
-                ],
-            }
-            if isinstance(commit, dict)
-            else commit
-            for commit in commits
-        ],
-    }
+                    for change in raw_changes
+                ]
+                new_commits.append({**commit, "changes": new_changes})
+            else:
+                new_commits.append(commit)
+        else:
+            new_commits.append(commit)
+    return {**planned, "commits": new_commits}
 
 
 def _dedupe_whole_files(planned: dict[str, object]) -> dict[str, object]:
     """Keep a file selected whole only in its first whole-file commit.
 
-    Any other selection of that file is redundant, so it is dropped; a commit
+    Every other selection of that file is redundant, so it is dropped; a commit
     left empty is removed and dependency indices are remapped.
     """
-    commits = cast("list[dict[str, object]]", planned.get("commits", []))
+    commits = _dict_list(planned.get("commits", []))
     owner: dict[str, int] = {}
     for index, commit in enumerate(commits):
-        for change in cast("list[dict[str, object]]", commit.get("changes", [])):
+        for change in _dict_list(commit.get("changes", [])):
             path = str(change.get("path"))
             if change.get("hunks") == "all" and path not in owner:
                 owner[path] = index
@@ -359,7 +392,7 @@ def _dedupe_whole_files(planned: dict[str, object]) -> dict[str, object]:
     for index, commit in enumerate(commits):
         changes = [
             change
-            for change in cast("list[dict[str, object]]", commit.get("changes", []))
+            for change in _dict_list(commit.get("changes", []))
             if owner.get(str(change.get("path")), index) == index
             and not (change.get("hunks") != "all" and str(change.get("path")) in owner)
         ]
@@ -367,8 +400,7 @@ def _dedupe_whole_files(planned: dict[str, object]) -> dict[str, object]:
             remap[index] = len(kept)
             kept.append({**commit, "changes": changes})
     if len(kept) == len(commits) and all(
-        len(cast("list[object]", a.get("changes", [])))
-        == len(cast("list[object]", b.get("changes", [])))
+        len(_dict_list(a.get("changes", []))) == len(_dict_list(b.get("changes", [])))
         for a, b in zip(kept, commits, strict=True)
     ):
         return planned
@@ -378,9 +410,11 @@ def _dedupe_whole_files(planned: dict[str, object]) -> dict[str, object]:
             {
                 **commit,
                 "dependencies": [
-                    remap[int(cast("int", dep))]
-                    for dep in cast("list[object]", commit.get("dependencies", []))
-                    if int(cast("int", dep)) in remap
+                    remap[dep]
+                    for dep in _list_val(commit.get("dependencies"))
+                    if isinstance(dep, int)
+                    and not isinstance(dep, bool)
+                    and dep in remap
                 ],
             }
             for commit in kept
@@ -394,25 +428,21 @@ def _with_move_commit(
     """Append the move-only commit and apply it first: later commits use its paths."""
     if move_commit is None:
         return planned
-    commits = cast("list[object]", planned.get("commits", []))
+    raw_commits = planned.get("commits", [])
+    commits = raw_commits if _is_list(raw_commits) else []
     move_index = len(commits)
+    updated_commits: list[object] = []
+    for commit in commits:
+        if _is_dict(commit):
+            raw_deps = commit.get("dependencies", [])
+            deps = list(raw_deps) if _is_list(raw_deps) else []
+            updated_commits.append({**commit, "dependencies": [*deps, move_index]})
+        else:
+            updated_commits.append(commit)
+    updated_commits.append(move_commit)
     return {
         **planned,
-        "commits": [
-            *(
-                {
-                    **commit,
-                    "dependencies": [
-                        *cast("list[object]", commit.get("dependencies", [])),
-                        move_index,
-                    ],
-                }
-                if isinstance(commit, dict)
-                else commit
-                for commit in commits
-            ),
-            move_commit,
-        ],
+        "commits": updated_commits,
     }
 
 
@@ -422,7 +452,7 @@ def _move_commit(
     """One deterministic move-only commit for renames with identical content."""
     if not moves:
         return None
-    subjects = _SUBJECT.findall(repository_context)
+    subjects = [m.group(1) for m in _SUBJECT.finditer(repository_context)]
     conventional = sum(1 for subject in subjects if _CONVENTIONAL.match(subject))
     summary = (
         "refactor: move files without content changes"
@@ -489,7 +519,7 @@ def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path 
         )
     verdict = normalize_atomicity_decision(decision)
     if verdict.decision == "accept":
-        context.decision_path.write_text(json.dumps(decision), encoding="utf-8")
+        _ = context.decision_path.write_text(json.dumps(decision), encoding="utf-8")
         return context.decision_path
     forced, last_error = _attempt_plan(
         context,
@@ -503,8 +533,7 @@ def _review(context: _PlanContext, proposal_payload: dict[str, object]) -> Path 
     if forced is None:
         raise AutommitError(
             "atomicity_split_required",
-            "The atomicity critic required a split and no valid multi-commit "
-            f"plan was produced. Last error: {_brief(last_error)}",
+            f"The atomicity critic required a split and no valid multi-commit plan was produced. Last error: {_brief(last_error)}",
         )
     return None
 
@@ -525,17 +554,18 @@ def _dry_run_payload(
 
 
 def _report(options: RunOptions, result: dict[str, object]) -> None:
-    commits = cast("list[dict[str, str]]", result.get("commits", []))
+    commits = _dict_list(result.get("commits", []))
     if options.json_output:
         _emit(_success(result))
         return
     for commit in commits:
-        _write(f"Created {commit['sha'][:7]} {commit['summary']}")
+        sha = str(commit.get("sha", ""))[:7]
+        summary = str(commit.get("summary", ""))
+        _write(f"Created {sha} {summary}")
     before = str(result.get("before", ""))[:7]
     after = str(result.get("after", ""))[:7]
     _write(
-        f"Created {len(commits)} commit(s) on {result.get('ref', '')} "
-        f"({before} -> {after})."
+        f"Created {len(commits)} commit(s) on {result.get('ref', '')} ({before} -> {after})."
     )
 
 
@@ -553,18 +583,17 @@ def run_orchestrated(options: RunOptions) -> int:
                 _note(options, "Nothing left to commit after recovery.")
                 return 0
         snapshot = str(prepared["snapshot"])
-        staged_files = tuple(cast("list[str]", prepared["staged_files"]))
-        hunk_count = int(cast("int", prepared["changed_hunk_count"]))
+        staged_files = _str_tuple(prepared.get("staged_files"))
+        hunk_count = _int_val(prepared.get("changed_hunk_count"))
         inventory = build_inventory(options.repo, staged_files, str(prepared["diff"]))
         repository_context = str(prepared.get("repository_context", ""))
-        user_context = tuple(cast("list[str]", prepared.get("user_context", [])))
+        user_context = _str_tuple(prepared.get("user_context", []))
         zero_diff = str(prepared.get("zero_diff", ""))
         ref = str(prepared["ref"])
         before = str(prepared["before"])
         _note(
             options,
-            f"Prepared {len(staged_files)} file(s), {hunk_count} hunk(s) "
-            f"(snapshot {snapshot[:8]}).",
+            f"Prepared {len(staged_files)} file(s), {hunk_count} hunk(s) (snapshot {snapshot[:8]}).",
         )
 
         if options.dry_run:
@@ -610,14 +639,13 @@ def run_orchestrated(options: RunOptions) -> int:
             if planned is None:
                 raise AutommitError(
                     "invalid_plan",
-                    f"Planner produced no valid plan after {MAX_PLAN_ATTEMPTS} "
-                    f"attempts. Last error: {_brief(last_error)}",
+                    f"Planner produced no valid plan after {MAX_PLAN_ATTEMPTS} attempts. Last error: {_brief(last_error)}",
                 )
             payload, review = planned
             decision_file = _review(context, payload) if review else None
             # a critic replan rewrites the plan file; count what will be applied
             settled = normalize_proposal(
-                json.loads(context.plan_path.read_text(encoding="utf-8"))
+                _json_loads(context.plan_path.read_text(encoding="utf-8"))
             )
             _progress(options, f"Applying {len(settled.commits)} commit(s)...")
             result = apply(

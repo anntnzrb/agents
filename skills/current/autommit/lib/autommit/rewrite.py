@@ -1,16 +1,15 @@
 """Rebuild the commits since a base revision while preserving the final tree."""
 
-from __future__ import annotations
-
 import contextlib
 import json
 import os
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final, TypeIs
 
 from autommit.client import ModelRequest, call_critic, call_planner
 from autommit.config import ConfigOverrides, load_config
@@ -40,14 +39,14 @@ from autommit.proposal import (
     validate_proposal_coverage,
 )
 from autommit.service import (
-    _blocking_state,
-    _cas_ref,
-    _commit_message,
-    _git_dir,
-    _repository_policy,
-    _require_atomicity_decision,
-    _run_smoke,
+    blocking_state,
+    cas_ref,
+    commit_message,
     read_json_file,
+    repository_policy,
+    require_atomicity_decision,
+    resolve_git_dir,
+    run_smoke,
 )
 from autommit.transaction import (
     Receipt,
@@ -62,9 +61,16 @@ from autommit.transaction import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from autommit.orchestrate import RunOptions
+
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
 
 SCHEMA: Final[str] = "autommit/v1"
 MAX_PLAN_ATTEMPTS: Final[int] = 3
@@ -111,8 +117,8 @@ def _write(message: str) -> None:
 
 
 def _write_error(message: str) -> None:
-    sys.stderr.write(message + "\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(message + "\n")
+    _ = sys.stderr.flush()
 
 
 def _note(options: RunOptions, message: str) -> None:
@@ -123,8 +129,8 @@ def _note(options: RunOptions, message: str) -> None:
 
 
 def _stderr_line(message: str) -> None:
-    sys.stderr.write(message + "\n")
-    sys.stderr.flush()
+    _ = sys.stderr.write(message + "\n")
+    _ = sys.stderr.flush()
 
 
 def _progress(options: RunOptions, message: str) -> None:
@@ -135,8 +141,8 @@ def _progress(options: RunOptions, message: str) -> None:
 
 def _emit(payload: dict[str, object], *, error: bool = False) -> None:
     stream = sys.stderr if error else sys.stdout
-    stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    stream.flush()
+    _ = stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    _ = stream.flush()
 
 
 def _success(data: object) -> dict[str, object]:
@@ -209,8 +215,14 @@ def _snapshot_token(ref: str, before: str, target: str) -> str:
     return sha256(canonical.encode()).hexdigest()
 
 
+def _str_tuple(val: object) -> tuple[str, ...]:
+    if _is_list(val):
+        return tuple(item for item in val if isinstance(item, str))
+    return ()
+
+
 def _evidence(repo: Path, prepared: dict[str, object]) -> RewriteEvidence:
-    staged_files = tuple(cast("list[str]", prepared["staged_files"]))
+    staged_files = _str_tuple(prepared.get("staged_files"))
     diff = str(prepared["diff"])
     return RewriteEvidence(
         ref=str(prepared["ref"]),
@@ -223,7 +235,7 @@ def _evidence(repo: Path, prepared: dict[str, object]) -> RewriteEvidence:
         zero_diff=str(prepared["zero_diff"]),
         inventory=build_inventory(repo, staged_files, diff),
         repository_context=str(prepared.get("repository_context", "")),
-        user_context=tuple(cast("list[str]", prepared.get("user_context", []))),
+        user_context=_str_tuple(prepared.get("user_context", [])),
     )
 
 
@@ -252,9 +264,9 @@ def prepare_rewrite(
     cwd: Path, context: tuple[str, ...], *, base_rev: str | None = None
 ) -> dict[str, object]:
     """Freeze the target tree, resolve the base, and expose rewrite evidence."""
-    git_dir = _git_dir(cwd)
+    git_dir = resolve_git_dir(cwd)
     with operation_lock(git_dir):
-        if blocking := _blocking_state(git_dir):
+        if blocking := blocking_state(git_dir):
             raise RefusalError("in_progress_state", blocking)
         ref_result = try_git(cwd, "symbolic-ref", "--quiet", "HEAD")
         head_result = try_git(cwd, "rev-parse", "HEAD")
@@ -289,7 +301,7 @@ def prepare_rewrite(
             "diff": diff,
             "zero_diff": zero_diff,
             "inventory": inventory_payload(inventory),
-            "repository_context": _repository_policy(cwd),
+            "repository_context": repository_policy(cwd),
             "user_context": list(context),
             "context": "\n\n".join(context),
         }
@@ -331,13 +343,13 @@ def publish_rewrite(
     smoke: str | None = None,
 ) -> dict[str, object]:
     """Rebuild commits off-branch, verify the final tree, and move the branch by CAS."""
-    git_dir = _git_dir(cwd)
+    git_dir = resolve_git_dir(cwd)
     with operation_lock(git_dir):
-        if blocking := _blocking_state(git_dir):
+        if blocking := blocking_state(git_dir):
             raise RefusalError("in_progress_state", blocking)
         validation = _validate_rewrite_plan(cwd, evidence, plan_file)
         proposal = normalize_proposal(read_json_file(plan_file, "plan"))
-        _ = _require_atomicity_decision(
+        _ = require_atomicity_decision(
             bool(validation["requires_atomicity_review"]), decision_file
         )
         created: list[dict[str, str]] = []
@@ -350,7 +362,9 @@ def publish_rewrite(
         ):
             worktree = Path(worktree_name)
             message = Path(patch_name) / "message.txt"
-            run_git(cwd, "worktree", "add", "--detach", str(worktree), evidence.base)
+            _ = run_git(
+                cwd, "worktree", "add", "--detach", str(worktree), evidence.base
+            )
             try:
                 for commit_index in compute_apply_order(proposal.commits):
                     group = proposal.commits[commit_index]
@@ -366,9 +380,9 @@ def publish_rewrite(
                     )
                     _ = apply_with_fallback(work, group)
                     if smoke is not None:
-                        _run_smoke(worktree, smoke, evidence.ref, evidence.before)
-                    message.write_text(_commit_message(group), encoding="utf-8")
-                    run_git(
+                        run_smoke(worktree, smoke, evidence.ref, evidence.before)
+                    _ = message.write_text(commit_message(group), encoding="utf-8")
+                    _ = run_git(
                         worktree,
                         "-c",
                         "core.hooksPath=",
@@ -385,8 +399,8 @@ def publish_rewrite(
                 _record_point(git_dir, evidence)
                 raise
             finally:
-                try_git(cwd, "worktree", "remove", "--force", str(worktree))
-                try_git(cwd, "worktree", "prune")
+                _ = try_git(cwd, "worktree", "remove", "--force", str(worktree))
+                _ = try_git(cwd, "worktree", "prune")
 
             final_tree = run_git(cwd, "rev-parse", f"{final_head}^{{tree}}").strip()
             if final_tree != evidence.target_tree:
@@ -405,7 +419,7 @@ def publish_rewrite(
                 index_tree=evidence.target_tree,
             )
             write_receipt(git_dir, receipt)
-            _cas_ref(cwd, evidence.ref, final_head, evidence.before)
+            cas_ref(cwd, evidence.ref, final_head, evidence.before)
             remove_receipt(git_dir)
             clear_recovery_point(git_dir)
             _ = run_git(cwd, "read-tree", final_head)
@@ -518,7 +532,7 @@ def _plan_loop(
                 ),
                 post=runner.options.post,
             )
-            runner.plan_file.write_text(json.dumps(payload), encoding="utf-8")
+            _ = runner.plan_file.write_text(json.dumps(payload), encoding="utf-8")
             _ = _validate_rewrite_plan(
                 runner.options.repo,
                 runner.evidence,
@@ -541,8 +555,7 @@ def run_rewrite(options: RunOptions) -> int:
         evidence = _evidence(options.repo, prepared)
         _note(
             options,
-            f"Frozen {len(evidence.staged_files)} file(s) since "
-            f"{evidence.base[:7]} (snapshot {evidence.snapshot[:8]}).",
+            f"Frozen {len(evidence.staged_files)} file(s) since {evidence.base[:7]} (snapshot {evidence.snapshot[:8]}).",
         )
         if options.dry_run:
             payload = {
@@ -599,12 +612,15 @@ def run_rewrite(options: RunOptions) -> int:
             if options.json_output:
                 _emit(_success(result))
             else:
-                for commit in cast("list[dict[str, str]]", result["commits"]):
-                    _write(f"Created {commit['sha'][:7]} {commit['summary']}")
+                commits_raw = result.get("commits")
+                if _is_list(commits_raw):
+                    for commit in commits_raw:
+                        if _is_dict(commit):
+                            sha = str(commit.get("sha", ""))
+                            summary = str(commit.get("summary", ""))
+                            _write(f"Created {sha[:7]} {summary}")
                 _write(
-                    f"Rewrote {result['commit_count']} commit(s) since "
-                    f"{evidence.base[:7]} ({evidence.before[:7]} -> "
-                    f"{str(result['after'])[:7]})."
+                    f"Rewrote {result['commit_count']} commit(s) since {evidence.base[:7]} ({evidence.before[:7]} -> {str(result['after'])[:7]})."
                 )
             return 0
     except AutommitError as error:
@@ -657,7 +673,7 @@ def _review(
         )
     verdict = normalize_atomicity_decision(decision)
     if verdict.decision == "accept":
-        decision_file.write_text(json.dumps(decision), encoding="utf-8")
+        _ = decision_file.write_text(json.dumps(decision), encoding="utf-8")
         return decision_file
     listed = "\n".join(f"- {concern}" for concern in verdict.concerns)
     correction = (
@@ -683,8 +699,7 @@ def _review(
     ):
         raise AutommitError(
             "atomicity_split_required",
-            "The atomicity critic required a split and no valid multi-commit "
-            "plan was produced.",
+            "The atomicity critic required a split and no valid multi-commit plan was produced.",
         )
     return None
 

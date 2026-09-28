@@ -1,13 +1,9 @@
 """Small subprocess boundary for Git."""
 
-from __future__ import annotations
-
 import os
 import subprocess
-from typing import TYPE_CHECKING, Final
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
+from typing import Final
 
 from autommit.errors import GitError, GitMissingError
 
@@ -50,7 +46,7 @@ def try_git(
     """Run Git when the caller needs to interpret a nonzero status."""
     merged_env = {**os.environ, **GIT_ENVIRONMENT, **(env or {})}
     for dropped in GIT_ENVIRONMENT_DROPS:
-        merged_env.pop(dropped, None)
+        _ = merged_env.pop(dropped, None)
     cmd = ["git", *GIT_SAFE_ARGS, *args]
     try:
         return subprocess.run(

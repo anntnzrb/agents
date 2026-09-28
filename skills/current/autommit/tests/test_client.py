@@ -1,14 +1,12 @@
 """Unit tests for the autommit config resolver and model client ladder."""
 
-from __future__ import annotations
-
 import json
 import sys
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
-from typing import cast
+from typing import TypeIs
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
@@ -44,7 +42,20 @@ PLAN = {
     ]
 }
 
-VERDICT = {"decision": "accept", "concerns": [], "rationale": "One behavior."}
+VERDICT: dict[str, object] = {
+    "decision": "accept",
+    "concerns": [],
+    "rationale": "One behavior.",
+}
+
+
+def _is_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _as_dict(val: object) -> dict[str, object]:
+    assert _is_dict(val)
+    return val
 
 
 def _request(api_key: str | None = "test-key") -> ModelRequest:
@@ -79,11 +90,7 @@ class TransportLadderTests(unittest.TestCase):
                 seen.append("tool")
                 return _unsupported()
             response_format = payload.get("response_format")
-            kind = (
-                response_format.get("type")
-                if isinstance(response_format, dict)
-                else None
-            )
+            kind = response_format.get("type") if _is_dict(response_format) else None
             if kind == "json_schema":
                 seen.append("json_schema")
                 return _unsupported()
@@ -133,11 +140,7 @@ class TransportLadderTests(unittest.TestCase):
             if "tools" in payload:
                 return _unsupported()
             response_format = payload.get("response_format")
-            kind = (
-                response_format.get("type")
-                if isinstance(response_format, dict)
-                else None
-            )
+            kind = response_format.get("type") if _is_dict(response_format) else None
             if kind == "json_schema":
                 return _unsupported()
             return _content(PLAN)
@@ -210,7 +213,7 @@ class TransportLadderTests(unittest.TestCase):
         def post(payload: dict[str, object]) -> HttpResponse:
             response_format = payload.get("response_format")
             if (
-                isinstance(response_format, dict)
+                _is_dict(response_format)
                 and response_format.get("type") == "json_schema"
             ):
                 return _content(VERDICT)
@@ -334,20 +337,18 @@ class ConfigResolutionTests(unittest.TestCase):
         )
 
     def test_plan_schema_publishes_no_count_ceilings(self) -> None:
-        plan_properties = cast("dict[str, object]", PLAN_JSON_SCHEMA["properties"])
-        commits = cast("dict[str, object]", plan_properties["commits"])
-        commit_items = cast("dict[str, object]", commits["items"])
-        commit_properties = cast("dict[str, object]", commit_items["properties"])
-        summary = cast("dict[str, object]", commit_properties["summary"])
+        plan_properties = _as_dict(PLAN_JSON_SCHEMA["properties"])
+        commits = _as_dict(plan_properties["commits"])
+        commit_items = _as_dict(commits["items"])
+        commit_properties = _as_dict(commit_items["properties"])
+        summary = _as_dict(commit_properties["summary"])
         self.assertEqual(summary["maxLength"], MAX_SUBJECT_LENGTH)
         self.assertEqual(MAX_SUBJECT_LENGTH, 72)
         self.assertNotIn("maxItems", commits)
         for name in ("details", "dependencies", "changes"):
-            self.assertNotIn(
-                "maxItems", cast("dict[str, object]", commit_properties[name])
-            )
-        critic_properties = cast("dict[str, object]", CRITIC_JSON_SCHEMA["properties"])
-        critic_concerns = cast("dict[str, object]", critic_properties["concerns"])
+            self.assertNotIn("maxItems", _as_dict(commit_properties[name]))
+        critic_properties = _as_dict(CRITIC_JSON_SCHEMA["properties"])
+        critic_concerns = _as_dict(critic_properties["concerns"])
         self.assertNotIn("maxItems", critic_concerns)
 
 

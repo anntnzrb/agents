@@ -1,7 +1,5 @@
 """Expected autommit failures and process exit codes."""
 
-from __future__ import annotations
-
 
 class AutommitError(Exception):
     """An actionable failure safe to expose at the CLI boundary."""

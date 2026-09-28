@@ -1,12 +1,9 @@
 """Escalating patch application for one commit inside the temporary worktree."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from autommit.errors import AutommitError
 from autommit.git import (
@@ -15,10 +12,12 @@ from autommit.git import (
     GIT_SAFE_ARGS,
     try_git,
 )
-from autommit.proposal import AllSelector, CommitGroup, build_commit_patch
-
-if TYPE_CHECKING:
-    from autommit.proposal import CommitChange
+from autommit.proposal import (
+    AllSelector,
+    CommitChange,
+    CommitGroup,
+    build_commit_patch,
+)
 
 DEFAULT_MODE = "100644"
 _RUNG_PATCH = "patch"
@@ -46,7 +45,7 @@ def _raw_git(
     """Run Git with byte I/O so binary blobs survive intact."""
     env = {**os.environ, **GIT_ENVIRONMENT}
     for dropped in GIT_ENVIRONMENT_DROPS:
-        env.pop(dropped, None)
+        _ = env.pop(dropped, None)
     return subprocess.run(
         ["git", *GIT_SAFE_ARGS, *args],
         cwd=cwd,
@@ -76,7 +75,7 @@ def _reset_worktree(worktree: Path) -> None:
 
 def _rung_patch(work: CommitWork, group: CommitGroup) -> str:
     target = work.patch_dir / "commit.patch"
-    target.write_text(
+    _ = target.write_text(
         build_commit_patch(group.changes, work.staged_diff, work.zero_diff),
         encoding="utf-8",
     )
@@ -86,7 +85,7 @@ def _rung_patch(work: CommitWork, group: CommitGroup) -> str:
 def _rung_per_file(work: CommitWork, group: CommitGroup) -> str:
     target = work.patch_dir / "change.patch"
     for position, change in enumerate(group.changes):
-        target.write_text(
+        _ = target.write_text(
             build_commit_patch((change,), work.staged_diff, work.zero_diff),
             encoding="utf-8",
         )
@@ -158,8 +157,7 @@ def _stage_change(work: CommitWork, change: CommitChange) -> str:
 def _failure(group: CommitGroup, detail: str, work: CommitWork) -> AutommitError:
     return AutommitError(
         "patch_failed",
-        f"Unable to apply commit '{group.summary}': {detail}. "
-        f"Recovery point: {work.ref} at {work.before}.",
+        f"Unable to apply commit '{group.summary}': {detail}. Recovery point: {work.ref} at {work.before}.",
     )
 
 
