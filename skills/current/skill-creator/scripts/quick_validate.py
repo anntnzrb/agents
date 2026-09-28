@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # Copyright (c) 2026
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = ["PyYAML>=6.0"]
 # ///
 """Quick validation script for skills - minimal version."""
@@ -9,15 +9,18 @@
 import re
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Final, TypeIs
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 import yaml
 
-MAX_DESCRIPTION_CHARS = 120
-MAX_NAME_CHARS = 64
-MAX_COMPATIBILITY_CHARS = 500
-EXPECTED_ARG_COUNT = 2
+MAX_DESCRIPTION_CHARS: Final[int] = 120
+MAX_NAME_CHARS: Final[int] = 64
+MAX_COMPATIBILITY_CHARS: Final[int] = 500
+EXPECTED_ARG_COUNT: Final[int] = 2
 
-ALLOWED_PROPERTIES = {
+ALLOWED_PROPERTIES: Final[set[str]] = {
     "name",
     "description",
     "license",
@@ -25,6 +28,15 @@ ALLOWED_PROPERTIES = {
     "compatibility",
     "disable-model-invocation",
 }
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _load_yaml(text: str) -> object:
+    fn: Callable[..., object] = yaml.safe_load
+    return fn(text)
 
 
 def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
@@ -41,12 +53,12 @@ def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
         return False, "Invalid frontmatter format"
 
     try:
-        frontmatter = yaml.safe_load(match.group(1))
+        raw = _load_yaml(match.group(1))
     except yaml.YAMLError as exc:
         return False, f"Invalid YAML in frontmatter: {exc}"
-    if not isinstance(frontmatter, dict):
+    if not _is_str_dict(raw):
         return False, "Frontmatter must be a YAML dictionary"
-    return True, frontmatter
+    return True, dict(raw)
 
 
 def _validate_name(name: object) -> tuple[bool, str]:

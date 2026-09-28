@@ -1,18 +1,13 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests for the skill code-gate runner."""
 
-from __future__ import annotations
-
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, Final
+
+from scripts.gates import EXIT_USAGE, GateRunner, main, pep723_deps, run_gates
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from scripts.gates import EXIT_USAGE, GateRunner, _pep723_deps, main, run_gates
+    from pathlib import Path
 
 _FAIL_CODE: Final[int] = 3
 
@@ -36,13 +31,13 @@ def _skill_dir(tmp_path: Path, *, with_python: bool = True) -> Path:
     skill = tmp_path / "demo-skill"
     (skill / "scripts").mkdir(parents=True)
     if with_python:
-        (skill / "scripts" / "cli.py").write_text(
+        content = (
             "# /// script\n"
-            '# requires-python = ">=3.12"\n'
+            '# requires-python = ">=3.14"\n'
             '# dependencies = ["PyYAML>=6.0"]\n'
-            "# ///\n",
-            encoding="utf-8",
+            "# ///\n"
         )
+        _ = (skill / "scripts" / "cli.py").write_text(content, encoding="utf-8")
     return skill
 
 
@@ -157,12 +152,14 @@ def test_main_propagates_gate_failure_code(tmp_path: Path) -> None:
 def test_pep723_deps_without_block_returns_empty(tmp_path: Path) -> None:
     """A cli.py without a PEP 723 block contributes no dependencies."""
     skill = _skill_dir(tmp_path, with_python=False)
-    (skill / "scripts" / "cli.py").write_text('"""Plain script."""\n', encoding="utf-8")
-    assert _pep723_deps(skill) == []
+    _ = (skill / "scripts" / "cli.py").write_text(
+        '"""Plain script."""\n', encoding="utf-8"
+    )
+    assert pep723_deps(skill) == []
 
 
 def test_pep723_deps_missing_cli_returns_empty(tmp_path: Path) -> None:
     """A skill without scripts/cli.py contributes no dependencies."""
     skill = tmp_path / "bare-skill"
     skill.mkdir()
-    assert _pep723_deps(skill) == []
+    assert pep723_deps(skill) == []

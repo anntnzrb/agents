@@ -7,20 +7,19 @@ Dependency truth is the PEP 723 block in the skill's ``scripts/cli.py``; the
 basedpyright and pytest steps derive their ``--with`` environments from it.
 """
 
-from __future__ import annotations
-
 import subprocess
 import sys
 import tomllib
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Final, TypeIs
 
-EXIT_OK = 0
-EXIT_USAGE = 2
+EXIT_OK: Final[int] = 0
+EXIT_USAGE: Final[int] = 2
 
 type GateRunner = Callable[[Sequence[str], Path], int]
 
-_USAGE = "usage: cli.py gates <skill-dir> [--tests]"
+_USAGE: Final[str] = "usage: cli.py gates <skill-dir> [--tests]"
 
 
 class _GatesError(Exception):
@@ -51,7 +50,19 @@ def _has_python(skill_dir: Path) -> bool:
     return any(skill_dir.rglob("*.py"))
 
 
-def _pep723_deps(skill_dir: Path) -> list[str]:
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_list(val: object) -> TypeIs[list[str]]:
+    return _is_object_list(val) and all(isinstance(x, str) for x in val)
+
+
+def _load_toml(text: str) -> dict[str, object]:
+    return tomllib.loads(text)
+
+
+def pep723_deps(skill_dir: Path) -> list[str]:
     """Read runtime dependencies from the scripts/cli.py PEP 723 block."""
     cli = skill_dir / "scripts" / "cli.py"
     if not cli.is_file():
@@ -71,15 +82,18 @@ def _pep723_deps(skill_dir: Path) -> list[str]:
         for line in lines[start + 1 : end]
     )
     try:
-        data = tomllib.loads(body)
+        data = _load_toml(body)
     except tomllib.TOMLDecodeError as exc:
         msg = f"malformed PEP 723 block in {cli}: {exc}"
         raise _GatesError(msg) from exc
-    deps = data.get("dependencies", [])
-    if not isinstance(deps, list) or not all(isinstance(dep, str) for dep in deps):
+    raw_deps = data.get("dependencies", [])
+    if not _is_str_list(raw_deps):
         msg = f"PEP 723 dependencies in {cli} must be a list of strings"
         raise _GatesError(msg)
-    return list(deps)
+    return list(raw_deps)
+
+
+_pep723_deps = pep723_deps
 
 
 def _with_prefix(deps: Sequence[str]) -> tuple[str, ...]:
@@ -107,9 +121,9 @@ def _pytest_step(deps: Sequence[str]) -> tuple[str, ...]:
     return (*_with_prefix(["pytest", *deps]), "pytest", "tests")
 
 
-def main(argv: list[str] | None = None, runner: GateRunner = _run_step) -> int:
+def main(argv: Sequence[str] | None = None, runner: GateRunner = _run_step) -> int:
     """Run the skill gates; return the process exit code (never raises)."""
-    raw_args: list[str] = sys.argv[1:] if argv is None else list(argv)
+    raw_args: list[str] = list(sys.argv[1:] if argv is None else argv)
     skill_dir: Path | None = None
     with_tests = False
     for arg in raw_args:
@@ -127,7 +141,7 @@ def main(argv: list[str] | None = None, runner: GateRunner = _run_step) -> int:
         print(_USAGE, file=sys.stderr)
         return EXIT_USAGE
     try:
-        deps = _pep723_deps(skill_dir)
+        deps = pep723_deps(skill_dir)
     except _GatesError as exc:
         print(f"gates: {exc}", file=sys.stderr)
         return EXIT_USAGE

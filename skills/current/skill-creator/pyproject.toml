@@ -1,12 +1,31 @@
 # Tool configuration only. Runtime dependencies stay PEP 723 inline metadata in
 # scripts/cli.py; the gates runner derives every tool environment from there.
+requires-python = ">=3.14"
+
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
+ignore = [
+    "A002",
+    "COM812",
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Executable scripts report to stdout/stderr by contract (exit codes, help
@@ -19,7 +38,7 @@ ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102"
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "eval-viewer", "tests"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"

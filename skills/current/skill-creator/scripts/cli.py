@@ -1,21 +1,20 @@
 #!/usr/bin/env -S uv run --script
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = ["PyYAML>=6.0"]
 # ///
 """Cross-platform dispatcher for skill-creator utilities."""
-
-from __future__ import annotations
 
 import argparse
 import runpy
 import sys
 from pathlib import Path
+from typing import Final, TypeIs
 
-SKILL_DIR = Path(__file__).resolve().parents[1]
-SCRIPTS_DIR = SKILL_DIR / "scripts"
-COMMANDS = {
+SKILL_DIR: Final[Path] = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR: Final[Path] = SKILL_DIR / "scripts"
+COMMANDS: Final[dict[str, Path]] = {
     "aggregate-benchmark": SCRIPTS_DIR / "aggregate_benchmark.py",
     "gates": SCRIPTS_DIR / "gates.py",
     "generate-review": SKILL_DIR / "eval-viewer" / "generate_review.py",
@@ -24,7 +23,7 @@ COMMANDS = {
 }
 
 # Example invocations shown by --help; the dispatcher prefix is added there.
-_HELP_EXAMPLES = (
+_HELP_EXAMPLES: Final[tuple[str, ...]] = (
     "aggregate-benchmark <workspace>/iteration-N --skill-name <name>",
     "gates <path-to-skill-folder> [--tests]",
     "generate-review <workspace> --skill-name <name>",
@@ -33,12 +32,12 @@ _HELP_EXAMPLES = (
 
 
 def _run_script(path: Path, args: list[str]) -> int:
-    sys.path.insert(0, str(SKILL_DIR))
-    sys.path.insert(0, str(SCRIPTS_DIR))
+    _ = sys.path.insert(0, str(SKILL_DIR))
+    _ = sys.path.insert(0, str(SCRIPTS_DIR))
     old_argv = sys.argv[:]
     sys.argv = [str(path), *args]
     try:
-        runpy.run_path(str(path), run_name="__main__")
+        _ = runpy.run_path(str(path), run_name="__main__")
     except SystemExit as exc:
         code = exc.code
         if code is None:
@@ -59,13 +58,13 @@ def build_parser() -> argparse.ArgumentParser:
         description="Skill Creator utility dispatcher.",
         add_help=False,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "command",
         nargs="?",
         choices=sorted(COMMANDS),
         help="Utility to run",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "args",
         nargs=argparse.REMAINDER,
         help="Arguments passed to the utility",
@@ -75,8 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Dispatch one skill-creator utility; return its exit code."""
-    argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] in {"-h", "--help"}:
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    if not args_list or args_list[0] in {"-h", "--help"}:
         commands = ",".join(sorted(COMMANDS))
         print(f"usage: cli.py {{{commands}}} [args...]\n")
         print("Cross-platform:")
@@ -85,10 +84,17 @@ def main(argv: list[str] | None = None) -> int:
         print("\nUse '<command> --help' for utility-specific flags.")
         return 0
     parser = build_parser()
-    ns = parser.parse_args(argv)
-    if ns.command is None:
+    ns = parser.parse_args(args_list)
+
+    def _is_object_list(val: object) -> TypeIs[list[object]]:
+        return isinstance(val, list)
+
+    raw_command = getattr(ns, "command", None)
+    if not isinstance(raw_command, str) or raw_command not in COMMANDS:
         parser.error("missing command")
-    return _run_script(COMMANDS[ns.command], ns.args)
+    raw_args = getattr(ns, "args", [])
+    sub_args = [str(arg) for arg in raw_args] if _is_object_list(raw_args) else []
+    return _run_script(COMMANDS[raw_command], sub_args)
 
 
 if __name__ == "__main__":

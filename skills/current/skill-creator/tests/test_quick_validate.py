@@ -1,15 +1,14 @@
 # Copyright (c) 2026
 """Executable contracts for the skill-creator quick validator."""
 
-from __future__ import annotations
-
 import subprocess
 from pathlib import Path
+from typing import Final
 
-SKILL: Path = Path(__file__).resolve().parents[1]
-CLI: Path = SKILL / "scripts" / "cli.py"
+SKILL: Final[Path] = Path(__file__).resolve().parents[1]
+CLI: Final[Path] = SKILL / "scripts" / "cli.py"
 
-_VALID_FRONTMATTER = """---
+_VALID_FRONTMATTER: Final[str] = """---
 name: fixture-skill
 description: Fixture skill for validator contract tests.
 ---
