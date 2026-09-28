@@ -1,11 +1,9 @@
 """Exercise repair transitions without host network changes or runtime packages."""
 
-from __future__ import annotations
-
 import sys
 import unittest
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 from unittest.mock import patch
 
 from fixnet import network
@@ -18,7 +16,7 @@ FAILED = [network.Result(6, "resolver failed"), network.Result(6, "resolver fail
 PASSED = [network.Result(0, "200 OK"), network.Result(0, "200 OK")]
 
 
-@dataclass
+@dataclass(slots=True)
 class Mac:
     """Model the native-command boundary with address and radio state."""
 
@@ -78,13 +76,22 @@ class Mac:
 class RepairTests(unittest.TestCase):
     """Protect mutable network state at the native-command boundary."""
 
+    mac: Mac = Mac()
+
+    @override
     def setUp(self) -> None:
         """Replace native commands, authentication and delays for each test."""
         self.mac = Mac()
-        self.enterContext(patch.object(network, "run", self.mac.run))
-        self.enterContext(patch.object(network, "authorize", lambda: None))
-        self.enterContext(patch.object(network.os, "geteuid", lambda: 0, create=True))
-        self.enterContext(patch.object(network.time, "sleep", lambda _: None))
+        _ = self.enterContext(patch.object(network, "run", self.mac.run))
+        _ = self.enterContext(patch.object(network, "authorize", lambda: None))
+        _ = self.enterContext(
+            patch.object(network.os, "geteuid", lambda: 0, create=True)
+        )
+
+        def _fake_sleep(_sec: float) -> None:
+            pass
+
+        _ = self.enterContext(patch.object(network.time, "sleep", _fake_sleep))
 
     def test_partial_connectivity_never_mutates(self) -> None:
         """One working endpoint must prevent a link reset."""
@@ -129,7 +136,7 @@ class RepairTests(unittest.TestCase):
             patch.object(network, "confirm", return_value=True),
             self.assertRaises(network.RepairError),
         ):
-            network.dns_trial(SERVICE, FAILED)
+            _ = network.dns_trial(SERVICE, FAILED)
         assert self.mac.dns == original
 
     def test_interrupted_dns_trial_restores_original(self) -> None:
@@ -140,7 +147,7 @@ class RepairTests(unittest.TestCase):
             patch.object(network, "confirm", return_value=True),
             self.assertRaises(KeyboardInterrupt),
         ):
-            network.dns_trial(SERVICE, FAILED)
+            _ = network.dns_trial(SERVICE, FAILED)
         assert self.mac.dns == original
 
     def test_interrupted_radio_cycle_enables_wifi(self) -> None:
@@ -149,7 +156,7 @@ class RepairTests(unittest.TestCase):
             patch.object(network.time, "sleep", side_effect=KeyboardInterrupt),
             self.assertRaises(KeyboardInterrupt),
         ):
-            network.cycle_radio(SERVICE)
+            _ = network.cycle_radio(SERVICE)
         assert self.mac.power
 
 
@@ -170,7 +177,7 @@ class BoundaryTests(unittest.TestCase):
     def test_unknown_dns_cannot_be_restore_arguments(self) -> None:
         """Unreadable settings must stop a DNS trial rather than poison rollback."""
         with self.assertRaises(network.RepairError):
-            network.parse_dns("An Error occurred while reading preferences")
+            _ = network.parse_dns("An Error occurred while reading preferences")
         assert network.parse_dns("There aren't any DNS Servers set on Wi-Fi.") == [
             "Empty"
         ]
