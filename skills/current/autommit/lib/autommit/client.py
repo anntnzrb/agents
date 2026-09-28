@@ -199,6 +199,8 @@ def _decode_body(raw: str) -> dict[str, object]:
 
 def _error_detail(body: dict[str, object]) -> str:
     error = body.get("error")
+    if isinstance(error, str) and error.strip():
+        return error.strip()
     if _is_dict(error):
         msg_val = error.get("message")
         if isinstance(msg_val, str) and msg_val.strip():
@@ -391,6 +393,7 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
         base_payload["reasoning_effort"] = request.reasoning_effort
     attempts = max(1, options.attempts)
     last_invalid: AutommitError | None = None
+    last_unsupported: HttpResponse | None = None
     for rung in options.rungs:
         for attempt in range(attempts):
             if request.notify is not None:
@@ -424,11 +427,19 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
                     1,
                 )
             if response.status in UNSUPPORTED_RUNG_STATUSES:
+                last_unsupported = response
                 break
             if response.status != OK_STATUS:
                 raise AutommitError(
                     "provider_error",
                     f"{request.base_url} returned HTTP {response.status}: {_error_detail(response.body)}.",
+                    1,
+                )
+            # gateways relay upstream rejections (e.g. context overflow) as 200 + error
+            if response.body.get("error") and not response.body.get("choices"):
+                raise AutommitError(
+                    "provider_error",
+                    f"{request.base_url} returned an error: {_error_detail(response.body)}.",
                     1,
                 )
             try:
@@ -446,6 +457,13 @@ def _call_model(request: ModelRequest, options: _CallOptions) -> dict[str, objec
             return _validate(payload, options.invalid_code)
     if last_invalid is not None:
         raise last_invalid
+    if last_unsupported is not None:
+        # every rung was rejected: a request-level failure, not a plan to retry
+        raise AutommitError(
+            "provider_error",
+            f"{request.base_url} returned HTTP {last_unsupported.status}: {_error_detail(last_unsupported.body)}.",
+            1,
+        )
     raise AutommitError(options.invalid_code, "Model returned no usable result.")
 
 

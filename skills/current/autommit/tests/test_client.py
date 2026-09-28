@@ -190,6 +190,64 @@ class TransportLadderTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "provider_error")
         self.assertEqual(raised.exception.exit_code, 1)
 
+    def test_ok_response_carrying_error_object_and_no_choices_is_provider_error(
+        self,
+    ) -> None:
+        calls: list[dict[str, object]] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            calls.append(payload)
+            return HttpResponse(
+                200,
+                {
+                    "error": {
+                        "code": 400,
+                        "message": (
+                            "The input token count exceeds the maximum number of tokens allowed 1048576."
+                        ),
+                        "status": "INVALID_ARGUMENT",
+                    }
+                },
+            )
+
+        with self.assertRaises(AutommitError) as raised:
+            _ = call_planner(_request(), post=post, attempts=1)
+
+        self.assertEqual(raised.exception.code, "provider_error")
+        self.assertEqual(raised.exception.exit_code, 1)
+        self.assertIn(
+            "The input token count exceeds the maximum number of tokens allowed 1048576.",
+            raised.exception.message,
+        )
+        self.assertEqual(len(calls), 1)
+
+    def test_all_rungs_unsupported_raises_terminal_provider_error(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            calls.append(payload)
+            return HttpResponse(
+                400,
+                {
+                    "error": {
+                        "message": (
+                            "The input token count exceeds the maximum number of tokens allowed 1048576."
+                        )
+                    }
+                },
+            )
+
+        with self.assertRaises(AutommitError) as raised:
+            _ = call_planner(_request(), post=post)
+
+        self.assertEqual(raised.exception.code, "provider_error")
+        self.assertEqual(raised.exception.exit_code, 1)
+        self.assertIn(
+            "The input token count exceeds the maximum number of tokens allowed 1048576.",
+            raised.exception.message,
+        )
+        self.assertEqual(len(calls), 3)
+
     def test_unusable_responses_become_invalid_plan(self) -> None:
         def post(payload: dict[str, object]) -> HttpResponse:
             del payload
