@@ -1,6 +1,7 @@
 """Command dispatch: validate inputs, perform one provider request, normalize."""
 
-from typing import Any, Literal, NotRequired, TypedDict
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 from contracts import (
     normalize_conversation_payload,
@@ -18,7 +19,9 @@ from contracts import (
     validate_ranking_mode,
 )
 from models import CliError, ContractError
-from provider import FetchResult, FxTwitterClient
+
+if TYPE_CHECKING:
+    from provider import FetchResult, FxTwitterClient
 
 
 class FetchCommandInput(TypedDict):
@@ -33,7 +36,7 @@ class FetchCommandInput(TypedDict):
 class UserPostsCommandInput(TypedDict):
     command: Literal["user-posts"]
     handle: str
-    count: NotRequired[int | None]
+    count: NotRequired[int | float | None]
     cursor: NotRequired[str | None]
     includeReplies: NotRequired[bool]
     summary: NotRequired[bool]
@@ -43,7 +46,7 @@ class UserPostsCommandInput(TypedDict):
 class SearchCommandInput(TypedDict):
     command: Literal["search"]
     query: str
-    count: NotRequired[int | None]
+    count: NotRequired[int | float | None]
     feed: NotRequired[str | None]
     cursor: NotRequired[str | None]
     summary: NotRequired[bool]
@@ -67,7 +70,7 @@ type CommandInput = (
 )
 
 
-def _build_provenance(result: FetchResult) -> dict[str, Any]:
+def _build_provenance(result: FetchResult) -> dict[str, object]:
     status = (
         result["provider_status"]
         if result["provider_status"] is not None
@@ -84,7 +87,7 @@ def _build_provenance(result: FetchResult) -> dict[str, Any]:
     }
 
 
-def _with_provenance(data: dict[str, Any], result: FetchResult) -> dict[str, Any]:
+def _with_provenance(data: dict[str, object], result: FetchResult) -> dict[str, object]:
     return {**data, **_build_provenance(result)}
 
 
@@ -121,19 +124,24 @@ def _invalid_payload_error(message: str, result: FetchResult) -> ContractError:
     )
 
 
-def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[str, Any]:
-    if command_input["command"] == "fetch":
-        parsed_target = status_id_from_target(command_input["target"])
-        post_id: str = parsed_target["id"]
+def run_command(
+    command_input: CommandInput | Mapping[str, object],
+    client: FxTwitterClient,
+) -> dict[str, object]:
+    cmd = command_input.get("command")
+    if cmd == "fetch":
+        target = command_input.get("target")
+        parsed_target = status_id_from_target(target)
+        post_id = parsed_target["id"]
         target_url = parsed_target.get("targetUrl")
         params: list[tuple[str, str]] = []
         lang = command_input.get("lang")
         if lang:
-            validate_lang(lang)
-            params.append(("lang", lang))
+            _ = validate_lang(lang)
+            params.append(("lang", str(lang)))
         provider = command_input.get("provider")
         if provider:
-            validate_provider(provider)
+            _ = validate_provider(provider)
 
         endpoint = f"/2/status/{post_id}"
         result = client.request_json(endpoint, params)
@@ -142,23 +150,29 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
             normalized = normalize_status_payload(result["payload"])
         except ContractError as err:
             raise _enrich_contract_error(err, result) from err
-        except Exception as err:
+        except (
+            TypeError,
+            ValueError,
+            LookupError,
+            AttributeError,
+            RuntimeError,
+        ) as err:
             raise _invalid_payload_error(
                 "provider status normalization did not return an object", result
             ) from err
 
-        data: dict[str, Any] = {"post": normalized["post"]}
+        data: dict[str, object] = {"post": normalized["post"]}
         if target_url:
             data["requested_url"] = target_url
         else:
             data["requested_id"] = post_id
         return _with_provenance(data, result)
 
-    if command_input["command"] == "user-posts":
+    if cmd == "user-posts":
         requested_count = command_input.get("count")
         if requested_count is None:
             requested_count = 20
-        handle = validate_handle(command_input["handle"])
+        handle = validate_handle(command_input.get("handle"))
         count = validate_count(requested_count)
         params = [
             ("count", str(count)),
@@ -166,8 +180,8 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
         ]
         cursor = command_input.get("cursor")
         if cursor:
-            validate_cursor(cursor)
-            params.append(("cursor", cursor))
+            _ = validate_cursor(cursor)
+            params.append(("cursor", str(cursor)))
         if command_input.get("includeReplies"):
             params.append(("with_replies", "1"))
 
@@ -178,7 +192,13 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
             page = normalize_page_payload(result["payload"], count)
         except ContractError as err:
             raise _enrich_contract_error(err, result) from err
-        except Exception as err:
+        except (
+            TypeError,
+            ValueError,
+            LookupError,
+            AttributeError,
+            RuntimeError,
+        ) as err:
             raise _invalid_payload_error(
                 "provider page normalization did not return an object", result
             ) from err
@@ -186,25 +206,25 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
         data = {"handle": handle, **page}
         return _with_provenance(data, result)
 
-    if command_input["command"] == "search":
+    if cmd == "search":
         requested_count = command_input.get("count")
         if requested_count is None:
             requested_count = 30
         feed = command_input.get("feed")
         if feed is None:
             feed = "latest"
-        query = normalize_query(command_input["query"])
+        query = normalize_query(command_input.get("query"))
         count = validate_count(requested_count)
-        validate_feed(feed)
+        _ = validate_feed(feed)
         params = [
             ("q", query),
             ("count", str(count)),
-            ("feed", feed),
+            ("feed", str(feed)),
         ]
         cursor = command_input.get("cursor")
         if cursor:
-            validate_cursor(cursor)
-            params.append(("cursor", cursor))
+            _ = validate_cursor(cursor)
+            params.append(("cursor", str(cursor)))
 
         endpoint = "/2/search"
         result = client.request_json(endpoint, params)
@@ -213,26 +233,32 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
             page = normalize_page_payload(result["payload"], count)
         except ContractError as err:
             raise _enrich_contract_error(err, result) from err
-        except Exception as err:
+        except (
+            TypeError,
+            ValueError,
+            LookupError,
+            AttributeError,
+            RuntimeError,
+        ) as err:
             raise _invalid_payload_error(
                 "provider search page normalization did not return an object",
                 result,
             ) from err
 
-        data = {"query": query, "feed": feed, **page}
+        data = {"query": query, "feed": str(feed), **page}
         return _with_provenance(data, result)
 
-    if command_input["command"] == "conversation":
+    if cmd == "conversation":
         ranking_mode = command_input.get("rankingMode")
         if ranking_mode is None:
             ranking_mode = "likes"
-        post_id = validate_numeric_id(command_input["id"])
-        validate_ranking_mode(ranking_mode)
-        params = [("ranking_mode", ranking_mode)]
+        post_id = validate_numeric_id(command_input.get("id"))
+        _ = validate_ranking_mode(ranking_mode)
+        params = [("ranking_mode", str(ranking_mode))]
         cursor = command_input.get("cursor")
         if cursor:
-            validate_cursor(cursor)
-            params.append(("cursor", cursor))
+            _ = validate_cursor(cursor)
+            params.append(("cursor", str(cursor)))
 
         endpoint = f"/2/conversation/{post_id}"
         result = client.request_json(endpoint, params)
@@ -241,7 +267,13 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
             conv = normalize_conversation_payload(result["payload"])
         except ContractError as err:
             raise _enrich_contract_error(err, result) from err
-        except Exception as err:
+        except (
+            TypeError,
+            ValueError,
+            LookupError,
+            AttributeError,
+            RuntimeError,
+        ) as err:
             raise _invalid_payload_error(
                 "provider conversation normalization did not return an object",
                 result,
@@ -249,13 +281,13 @@ def run_command(command_input: CommandInput, client: FxTwitterClient) -> dict[st
 
         data = {
             "requested_id": post_id,
-            "ranking_mode": ranking_mode,
+            "ranking_mode": str(ranking_mode),
             **conv,
         }
         return _with_provenance(data, result)
 
     raise CliError(
         code="usage",
-        message=f"unknown command: {command_input['command']}",
+        message=f"unknown command: {cmd}",
         details={},
     )

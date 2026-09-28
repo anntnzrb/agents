@@ -1,55 +1,57 @@
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
     "A002",
-    "ANN401",
-    "BLE001",
+    "C901",    # Command dispatch and payload normalization require multi-branch validation
     "COM812",
-    "CPY001",
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
+    "CPY001",  # Repository convention does not use per-file copyright headers
+    "D101",    # TypedDict schema definitions are self-documenting via field names
+    "D102",    # Protocol and helper methods are self-documenting via signatures
+    "D103",    # Public contract validators and normalizers are self-documenting via names
     "D203",
     "D213",
-    "E501",
     "EM101",
     "EM102",
     "ERA001",
-    "FBT001",
-    "FBT002",
+    "FBT001",  # Boolean flags in CLI emitter and contract helpers mirror upstream API
+    "FBT002",  # Boolean default flags in contract helpers mirror upstream API
     "PERF401",
     "PLR0911",
     "PLR0912",
-    "PLR0915",
-    "C901",
+    "PLR0915", # Command dispatch handles four subcommands in a single entrypoint
     "S101",
     "S603",
     "S607",
     "SLF001",
-    "TC003",
+    "TC003",   # PEP 649 evaluates annotations at runtime without __future__ annotations
     "TRY003",
     "TRY301",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/**/*.py" = ["T201", "INP001"]
-"tests/**/*.py" = ["S101", "PT009", "ANN", "ARG", "E402", "INP001", "FBT001", "PLR2004"]
+"scripts/**/*.py" = ["T201"]
+"tests/**/*.py" = [
+    "S101",
+    "PLR2004", # Magic literal values are idiomatic in test assertion targets
+]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "lib", "tests"]
-extraPaths = ["lib"]
-pythonVersion = "3.12"
+extraPaths = ["lib", "."]
+pythonVersion = "3.14"
 pythonPlatform = "All"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = false  # tests deliberately exercise internal helpers
 
 [tool.pytest.ini_options]
 pythonpath = ["lib", "."]

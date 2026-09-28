@@ -2,11 +2,24 @@
 
 import math
 import re
-from typing import Any
+from typing import TypeIs
 from urllib.parse import urlsplit
 
-from models import UNDEFINED, CliError, ContractError
-from provider import _preprocess_url_input
+from models import (
+    UNDEFINED,
+    CliError,
+    ContractError,
+    ConversationPayloadData,
+    MediaDict,
+    MediaFormat,
+    MediaItem,
+    PagePayloadData,
+    PostAuthor,
+    PostData,
+    PostMetrics,
+    StatusPayloadData,
+)
+from provider import preprocess_url_input
 
 SAFE_HANDLE_RE = re.compile(r"[A-Za-z0-9_]+")
 NUMERIC_ID_RE = re.compile(r"[0-9]+")
@@ -44,11 +57,11 @@ def _make_contract_error(  # noqa: PLR0913 - mirrors makeContractError(code, mes
     message: str,
     field: str,
     expected: str,
-    value: Any,
+    value: object,
     *,
     index: int | None = None,
 ) -> ContractError:
-    details: dict[str, Any] = {
+    details: dict[str, object] = {
         "field": field,
         "expected": expected,
         "actual_type": actual_type(value),
@@ -79,7 +92,7 @@ def validate_numeric_id(raw: object, field: str = "id") -> str:
     return raw
 
 
-def status_id_from_target(raw: object) -> dict[str, Any]:
+def status_id_from_target(raw: object) -> dict[str, str]:
     target_error = CliError(
         code="invalid_target",
         message="target must be a numeric ID or an https x.com/twitter.com status URL",
@@ -91,7 +104,7 @@ def status_id_from_target(raw: object) -> dict[str, Any]:
         return {"id": raw}
 
     try:
-        parsed = urlsplit(_preprocess_url_input(raw))
+        parsed = urlsplit(preprocess_url_input(raw))
         port = parsed.port
     except ValueError:
         raise target_error from None
@@ -214,8 +227,16 @@ def validate_provider(raw: object) -> str:
     )
 
 
-def _get_object(value: object, field: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
+def _is_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _get_object(value: object, field: str) -> dict[str, object]:
+    if not _is_dict(value):
         raise _make_contract_error(
             "malformed_payload",
             f"{field} must be an object",
@@ -223,11 +244,11 @@ def _get_object(value: object, field: str) -> dict[str, Any]:
             "object",
             value,
         )
-    return value
+    return {str(k): v for k, v in value.items()}
 
 
 def _required_string(
-    obj: dict[str, Any],
+    obj: dict[str, object],
     key: str,
     field: str | None = None,
     allow_empty: bool = False,
@@ -254,7 +275,7 @@ def _required_string(
 
 
 def _optional_string(
-    obj: dict[str, Any], key: str, allow_empty: bool = False
+    obj: dict[str, object], key: str, allow_empty: bool = False
 ) -> str | None:
     if key not in obj or obj[key] is None or obj[key] is UNDEFINED:
         return None
@@ -275,15 +296,15 @@ def _get_number(value: object) -> int | float | None:
 
 
 def _normalize_verification(raw: object) -> bool | None:
-    if isinstance(raw, dict):
+    if _is_dict(raw):
         v = raw.get("verified")
         return v if isinstance(v, bool) else None
     return raw if isinstance(raw, bool) else None
 
 
-def normalize_profile(raw: object, field_name: str = "author") -> dict[str, Any]:
+def normalize_profile(raw: object, field_name: str = "author") -> PostAuthor:
     obj = _get_object(raw, field_name)
-    result: dict[str, Any] = {}
+    result: PostAuthor = {}
 
     id_val = _optional_string(obj, "id")
     if id_val is not None:
@@ -319,15 +340,15 @@ def normalize_profile(raw: object, field_name: str = "author") -> dict[str, Any]
     return result
 
 
-def _normalize_media_item(raw: object) -> dict[str, Any] | None:
-    if not isinstance(raw, dict):
+def _normalize_media_item(raw: object) -> MediaItem | None:
+    if not _is_dict(raw):
         return None
-    obj = raw
+    obj = {str(k): v for k, v in raw.items()}
     item_type = obj.get("type")
     item_url = obj.get("url")
     if not isinstance(item_type, str) or not isinstance(item_url, str):
         return None
-    item: dict[str, Any] = {"type": item_type, "url": item_url}
+    item: MediaItem = {"type": item_type, "url": item_url}
 
     for key in ("format", "thumbnail_url", "transcode_url", "altText"):
         val = obj.get(key)
@@ -341,27 +362,29 @@ def _normalize_media_item(raw: object) -> dict[str, Any] | None:
 
     if item_type in ("video", "gif"):
         formats = obj.get("formats")
-        if isinstance(formats, list):
-            normalized_formats: list[dict[str, Any]] = []
+        if _is_list(formats):
+            normalized_formats: list[MediaFormat] = []
             for candidate in formats:
-                if isinstance(candidate, dict):
-                    normalized: dict[str, Any] = {}
+                if _is_dict(candidate):
+                    cand_dict = {str(k): v for k, v in candidate.items()}
+                    normalized: MediaFormat = {}
                     for key in ("container", "codec", "url"):
-                        val = candidate.get(key)
+                        val = cand_dict.get(key)
                         if isinstance(val, str) and val:
                             normalized[key] = val
                     for key in ("bitrate", "size", "height", "width"):
-                        num = _get_number(candidate.get(key))
+                        num = _get_number(cand_dict.get(key))
                         if num is not None:
                             normalized[key] = num
                     if isinstance(normalized.get("url"), str):
                         normalized_formats.append(normalized)
             if normalized_formats:
                 item["formats"] = normalized_formats
-        elif isinstance(formats, dict):
-            normalized_formats_obj: dict[str, str] = {}
+        elif _is_dict(formats):
+            fmt_dict = {str(k): v for k, v in formats.items()}
+            normalized_formats_obj: MediaFormat = {}
             for key in ("webp", "jpeg"):
-                val = formats.get(key)
+                val = fmt_dict.get(key)
                 if isinstance(val, str) and val:
                     normalized_formats_obj[key] = val
             if normalized_formats_obj:
@@ -370,11 +393,11 @@ def _normalize_media_item(raw: object) -> dict[str, Any] | None:
     return item
 
 
-def _normalize_media_object(raw: object) -> dict[str, Any] | None:
-    if not isinstance(raw, dict):
+def _normalize_media_object(raw: object) -> MediaItem | None:
+    if not _is_dict(raw):
         return None
-    obj = raw
-    normalized = _normalize_media_item(raw)
+    obj = {str(k): v for k, v in raw.items()}
+    normalized = _normalize_media_item(obj)
     if normalized:
         state = obj.get("state")
         if isinstance(state, str) and state:
@@ -386,16 +409,16 @@ def _normalize_media_object(raw: object) -> dict[str, Any] | None:
     return None
 
 
-def _normalize_media(raw: object) -> dict[str, Any] | None:
-    if not isinstance(raw, dict):
+def _normalize_media(raw: object) -> MediaDict | None:
+    if not _is_dict(raw):
         return None
-    obj = raw
-    media: dict[str, Any] = {}
+    obj = {str(k): v for k, v in raw.items()}
+    media: MediaDict = {}
 
     for key in MEDIA_COLLECTIONS:
         candidates = obj.get(key)
-        if isinstance(candidates, list):
-            items: list[dict[str, Any]] = []
+        if _is_list(candidates):
+            items: list[MediaItem] = []
             for v in candidates:
                 item = _normalize_media_item(v)
                 if item:
@@ -411,7 +434,7 @@ def _normalize_media(raw: object) -> dict[str, Any] | None:
     return media or None
 
 
-def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
+def normalize_post(raw: object, field_name: str = "post") -> PostData:
     obj = _get_object(raw, field_name)
     post_id = _required_string(obj, "id", f"{field_name}.id")
     url = _required_string(obj, "url", f"{field_name}.url")
@@ -428,7 +451,7 @@ def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
         )
     author = normalize_profile(obj["author"], f"{field_name}.author")
 
-    result: dict[str, Any] = {
+    result: PostData = {
         "id": post_id,
         "url": url,
         "text": text,
@@ -437,10 +460,11 @@ def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
     }
 
     metrics_obj = obj.get("metrics")
-    if isinstance(metrics_obj, dict):
-        metrics: dict[str, Any] = {}
+    if _is_dict(metrics_obj):
+        metrics_dict = {str(k): v for k, v in metrics_obj.items()}
+        metrics: PostMetrics = {}
         for key in METRIC_FIELDS:
-            num = _get_number(metrics_obj.get(key))
+            num = _get_number(metrics_dict.get(key))
             if num is not None:
                 metrics[key] = num
         if metrics:
@@ -456,8 +480,8 @@ def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
 
     quote_id = None
     quote_obj = obj.get("quote")
-    if isinstance(quote_obj, dict):
-        quote_id = _optional_string(quote_obj, "id")
+    if _is_dict(quote_obj):
+        quote_id = _optional_string({str(k): v for k, v in quote_obj.items()}, "id")
     if quote_id is None:
         quote_id = _optional_string(obj, "quote_id")
     if quote_id is not None:
@@ -465,8 +489,10 @@ def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
 
     reply_to_id = None
     replying_to_obj = obj.get("replying_to")
-    if isinstance(replying_to_obj, dict):
-        reply_to_id = _optional_string(replying_to_obj, "status")
+    if _is_dict(replying_to_obj):
+        reply_to_id = _optional_string(
+            {str(k): v for k, v in replying_to_obj.items()}, "status"
+        )
     if reply_to_id is None:
         reply_to_id = _optional_string(obj, "reply_to_id")
     if reply_to_id is not None:
@@ -475,7 +501,7 @@ def normalize_post(raw: object, field_name: str = "post") -> dict[str, Any]:
     return result
 
 
-def normalize_status_payload(payload: object) -> dict[str, Any]:
+def normalize_status_payload(payload: object) -> StatusPayloadData:
     root = _get_object(payload, "payload")
     if "status" not in root or root["status"] is UNDEFINED:
         raise _make_contract_error(
@@ -486,7 +512,7 @@ def normalize_status_payload(payload: object) -> dict[str, Any]:
             UNDEFINED,
         )
     status = root["status"]
-    if not isinstance(status, dict):
+    if not _is_dict(status):
         raise _make_contract_error(
             "invalid_status",
             "status payload status must be an object",
@@ -497,16 +523,17 @@ def normalize_status_payload(payload: object) -> dict[str, Any]:
     return {"post": normalize_post(status)}
 
 
-def _bottom_cursor(root: dict[str, Any]) -> tuple[str | None, str]:
+def _bottom_cursor(root: dict[str, object]) -> tuple[str | None, str]:
     if "cursor" not in root or root["cursor"] is UNDEFINED:
         return None, "missing"
     cursor = root["cursor"]
     if cursor is None:
         return None, "exhausted"
-    if isinstance(cursor, dict):
-        if "bottom" not in cursor:
+    if _is_dict(cursor):
+        cursor_dict = {str(k): v for k, v in cursor.items()}
+        if "bottom" not in cursor_dict:
             return None, "invalid"
-        bottom = cursor["bottom"]
+        bottom = cursor_dict["bottom"]
         if bottom is None:
             return None, "exhausted"
         if isinstance(bottom, str) and bottom:
@@ -515,7 +542,7 @@ def _bottom_cursor(root: dict[str, Any]) -> tuple[str | None, str]:
     return None, "invalid"
 
 
-def normalize_page_payload(payload: object, requested_count: object) -> dict[str, Any]:
+def normalize_page_payload(payload: object, requested_count: object) -> PagePayloadData:
     count = validate_count(requested_count)
     root = _get_object(payload, "payload")
 
@@ -528,7 +555,7 @@ def normalize_page_payload(payload: object, requested_count: object) -> dict[str
             UNDEFINED,
         )
     raw_results = root["results"]
-    if not isinstance(raw_results, list):
+    if not _is_list(raw_results):
         raise _make_contract_error(
             "invalid_results",
             "results must be an array",
@@ -537,7 +564,7 @@ def normalize_page_payload(payload: object, requested_count: object) -> dict[str
             raw_results,
         )
 
-    posts: list[dict[str, Any]] = []
+    posts: list[PostData] = []
     for i, raw_post in enumerate(raw_results):
         try:
             posts.append(normalize_post(raw_post))
@@ -550,7 +577,7 @@ def normalize_page_payload(payload: object, requested_count: object) -> dict[str
             ) from err
 
     limited_posts = posts[:count] if len(posts) > count else posts
-    result: dict[str, Any] = {
+    result: PagePayloadData = {
         "posts": limited_posts,
         "requested_count": count,
         "returned_count": len(limited_posts),
@@ -581,8 +608,8 @@ def normalize_page_payload(payload: object, requested_count: object) -> dict[str
     return result
 
 
-def _normalize_status_list(raw: object, field_name: str) -> list[dict[str, Any]]:
-    if not isinstance(raw, list):
+def _normalize_status_list(raw: object, field_name: str) -> list[PostData]:
+    if not _is_list(raw):
         raise _make_contract_error(
             "invalid_results",
             f"conversation {field_name} must be an array",
@@ -590,7 +617,7 @@ def _normalize_status_list(raw: object, field_name: str) -> list[dict[str, Any]]
             "array",
             raw,
         )
-    normalized: list[dict[str, Any]] = []
+    normalized: list[PostData] = []
     for i, raw_post in enumerate(raw):
         try:
             normalized.append(normalize_post(raw_post))
@@ -604,7 +631,7 @@ def _normalize_status_list(raw: object, field_name: str) -> list[dict[str, Any]]
     return normalized
 
 
-def normalize_conversation_payload(payload: object) -> dict[str, Any]:
+def normalize_conversation_payload(payload: object) -> ConversationPayloadData:
     root = _get_object(payload, "payload")
 
     if "status" not in root or root["status"] is UNDEFINED:
@@ -616,7 +643,7 @@ def normalize_conversation_payload(payload: object) -> dict[str, Any]:
             UNDEFINED,
         )
     status = root["status"]
-    if not isinstance(status, dict):
+    if not _is_dict(status):
         raise _make_contract_error(
             "invalid_status",
             "conversation status must be an object",
@@ -646,7 +673,7 @@ def normalize_conversation_payload(payload: object) -> dict[str, Any]:
         )
     replies = _normalize_status_list(root["replies"], "replies")
 
-    result: dict[str, Any] = {
+    result: ConversationPayloadData = {
         "target": target,
         "thread": thread,
         "replies": replies,

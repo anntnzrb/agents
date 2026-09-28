@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from typing import Any, Protocol, TypedDict
+from typing import Protocol, TypedDict, TypeIs, runtime_checkable
 
 from models import (
     DEFAULT_BASE_URL,
@@ -30,8 +30,7 @@ _PARAM_PAIR_LEN = 2
 _PROVIDER_ERROR_MIN = 400
 _HTTP_SUCCESS_MIN = 200
 _HTTP_SUCCESS_MAX = 300
-
-type Transport = Callable[[urllib.request.Request, float], "tuple[int, str]"]
+type Transport = Callable[[urllib.request.Request, float], tuple[int, str]]
 """Perform one GET and return ``(http_status, body_text)``."""
 
 
@@ -54,11 +53,14 @@ _FORBIDDEN_HOST_CHARS = frozenset(
 )
 
 
-def _preprocess_url_input(value: str) -> str:
+def preprocess_url_input(value: str) -> str:
     """Mirror WHATWG URL input preprocessing: drop tab/LF/CR, trim C0+space."""
     return "".join(ch for ch in value if ch not in "\t\n\r").strip(
         "".join(chr(c) for c in range(0x21))
     )
+
+
+_preprocess_url_input = preprocess_url_input
 
 
 def _has_forbidden_host_char(hostname: str) -> bool:
@@ -66,7 +68,7 @@ def _has_forbidden_host_char(hostname: str) -> bool:
     return any(ch in _FORBIDDEN_HOST_CHARS for ch in hostname)
 
 
-def validate_base_url(base_url: str) -> str:
+def validate_base_url(base_url: object) -> str:
     if not isinstance(base_url, str) or not base_url or base_url.strip() != base_url:
         raise CliError(
             code="invalid_base_url",
@@ -117,7 +119,7 @@ def validate_base_url(base_url: str) -> str:
     return base_url.removesuffix("/")
 
 
-def validate_timeout(timeout: float) -> float:
+def validate_timeout(timeout: object) -> float:
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -130,10 +132,10 @@ def validate_timeout(timeout: float) -> float:
             message="timeout must be greater than 0 and at most 60 seconds",
             details={},
         )
-    return timeout
+    return float(timeout)
 
 
-def validate_endpoint(endpoint: str) -> str:
+def validate_endpoint(endpoint: object) -> str:
     if not isinstance(endpoint, str) or not endpoint or not endpoint.startswith("/"):
         raise ProviderError(
             code="invalid_endpoint",
@@ -171,10 +173,20 @@ def validate_endpoint(endpoint: str) -> str:
     return endpoint
 
 
-def validate_params(params: Any) -> list[tuple[str, str]]:
+def _is_sequence(val: object) -> TypeIs[Sequence[object]]:
+    return isinstance(val, (list, tuple))
+
+
+def _is_pair(val: object) -> TypeIs[Sequence[object]]:
+    if not _is_sequence(val):
+        return False
+    return len(val) == _PARAM_PAIR_LEN
+
+
+def validate_params(params: object) -> list[tuple[str, str]]:
     if params is None:
         return []
-    if not isinstance(params, (list, tuple)):
+    if not _is_sequence(params):
         raise ProviderError(
             code="invalid_endpoint",
             message="query parameters must be a sequence of pairs",
@@ -182,13 +194,14 @@ def validate_params(params: Any) -> list[tuple[str, str]]:
         )
     pairs: list[tuple[str, str]] = []
     for pair in params:
-        if not isinstance(pair, (list, tuple)) or len(pair) != _PARAM_PAIR_LEN:
+        if not _is_pair(pair):
             raise ProviderError(
                 code="invalid_endpoint",
                 message="query parameters must be a sequence of pairs",
                 details={},
             )
-        key, value = pair
+        key = pair[0]
+        value = pair[1]
         if not isinstance(key, str) or not isinstance(value, str):
             raise ProviderError(
                 code="invalid_endpoint",
@@ -200,7 +213,7 @@ def validate_params(params: Any) -> list[tuple[str, str]]:
 
 
 def encode_query(params: Sequence[tuple[str, str]]) -> str:
-    parts = []
+    parts: list[str] = []
     for key, value in params:
         ek = urllib.parse.quote(key, safe=_ENCODE_SAFE).replace("%20", "+")
         ev = urllib.parse.quote(value, safe=_ENCODE_SAFE).replace("%20", "+")
@@ -221,7 +234,7 @@ def build_url(
 
 
 class FetchResult(TypedDict):
-    payload: Any
+    payload: object
     bytes: int
     http_status: int
     provider_status: int | None
@@ -238,16 +251,17 @@ class FxTwitterClient(Protocol):
     ) -> FetchResult: ...
 
 
-def _reject_json_constant(value: str) -> Any:
+def _reject_json_constant(value: str) -> None:
     raise ValueError(value)
 
 
 def _decode_payload(
     text: str, source_url: str, endpoint: str, http_status: int
-) -> tuple[Any, int]:
+) -> tuple[object, int]:
     byte_count = len(text.encode("utf-8"))
     try:
-        payload = json.loads(text, parse_constant=_reject_json_constant)
+        loads_fn: Callable[..., object] = json.loads
+        payload = loads_fn(text, parse_constant=_reject_json_constant)
     except ValueError:
         raise ProviderError(
             code="invalid_json",
@@ -262,6 +276,10 @@ def _decode_payload(
     return payload, byte_count
 
 
+def _is_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
 def _check_provider_status(
     payload: object,
     http_status: int,
@@ -269,7 +287,7 @@ def _check_provider_status(
     endpoint: str,
     byte_count: int,
 ) -> int | None:
-    if not isinstance(payload, dict):
+    if not _is_dict(payload):
         raise ProviderError(
             code="invalid_payload",
             message="provider response must be a JSON object",
@@ -319,9 +337,14 @@ def _check_provider_status(
 
 
 class _FxTwitterClient:
+    _transport: Transport
+    _base_url: str
+    _timeout: float
+
     def __init__(
         self, transport: Transport, base_url: str, timeout_seconds: float
     ) -> None:
+        """Initialize the FxTwitter client with validated base URL and timeout."""
         self._transport = transport
         self._base_url = validate_base_url(base_url)
         self._timeout = validate_timeout(timeout_seconds)
@@ -331,9 +354,9 @@ class _FxTwitterClient:
     ) -> FetchResult:
         try:
             source_url = build_url(self._base_url, endpoint, params)
-        except (CliError, ProviderError):
+        except CliError, ProviderError:
             raise
-        except Exception as err:
+        except (TypeError, ValueError) as err:
             raise ProviderError(
                 code="invalid_endpoint",
                 message="failed to construct request URL",
@@ -351,7 +374,7 @@ class _FxTwitterClient:
 
         try:
             http_status, text = self._transport(request, self._timeout)
-        except (CliError, ProviderError):
+        except CliError, ProviderError:
             raise
         except Exception as err:
             raise ProviderError(
@@ -379,9 +402,9 @@ class _FxTwitterClient:
             payload, byte_count = _decode_payload(
                 text, source_url, endpoint, http_status
             )
-        except (CliError, ProviderError):
+        except CliError, ProviderError:
             raise
-        except Exception as err:
+        except (TypeError, ValueError, UnicodeError, AttributeError) as err:
             raise ProviderError(
                 code="invalid_json",
                 message="provider response was not valid JSON",
@@ -396,9 +419,9 @@ class _FxTwitterClient:
             provider_status = _check_provider_status(
                 payload, http_status, source_url, endpoint, byte_count
             )
-        except (CliError, ProviderError):
+        except CliError, ProviderError:
             raise
-        except Exception as err:
+        except (TypeError, ValueError, LookupError) as err:
             raise ProviderError(
                 code="invalid_payload",
                 message="provider response validation failed",
@@ -424,17 +447,29 @@ class _FxTwitterClient:
         }
 
 
+@runtime_checkable
+class _UrlopenResponse(Protocol):
+    def read(self) -> bytes: ...
+    def getcode(self) -> int: ...
+    def __enter__(self) -> object: ...
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> object: ...
+
+
 def urllib_transport(
     request: urllib.request.Request, timeout: float
 ) -> tuple[int, str]:
     """Production transport: one stdlib ``urlopen`` GET, body as UTF-8 text."""
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - base URL is restricted to validated HTTPS
-            body = response.read()
-            return response.getcode(), body.decode("utf-8", errors="replace")
+        urlopen_fn: Callable[..., object] = urllib.request.urlopen
+        raw_resp = urlopen_fn(request, timeout=timeout)
+        if isinstance(raw_resp, _UrlopenResponse):
+            with raw_resp:
+                body = raw_resp.read()
+                return raw_resp.getcode(), body.decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         exc.close()
         return exc.code, ""
+    return 500, ""
 
 
 def make_fx_twitter_client(
