@@ -1,11 +1,9 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Run the local raw-Git worktree lifecycle CLI."""
-
-from __future__ import annotations
 
 import sys
 from pathlib import Path

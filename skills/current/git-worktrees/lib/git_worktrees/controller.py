@@ -1,7 +1,5 @@
 """Private durable state and repository-scoped interprocess locking."""
 
-from __future__ import annotations
-
 import errno
 import os
 import sqlite3
@@ -12,7 +10,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import quote
 
 if TYPE_CHECKING:
@@ -242,7 +240,7 @@ class Controller:
         return connection
 
     @contextmanager
-    def repository_lock(self, common_git_dir: Path) -> Generator[None, None, None]:
+    def repository_lock(self, common_git_dir: Path) -> Generator[None]:
         """Take a bounded cross-platform lock indexed by physical Git identity."""
         self.initialize()
         digest = sha256(str(common_git_dir).encode("utf-8")).hexdigest()
@@ -355,13 +353,13 @@ def row_to_lease(row: sqlite3.Row | tuple[object, ...]) -> Lease:
         Path(str(common_git_dir)),
         Path(str(primary_path)),
         Path(str(path)),
-        cast("Mode", str(mode)),
+        _to_mode(mode),
         None if branch is None else str(branch),
         None if base is None else str(base),
         str(owner),
         str(session_actor),
         str(task),
-        cast("LeaseState", str(state)),
+        _to_lease_state(state),
         str(provenance),
         None if owner_token_hash is None else str(owner_token_hash),
         str(created_at),
@@ -369,6 +367,33 @@ def row_to_lease(row: sqlite3.Row | tuple[object, ...]) -> Lease:
         None if released_at is None else str(released_at),
         None if failure is None else str(failure),
     )
+
+
+def _to_mode(value: object) -> Mode:
+    match str(value):
+        case "new-branch" | "existing-branch" | "detached-ephemeral" as m:
+            return m
+        case other:
+            msg = f"Unknown mode: {other}"
+            raise ValueError(msg)
+
+
+def _to_lease_state(value: object) -> LeaseState:
+    match str(value):
+        case "reserved" | "ready" | "create_failed" | "setup_failed" | "released" as s:
+            return s
+        case other:
+            msg = f"Unknown lease state: {other}"
+            raise ValueError(msg)
+
+
+def _to_handoff_state(value: object) -> Literal["active", "completed"]:
+    match str(value):
+        case "active" | "completed" as s:
+            return s
+        case other:
+            msg = f"Unknown handoff state: {other}"
+            raise ValueError(msg)
 
 
 def row_to_handoff(row: sqlite3.Row | tuple[object, ...]) -> Handoff:
@@ -379,7 +404,7 @@ def row_to_handoff(row: sqlite3.Row | tuple[object, ...]) -> Handoff:
         str(lease_id),
         str(actor),
         str(session_actor),
-        cast("Literal['active', 'completed']", str(state)),
+        _to_handoff_state(state),
         str(created_at),
         None if completed_at is None else str(completed_at),
     )

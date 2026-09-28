@@ -1,7 +1,5 @@
 """Argparse boundary for the raw-Git worktree lifecycle controller."""
 
-from __future__ import annotations
-
 import argparse
 import dataclasses
 import json
@@ -11,7 +9,7 @@ from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Never, TypeGuard, cast
+from typing import TYPE_CHECKING, Never, TypeIs, override
 
 if TYPE_CHECKING:
     from git_worktrees.controller import Controller
@@ -24,6 +22,9 @@ SCHEMA = "git-worktrees/v1"
 ROOT = default_root().resolve()
 DEFAULT_SETUP_TIMEOUT_SECONDS = 600
 NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+
+_json_loads: Callable[[str], object] = json.loads
+_getattr: Callable[..., object] = getattr
 
 
 class CliError(Exception):
@@ -47,34 +48,44 @@ class CliError(Exception):
 class ProtocolArgumentParser(argparse.ArgumentParser):
     """Argparse parser which keeps ordinary parse errors inside the protocol."""
 
-    # typing.override needs 3.12+; this ignore marks the intentional override.
-    def error(self, message: str) -> Never:  # pyright: ignore[reportImplicitOverride]
+    @override
+    def error(self, message: str) -> Never:
         """Map parse failures into the protocol envelope."""
         raise CliError("usage_error", message)
 
-    # typing.override needs 3.12+; this ignore marks the intentional override.
-    def exit(  # pyright: ignore[reportImplicitOverride]
-        self, status: int = 0, message: str | None = None
-    ) -> Never:
+    @override
+    def exit(self, status: int = 0, message: str | None = None) -> Never:
         """Map parser exits into the protocol envelope."""
         if status == 0:
             raise SystemExit(0)
         raise CliError("usage_error", (message or "invalid command line").strip())
 
 
-def _is_nonempty_list(value: object) -> TypeGuard[list[object]]:
+def _is_nonempty_list(value: object) -> TypeIs[list[object]]:
     """Check for a nonempty list (elements validated by callers)."""
     return bool(value) and isinstance(value, list)
 
 
-def _is_str_dict(value: object) -> TypeGuard[dict[str, object]]:
+def _is_str_dict(value: object) -> TypeIs[dict[str, object]]:
     """Check for a plain string-keyed dict."""
     return isinstance(value, dict)
 
 
+def _is_obj_mapping(value: object) -> TypeIs[Mapping[object, object]]:
+    return isinstance(value, Mapping)
+
+
+def _is_obj_seq(value: object) -> TypeIs[Sequence[object]]:
+    return isinstance(value, (list, tuple))
+
+
+def _is_setup_argv(value: object) -> TypeIs[list[tuple[str, ...]]]:
+    return isinstance(value, list)
+
+
 def _json_argv(value: str) -> tuple[str, ...]:
     try:
-        decoded = cast("object", json.loads(value))
+        decoded = _json_loads(value)
     except json.JSONDecodeError as error:
         msg = "must be a JSON array of strings"
         raise argparse.ArgumentTypeError(msg) from error
@@ -175,34 +186,51 @@ def _require_nonblank(value: str, argument: str) -> None:
         )
 
 
+def _get_arg(args: argparse.Namespace, field: str) -> object:
+    return _getattr(args, field)
+
+
 def _arg_str(args: argparse.Namespace, field: str) -> str:
     """Extract a required str option from parsed args."""
-    return cast("str", getattr(args, field))
+    value = _get_arg(args, field)
+    return value if isinstance(value, str) else ""
 
 
 def _arg_optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Extract an optional str option from parsed args."""
-    return cast("str | None", getattr(args, field))
+    value = _get_arg(args, field)
+    return value if isinstance(value, str) else None
 
 
 def _arg_bool(args: argparse.Namespace, field: str) -> bool:
     """Extract a required bool flag from parsed args."""
-    return cast("bool", getattr(args, field))
+    value = _get_arg(args, field)
+    return value if isinstance(value, bool) else False
 
 
 def _arg_int(args: argparse.Namespace, field: str) -> int:
     """Extract a required int option from parsed args."""
-    return cast("int", getattr(args, field))
+    value = _get_arg(args, field)
+    return value if isinstance(value, int) else 0
 
 
 def _arg_setup_argv(args: argparse.Namespace, field: str) -> list[tuple[str, ...]]:
     """Extract the setup argv list from parsed args."""
-    return cast("list[tuple[str, ...]]", getattr(args, field))
+    value = _get_arg(args, field)
+    if _is_setup_argv(value):
+        return value
+    return []
 
 
 def _arg_mode(args: argparse.Namespace, field: str) -> Mode:
     """Extract a worktree mode literal from parsed args."""
-    return cast("Mode", getattr(args, field))
+    value = _get_arg(args, field)
+    match str(value):
+        case "new-branch" | "existing-branch" | "detached-ephemeral" as m:
+            return m
+        case other:
+            msg = f"Invalid mode: {other}"
+            raise ValueError(msg)
 
 
 def _validate_arguments(args: argparse.Namespace) -> None:
@@ -463,13 +491,11 @@ def _json_value(value: object) -> object:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Enum):
-        return _json_value(cast("object", value.value))
-    if isinstance(value, Mapping):
-        fields = cast("Mapping[object, object]", value)
-        return {str(key): _json_value(item) for key, item in fields.items()}
-    if isinstance(value, (list, tuple)):
-        items = cast("Sequence[object]", value)
-        return [_json_value(item) for item in items]
+        return _json_value(_getattr(value, "value"))
+    if _is_obj_mapping(value):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if _is_obj_seq(value):
+        return [_json_value(item) for item in value]
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
@@ -545,11 +571,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         with suppress(Exception):
             domain_error_type = _core_api()[2]
         if domain_error_type is not None and isinstance(error, domain_error_type):
-            details = cast("object", getattr(error, "details", {}))
-            exit_code = cast("object", getattr(error, "exit_code", 2))
+            details = _getattr(error, "details", {})
+            exit_code = _getattr(error, "exit_code", 2)
+            code = _getattr(error, "code", "controller_error")
+            message_val = _getattr(error, "message", str(error))
             protocol_error = CliError(
-                getattr(error, "code", "controller_error"),
-                getattr(error, "message", str(error)),
+                str(code),
+                str(message_val),
                 details if _is_str_dict(details) else {},
                 exit_code if isinstance(exit_code, int) else 2,
             )

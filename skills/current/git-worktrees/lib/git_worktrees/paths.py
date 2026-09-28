@@ -1,7 +1,5 @@
 """XDG data-path selection for durable git-worktree controller state."""
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 

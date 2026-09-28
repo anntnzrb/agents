@@ -1,15 +1,15 @@
 """Typed values used by the raw-Git worktree lifecycle."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-Mode = Literal["new-branch", "existing-branch", "detached-ephemeral"]
-LeaseState = Literal["reserved", "ready", "create_failed", "setup_failed", "released"]
+type Mode = Literal["new-branch", "existing-branch", "detached-ephemeral"]
+type LeaseState = Literal[
+    "reserved", "ready", "create_failed", "setup_failed", "released"
+]
 
 
 class WorktreeSnapshot(TypedDict):

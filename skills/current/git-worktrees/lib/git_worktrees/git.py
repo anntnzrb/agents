@@ -1,7 +1,5 @@
 """Narrow, argv-only adapter for the Git observations this controller needs."""
 
-from __future__ import annotations
-
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path

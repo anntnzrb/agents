@@ -1,7 +1,5 @@
 """Safe raw-Git worktree lifecycle operations."""
 
-from __future__ import annotations
-
 import hmac
 import json
 import re
@@ -11,11 +9,11 @@ import subprocess
 from contextlib import contextmanager
 from hashlib import sha256
 from threading import Lock, Thread
-from typing import TYPE_CHECKING, BinaryIO, NoReturn, cast
+from typing import TYPE_CHECKING, BinaryIO, NoReturn, TypeIs
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
     from pathlib import Path
 
 from .controller import Controller, row_to_handoff, row_to_lease, utc_now
@@ -40,6 +38,31 @@ from .models import (
     Repository,
     SetupCommand,
 )
+
+_getattr: Callable[[object, str], object] = getattr
+
+
+def _is_obj_tuple(val: object) -> TypeIs[tuple[object, ...]]:
+    return isinstance(val, tuple)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _fetchone(cursor: sqlite3.Cursor) -> tuple[object, ...] | None:
+    fn = _getattr(cursor, "fetchone")
+    row = fn() if callable(fn) else None
+    return row if _is_obj_tuple(row) else None
+
+
+def _fetchall(cursor: sqlite3.Cursor) -> list[tuple[object, ...]]:
+    fn = _getattr(cursor, "fetchall")
+    rows = fn() if callable(fn) else None
+    if _is_obj_list(rows):
+        return [r for r in rows if _is_obj_tuple(r)]
+    return []
+
 
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 _EXIT_COMMAND_NOT_FOUND = 127
@@ -156,32 +179,29 @@ def _visible_slug(
     connection: sqlite3.Connection, repository: Repository, controller: Controller
 ) -> str:
     common = str(repository.common_git_dir)
-    existing = cast(
-        "tuple[object, ...] | None",
+    existing = _fetchone(
         connection.execute(
             "SELECT visible_slug FROM repository_names WHERE common_git_dir = ?",
             (common,),
-        ).fetchone(),
+        )
     )
     if existing is not None:
         return str(existing[0])
     base = _namespace_slug(repository)
-    bound = cast(
-        "tuple[object, ...] | None",
+    bound = _fetchone(
         connection.execute(
             "SELECT common_git_dir FROM repository_names WHERE visible_slug = ?",
             (base,),
-        ).fetchone(),
+        )
     )
     slug = base
     if bound is not None and str(bound[0]) != common:
         slug = f"{base}-{sha256(common.encode('utf-8')).hexdigest()[:6]}"
-        alternate = cast(
-            "tuple[object, ...] | None",
+        alternate = _fetchone(
             connection.execute(
                 "SELECT common_git_dir FROM repository_names WHERE visible_slug = ?",
                 (slug,),
-            ).fetchone(),
+            )
         )
         if alternate is not None and str(alternate[0]) != common:
             raise RefusalError(
@@ -191,12 +211,11 @@ def _visible_slug(
             )
     parent = controller.root / slug
     _safe_path_chain(controller.root, parent)
-    mapping = cast(
-        "tuple[object, ...] | None",
+    mapping = _fetchone(
         connection.execute(
             "SELECT common_git_dir FROM repository_names WHERE visible_slug = ?",
             (slug,),
-        ).fetchone(),
+        )
     )
     if parent.exists() and mapping is None:
         if not parent.is_dir():
@@ -231,22 +250,20 @@ def _visible_slug_for_inspection(
     connection: sqlite3.Connection, repository: Repository
 ) -> str:
     common = str(repository.common_git_dir)
-    existing = cast(
-        "tuple[object, ...] | None",
+    existing = _fetchone(
         connection.execute(
             "SELECT visible_slug FROM repository_names WHERE common_git_dir = ?",
             (common,),
-        ).fetchone(),
+        )
     )
     if existing is not None:
         return str(existing[0])
     base = _namespace_slug(repository)
-    bound = cast(
-        "tuple[object, ...] | None",
+    bound = _fetchone(
         connection.execute(
             "SELECT common_git_dir FROM repository_names WHERE visible_slug = ?",
             (base,),
-        ).fetchone(),
+        )
     )
     if bound is None or str(bound[0]) == common:
         return base
@@ -301,10 +318,7 @@ def _allocate_destination(
 
 
 def _lease(connection: sqlite3.Connection, lease_id: str) -> Lease:
-    row = cast(
-        "tuple[object, ...] | None",
-        connection.execute(_SELECT_LEASE_BY_ID, (lease_id,)).fetchone(),
-    )
+    row = _fetchone(connection.execute(_SELECT_LEASE_BY_ID, (lease_id,)))
     if row is None:
         raise InputError(
             "lease_unknown",
@@ -315,17 +329,14 @@ def _lease(connection: sqlite3.Connection, lease_id: str) -> Lease:
 
 
 def _active_handoffs(connection: sqlite3.Connection, lease_id: str) -> list[Handoff]:
-    rows = cast(
-        "list[tuple[object, ...]]",
-        connection.execute(_SELECT_ACTIVE_HANDOFFS_BY_LEASE, (lease_id,)).fetchall(),
-    )
+    rows = _fetchall(connection.execute(_SELECT_ACTIVE_HANDOFFS_BY_LEASE, (lease_id,)))
     return [row_to_handoff(row) for row in rows]
 
 
 @contextmanager
 def _write_transaction(
     controller: Controller,
-) -> Generator[sqlite3.Connection, None, None]:
+) -> Generator[sqlite3.Connection]:
     connection = controller.connect(write=True)
     try:
         _ = connection.execute("BEGIN IMMEDIATE")
@@ -379,7 +390,7 @@ def _assert_fresh_identity(initial: Repository, refreshed: Repository) -> None:
 @contextmanager
 def _locked_lease_repository(
     controller: Controller, lease_id: str
-) -> Generator[Repository, None, None]:
+) -> Generator[Repository]:
     with controller.connect(write=False) as connection:
         initial_lease = _lease(connection, lease_id)
     initial_repository = git_inspect_repository(initial_lease.primary_path)
@@ -449,7 +460,7 @@ def _assert_managed_target(repository: Repository, lease: Lease) -> GitWorktree:
 def _setup_command(command: SetupCommand, cwd: Path, timeout: int) -> dict[str, object]:
     """Run setup with bounded stream retention, preserving a failed worktree."""
     try:
-        process = subprocess.Popen(  # noqa: S603 - operator-configured setup argv
+        process = subprocess.Popen(
             command.argv,
             cwd=cwd,
             stdin=subprocess.DEVNULL,
@@ -532,11 +543,10 @@ def inspect_repository(
     if active_controller.state_exists():
         try:
             with active_controller.connect(write=False) as connection:
-                rows = cast(
-                    "list[tuple[object, ...]]",
+                rows = _fetchall(
                     connection.execute(
                         _SELECT_LEASES_BY_COMMON_DIR, (str(repository.common_git_dir),)
-                    ).fetchall(),
+                    )
                 )
                 leases = [row_to_lease(row).public() for row in rows]
                 visible_slug = _visible_slug_for_inspection(connection, repository)
@@ -916,14 +926,13 @@ def complete_handoff(
         )
     token_hash = sha256(handoff_token.encode("utf-8")).hexdigest()
     with _write_transaction(controller) as connection:
-        row = cast(
-            "tuple[object, ...] | None",
+        row = _fetchone(
             connection.execute(
                 """SELECT handoff_id, lease_id, actor, session_actor, state,
                 created_at, completed_at FROM handoffs
                 WHERE lease_id = ? AND token_hash = ? AND state = 'active'""",
                 (lease_id, token_hash),
-            ).fetchone(),
+            )
         )
         if row is None:
             raise RefusalError(

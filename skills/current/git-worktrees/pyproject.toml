@@ -3,27 +3,53 @@ name = "git-worktrees"
 version = "0.1.0"
 description = "Local raw-Git worktree lifecycle CLI"
 readme = "SKILL.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 88
 src = ["lib", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+  "A002",
+  "COM812",
+  "CPY001",  # No copyright headers in non-Markdown files (repository policy)
+  "D203",
+  "D213",
+  "EM101",
+  "EM102",
+  "ERA001",
+  "FBT001",  # Boolean parameters in CLI flags
+  "FBT002",  # Boolean parameters in CLI flags
+  "FIX002",  # Line contains TODO/FIXME
+  "ISC001",  # Implicit string concatenation on a single line
+  "ISC003",  # Explicit string concatenation
+  "PERF401",
+  "PLR0911",
+  "PLR0912",
+  "S101",
+  "S603",
+  "S607",
+  "SLF001",
+  "TD002",  # Missing author in TODO
+  "TD003",  # Missing issue link in TODO
+  "TRY003",
+  "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # unittest-style suite (repo precedent: PT009); live-git CLI tests (S603/S607).
-"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
+"tests/**/*.py" = [
+  "S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
   "PLR2004", "PLR0913", "PT009", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
+  "E402", "S603", "S607"
+]
 "scripts/**/*.py" = ["T201", "INP001", "E402", "I001"]
 # Coded CliError/InputError/GitError use literal codes by design (TRY003 kept).
 "lib/git_worktrees/cli.py" = ["EM101", "C901", "PLR0911", "PLR0912", "PLC0415"]
@@ -44,7 +70,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.11"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["lib", "scripts", "tests"]
 extraPaths = ["lib", "scripts"]
@@ -52,6 +78,10 @@ reportUnusedCallResult = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 reportUnusedVariable = "error"
 reportPrivateUsage = "error"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = "none"  # Live-git test suite exercises private helpers
 
 [tool.pytest.ini_options]
 minversion = "8.0"

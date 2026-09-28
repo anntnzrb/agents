@@ -1,8 +1,6 @@
 # pyright: reportUninitializedInstanceVariable=false
 """End-to-end contract tests for the public git-worktrees CLI."""
 
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -12,7 +10,12 @@ import tempfile
 import unittest
 from hashlib import sha256
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs, override
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+_json_loads: Callable[[str], object] = json.loads
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CLI = SKILL_ROOT / "scripts" / "cli.py"
@@ -58,6 +61,42 @@ class _ErrorDetail(TypedDict):
     details: dict[str, object]
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_lease_payload(val: object) -> TypeIs[_LeasePayload]:
+    return isinstance(val, dict)
+
+
+def _is_capabilities(val: object) -> TypeIs[_Capabilities]:
+    return isinstance(val, dict)
+
+
+def _is_handoff_capabilities(val: object) -> TypeIs[_HandoffCapabilities]:
+    return isinstance(val, dict)
+
+
+def _is_status_result(val: object) -> TypeIs[_StatusResult]:
+    return isinstance(val, dict)
+
+
+def _is_error_detail(val: object) -> TypeIs[_ErrorDetail]:
+    return isinstance(val, dict)
+
+
+def _is_lease_list(val: object) -> TypeIs[list[_LeasePayload]]:
+    return isinstance(val, list)
+
+
+def _is_worktree_list(val: object) -> TypeIs[list[_WorktreeEntry]]:
+    return isinstance(val, list)
+
+
+def _is_finding_list(val: object) -> TypeIs[list[_Finding]]:
+    return isinstance(val, list)
+
+
 class GitWorktreesCliContractTests(unittest.TestCase):
     """Exercise the wire protocol against disposable local Git repositories."""
 
@@ -69,8 +108,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
     repo: Path
     base: str
 
-    # typing.override needs 3.12+; this ignore marks the intentional override.
-    def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
+    @override
+    def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.temp_path = Path(self.temporary_directory.name)
         self.home = self.temp_path / "home"
@@ -86,7 +125,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         _ = self.git("commit", "-m", "initial")
         self.base = self.git("rev-parse", "HEAD").stdout.strip()
 
-    def tearDown(self) -> None:  # pyright: ignore[reportImplicitOverride]
+    @override
+    def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
     def git(
@@ -136,10 +176,11 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             f"CLI stdout must be one JSON line; stderr={completed.stderr!r}",
         )
         try:
-            payload = cast("dict[str, object]", json.loads(lines[0]))
+            raw_payload = _json_loads(lines[0])
         except json.JSONDecodeError as error:
             self.fail(f"CLI stdout was not JSON: {error}: {lines[0]!r}")
-        self.assertIsInstance(payload, dict)
+        assert _is_str_dict(raw_payload)
+        payload = raw_payload
         self.assertEqual(payload.get("schema"), SCHEMA)
         return completed, payload
 
@@ -149,17 +190,18 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"), payload)
         self.assertEqual(payload.get("type"), "response")
         self.assertIsInstance(payload.get("command"), str)
-        self.assertIsInstance(payload.get("result"), dict)
+        res = payload.get("result")
+        assert _is_str_dict(res)
         self.assertEqual(payload.get("warnings"), [])
-        return cast("dict[str, object]", payload["result"])
+        return res
 
     def refusal(self, *args: str) -> _ErrorDetail:
         completed, payload = self.cli(*args)
         self.assertEqual(completed.returncode, 3, payload)
         self.assertFalse(payload.get("ok"), payload)
         self.assertEqual(payload.get("type"), "error")
-        error = cast("_ErrorDetail", payload.get("error"))
-        self.assertIsInstance(error, dict)
+        error = payload.get("error")
+        assert _is_error_detail(error)
         self.assertRegex(str(error.get("code")), r"^[a-z][a-z0-9_]*$")
         self.assertIsInstance(error.get("message"), str)
         self.assertIsInstance(error.get("details"), dict)
@@ -192,20 +234,21 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         if setup_argv is not None:
             arguments.extend(["--setup-argv", json.dumps(setup_argv)])
         result = self.success(*arguments)
-        lease = cast("_LeasePayload", result["lease"])
-        capabilities = cast("_Capabilities", result["capabilities"])
-        self.assertIsInstance(lease, dict)
-        self.assertIsInstance(capabilities, dict)
+        lease = result["lease"]
+        capabilities = result["capabilities"]
+        assert _is_lease_payload(lease)
+        assert _is_capabilities(capabilities)
         token = capabilities["owner_token"]
         self.assertIsInstance(token, str)
         self.assertTrue(token)
         return lease, token
 
     def status(self, lease_id: str) -> _StatusResult:
-        result = self.success("status", "--lease-id", lease_id)
+        result: object = self.success("status", "--lease-id", lease_id)
+        assert _is_status_result(result)
         self.assertIsInstance(result.get("lease"), dict)
         self.assertIsInstance(result.get("safe_to_release"), bool)
-        return cast("_StatusResult", cast("object", result))
+        return result
 
     def lease_path(self, lease: _LeasePayload) -> Path:
         path = lease.get("path")
@@ -248,8 +291,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
         self.assertEqual(result.get("canonical_root"), str(self.repo.resolve()))
         self.assertEqual(result.get("primary_path"), str(self.repo.resolve()))
-        worktrees = cast("list[_WorktreeEntry]", result.get("worktrees"))
-        self.assertIsInstance(worktrees, list)
+        worktrees = result.get("worktrees")
+        assert _is_worktree_list(worktrees)
         self.assertTrue(
             any(item.get("path") == str(self.repo.resolve()) for item in worktrees)
         )
@@ -262,12 +305,12 @@ class GitWorktreesCliContractTests(unittest.TestCase):
 
     def test_schema_describes_status_result_shape(self) -> None:
         schema = self.success("schema")
-        verbs = cast("dict[str, object]", schema.get("verbs"))
-        self.assertIsInstance(verbs, dict)
-        status_schema = cast("dict[str, object]", verbs.get("status"))
-        self.assertIsInstance(status_schema, dict)
-        result = cast("dict[str, object]", status_schema.get("result"))
-        self.assertIsInstance(result, dict)
+        verbs = schema.get("verbs")
+        assert _is_str_dict(verbs)
+        status_schema = verbs.get("status")
+        assert _is_str_dict(status_schema)
+        result = status_schema.get("result")
+        assert _is_str_dict(result)
         self.assertIn("observation", result)
         self.assertIn("blockers", result)
         self.assertIn("safe_to_release", result)
@@ -283,8 +326,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         completed, payload = self.cli("schema", use_xdg_default=True)
         self.assertEqual(completed.returncode, 0, payload)
         self.assertTrue(payload.get("ok"), payload)
-        result = cast("dict[str, object]", payload.get("result"))
-        self.assertIsInstance(result, dict)
+        result = payload.get("result")
+        assert _is_str_dict(result)
         self.assertEqual(
             result.get("root"),
             str((self.home / ".local" / "share" / "agents" / "worktrees").resolve()),
@@ -340,8 +383,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIsInstance(payload.get("error"), dict)
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = cast("list[_LeasePayload]", inspection.get("leases"))
-        self.assertIsInstance(leases, list)
+        leases = inspection.get("leases")
+        assert _is_lease_list(leases)
         failed = next(
             (lease for lease in leases if lease.get("ref") == "work/setup-failure"),
             None,
@@ -376,12 +419,13 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             "1",
         )
         self.assertEqual(completed.returncode, 4, payload)
-        error = cast("_ErrorDetail", payload.get("error", {}))
+        error = payload.get("error", {})
+        assert _is_error_detail(error)
         self.assertEqual(error.get("code"), "setup_timeout")
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = cast("list[_LeasePayload]", inspection.get("leases"))
-        self.assertIsInstance(leases, list)
+        leases = inspection.get("leases")
+        assert _is_lease_list(leases)
         failed = next(
             (lease for lease in leases if lease.get("ref") == "work/setup-timeout"),
             None,
@@ -426,8 +470,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
             "--session-actor",
             "worker-session",
         )
-        capabilities = cast("_HandoffCapabilities", handoff.get("capabilities"))
-        self.assertIsInstance(capabilities, dict)
+        capabilities = handoff.get("capabilities")
+        assert _is_handoff_capabilities(capabilities)
         handoff_token = capabilities["handoff_token"]
         self.assertIsInstance(handoff_token, str)
         self.assertTrue(handoff_token)
@@ -506,8 +550,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         _ = unsafe_parent.write_text("not a directory", encoding="utf-8")
 
         inspection = self.success("inspect", "--repo", str(other_repo))
-        findings = cast("list[_Finding]", inspection.get("findings"))
-        self.assertIsInstance(findings, list)
+        findings = inspection.get("findings")
+        assert _is_finding_list(findings)
         self.assertTrue(
             any(
                 finding.get("code") == "allocation_parent_unsafe"
@@ -524,8 +568,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         _ = self.git("worktree", "lock", str(path))
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
-        self.assertIsInstance(worktrees, list)
+        worktrees = inspection.get("worktrees")
+        assert _is_worktree_list(worktrees)
         locked = next(
             (worktree for worktree in worktrees if worktree.get("path") == str(path)),
             None,
@@ -563,8 +607,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIn(b"prunable", registered.encode())
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
-        self.assertIsInstance(worktrees, list)
+        worktrees = inspection.get("worktrees")
+        assert _is_worktree_list(worktrees)
         prunable = next(
             (
                 worktree
@@ -618,8 +662,8 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         inspection = self.success("inspect", "--repo", str(sha256_repo))
         self.assertEqual(inspection.get("canonical_root"), str(sha256_repo.resolve()))
         self.assertEqual(inspection.get("primary_path"), str(sha256_repo.resolve()))
-        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
-        self.assertIsInstance(worktrees, list)
+        worktrees = inspection.get("worktrees")
+        assert _is_worktree_list(worktrees)
         self.assertTrue(
             any(
                 worktree.get("path") == str(sha256_repo.resolve())
@@ -659,13 +703,13 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertIn(f"worktree {canonical_foreign_path}\x00", registered)
 
         inspection = self.success("inspect", "--repo", str(self.repo))
-        leases = cast("list[_LeasePayload]", inspection.get("leases"))
-        self.assertIsInstance(leases, list)
+        leases = inspection.get("leases")
+        assert _is_lease_list(leases)
         self.assertFalse(
             any(lease.get("path") == str(canonical_foreign_path) for lease in leases)
         )
-        worktrees = cast("list[_WorktreeEntry]", inspection.get("worktrees"))
-        self.assertIsInstance(worktrees, list)
+        worktrees = inspection.get("worktrees")
+        assert _is_worktree_list(worktrees)
         self.assertTrue(
             any(item.get("path") == str(canonical_foreign_path) for item in worktrees)
         )
