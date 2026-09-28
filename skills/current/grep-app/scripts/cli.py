@@ -1,19 +1,32 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 
 """Search public code via the grep.app API."""
 
-from __future__ import annotations
-
+from contextlib import closing
 import os
 import sys
+from typing import TYPE_CHECKING, Protocol, TypeIs
 import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.response
-from typing import cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+class _Readable(Protocol):
+    def read(self) -> bytes: ...
+    def close(self) -> None: ...
+
+
+def _is_readable(obj: object) -> TypeIs[_Readable]:
+    return callable(getattr(obj, "read", None)) and callable(
+        getattr(obj, "close", None)
+    )
+
 
 USAGE = "usage: grep-app <search|regex> ..."
 
@@ -37,9 +50,13 @@ def request_get(base_url: str, params: list[tuple[str, str]]) -> int:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url)
     try:
-        opened = cast("object", urllib.request.urlopen(req, timeout=60))
-        with cast("urllib.response.addinfourl", opened) as response:
-            _ = sys.stdout.buffer.write(response.read())
+        open_fn: Callable[..., object] = urllib.request.urlopen
+        opened = open_fn(req, timeout=60)
+        if not _is_readable(opened):
+            print("Grep.app invalid response stream", file=sys.stderr)
+            return 1
+        with closing(opened):
+            _ = sys.stdout.buffer.write(opened.read())
     except urllib.error.HTTPError as exc:
         text = exc.read().decode("utf-8", errors="replace") or f"HTTP {exc.code}"
         print(text, file=sys.stderr)

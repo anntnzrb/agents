@@ -3,21 +3,38 @@ name = "grep-app"
 version = "0.1.0"
 description = "Search public code via the grep.app API"
 readme = "SKILL.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["scripts"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+    "A002",
+    "COM812",
+    "CPY001",  # repo policy: no license or copyright headers in code files
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TRY301",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["T201", "INP001", "E402", "I001", "S310"]
@@ -33,7 +50,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["scripts"]
 extraPaths = ["scripts"]
