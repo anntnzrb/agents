@@ -1,7 +1,5 @@
 """Marketplace adapters package (port of lib/adapters/index.ts)."""
 
-from __future__ import annotations
-
 from adapters.common import (
     RawScrapedItem,
     detect_delivery_format,

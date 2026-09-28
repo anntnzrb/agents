@@ -1,28 +1,30 @@
 """Kinguin marketplace adapter (port of lib/adapters/kinguin.ts)."""
 
-from __future__ import annotations
-
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from adapters.common import RawScrapedItem, normalize_raw_items
+from adapters.common import (
+    RawScrapedItem,
+    extract_raw_items,
+    is_str_dict,
+    normalize_raw_items,
+)
 
 if TYPE_CHECKING:
     from models import MarketplaceId, RawMarketListing, SearchTarget
 
-_LINK_RE = re.compile(
-    r"\[([^\]]+)\]\((https://www\.kinguin\.net/category/[^)]+)\)"
-    r"[\s\S]*?([0-9]+(?:\.[0-9]+)?)\s*(?:USD|\$|EUR|€)"
-)
+_LINK_HEAD_PAT = r"\[([^\]]+)\]\((https://www\.kinguin\.net/category/[^)]+)\)"
+_LINK_TAIL_PAT = r"[\s\S]*?([0-9]+(?:\.[0-9]+)?)\s*(?:USD|\$|EUR|€)"
+_LINK_RE = re.compile(f"{_LINK_HEAD_PAT}{_LINK_TAIL_PAT}")
 
 
 class KinguinAdapter:
     """Kinguin marketplace adapter."""
 
     id: MarketplaceId = "kinguin"
-    display_name = "Kinguin"
-    is_enabled_by_default = True
+    display_name: str = "Kinguin"
+    is_enabled_by_default: bool = True
 
     def build_search_target(self, query: str) -> SearchTarget:
         """Build the Kinguin listing URL for a query."""
@@ -34,7 +36,7 @@ class KinguinAdapter:
             "format": "json",
         }
 
-    def parse_listings(self, raw: Any) -> list[RawMarketListing]:
+    def parse_listings(self, raw: object) -> list[RawMarketListing]:
         """Parse Kinguin markdown or JSON scrape output into listings."""
         if not raw:
             return []
@@ -60,14 +62,7 @@ class KinguinAdapter:
 
             return normalize_raw_items(items, self.id, 30)
 
-        if isinstance(raw, dict):
-            raw_items = raw.get("items")
-            if not isinstance(raw_items, list):
-                raw_items = raw.get("products")
-            return normalize_raw_items(
-                raw_items if isinstance(raw_items, list) else [],
-                self.id,
-                30,
-            )
+        if is_str_dict(raw):
+            return normalize_raw_items(extract_raw_items(raw), self.id, 30)
 
         return []

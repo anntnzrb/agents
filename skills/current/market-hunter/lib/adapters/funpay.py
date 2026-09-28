@@ -1,11 +1,14 @@
 """FunPay marketplace adapter (port of lib/adapters/funpay.ts)."""
 
-from __future__ import annotations
-
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from adapters.common import RawScrapedItem, normalize_raw_items
+from adapters.common import (
+    RawScrapedItem,
+    extract_raw_items,
+    is_str_dict,
+    normalize_raw_items,
+)
 
 if TYPE_CHECKING:
     from models import MarketplaceId, RawMarketListing, SearchTarget
@@ -41,8 +44,8 @@ class FunPayAdapter:
     """FunPay marketplace adapter."""
 
     id: MarketplaceId = "funpay"
-    display_name = "FunPay"
-    is_enabled_by_default = True
+    display_name: str = "FunPay"
+    is_enabled_by_default: bool = True
 
     def build_search_target(self, query: str) -> SearchTarget:
         """Build the FunPay lot-category URL for a query."""
@@ -61,7 +64,7 @@ class FunPayAdapter:
             "format": "api",  # Allows direct fast HTML fetch & parse
         }
 
-    def parse_listings(self, raw: Any) -> list[RawMarketListing]:
+    def parse_listings(self, raw: object) -> list[RawMarketListing]:
         """Parse FunPay HTML or JSON scrape output into listings."""
         if not raw:
             return []
@@ -112,14 +115,7 @@ class FunPayAdapter:
             return normalize_raw_items(items, self.id, 7)
 
         # 2. If raw is JSON from Firecrawl schema
-        if isinstance(raw, dict):
-            raw_items = raw.get("items")
-            if not isinstance(raw_items, list):
-                raw_items = raw.get("products")
-            return normalize_raw_items(
-                raw_items if isinstance(raw_items, list) else [],
-                self.id,
-                7,
-            )
+        if is_str_dict(raw):
+            return normalize_raw_items(extract_raw_items(raw), self.id, 7)
 
         return []

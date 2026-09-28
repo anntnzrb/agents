@@ -1,14 +1,14 @@
 """Shared normalization helpers for marketplace adapters (port of common.ts)."""
 
-from __future__ import annotations
-
 import math
 import re
-from collections.abc import Sequence
-from typing import Any, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 from urllib.parse import quote
 
 from models import DeliveryFormat, MarketplaceId, RawMarketListing, js_string
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class RawScrapedItem(TypedDict, total=False):
@@ -44,12 +44,12 @@ _NON_DIGIT_RE = re.compile(r"[^0-9]")
 _FIVE_POINT_RATING_MAX = 5
 
 
-def _is_js_number(val: Any) -> bool:
+def _is_js_number(val: object) -> TypeIs[float | int]:
     """Match JavaScript `typeof val === "number" && !isNaN(val)`."""
     return (
         isinstance(val, (int, float))
         and not isinstance(val, bool)
-        and not math.isnan(val)
+        and not math.isnan(float(val))
     )
 
 
@@ -61,7 +61,7 @@ def _js_parse_float(cleaned: str) -> float | None:
     return float(match.group(0))
 
 
-def _first_defined(fields: dict[str, Any], *keys: str) -> Any:
+def _first_defined[T](fields: dict[str, T], *keys: str) -> T | None:
     """Emulate a JavaScript `??` chain across keys: first non-None value."""
     for key in keys:
         value = fields.get(key)
@@ -75,21 +75,22 @@ def _encode_uri_component(value: str) -> str:
     return quote(value, safe="!'()*")
 
 
-def parse_price(val: Any) -> float:
+def parse_price(val: object) -> float:
     """Parse a price value from a number or loose string."""
     if _is_js_number(val):
-        return val
+        return float(val)
     if isinstance(val, str):
         cleaned = _NON_NUMERIC_DOT_RE.sub("", val)
         parsed = _js_parse_float(cleaned)
-        return 0 if parsed is None else parsed
-    return 0
+        return 0.0 if parsed is None else parsed
+    return 0.0
 
 
-def parse_rating(val: Any, fallback: float = 95) -> float:
+def parse_rating(val: object, fallback: float = 95.0) -> float:
     """Parse a seller rating, normalizing 0-5 scales to percentages."""
     if _is_js_number(val):
-        return (val / 5) * 100 if val <= _FIVE_POINT_RATING_MAX else val
+        num = float(val)
+        return (num / 5) * 100 if num <= _FIVE_POINT_RATING_MAX else num
     if isinstance(val, str):
         cleaned = _NON_NUMERIC_DOT_RE.sub("", val)
         parsed = _js_parse_float(cleaned)
@@ -98,10 +99,10 @@ def parse_rating(val: Any, fallback: float = 95) -> float:
     return fallback
 
 
-def parse_sales(val: Any, fallback: int = 100) -> int:
+def parse_sales(val: object, fallback: int = 100) -> int:
     """Parse a sales or review count."""
     if _is_js_number(val):
-        return math.floor(val)
+        return math.floor(float(val))
     if isinstance(val, str):
         cleaned = _NON_DIGIT_RE.sub("", val)
         if cleaned:
@@ -110,10 +111,10 @@ def parse_sales(val: Any, fallback: int = 100) -> int:
     return fallback
 
 
-def detect_delivery_format(title: str, raw_type: Any = None) -> DeliveryFormat:
+def detect_delivery_format(title: str, raw_type: object = None) -> DeliveryFormat:
     """Classify the delivery format from title and seller-provided type."""
-    combined = f"{title} {raw_type or ''}".lower()
-
+    raw_str = str(raw_type) if raw_type is not None else ""
+    combined = f"{title} {raw_str}".lower()
     if (
         "cookie" in combined
         or "session token" in combined
@@ -157,8 +158,33 @@ def detect_delivery_format(title: str, raw_type: Any = None) -> DeliveryFormat:
     return "UNKNOWN"
 
 
+def is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    """Narrow an object to a string-keyed dictionary."""
+    return isinstance(val, dict)
+
+
+def is_object_list(val: object) -> TypeIs[list[object]]:
+    """Narrow an object to a list of objects."""
+    return isinstance(val, list)
+
+
+def as_dict(item: object) -> dict[str, object]:
+    """Convert a loose item to a string-keyed dictionary."""
+    return item if is_str_dict(item) else {}
+
+
+def extract_raw_items(raw: object) -> list[object]:
+    """Extract the items or products list from a raw response dictionary."""
+    if not is_str_dict(raw):
+        return []
+    raw_items = raw.get("items")
+    if not is_object_list(raw_items):
+        raw_items = raw.get("products")
+    return raw_items if is_object_list(raw_items) else []
+
+
 def normalize_raw_items(
-    raw_items: Sequence[Any],
+    raw_items: Sequence[object],
     marketplace: MarketplaceId,
     default_warranty_days: float = 14,
 ) -> list[RawMarketListing]:
@@ -169,9 +195,9 @@ def normalize_raw_items(
         if not item:
             continue
 
-        fields = cast("dict[str, Any]", item) if isinstance(item, dict) else {}
-
-        title = (fields.get("title") or fields.get("name") or "").strip()
+        fields = as_dict(item)
+        title_val = fields.get("title") or fields.get("name")
+        title: str = str(title_val).strip() if title_val is not None else ""
         if not title:
             continue
 
@@ -197,27 +223,39 @@ def normalize_raw_items(
             and "region locked" not in title_lower
         )
 
+        url_raw = fields.get("url")
+        url = (
+            str(url_raw)
+            if url_raw is not None
+            else f"https://www.{marketplace}.com/search?query={_encode_uri_component(title)}"
+        )
+        seller_raw = fields.get("sellerName") or fields.get("seller")
+        seller_name = (
+            str(seller_raw)
+            if seller_raw is not None
+            else f"{marketplace.upper()} Verified Seller"
+        )
+        desc_raw = fields.get("description")
+        desc = str(desc_raw) if desc_raw is not None else title
+
         result.append(
             {
                 "id": js_string(fields.get("id") or f"{marketplace}-{i + 1}"),
                 "marketplace": marketplace,
                 "title": title,
-                "url": fields.get("url")
-                or f"https://www.{marketplace}.com/search?query={_encode_uri_component(title)}",
+                "url": url,
                 "priceUsd": price_usd,
                 "seller": {
-                    "name": fields.get("sellerName")
-                    or fields.get("seller")
-                    or f"{marketplace.upper()} Verified Seller",
+                    "name": seller_name,
                     "positiveFeedbackPercent": rating_percent,
-                    "totalSalesCount": total_sales,
+                    "totalSalesCount": float(total_sales),
                 },
                 "deliveryFormat": format_,
                 "isStockAvailable": True,
                 "isAutoDelivery": True,
                 "isGlobal": is_global,
                 "warrantyDays": default_warranty_days,
-                "description": fields.get("description") or title,
+                "description": desc,
             }
         )
 

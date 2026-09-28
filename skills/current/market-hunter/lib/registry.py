@@ -1,11 +1,10 @@
 """Dynamic marketplace adapter registry (port of lib/registry.ts)."""
 
-from __future__ import annotations
-
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from models import MarketplaceAdapter, MarketplaceId
 
 _adapters_registry: dict[MarketplaceId, MarketplaceAdapter] = {}

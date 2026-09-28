@@ -1,20 +1,22 @@
 """G2A marketplace adapter (port of lib/adapters/g2a.ts)."""
 
-from __future__ import annotations
-
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from adapters.common import RawScrapedItem, normalize_raw_items
+from adapters.common import (
+    RawScrapedItem,
+    extract_raw_items,
+    is_str_dict,
+    normalize_raw_items,
+)
 
 if TYPE_CHECKING:
     from models import MarketplaceId, RawMarketListing, SearchTarget
 
-_LINK_RE = re.compile(
-    r"\[\*\*([^*]+)\*\*([\s\S]*?)\]\((https://www\.g2a\.com/[^)]+)\)"
-    r"[\s\S]*?([0-9]+(?:\.[0-9]+)?)\s*USD"
-)
+_LINK_HEAD_PAT = r"\[\*\*([^*]+)\*\*([\s\S]*?)\]\((https://www\.g2a\.com/[^)]+)\)"
+_LINK_TAIL_PAT = r"[\s\S]*?([0-9]+(?:\.[0-9]+)?)\s*USD"
+_LINK_RE = re.compile(f"{_LINK_HEAD_PAT}{_LINK_TAIL_PAT}")
 _WHITESPACE_RE = re.compile(r"\s+")
 _NEWLINES_RE = re.compile(r"[\n\r]+")
 _MARKDOWN_CHARS_RE = re.compile(r"[-\\*#]+")
@@ -25,8 +27,8 @@ class G2aAdapter:
     """G2A marketplace adapter."""
 
     id: MarketplaceId = "g2a"
-    display_name = "G2A"
-    is_enabled_by_default = True
+    display_name: str = "G2A"
+    is_enabled_by_default: bool = True
 
     def build_search_target(self, query: str) -> SearchTarget:
         """Build the G2A search URL for a query."""
@@ -38,7 +40,7 @@ class G2aAdapter:
             "format": "json",
         }
 
-    def parse_listings(self, raw: Any) -> list[RawMarketListing]:
+    def parse_listings(self, raw: object) -> list[RawMarketListing]:
         """Parse G2A markdown or JSON scrape output into listings."""
         if not raw:
             return []
@@ -74,14 +76,6 @@ class G2aAdapter:
                     items.append(item)
             return normalize_raw_items(items, self.id, 14)
 
-        if isinstance(raw, dict):
-            raw_items = raw.get("items")
-            if not isinstance(raw_items, list):
-                raw_items = raw.get("products")
-            return normalize_raw_items(
-                raw_items if isinstance(raw_items, list) else [],
-                self.id,
-                14,
-            )
-
+        if is_str_dict(raw):
+            return normalize_raw_items(extract_raw_items(raw), self.id, 14)
         return []

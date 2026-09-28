@@ -1,11 +1,9 @@
 """Data models, error types, and JS-compatible formatting helpers."""
 
-from __future__ import annotations
-
 import math
 import sys
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Literal, NotRequired, Protocol, TypedDict
+from typing import Literal, NotRequired, Protocol, TypedDict
 
 SCHEMA_VERSION = 1
 
@@ -98,7 +96,7 @@ class MarketplaceAdapter(Protocol):
         """Build the fetch or scrape target for a query."""
         ...
 
-    def parse_listings(self, raw: Any) -> list[RawMarketListing]:
+    def parse_listings(self, raw: object) -> list[RawMarketListing]:
         """Normalize raw fetched or scraped data into listings."""
         ...
 
@@ -136,7 +134,7 @@ class EnvelopeError(TypedDict):
 
     code: str
     message: str
-    details: NotRequired[dict[str, Any]]
+    details: NotRequired[dict[str, object]]
 
 
 class DealHunterEnvelope(TypedDict):
@@ -152,7 +150,11 @@ class DealHunterEnvelope(TypedDict):
 class AdapterError(Exception):
     """Failure raised by a marketplace adapter."""
 
-    def __init__(self, marketplace: str, message: str, cause: Any = None) -> None:
+    marketplace: str
+    message: str
+    cause: object
+
+    def __init__(self, marketplace: str, message: str, cause: object = None) -> None:
         """Initialize the adapter failure."""
         super().__init__(message)
         self.marketplace = marketplace
@@ -163,8 +165,12 @@ class AdapterError(Exception):
 class EngineError(Exception):
     """Failure raised by the scan engine."""
 
+    code: str
+    message: str
+    details: dict[str, object] | None
+
     def __init__(
-        self, code: str, message: str, details: dict[str, Any] | None = None
+        self, code: str, message: str, details: dict[str, object] | None = None
     ) -> None:
         """Initialize the engine failure."""
         super().__init__(message)
@@ -208,7 +214,7 @@ def js_to_locale_string(value: float) -> str:
     return f"{value:,.3f}".rstrip("0").rstrip(".")
 
 
-def js_string(value: Any) -> str:
+def js_string(value: object) -> str:
     """Match JavaScript String(value) for JSON scalar types."""
     if value is None:
         return "null"
@@ -216,7 +222,9 @@ def js_string(value: Any) -> str:
         return "true"
     if value is False:
         return "false"
-    return js_number_to_str(value) if isinstance(value, (int, float)) else str(value)
+    if isinstance(value, (int, float)):
+        return js_number_to_str(float(value))
+    return str(value)
 
 
 NUMBER_EPSILON = sys.float_info.epsilon

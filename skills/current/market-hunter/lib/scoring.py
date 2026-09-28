@@ -1,10 +1,7 @@
 """Trust and deal scoring engine (port of lib/scoring.ts)."""
 
-from __future__ import annotations
-
 import math
 import re
-from typing import cast
 
 from models import (
     NUMBER_EPSILON,
@@ -191,6 +188,39 @@ def compute_warranty_score(warranty_days: float | None = None) -> int:
     return 30
 
 
+def _check_circuit_breaker(
+    listing: RawMarketListing, msrp: float, searchable_text: str
+) -> tuple[bool, str | None]:
+    """Evaluate hard circuit breakers on suspicious or banned offers."""
+    if listing["deliveryFormat"] == "SESSION_COOKIE" or "cookie" in searchable_text:
+        return True, "High-risk session cookie injection detected"
+    if listing["seller"]["positiveFeedbackPercent"] < _MIN_SELLER_FEEDBACK_PERCENT:
+        pct_str = js_number_to_str(listing["seller"]["positiveFeedbackPercent"])
+        return True, f"Low seller feedback rating ({pct_str}%)"
+    if (
+        listing["priceUsd"] < _DEDICATED_ACCOUNT_SUSPICIOUS_PRICE
+        and msrp >= _PREMIUM_SERVICE_MSRP
+        and listing["deliveryFormat"] == "DEDICATED_ACCOUNT"
+    ):
+        return True, (
+            "Unrealistically low price for dedicated account (high fraud probability)"
+        )
+    return False, None
+
+
+def _determine_trust_tier(final_trust_score: int) -> TrustTier:
+    """Map a numerical trust score to its discrete TrustTier."""
+    if final_trust_score >= _TIER_STRONG_BUY:
+        return "STRONG_BUY"
+    if final_trust_score >= _TIER_ACCEPTABLE:
+        return "ACCEPTABLE"
+    if final_trust_score >= _TIER_RISKY_BUDGET:
+        return "RISKY_BUDGET"
+    if final_trust_score >= _TIER_AVOID_DANGER:
+        return "AVOID_DANGER"
+    return "CONFIRMED_SCAM"
+
+
 def score_listing(listing: RawMarketListing) -> ScoredDeal:
     """Score a raw listing through the trust and deal decision engine."""
     msrp = estimate_msrp(listing["title"])
@@ -211,32 +241,13 @@ def score_listing(listing: RawMarketListing) -> ScoredDeal:
             detected_red_flags.append(label)
             penalty_deductions += penalty
 
-    # Check hard circuit breakers
-    is_circuit_breaker_tripped = False
-    circuit_breaker_reason: str | None = None
+    is_tripped, circuit_breaker_reason = _check_circuit_breaker(
+        listing, msrp, searchable_text
+    )
 
-    if listing["deliveryFormat"] == "SESSION_COOKIE" or "cookie" in searchable_text:
-        is_circuit_breaker_tripped = True
-        circuit_breaker_reason = "High-risk session cookie injection detected"
-    elif listing["seller"]["positiveFeedbackPercent"] < _MIN_SELLER_FEEDBACK_PERCENT:
-        is_circuit_breaker_tripped = True
-        circuit_breaker_reason = (
-            "Low seller feedback rating "
-            f"({js_number_to_str(listing['seller']['positiveFeedbackPercent'])}%)"
-        )
-    elif (
-        listing["priceUsd"] < _DEDICATED_ACCOUNT_SUSPICIOUS_PRICE
-        and msrp >= _PREMIUM_SERVICE_MSRP
-        and listing["deliveryFormat"] == "DEDICATED_ACCOUNT"
-    ):
-        is_circuit_breaker_tripped = True
-        circuit_breaker_reason = (
-            "Unrealistically low price for dedicated account (high fraud probability)"
-        )
-
-    final_trust_score = (
+    raw_score = (
         5
-        if is_circuit_breaker_tripped
+        if is_tripped
         else js_round(
             0.30 * price_score
             + 0.30 * seller_score
@@ -245,18 +256,8 @@ def score_listing(listing: RawMarketListing) -> ScoredDeal:
             - penalty_deductions
         )
     )
-
-    final_trust_score = max(0, min(100, final_trust_score))
-
-    trust_tier: TrustTier = "CONFIRMED_SCAM"
-    if final_trust_score >= _TIER_STRONG_BUY:
-        trust_tier = "STRONG_BUY"
-    elif final_trust_score >= _TIER_ACCEPTABLE:
-        trust_tier = "ACCEPTABLE"
-    elif final_trust_score >= _TIER_RISKY_BUDGET:
-        trust_tier = "RISKY_BUDGET"
-    elif final_trust_score >= _TIER_AVOID_DANGER:
-        trust_tier = "AVOID_DANGER"
+    final_trust_score = max(0, min(100, raw_score))
+    trust_tier = _determine_trust_tier(final_trust_score)
 
     discount_percent = max(
         0,
@@ -269,25 +270,38 @@ def score_listing(listing: RawMarketListing) -> ScoredDeal:
     if len(detected_red_flags) > 0:
         recommendation_summary += f" | Warnings: {', '.join(detected_red_flags)}"
 
-    return cast(
-        "ScoredDeal",
-        {
-            **listing,
-            "trustScore": final_trust_score,
-            "trustTier": trust_tier,
-            "priceSanityScore": price_score,
-            "sellerScore": seller_score,
-            "formatScore": format_score,
-            "warrantyScore": warranty_score,
-            "penaltyDeductions": penalty_deductions,
-            "detectedRedFlags": detected_red_flags,
-            "isCircuitBreakerTripped": is_circuit_breaker_tripped,
-            **(
-                {"circuitBreakerReason": circuit_breaker_reason}
-                if circuit_breaker_reason is not None
-                else {}
-            ),
-            "discountVsMsrpPercent": discount_percent,
-            "recommendationSummary": recommendation_summary,
-        },
-    )
+    deal: ScoredDeal = {
+        "id": listing["id"],
+        "marketplace": listing["marketplace"],
+        "title": listing["title"],
+        "url": listing["url"],
+        "priceUsd": listing["priceUsd"],
+        "seller": listing["seller"],
+        "deliveryFormat": listing["deliveryFormat"],
+        "isStockAvailable": listing["isStockAvailable"],
+        "isAutoDelivery": listing["isAutoDelivery"],
+        "isGlobal": listing["isGlobal"],
+        "trustScore": float(final_trust_score),
+        "trustTier": trust_tier,
+        "priceSanityScore": float(price_score),
+        "sellerScore": float(seller_score),
+        "formatScore": float(format_score),
+        "warrantyScore": float(warranty_score),
+        "penaltyDeductions": float(penalty_deductions),
+        "detectedRedFlags": detected_red_flags,
+        "isCircuitBreakerTripped": is_tripped,
+        "discountVsMsrpPercent": float(discount_percent),
+        "recommendationSummary": recommendation_summary,
+    }
+    if "originalCurrency" in listing:
+        deal["originalCurrency"] = listing["originalCurrency"]
+    if "originalPrice" in listing:
+        deal["originalPrice"] = listing["originalPrice"]
+    if "warrantyDays" in listing:
+        deal["warrantyDays"] = listing["warrantyDays"]
+    if "description" in listing:
+        deal["description"] = listing["description"]
+    if circuit_breaker_reason is not None:
+        deal["circuitBreakerReason"] = circuit_breaker_reason
+
+    return deal
