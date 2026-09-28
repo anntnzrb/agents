@@ -28,6 +28,16 @@ providers:
           mode: effort
           efforts:
             - medium
+      claude-sonnet-5-5:
+        cost:
+          input: 2
+          output: 10
+          cacheRead: 0.2
+          cacheWrite: 2.5
+        thinking:
+          mode: effort
+          efforts:
+            - high
       command-code/deepseek/deepseek-v4.1-flash:
         reasoning: true
         contextWindow: 1000000 # 1M * 85% = 850K trigger, server-advertised 1M window / 384K max output
