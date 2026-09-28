@@ -1,8 +1,6 @@
 # Copyright (c) 2026
 """CLI configuration and backend discovery orchestration."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 

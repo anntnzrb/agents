@@ -1,20 +1,34 @@
 # Copyright (c) 2026
 """Read-only adapters for T3 Code and OpenCode SQLite session stores."""
 
-from __future__ import annotations
-
 import json
 import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 from urllib.parse import quote
 
 from .model import Harness, Message, Session, make_session, timestamp_from_epoch_ms
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
+
+_json_loads: Callable[[str], object] = json.loads
+_getattr: Callable[[object, str], object] = getattr
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
 
 _T3_SCHEMA: dict[str, frozenset[str]] = {
     "projection_threads": frozenset(
@@ -70,13 +84,19 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 def _rows(cursor: sqlite3.Cursor) -> Iterable[sqlite3.Row]:
     """Iterate a row-factory cursor with precise element types."""
-    yield from cast("Iterable[sqlite3.Row]", cursor)
+    fn = _getattr(cursor, "fetchall")
+    rows = fn() if callable(fn) else None
+    if _is_obj_list(rows):
+        for row in rows:
+            if isinstance(row, sqlite3.Row):
+                yield row
 
 
 def _record(row: sqlite3.Row) -> dict[str, object]:
-    """Materialize one row with a single boundary cast."""
+    """Materialize one row with a single boundary narrowing."""
     # Row.__iter__ yields values, so .keys() is required for column names.
-    return {key: cast("object", row[key]) for key in row.keys()}  # noqa: SIM118
+    getitem: Callable[[str], object] = row.__getitem__
+    return {key: getitem(key) for key in row.keys()}  # noqa: SIM118
 
 
 def _columns(connection: sqlite3.Connection) -> dict[str, frozenset[str]]:
@@ -198,27 +218,24 @@ def _json_object(value: object) -> dict[str, object] | None:
     if not isinstance(value, str):
         return None
     try:
-        decoded = cast("object", json.loads(value))
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        decoded = _json_loads(value)
+    except json.JSONDecodeError, UnicodeDecodeError:
         return None
-    if not isinstance(decoded, dict):
+    if not _is_obj_dict(decoded):
         return None
-    raw = cast("dict[object, object]", decoded)
-    return {str(key): item for key, item in raw.items()}
+    return {str(key): item for key, item in decoded.items()}
 
 
 def _text_blocks(value: object) -> str:
-    if not isinstance(value, list):
+    if not _is_obj_list(value):
         return ""
-    blocks = cast("list[object]", value)
     parts: list[str] = []
-    for block in blocks:
-        if not isinstance(block, dict):
+    for block in value:
+        if not _is_str_dict(block):
             continue
-        mapping = cast("dict[str, object]", block)
-        if mapping.get("type") != "text":
+        if block.get("type") != "text":
             continue
-        text = mapping.get("text")
+        text = block.get("text")
         if isinstance(text, str) and text.strip():
             parts.append(text)
     return "\n".join(parts)
@@ -396,6 +413,6 @@ def discover_sqlite_sessions(
                     if harness == "t3code"
                     else _opencode_sessions(path, connection)
                 )
-        except (OSError, sqlite3.Error, ValueError):
+        except OSError, sqlite3.Error, ValueError:
             continue
     return sessions

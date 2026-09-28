@@ -1,8 +1,6 @@
 # Copyright (c) 2026
 """Executable contracts for the multi-harness session finder."""
 
-from __future__ import annotations
-
 import gzip
 import hashlib
 import json
@@ -10,12 +8,23 @@ import os
 import sqlite3
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final, TypeIs
 
 import zstandard
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Callable, Iterable, Mapping, Sequence
+
+_json_loads: Callable[[str], object] = json.loads
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
 
 SKILL: Final = Path(__file__).resolve().parents[1]
 CLI: Final = SKILL / "scripts" / "cli.py"
@@ -119,18 +128,16 @@ def records(result: subprocess.CompletedProcess[str]) -> list[dict[str, object]]
     assert result.stderr == ""
     assert result.stdout.endswith("\n")
     assert "\n" not in result.stdout[:-1]
-    value = cast("object", json.loads(result.stdout))
-    assert isinstance(value, list)
-    items = cast("list[object]", value)
+    value = _json_loads(result.stdout)
+    assert _is_obj_list(value)
     assert all(
-        isinstance(item, dict)
-        and all(isinstance(key, str) for key in cast("dict[object, object]", item))
-        for item in items
+        _is_obj_dict(item) and all(isinstance(key, str) for key in item)
+        for item in value
     )
     return [
-        {str(key): item for key, item in cast("dict[object, object]", record).items()}
-        for record in items
-        if isinstance(record, dict)
+        {str(key): item for key, item in record.items()}
+        for record in value
+        if _is_obj_dict(record)
     ]
 
 
@@ -152,10 +159,9 @@ def assert_record_shape(record: Mapping[str, object]) -> None:
     assert isinstance(record["archived"], bool)
     assert isinstance(record["score"], int)
     argv = record["resume_argv"]
-    assert argv is None or isinstance(argv, list)
+    assert argv is None or _is_obj_list(argv)
     if argv is not None:
-        strings = cast("list[object]", argv)
-        assert all(isinstance(item, str) for item in strings)
+        assert all(isinstance(item, str) for item in argv)
 
 
 def omp_rows(

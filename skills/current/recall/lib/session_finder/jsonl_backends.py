@@ -1,30 +1,45 @@
 # Copyright (c) 2026
 """Discovery and parsing for the OMP, Pi, and Codex JSONL stores."""
 
-from __future__ import annotations
-
 import gzip
 import io
 import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, TypeIs
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
     from typing import TextIO
-
 import zstandard
 
 from .model import Harness, Message, Session, make_session, timestamp_from_mtime
 
 _JSON_DECODER = json.JSONDecoder()
+_raw_decode: Callable[[str, int], tuple[object, int]] = _JSON_DECODER.raw_decode
+_json_loads: Callable[[str], object] = json.loads
 
 type JsonValue = (
     bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 )
 type AuthoredRole = Literal["user", "assistant"]
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
+
+
+def _is_json_dict(val: object) -> TypeIs[dict[str, JsonValue]]:
+    return _is_obj_dict(val) and all(isinstance(key, str) for key in val)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 @dataclass(slots=True)
@@ -44,34 +59,29 @@ def _objects(lines: Iterable[str]) -> Iterator[dict[str, JsonValue]]:
             if start < 0:
                 break
             try:
-                decoded: tuple[object, int] = _JSON_DECODER.raw_decode(line, start)
-            except (json.JSONDecodeError, RecursionError):
+                decoded = _raw_decode(line, start)
+            except json.JSONDecodeError, RecursionError:
                 offset = start + 1
                 continue
             value, end = decoded
             offset = end
-            if isinstance(value, dict):
-                raw = cast("dict[object, object]", value)
-                if all(isinstance(key, str) for key in raw):
-                    # Decoder is untyped; nested values are validated lazily.
-                    yield cast("dict[str, JsonValue]", value)
-                    break
+            if _is_json_dict(value):
+                yield value
+                break
 
 
 def _flatten_text(value: object) -> str:
     """Flatten the polymorphic text/content shapes used by compatible stores."""
     if isinstance(value, str):
         return value
-    if isinstance(value, list):
-        items = cast("list[object]", value)
+    if _is_obj_list(value):
         return "\n".join(
-            part for item in items if (part := _flatten_text(item)).strip()
+            part for item in value if (part := _flatten_text(item)).strip()
         )
-    if not isinstance(value, dict):
+    if not _is_str_dict(value):
         return ""
-    mapping = cast("dict[str, object]", value)
     for key in ("text", "content", "message", "value"):
-        if key in mapping and (text := _flatten_text(mapping[key])).strip():
+        if key in value and (text := _flatten_text(value[key])).strip():
             return text
     return ""
 
@@ -98,13 +108,12 @@ def _files(root: Path, patterns: tuple[str, ...]) -> Iterator[Path]:
 
 def _read_json(path: Path) -> dict[str, JsonValue]:
     try:
-        value = cast("object", json.loads(path.read_text(encoding="utf-8")))
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        value = _json_loads(path.read_text(encoding="utf-8"))
+    except OSError, UnicodeError, json.JSONDecodeError:
         return {}
-    if not isinstance(value, dict):
+    if not _is_json_dict(value):
         return {}
-    # Decoder is untyped; nested values are validated lazily.
-    return cast("dict[str, JsonValue]", value)
+    return value
 
 
 def _pi_root() -> tuple[Path, str]:
@@ -143,7 +152,7 @@ def _add_compatible(
     (candidate.explicit if explicit else candidate.provenance).add(owner)
 
 
-def _discover_compatible(  # noqa: C901, PLR0912
+def _discover_compatible(  # noqa: C901
     roots: dict[Harness, tuple[Path, ...]],
 ) -> dict[Path, _CompatibleCandidate]:
     registry: dict[Path, _CompatibleCandidate] = {}
@@ -262,7 +271,7 @@ def _parse_compatible(candidate: _CompatibleCandidate) -> Session | None:
     try:
         with _open_text(candidate.path) as stream:
             records = list(_objects(stream))
-    except (OSError, UnicodeError, EOFError, zstandard.ZstdError):
+    except OSError, UnicodeError, EOFError, zstandard.ZstdError:
         return None
     owner = _compatible_owner(candidate, records)
     if owner not in {"omp", "pi"}:
@@ -334,22 +343,20 @@ def _codex_names(home: Path) -> dict[str, str]:
                 name = record.get("thread_name")
                 if isinstance(session_id, str) and isinstance(name, str):
                     names[session_id] = name
-    except (OSError, UnicodeError):
+    except OSError, UnicodeError:
         return names
     return names
 
 
 def _codex_content(content: object) -> str:
-    if not isinstance(content, list):
+    if not _is_obj_list(content):
         return ""
-    blocks = cast("list[object]", content)
     texts: list[str] = []
-    for block in blocks:
-        if not isinstance(block, dict):
+    for block in content:
+        if not _is_str_dict(block):
             continue
-        mapping = cast("dict[str, object]", block)
-        if mapping.get("type") in {"input_text", "output_text"}:
-            text = mapping.get("text")
+        if block.get("type") in {"input_text", "output_text"}:
+            text = block.get("text")
             if isinstance(text, str) and text.strip():
                 texts.append(text)
     return "\n".join(texts)
@@ -367,7 +374,7 @@ def _parse_codex(
     try:
         with _open_text(path) as stream:
             records = list(_objects(stream))
-    except (OSError, UnicodeError, EOFError, zstandard.ZstdError):
+    except OSError, UnicodeError, EOFError, zstandard.ZstdError:
         return None
     meta_record = next(
         (record for record in records if record.get("type") == "session_meta"), None

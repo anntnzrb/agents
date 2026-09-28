@@ -1,8 +1,6 @@
 # Copyright (c) 2026
 """Normalized session records, matching, and ranking."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal, TypedDict
@@ -10,8 +8,8 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 if TYPE_CHECKING:
     from pathlib import Path
 
-Harness = Literal["omp", "pi", "codex", "t3code", "opencode"]
-MatchType = Literal["title", "user_message", "transcript", "cwd"]
+type Harness = Literal["omp", "pi", "codex", "t3code", "opencode"]
+type MatchType = Literal["title", "user_message", "transcript", "cwd"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +76,7 @@ def timestamp_from_epoch_ms(value: object) -> str | None:
         return None
     try:
         parsed = datetime.fromtimestamp(value / 1000, tz=UTC)
-    except (OverflowError, OSError, ValueError):
+    except OverflowError, OSError, ValueError:
         return None
     return parsed.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 

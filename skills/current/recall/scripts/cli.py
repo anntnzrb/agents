@@ -1,19 +1,20 @@
 #!/usr/bin/env -S uv run --script
 # Copyright (c) 2026
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = ["zstandard>=0.23,<1"]
 # ///
 
 """Find saved sessions across supported coding harnesses."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, TypeIs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 
@@ -23,6 +24,13 @@ from session_finder import (
     build_config,
     search,
 )
+
+
+_getattr: Callable[[object, str], object] = getattr
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 def positive_int(value: str) -> int:
@@ -60,18 +68,17 @@ def arguments() -> argparse.Namespace:
 
 def _optional_str_list(args: argparse.Namespace, field: str) -> list[str] | None:
     """Narrow a repeatable argparse option to a string list."""
-    value = cast("object", getattr(args, field))
-    if value is None:
+    value = _getattr(args, field)
+    if not _is_obj_list(value):
         return None
-    items = cast("list[object]", value)
-    return [item for item in items if isinstance(item, str)]
+    return [item for item in value if isinstance(item, str)]
 
 
 def main() -> int:
     """Search sessions and return the documented status."""
     args = arguments()
     query = _optional_str_list(args, "query") or []
-    limit_value = cast("object", args.limit)
+    limit_value = _getattr(args, "limit")
     limit = limit_value if isinstance(limit_value, int) else 10
     try:
         config = build_config(
