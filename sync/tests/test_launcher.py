@@ -816,9 +816,13 @@ def test_static_release_harness_launch_dispatches_prepared_binary(
 
 def test_tool_launcher_launch_uses_the_registered_npm_spec(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test tool launcher resolution uses registered npm spec and arguments."""
     home = str(tmp_path)
+    # Isolate the npm cache from the real XDG cache so a previously cached
+    # mcporter does not make the install (and its recorded npm call) a no-op.
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     tool = tool_launcher("mcporter")
     assert tool is not None
     calls: list[list[str]] = []
