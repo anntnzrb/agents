@@ -15,7 +15,7 @@ Keep development credentials in the root ignored `.env` file (`.env.example` at 
 
 ## Validate Python skills (standard)
 
-All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in standard type-checking mode, and optionally pytest. Dependency environments for Basedpyright and pytest are derived automatically from the PEP 723 block in `scripts/cli.py`.
+All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in `all` type-checking mode, and optionally pytest. Dependency environments for Basedpyright and pytest are derived automatically from the PEP 723 block in `scripts/cli.py`. Python skill code follows the `python` skill (`skills/current/python/SKILL.md` and `cookbook/modern.md`) and targets Python 3.14.
 
 Run static checks (Ruff format-check, Ruff lint, Basedpyright):
 
@@ -33,12 +33,12 @@ Each Python skill provides a `pyproject.toml` containing tool configuration only
 
 ```toml
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
+ignore = ["A002", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["T201"]
@@ -48,9 +48,9 @@ ignore = ["A002", "ANN401", "BLE001", "COM812", "D203", "D213", "EM101", "EM102"
 quote-style = "double"
 
 [tool.basedpyright]
-typeCheckingMode = "standard"
+typeCheckingMode = "all"
 include = ["scripts", "lib", "tests"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 ```
 
