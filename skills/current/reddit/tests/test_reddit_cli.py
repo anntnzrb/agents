@@ -13,18 +13,19 @@ drive ``main()`` with crafted argv to assert the documented contract:
   noisy ones.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import io
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Mapping
 from http.client import HTTPMessage
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Protocol, Self, TypeIs, runtime_checkable
 
 import pytest
+
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -32,21 +33,17 @@ if TYPE_CHECKING:
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
 
 
+@runtime_checkable
 class _RedditCli(Protocol):
     def main(self, argv: list[str]) -> int: ...
 
 
-class _ErrorDetail(TypedDict):
-    provider: str
-    status: int | None
-    kind: str
-    body_bytes: int
-    body_preview: str
-    body_truncated: bool
+def _is_str_mapping(val: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(val, Mapping)
 
 
-class _ErrorEnvelope(TypedDict):
-    error: _ErrorDetail
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class FakeResponse:
@@ -123,7 +120,9 @@ def reddit_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _RedditCli:
     monkeypatch.chdir(tmp_path)
     cli = _load_cli("reddit_cli_under_test")
     monkeypatch.setattr(cli, "load_env", lambda: None)
-    return cast("_RedditCli", cast("object", cli))
+    if not isinstance(cli, _RedditCli):
+        raise TypeError(f"{cli} does not implement _RedditCli")
+    return cli
 
 
 def _no_network_urlopen(monkeypatch: pytest.MonkeyPatch) -> CallRecorder:
@@ -143,15 +142,17 @@ def test_explain_normalizes_whitespace_and_hyphens(
 ) -> None:
     rc = reddit_cli.main(["explain", " cake-day "])
     captured = capsys.readouterr()
-
     assert rc == 0, f"unexpected stderr: {captured.err!r}"
-    parsed = cast("dict[str, object]", json.loads(captured.out))
-    assert parsed["term"] == "cake day", f"term not normalized; got {parsed!r}"
-    # The definition should be the real one, not the "Unknown term" fallback.
-    definition = parsed["definition"]
+    raw_parsed = _json_loads(captured.out)
+    if not _is_str_mapping(raw_parsed):
+        raise TypeError("expected dict")
+    assert raw_parsed.get("term") == "cake day", (
+        f"term not normalized; got {raw_parsed!r}"
+    )
+    definition = raw_parsed.get("definition")
     assert isinstance(definition, str)
     assert "anniversary" in definition.lower(), (
-        f"expected the cake-day definition; got {parsed!r}"
+        f"expected the cake-day definition; got {raw_parsed!r}"
     )
 
 
@@ -280,8 +281,12 @@ def test_http_403_block_emits_compact_json(
     )
     err_lines = [ln for ln in captured.err.splitlines() if ln.strip()]
     assert err_lines, "expected a non-empty stderr envelope"
-    envelope = cast("_ErrorEnvelope", json.loads(err_lines[-1]))
-    err = envelope["error"]
+    raw_env = _json_loads(err_lines[-1])
+    if not _is_str_mapping(raw_env):
+        raise TypeError("expected dict")
+    err = raw_env.get("error")
+    if not _is_str_mapping(err):
+        raise TypeError("expected error dict")
     assert err.get("kind") == "network_security_block", f"bad kind: {err}"
     assert err.get("provider") == "reddit", f"bad provider: {err}"
     assert err.get("status") == 403, f"bad status: {err}"
@@ -352,19 +357,25 @@ def test_compact_listing_keeps_useful_fields(
 
     rc = reddit_cli.main(["browse", "python"])
     captured = capsys.readouterr()
-
     assert rc == 0, f"unexpected stderr: {captured.err!r}"
-    parsed = cast("list[object] | dict[str, object]", json.loads(captured.out))
-    # CLI may wrap in {"results": [...]}.
-    rows = parsed if isinstance(parsed, list) else parsed.get("results")
-    assert isinstance(rows, list), f"expected results list; got: {captured.out!r}"
+    raw = _json_loads(captured.out)
+    if _is_object_list(raw):
+        rows = raw
+    elif _is_str_mapping(raw):
+        res = raw.get("results")
+        if not _is_object_list(res):
+            raise TypeError("expected results list")
+        rows = res
+    else:
+        raise TypeError(f"unexpected listing: {raw!r}")
     assert rows, f"expected non-empty listing; got: {captured.out!r}"
-    first = cast("dict[str, object]", rows[0])
+    first = rows[0]
+    if not _is_str_mapping(first):
+        raise TypeError("expected row dict")
     if "data" in first:
         nested = first["data"]
-        if isinstance(nested, dict):
-            first = cast("dict[str, object]", nested)
-
+        if _is_str_mapping(nested):
+            first = nested
     for kept in ("id", "title", "subreddit", "url"):
         assert kept in first, f"{kept!r} must be kept; got keys: {sorted(first)}"
     for dropped in (

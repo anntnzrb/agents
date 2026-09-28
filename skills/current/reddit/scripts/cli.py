@@ -1,11 +1,9 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Browse and search Reddit via the public JSON API."""
-
-from __future__ import annotations
 
 import html
 import json
@@ -16,14 +14,18 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.response
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import Protocol, TypeIs
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
+
+
+def _urlopen(req: urllib.request.Request, timeout: int = 60) -> object:
+    fn: Callable[..., object] = urllib.request.urlopen
+    return fn(req, timeout=timeout)
+
 
 USAGE = (
     "usage: reddit <browse|search|post|post-url|user|user-posts|user-comments|"
@@ -36,8 +38,8 @@ SELF_PREVIEW_CAP = 240
 _MIN_QUOTED_LEN = 2
 _MIN_POST_ARGS = 2
 
-JsonValue = (
-    dict[str, "JsonValue"] | Sequence["JsonValue"] | str | int | float | bool | None
+type JsonValue = (
+    dict[str, JsonValue] | Sequence[JsonValue] | str | int | float | bool | None
 )
 
 NETWORK_SECURITY_MARKER = "blocked by network security"
@@ -262,10 +264,30 @@ def usage_error(message: str) -> int:
 # ---------- HTTP ----------
 
 
+class _ReadableContext(Protocol):
+    def read(self) -> bytes: ...
+    def __enter__(self) -> object: ...
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> object: ...
+
+
+def _is_readable_context(obj: object) -> TypeIs[_ReadableContext]:
+    return (
+        callable(getattr(obj, "read", None))
+        and callable(getattr(obj, "__enter__", None))
+        and callable(getattr(obj, "__exit__", None))
+    )
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 def _read_http_error(exc: urllib.error.HTTPError) -> bytes:
     """Read an HTTP error body and release the error response."""
     try:
         return exc.read()
+    except OSError:
+        return b""
     finally:
         exc.close()
 
@@ -283,9 +305,17 @@ def request_get(
         url = f"{url}{sep}{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={"User-Agent": user_agent})
     try:
-        opened = cast("object", urllib.request.urlopen(req, timeout=60))
-        with cast("urllib.response.addinfourl", opened) as response:
-            body = response.read()
+        opened = _urlopen(req, timeout=60)
+        if not _is_readable_context(opened):
+            emit_error(
+                status=None,
+                message="Reddit network error: unreadable response",
+                body=b"",
+                kind="network_error",
+            )
+            return 1, b""
+        with opened:
+            body = opened.read()
     except urllib.error.HTTPError as exc:
         emit_error(
             status=exc.code,
@@ -306,6 +336,38 @@ def request_get(
     return 0, body
 
 
+def is_json_value(val: object) -> TypeIs[JsonValue]:
+    """Narrow an arbitrary object to a JsonValue."""
+    match val:
+        case dict() | list() | str() | int() | float() | bool() | None:
+            return True
+        case _:
+            return False
+
+
+def parse_json_payload(body: bytes) -> tuple[int, JsonValue]:
+    """Decode a JSON byte payload, emitting a standardized error on failure."""
+    try:
+        raw = _json_loads(body)
+    except json.JSONDecodeError as exc:
+        emit_error(
+            status=None,
+            message=f"Reddit returned invalid JSON: {exc}",
+            body=body,
+            kind="invalid_json",
+        )
+        return 1, None
+    if not is_json_value(raw):
+        emit_error(
+            status=None,
+            message="Reddit returned invalid JSON",
+            body=body,
+            kind="invalid_json",
+        )
+        return 1, None
+    return 0, raw
+
+
 def fetch_json(
     url: str,
     params: list[tuple[str, str]],
@@ -315,16 +377,7 @@ def fetch_json(
     code, body = request_get(url, params, user_agent, raw=False)
     if code != 0:
         return code, None
-    try:
-        return 0, cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1, None
+    return parse_json_payload(body)
 
 
 # ---------- validation (testable hooks) ----------
@@ -366,14 +419,13 @@ def parse_subreddits(value: str) -> list[str]:
     """Parse a subreddits= JSON list option."""
     msg = "subreddits= must be a JSON list of non-empty strings"
     try:
-        parsed = cast("object", json.loads(value))
+        raw = _json_loads(value)
     except json.JSONDecodeError as exc:
         raise ValueError(msg) from exc
-    if not isinstance(parsed, list):
+    if not _is_object_list(raw):
         raise TypeError(msg)
-    items = cast("list[JsonValue]", parsed)
     out: list[str] = []
-    for item in items:
+    for item in raw:
         if not isinstance(item, str):
             raise TypeError(msg)
         stripped = item.strip()
@@ -783,16 +835,9 @@ def cmd_browse(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(
         compact_listing_envelope(
             kind="listing",
@@ -870,16 +915,9 @@ def cmd_search(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(
         compact_listing_envelope(
             kind="search",
@@ -905,16 +943,9 @@ def cmd_post(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(compact_post_envelope(payload))
     return 0
 
@@ -940,16 +971,9 @@ def cmd_post_url(_base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(compact_post_envelope(payload))
     return 0
 
@@ -967,16 +991,9 @@ def cmd_user(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(compact_user_envelope(args[0], payload))
     return 0
 
@@ -995,16 +1012,9 @@ def cmd_user_posts(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(
         compact_listing_envelope(
             kind="user-posts",
@@ -1030,16 +1040,9 @@ def cmd_user_comments(base_url: str, user_agent: str, args: list[str]) -> int:
     )
     if code != 0 or raw_mode:
         return code
-    try:
-        payload = cast("JsonValue", json.loads(body))
-    except json.JSONDecodeError as exc:
-        emit_error(
-            status=None,
-            message=f"Reddit returned invalid JSON: {exc}",
-            body=body,
-            kind="invalid_json",
-        )
-        return 1
+    code, payload = parse_json_payload(body)
+    if code != 0:
+        return code
     json_print(
         compact_listing_envelope(
             kind="user-comments",

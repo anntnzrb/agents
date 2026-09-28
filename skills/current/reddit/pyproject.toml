@@ -3,27 +3,56 @@ name = "reddit"
 version = "0.1.0"
 description = "Browse and search Reddit via the public JSON API"
 readme = "SKILL.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 src = ["scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "ISC001", "ISC003", "D203", "D213", "CPY001", "FBT001", "FBT002",
-          "TD002", "TD003", "FIX002"]
+ignore = [
+    "A002",
+    "COM812",
+    "D203",
+    "D213",
+    "EM101",
+    "EM102",
+    "ERA001",
+    "PERF401",
+    "PLR0911",
+    "PLR0912",
+    "S101",
+    "S603",
+    "S607",
+    "SLF001",
+    "TRY003",
+    "TRY301",
+    # Skill-specific justified ignores:
+    "CPY001",  # No copyright headers per skill licensing policy
+    "ISC001",  # Formatter compatibility
+    "ISC003",  # Explicit string concatenation in CLI constants
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ANN", "ARG", "ARG001", "ARG005", "PLC0415",
-  "PLR2004", "PLR0913", "SLF001", "D", "TRY003", "TRY004", "EM101", "EM102",
-  "E402", "S603", "S607"]
-"scripts/**/*.py" = ["T201", "INP001", "E402", "I001", "S310"]
+"tests/**/*.py" = [
+    "S101",
+    "ANN",     # Test helpers and fixtures don't need exhaustive annotations
+    "ARG",     # Unused mock/fixture arguments in tests
+    "D",       # Test docstrings not strictly required
+    "PLR2004", # Magic values in assertions
+    "SLF001",  # Testing private helpers
+]
+"scripts/**/*.py" = [
+    "T201",
+    "INP001",  # Scripts are executed standalone without package __init__
+    "S310",    # Audit URL open for permitted schemes (urllib used for Reddit JSON API)
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -36,7 +65,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 include = ["scripts", "tests"]
 extraPaths = ["scripts"]
