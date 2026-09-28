@@ -1,10 +1,8 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = []
 # ///
 """Cross-platform wrapper for agent-browser via nix flake."""
-
-from __future__ import annotations
 
 import shutil
 import subprocess
@@ -50,11 +48,9 @@ def run(argv: Sequence[str]) -> int:
         return 0
 
     if shutil.which("nix") is None:
-        return missing_tool(
-            "nix",
-            "Install Nix or run this skill on a host where "
-            + "`nix run github:numtide/llm-agents.nix#agent-browser -- ...` works.",
-        )
+        prefix = "Install Nix or run this skill on a host where"
+        suffix = f"`nix run {FLAKE_REF} -- ...` works."
+        return missing_tool("nix", f"{prefix} {suffix}")
 
     completed = subprocess.run(
         ["nix", "run", FLAKE_REF, "--", *argv],
