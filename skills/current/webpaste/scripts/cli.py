@@ -1,14 +1,12 @@
 #!/usr/bin/env -S uv run --script
 # Copyright (c) 2026
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = [
-#     "httpx>=0.27.0",
+#     "httpx2>=2.13.1",
 # ]
 # ///
 """Upload code, diffs, and text to pastes.dev."""
-
-from __future__ import annotations
 
 import argparse
 import gzip
@@ -18,12 +16,12 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypedDict, cast
+from typing import TYPE_CHECKING, Final, TypeIs, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-import httpx
+import httpx2
 
 DEFAULT_BASE_URL: Final[str] = "https://api.pastes.dev/"
 DEFAULT_USER_AGENT: Final[str] = "webpaste-cli/0.1.0"
@@ -94,6 +92,10 @@ class UploadResponse(TypedDict):
     """Wire shape of the bytebin upload response."""
 
     key: str
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 # Canonical language IDs recognized by lucko/paste Monaco editor
@@ -455,7 +457,7 @@ def execute_fetch(
     url = f"{base_url.rstrip('/')}/{key}"
     headers = {"User-Agent": user_agent}
     try:
-        with httpx.Client(timeout=timeout) as client:
+        with httpx2.Client(timeout=timeout) as client:
             resp = client.get(url, headers=headers)
             if resp.status_code == http.HTTPStatus.NOT_FOUND:
                 return Err(
@@ -464,14 +466,14 @@ def execute_fetch(
             _ = resp.raise_for_status()
             text = resp.text
             return Ok(text if text.endswith("\n") else text + "\n")
-    except httpx.HTTPStatusError as exc:
+    except httpx2.HTTPStatusError as exc:
         return Err(
             AppError(
                 f"HTTP error {exc.response.status_code}: {exc.response.text}",
                 EXIT_NETWORK_ERROR,
             )
         )
-    except httpx.RequestError as exc:
+    except httpx2.RequestError as exc:
         return Err(AppError(f"Network error: {exc}", EXIT_NETWORK_ERROR))
 
 
@@ -517,46 +519,61 @@ def execute_upload(payload: UploadPayload) -> Result[str, AppError]:
         headers["Content-Encoding"] = "gzip"
 
     try:
-        with httpx.Client(timeout=payload.timeout) as client:
+        with httpx2.Client(timeout=payload.timeout) as client:
             resp = client.post(post_url, headers=headers, content=body)
-            _ = resp.raise_for_status()
-            data = cast("UploadResponse", resp.json())
-            key = data.get("key")
-            if not key:
+            decode_json: Callable[..., object] = resp.json
+            raw = decode_json()
+            if not _is_str_dict(raw):
+                return Err(AppError("malformed server response", EXIT_NETWORK_ERROR))
+            key = raw.get("key")
+            if not isinstance(key, str) or not key:
                 return Err(
                     AppError("missing key in server response", EXIT_NETWORK_ERROR)
                 )
 
             return Ok(format_upload_response(key, payload))
-    except httpx.HTTPStatusError as exc:
+    except httpx2.HTTPStatusError as exc:
         return Err(
             AppError(
                 f"HTTP error {exc.response.status_code}: {exc.response.text}",
                 EXIT_NETWORK_ERROR,
             )
         )
-    except httpx.RequestError as exc:
+    except httpx2.RequestError as exc:
         return Err(AppError(f"Network error: {exc}", EXIT_NETWORK_ERROR))
 
 
 def _config_str(args: argparse.Namespace, field: str) -> str:
     """Extract a required str option from parsed args."""
-    return cast("str", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, str):
+        return val
+    msg = f"expected string for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def _optional_str(args: argparse.Namespace, field: str) -> str | None:
     """Extract an optional str option from parsed args."""
-    return cast("str | None", getattr(args, field))
+    val = getattr(args, field, None)
+    return val if isinstance(val, str) else None
 
 
 def _config_float(args: argparse.Namespace, field: str) -> float:
     """Extract a required float option from parsed args."""
-    return cast("float", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, (int, float)):
+        return float(val)
+    msg = f"expected float for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def _config_bool(args: argparse.Namespace, field: str) -> bool:
     """Extract a required bool flag from parsed args."""
-    return cast("bool", getattr(args, field))
+    val = getattr(args, field, None)
+    if isinstance(val, bool):
+        return val
+    msg = f"expected bool for {field}, got {type(val)}"
+    raise TypeError(msg)
 
 
 def run_pipeline(args: argparse.Namespace, *, is_atty: bool) -> Result[str, AppError]:

@@ -1,14 +1,12 @@
 # Copyright (c) 2026
 """Unit tests for webpaste CLI."""
 
-from __future__ import annotations
-
 import io
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeIs
 
-import httpx
+import httpx2
 
 from cli import (
     EXIT_SUCCESS,
@@ -24,7 +22,18 @@ from cli import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pytest
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _loads_json(text: str) -> object:
+    fn: Callable[..., object] = json.loads
+    return fn(text)
 
 
 def test_result_combinators() -> None:
@@ -184,14 +193,14 @@ def test_upload_success_mock(
     sample_file = tmp_path / "test.py"
     _ = sample_file.write_text("print('hello world')\n")
 
-    def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
+    def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
         if "/post" not in url:
             msg = "unexpected url"
             raise AssertionError(msg)
-        request = httpx.Request("POST", url)
-        return httpx.Response(200, json={"key": "mock123"}, request=request)
+        request = httpx2.Request("POST", url)
+        return httpx2.Response(200, json={"key": "mock123"}, request=request)
 
-    monkeypatch.setattr(httpx.Client, "post", mock_post)
+    monkeypatch.setattr(httpx2.Client, "post", mock_post)
 
     ret = main([str(sample_file)])
     if ret != EXIT_SUCCESS:
@@ -211,11 +220,11 @@ def test_upload_stdin_mock(
     monkeypatch.setattr("sys.stdin", io.TextIOWrapper(stdin_data))
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
-    def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
-        request = httpx.Request("POST", url)
-        return httpx.Response(200, json={"key": "stdin789"}, request=request)
+    def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
+        request = httpx2.Request("POST", url)
+        return httpx2.Response(200, json={"key": "stdin789"}, request=request)
 
-    monkeypatch.setattr(httpx.Client, "post", mock_post)
+    monkeypatch.setattr(httpx2.Client, "post", mock_post)
 
     ret = main(["-l", "rust", "-"])
     if ret != EXIT_SUCCESS:
@@ -234,11 +243,11 @@ def test_upload_raw_url_output(
     sample_file = tmp_path / "test.txt"
     _ = sample_file.write_text("raw text")
 
-    def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
-        request = httpx.Request("POST", url)
-        return httpx.Response(200, json={"key": "raw999"}, request=request)
+    def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
+        request = httpx2.Request("POST", url)
+        return httpx2.Response(200, json={"key": "raw999"}, request=request)
 
-    monkeypatch.setattr(httpx.Client, "post", mock_post)
+    monkeypatch.setattr(httpx2.Client, "post", mock_post)
 
     ret = main(["--raw-url", str(sample_file)])
     if ret != EXIT_SUCCESS:
@@ -257,18 +266,22 @@ def test_upload_json_output(
     sample_file = tmp_path / "test.json"
     _ = sample_file.write_text('{"a": 1}')
 
-    def mock_post(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
-        request = httpx.Request("POST", url)
-        return httpx.Response(200, json={"key": "json456"}, request=request)
+    def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
+        request = httpx2.Request("POST", url)
+        return httpx2.Response(200, json={"key": "json456"}, request=request)
 
-    monkeypatch.setattr(httpx.Client, "post", mock_post)
+    monkeypatch.setattr(httpx2.Client, "post", mock_post)
 
     ret = main(["--json", str(sample_file)])
     if ret != EXIT_SUCCESS:
         msg = f"expected exit code 0, got {ret}"
         raise AssertionError(msg)
     captured = capsys.readouterr()
-    data = cast("dict[str, str]", json.loads(captured.out))
+    raw_data = _loads_json(captured.out)
+    if not _is_str_dict(raw_data):
+        msg = f"expected json dict, got {type(raw_data).__name__}"
+        raise AssertionError(msg)
+    data = raw_data
     if data["key"] != "json456" or data["url"] != "https://pastes.dev/json456":
         msg = f"unexpected json data: {data}"
         raise AssertionError(msg)
@@ -282,14 +295,14 @@ def test_get_paste_success(
 ) -> None:
     """Test fetching an existing paste by key."""
 
-    def mock_get(_self: httpx.Client, url: str, **_kwargs: object) -> httpx.Response:
+    def mock_get(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
         if "/testkey" not in url:
             msg = "unexpected url"
             raise AssertionError(msg)
-        request = httpx.Request("GET", url)
-        return httpx.Response(200, text="fetched content", request=request)
+        request = httpx2.Request("GET", url)
+        return httpx2.Response(200, text="fetched content", request=request)
 
-    monkeypatch.setattr(httpx.Client, "get", mock_get)
+    monkeypatch.setattr(httpx2.Client, "get", mock_get)
 
     ret = main(["--get", "https://pastes.dev/testkey"])
     if ret != EXIT_SUCCESS:
