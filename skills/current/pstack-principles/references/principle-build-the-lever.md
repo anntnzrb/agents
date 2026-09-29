@@ -15,4 +15,4 @@ When the work isn't trivial, build the tool that does it instead of doing it by 
 
 **Balance:** The bar is triviality, not repetition. A one-off still earns a lever when the lever is what makes the work checkable. Per the [Laziness Protocol](principle-laziness-protocol.md), build the smallest script that does or proves the job, never a framework.
 
-Distinct from [Encode Lessons in Structure](principle-encode-lessons-in-structure.md), which makes a recurring instruction a durable guardrail. This is throughput and reviewability on the work in front of you. For scripting the verification itself, see [Prove It Works](../principle-prove-it-works/SKILL.md).
+Distinct from [Encode Lessons in Structure](principle-encode-lessons-in-structure.md), which makes a recurring instruction a durable guardrail. This is throughput and reviewability on the work in front of you. For scripting the verification itself, see [Prove It Works](principle-prove-it-works.md).
