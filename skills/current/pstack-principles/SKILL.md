@@ -6,7 +6,7 @@ license: AGPL-3.0-or-later
 
 # Pstack Principles
 
-Twenty-one engineering principles from pstack (Lauren Tan, MIT). One bundled skill, not twenty-one, to protect the skill-inventory metadata budget.
+Twenty-three engineering principles from pstack (Lauren Tan, MIT). One bundled skill, not twenty-three, to protect the skill-inventory metadata budget.
 
 **Rules of use:**
 
@@ -35,7 +35,9 @@ Twenty-one engineering principles from pstack (Lauren Tan, MIT). One bundled ski
 | Migrate Callers Then Delete Legacy APIs rule | [references/principle-migrate-callers-then-delete-legacy-apis.md](references/principle-migrate-callers-then-delete-legacy-apis.md) | Introducing a new internal API while old callers exist |
 | Separate Before Serializing Shared State rule | [references/principle-separate-before-serializing-shared-state.md](references/principle-separate-before-serializing-shared-state.md) | Concurrent actors might write the same file, branch, key, or object |
 | Prove It Works rule | [references/principle-prove-it-works.md](references/principle-prove-it-works.md) | After a task, before declaring done |
+| Test Behavior, Not Implementation rule | [references/principle-test-behavior-not-implementation.md](references/principle-test-behavior-not-implementation.md) | Writing, changing, or keeping a test |
 | Fix Root Causes rule | [references/principle-fix-root-causes.md](references/principle-fix-root-causes.md) | Debugging: trace each symptom to its root cause |
+| Attack the Premise rule | [references/principle-attack-the-premise.md](references/principle-attack-the-premise.md) | Two or more fixes sharing one premise failed the same gate |
 | Sequence Work into Verifiable Units rule | [references/principle-sequence-verifiable-units.md](references/principle-sequence-verifiable-units.md) | Multi-step work and how you stack commits and PRs |
 | Guard the Context Window rule | [references/principle-guard-the-context-window.md](references/principle-guard-the-context-window.md) | Context fills up: large outputs, long files, repeated reads, fan-out planning |
 | Never Block on the Human rule | [references/principle-never-block-on-the-human.md](references/principle-never-block-on-the-human.md) | Tempted to ask "should I do X?" on reversible work |
