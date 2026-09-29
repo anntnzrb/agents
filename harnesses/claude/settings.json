@@ -9,10 +9,13 @@
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20"
   },
-  "model": "opus[1m]",
+  "model": "sonnet[1m]",
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "medium"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
     }
   },
   "theme": "dark",
