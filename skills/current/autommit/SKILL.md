@@ -1,5 +1,4 @@
 ---
-disable-model-invocation: true
 name: autommit
 description: "Use when asked to autommit, split changes into atomic commits, or create unattended git commits from local diffs."
 license: AGPL-3.0-or-later
