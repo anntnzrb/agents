@@ -86,6 +86,7 @@ inherit = "all"
 
 [features]
 chronicle = false
+daemon_auto_start = false
 default_mode_request_user_input = true
 hooks = false
 memories = false
