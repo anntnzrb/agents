@@ -8,6 +8,7 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.84.2",
   "enabledModels": [
+    "cliproxy/gpt-6.1-sol:medium",
     "cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh",
     "cliproxy/mimo/mimo-v2.6-pro",
     "cliproxy/opencode-go/deepseek-v4.1-flash",
