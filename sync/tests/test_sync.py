@@ -148,21 +148,23 @@ def _is_gone(pid: int) -> bool:
 def _init_git_repo(path: Path) -> None:
     """Initialize a mock git repository with one commit."""
     git_bin = shutil.which("git") or "git"
-    _ = asyncio.run(run_process([git_bin, "init"], cwd=path))
+    _ = asyncio.run(run_process([git_bin, "init"], RunProcessOptions(cwd=path)))
     _ = asyncio.run(
         run_process(
             [git_bin, "config", "user.name", "Test User"],
-            cwd=path,
+            RunProcessOptions(cwd=path),
         )
     )
     _ = asyncio.run(
         run_process(
             [git_bin, "config", "user.email", "test@example.com"],
-            cwd=path,
+            RunProcessOptions(cwd=path),
         )
     )
-    _ = asyncio.run(run_process([git_bin, "add", "."], cwd=path))
-    _ = asyncio.run(run_process([git_bin, "commit", "-m", "init"], cwd=path))
+    _ = asyncio.run(run_process([git_bin, "add", "."], RunProcessOptions(cwd=path)))
+    _ = asyncio.run(
+        run_process([git_bin, "commit", "-m", "init"], RunProcessOptions(cwd=path))
+    )
 
 
 def _make_sync_env(

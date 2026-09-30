@@ -324,10 +324,6 @@ async def _communicate_subprocess(
 async def run_process(
     command: Sequence[str],
     options: RunProcessOptions | None = None,
-    *,
-    cwd: str | Path | None = None,
-    env: Mapping[str, str | None] | None = None,
-    timeout_ms: float | None = None,
 ) -> ProcessResult:
     """Run a command in its own session with captured output and optional timeout."""
     if not command or not command[0]:
@@ -338,14 +334,9 @@ async def run_process(
             timed_out=False,
         )
 
-    eff_cwd = options.cwd if options is not None and options.cwd is not None else cwd
-    eff_env = options.env if options is not None and options.env is not None else env
-    eff_timeout = (
-        options.timeout_ms
-        if options is not None and options.timeout_ms is not None
-        else timeout_ms
-    )
-    resolved_env = build_process_env(eff_env)
+    opts = options or RunProcessOptions()
+    eff_cwd = opts.cwd
+    resolved_env = build_process_env(opts.env)
     executable = await asyncio.to_thread(
         _resolve_executable, command[0], eff_cwd, resolved_env.get("PATH")
     )
@@ -369,7 +360,7 @@ async def run_process(
     )
 
     stdout_raw, stderr_raw, timed_out, output_limited = await _communicate_subprocess(
-        proc, eff_timeout
+        proc, opts.timeout_ms
     )
     exit_code = proc.returncode if proc.returncode is not None else EXIT_GENERAL_ERROR
     return ProcessResult(
@@ -389,8 +380,7 @@ async def run_command_outcome(
     """Run a command and convert the process execution result into a CommandOutcome."""
     result = await run_process(
         command,
-        cwd=cwd,
-        timeout_ms=timeout_ms if timeout_ms > 0 else None,
+        RunProcessOptions(cwd=cwd, timeout_ms=timeout_ms if timeout_ms > 0 else None),
     )
     if result.output_limited:
         return OutputLimit(

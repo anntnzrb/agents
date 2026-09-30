@@ -248,9 +248,9 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
     install = await run_process(
         [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
         RunProcessOptions(
+            cwd=stage,
             timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS)),
         ),
-        cwd=stage,
     )
     if install.output_limited:
         message = "runtime dependency install failed: output limit exceeded"
