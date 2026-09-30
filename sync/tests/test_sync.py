@@ -34,7 +34,6 @@ from sync.core.hook_state import fingerprint_tree
 from sync.core.index import (
     EXIT_TIMED_OUT,
     ensure_python_env,
-    parse_timeout_seconds,
     run_sync,
     run_sync_with_deadline,
     try_acquire_sync_lock,
@@ -112,9 +111,6 @@ TIMEOUT_ASSERT_GRACE_MS: Final[float] = 2500.0
 # below the fixtures' sleep durations.
 TREE_STARTUP_TIMEOUT_MS: Final[int] = 2000
 EXPECTED_TREE_PIDS: Final[int] = 2
-
-DEFAULT_TIMEOUT_SEVEN: Final[int] = 7
-PARSED_TIMEOUT_NINE: Final[int] = 9
 
 
 def _is_dict(value: object) -> TypeGuard[dict[str, object]]:
@@ -772,14 +768,6 @@ print('ok')
     )
     assert result.exit_code == 0
     assert result.stdout.strip() == "ok"
-
-
-def test_parse_timeout_seconds_uses_default_for_invalid_values() -> None:
-    """Verify parse_timeout_seconds falls back to default on invalid inputs."""
-    assert parse_timeout_seconds(None, DEFAULT_TIMEOUT_SEVEN) == DEFAULT_TIMEOUT_SEVEN
-    assert parse_timeout_seconds("0", DEFAULT_TIMEOUT_SEVEN) == DEFAULT_TIMEOUT_SEVEN
-    assert parse_timeout_seconds("nope", DEFAULT_TIMEOUT_SEVEN) == DEFAULT_TIMEOUT_SEVEN
-    assert parse_timeout_seconds("9", DEFAULT_TIMEOUT_SEVEN) == PARSED_TIMEOUT_NINE
 
 
 def test_sync_env_harness_lookup_is_typed(home: Path) -> None:

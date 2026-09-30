@@ -134,18 +134,6 @@ async def ensure_python_env(
         warn("failed to create python-env")
 
 
-def parse_timeout_seconds(value: str | None, default_seconds: int) -> int:
-    """Parse a timeout string in seconds, falling back to default if invalid."""
-    if value is None:
-        return default_seconds
-    try:
-        parsed = int(value)
-    except ValueError:
-        return default_seconds
-    else:
-        return parsed if parsed > 0 else default_seconds
-
-
 def sync_timeout() -> int:
     """Return the default sync execution timeout in seconds."""
     return DEFAULT_SYNC_TIMEOUT_SECONDS
