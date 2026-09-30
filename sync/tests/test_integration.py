@@ -10,7 +10,9 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeGuard
 
@@ -27,7 +29,7 @@ from tests.conftest import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
 EXIT_SYNTAX_ERROR = 2
 EXIT_RUNTIME_MISSING = 127
@@ -674,8 +676,43 @@ def test_integration_owned_entry_cleanup_and_unmanaged_file_preservation(
     )
 
 
+class _ReadyModelsHandler(BaseHTTPRequestHandler):
+    """Answer CLIProxyAPI's /v1/models readiness probe with one model."""
+
+    def do_GET(self) -> None:  # noqa: N802 - http.server handler name
+        """Serve a non-empty model list for /v1/models, 404 otherwise."""
+        if self.path != "/v1/models":
+            self.send_error(404)
+            return
+        body = b'{"data": [{"id": "fixture-model"}]}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        _ = self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+        """Keep test output quiet."""
+        del format, args
+
+
+@pytest.fixture
+def ready_proxy_base_url() -> Iterator[str]:
+    """Yield the base URL of a local CLIProxyAPI stand-in that reports ready."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _ReadyModelsHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/v1"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
 def test_integration_failed_publication_clean_recovery(
     tmp_path: Path,
+    ready_proxy_base_url: str,
 ) -> None:
     """Test skipped endpoints on unreachable proxy recover on subsequent healthy run."""
     home = make_fixture(tmp_path)
@@ -693,13 +730,16 @@ def test_integration_failed_publication_clean_recovery(
     for i, path in enumerate(endpoint_paths):
         assert path.read_text(encoding="utf-8") == original_contents[i]
 
-    write_deployment(home, socket.gethostname(), "http://100.64.0.42:8317/v1")
+    write_deployment(home, socket.gethostname(), ready_proxy_base_url)
     recovery_result = run_sync_process(home)
     assert recovery_result.exit_code == 0, (
         recovery_result.stderr or recovery_result.stdout
     )
+    assert "endpoint is not ready" not in recovery_result.stderr
     for path in endpoint_paths:
         content = path.read_text(encoding="utf-8")
+        assert ready_proxy_base_url in content, str(path)
+        assert "old-gateway" not in content, str(path)
         assert CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER not in content
 
     assert (home / ".codex" / "AGENTS.md").is_file()
