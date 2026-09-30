@@ -401,11 +401,20 @@ def _diff_filename(header: str, content: str) -> str:
         or "\nsimilarity index " in content
     )
     if is_rename:
-        for line in content.splitlines():
+        for line in _diff_lines(content):
             if line.startswith("rename to "):
                 return _decode_git_path(line.removeprefix("rename to "))
     path_str = _decode_git_path(second)
     return path_str.removeprefix("b/")
+
+
+def _diff_lines(text: str) -> list[str]:
+    """Split diff text on newlines only, as Git does.
+
+    `str.splitlines()` also breaks on characters such as U+2028 and form feed, and
+    drops the carriage return of CRLF lines, which corrupts rebuilt hunks.
+    """
+    return text.removesuffix("\n").split("\n")
 
 
 def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
@@ -522,7 +531,7 @@ def _describe_selector(selector: HunkSelector) -> str:
 
 
 def _changed_new_lines(hunk: DiffHunk) -> tuple[int, ...]:
-    lines = hunk.content.splitlines()[1:]
+    lines = _diff_lines(hunk.content)[1:]
     changed: list[int] = []
     line_num = hunk.new_start
     for line in lines:
@@ -647,7 +656,7 @@ def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
         if hunk_end < selector.start or hunk.new_start > selector.end:
             continue
 
-        hunk_lines = hunk.content.splitlines()[1:]
+        hunk_lines = _diff_lines(hunk.content)[1:]
         kept_lines: list[str] = []
         hunk_old_start = hunk.old_start if selector.start == 1 else selector.start
         hunk_old_count = 0
@@ -694,7 +703,7 @@ def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
     if selector.start > 1:
         header_lines = [
             line
-            for line in file_header.splitlines()
+            for line in _diff_lines(file_header)
             if not line.startswith("new file mode ")
             and not line.startswith("--- /dev/null")
         ]
