@@ -62,8 +62,6 @@ from sync.core.plan import (
 )
 from sync.extensions.install import iter_extension_packages, run_install
 from sync.packages.index import (
-    extract_import_specifiers,
-    missing_package_roots,
     package_cache_dir,
     package_has_build_script,
     package_is_healthy,
@@ -71,6 +69,7 @@ from sync.packages.index import (
     read_package_manifest,
 )
 from sync.packages.source import clone_package_with_runner
+from sync.packages.validate import extract_import_specifiers, missing_package_roots
 from sync.runtime.lock import release_sync_lock
 from sync.runtime.process import (
     MAX_OUTPUT_BYTES,

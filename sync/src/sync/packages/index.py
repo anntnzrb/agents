@@ -22,8 +22,6 @@ from sync.packages.source import (
     staging_dir_for,
 )
 from sync.packages.validate import (
-    extract_import_specifiers,
-    missing_package_roots,
     package_has_build_script,
     package_is_healthy,
 )
@@ -37,8 +35,6 @@ if TYPE_CHECKING:
 __all__ = [
     "PackageBootstrapTarget",
     "bootstrap_package_target",
-    "extract_import_specifiers",
-    "missing_package_roots",
     "package_cache_dir",
     "package_has_build_script",
     "package_is_healthy",
