@@ -1,7 +1,10 @@
 {
   "cacheWarming": "idle",
   "collapseChangelog": true,
-  "defaultTools": ["read", "bash", "edit", "write", "codemode"],
+  "codemode": {
+    "mode": "only"
+  },
+  "defaultTools": ["+codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
   "followUpMode": "all",
