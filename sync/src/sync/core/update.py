@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import cast
 
 from sync.runtime.errors import warn
+from sync.runtime.jsonc import is_obj_dict
 from sync.runtime.process import RunProcessOptions, run_process
 
 __all__ = [
@@ -81,11 +82,7 @@ def read_synced_commit(managed_state_home: str) -> str | None:
         )
     except (OSError, ValueError):
         return None
-    commit = (
-        cast("dict[str, object]", data).get("commit")
-        if isinstance(data, dict)
-        else None
-    )
+    commit = data.get("commit") if is_obj_dict(data) else None
     return commit if isinstance(commit, str) else None
 
 

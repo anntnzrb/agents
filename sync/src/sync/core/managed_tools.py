@@ -30,7 +30,7 @@ from sync.core.cliproxy_deployment import (
 )
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import is_executable
-from sync.runtime.jsonc import strip_jsonc
+from sync.runtime.jsonc import is_obj_dict, strip_jsonc
 
 TOOL_NAME = "cliproxyapi"
 RELEASE_FILE = "release.json"
@@ -366,10 +366,9 @@ def installed_receipt_matches(
         parsed = cast("object", json.loads(receipt_path.read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError, ValueError):
         return False
-    if not isinstance(parsed, dict):
+    if not is_obj_dict(parsed):
         return False
-    payload = cast("dict[str, object]", parsed)
-    return all(payload.get(key) == value for key, value in expected.items())
+    return all(parsed.get(key) == value for key, value in expected.items())
 
 
 def _version_sort_key(version: str) -> tuple[int, ...]:
@@ -390,14 +389,13 @@ def _newest_cached_install(
     for version_dir in versions_root.iterdir():
         receipt_path = version_dir / platform_key / "receipt.json"
         try:
-            parsed = cast(
+            payload = cast(
                 "object", json.loads(receipt_path.read_text(encoding="utf-8"))
             )
         except (OSError, UnicodeDecodeError, ValueError):
             continue
-        if not isinstance(parsed, dict):
+        if not is_obj_dict(payload):
             continue
-        payload = cast("dict[str, object]", parsed)
         if payload.get("repository") != repository:
             continue
         version = payload.get("version")

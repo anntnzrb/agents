@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, cast
 from sync.core.cliproxy_config import AUTH_GATEWAY_ENV
 from sync.core.cliproxy_deployment import CLI_PROXY_SOURCE_DIR
 from sync.runtime.errors import panic_message, warn
+from sync.runtime.jsonc import is_obj_dict, is_obj_list
 from sync.runtime.process import RunProcessOptions, command_exists, run_process
 
 if TYPE_CHECKING:
@@ -207,13 +208,11 @@ def _is_deployment_host(sync_env: SyncEnv, deployment: tuple[str, ...]) -> bool:
     except (OSError, ValueError) as error:
         warn(f"services: unreadable {path} ({panic_message(error)})")
         return False
-    hosts = (
-        cast("dict[str, object]", data).get("hosts") if isinstance(data, dict) else None
-    )
-    if not isinstance(hosts, list):
+    hosts = data.get("hosts") if is_obj_dict(data) else None
+    if not is_obj_list(hosts):
         warn(f"services: {path} needs a hosts list")
         return False
-    names = {h.lower() for h in cast("list[object]", hosts) if isinstance(h, str)}
+    names = {h.lower() for h in hosts if isinstance(h, str)}
     return _short_hostname() in names
 
 
@@ -301,16 +300,8 @@ def _is_t3_host(sync_env: SyncEnv) -> bool:
     except (OSError, ValueError) as error:
         warn(f"services: unreadable {path} ({panic_message(error)})")
         return False
-    server = (
-        cast("dict[str, object]", data).get("server")
-        if isinstance(data, dict)
-        else None
-    )
-    hostname = (
-        cast("dict[str, object]", server).get("hostname")
-        if isinstance(server, dict)
-        else None
-    )
+    server = data.get("server") if is_obj_dict(data) else None
+    hostname = server.get("hostname") if is_obj_dict(server) else None
     return isinstance(hostname, str) and hostname.lower() == _short_hostname()
 
 
@@ -372,12 +363,10 @@ def _read_owned(sync_env: SyncEnv) -> set[str]:
         data = cast("object", json.loads(_owned_state_path(sync_env).read_text()))
     except (OSError, ValueError):
         return set()
-    units = (
-        cast("dict[str, object]", data).get("units") if isinstance(data, dict) else None
-    )
-    if not isinstance(units, list):
+    units = data.get("units") if is_obj_dict(data) else None
+    if not is_obj_list(units):
         return set()
-    return {name for name in cast("list[object]", units) if isinstance(name, str)}
+    return {name for name in units if isinstance(name, str)}
 
 
 def _record_owned(sync_env: SyncEnv, names: set[str]) -> None:
