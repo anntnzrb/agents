@@ -23,7 +23,7 @@ from sync.core.harness import (
     harness_root,
 )
 from sync.core.harness_adapters import HARNESS_ADAPTERS
-from sync.core.plan import build_sync_plan, top_level_entry_names
+from sync.core.plan import top_level_entry_names
 from sync.runtime.errors import err, panic_message, warn
 from sync.runtime.fs import (
     existing_file_mode,
@@ -35,7 +35,6 @@ from sync.runtime.fs import (
 __all__ = [
     "clean_managed_entries",
     "load_recorded_entry_names",
-    "plan_managed_entries",
     "plan_managed_entries_for_sync_plan",
     "record_managed_entries",
     "top_level_entry_names",
@@ -180,11 +179,6 @@ def plan_managed_entries_for_sync_plan(
         )
 
     return ManagedSyncPlan(harnesses=harnesses)
-
-
-def plan_managed_entries(sync_env: SyncEnv) -> ManagedSyncPlan:
-    """Build a sync plan and compute managed entry cleanup/record plan."""
-    return plan_managed_entries_for_sync_plan(sync_env, build_sync_plan(sync_env))
 
 
 def clean_managed_entries(plan: ManagedSyncPlan) -> bool:

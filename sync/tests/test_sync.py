@@ -43,7 +43,7 @@ from sync.core.managed_state import (
     ManagedSyncPlan,
     clean_managed_entries,
     load_recorded_entry_names,
-    plan_managed_entries,
+    plan_managed_entries_for_sync_plan,
     record_managed_entries,
     write_recorded_entry_names,
 )
@@ -1784,7 +1784,7 @@ def test_managed_state_helpers_match_safe_entry_rules(home: Path) -> None:
     names = load_recorded_entry_names(str(state_file))
     assert names == ["good.txt"]
 
-    plan = plan_managed_entries(sync_env)
+    plan = plan_managed_entries_for_sync_plan(sync_env, build_sync_plan(sync_env))
     assert len(plan.harnesses) > 0
 
 
@@ -1836,7 +1836,7 @@ def test_managed_state_malformed_json_is_recoverable(home: Path) -> None:
     recovered = load_recorded_entry_names(str(state_path))
     assert recovered == []
 
-    plan = plan_managed_entries(sync_env)
+    plan = plan_managed_entries_for_sync_plan(sync_env, build_sync_plan(sync_env))
     assert len(plan.harnesses) > 0
 
 
@@ -2107,7 +2107,7 @@ def test_plan_managed_entries_cleans_up_inactive_harness(home: Path) -> None:
     state_path = home / ".local" / "share" / "agents" / "sync-managed" / "amp.json"
     write_recorded_entry_names(state_path, ["settings.json"])
 
-    plan = plan_managed_entries(sync_env)
+    plan = plan_managed_entries_for_sync_plan(sync_env, build_sync_plan(sync_env))
     inactive = next(
         (h for h in plan.harnesses if h.state_path == str(state_path)), None
     )
