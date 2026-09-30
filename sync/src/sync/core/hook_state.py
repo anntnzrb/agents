@@ -270,7 +270,7 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
         warn(f"hook state parse failed, ignoring {path} ({error})")
         return None
 
-    if not isinstance(parsed, dict) or isinstance(parsed, list):
+    if not isinstance(parsed, dict):
         warn(f"hook state parse failed, ignoring {path} (not an object)")
         return None
 
