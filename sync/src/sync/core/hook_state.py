@@ -49,6 +49,9 @@ class _HookStatePayload(TypedDict):
     generatedEntries: list[str]
 
 
+_HOOK_STATE_PAYLOAD = TypeAdapter(_HookStatePayload)
+
+
 @dataclass(frozen=True, slots=True)
 class PreparedExtensionHookState:
     """Prepared state for extension hook execution."""
@@ -275,7 +278,7 @@ def load_extension_hook_state(path: str) -> _LoadedExtensionHookState | None:
         return None
 
     try:
-        payload = TypeAdapter(_HookStatePayload).validate_python(parsed)
+        payload = _HOOK_STATE_PAYLOAD.validate_python(parsed)
     except ValidationError:
         warn(f"hook state parse failed, ignoring {path} (invalid shape)")
         return None
