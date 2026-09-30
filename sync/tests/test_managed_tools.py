@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tarfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+import httpx
 import pytest
 
 from sync.core.cliproxy_deployment import (
@@ -21,7 +24,9 @@ from sync.core.cliproxy_deployment import (
 from sync.core.harness import SyncEnv
 from sync.core.managed_tools import (
     ManagedToolRuntime,
+    download_release,
     extract_release,
+    fetch_checksums,
     installed_tool_matches,
     is_cli_proxy_running,
     prepare_managed_tools,
@@ -513,3 +518,107 @@ def test_managed_tool_latest_requires_checksums_entry(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match=r"checksums missing"):
         _ = prepare_managed_tools(sync_env, runtime)
     assert downloads == 0
+
+
+@dataclass(frozen=True, slots=True)
+class _FakeHttpResponse:
+    """Minimal stand-in for the httpx response surface the fetchers read."""
+
+    status_code: int
+    content: bytes = b""
+
+    @property
+    def text(self) -> str:
+        """Decode the body like httpx does for UTF-8 payloads."""
+        return self.content.decode("utf-8")
+
+
+def _install_http_get(
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: _FakeHttpResponse | Exception,
+    calls: list[tuple[str, float, bool]],
+) -> None:
+    """Replace httpx.get with a fake that records its call and replays one outcome."""
+
+    def _fake_get(
+        url: str, *, timeout: float, follow_redirects: bool
+    ) -> _FakeHttpResponse:
+        calls.append((url, timeout, follow_redirects))
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr("httpx.get", _fake_get)
+
+
+def test_download_release_writes_body_and_converts_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 200 response body lands at the destination; timeout is in seconds."""
+    calls: list[tuple[str, float, bool]] = []
+    _install_http_get(monkeypatch, _FakeHttpResponse(200, ARCHIVE_CONTENT), calls)
+    destination = tmp_path / "archive.tar.gz"
+
+    download_release("https://example.test/a.tar.gz", destination, 1500)
+
+    assert destination.read_bytes() == ARCHIVE_CONTENT
+    assert calls == [
+        ("https://example.test/a.tar.gz", EXPECTED_FETCH_TIMEOUT_SEC, True)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [
+        (_FakeHttpResponse(404), "download failed with HTTP 404"),
+        (httpx.ConnectError("refused"), "download failed (refused)"),
+    ],
+)
+def test_download_release_reports_http_and_transport_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: _FakeHttpResponse | Exception,
+    message: str,
+) -> None:
+    """Non-200 statuses and transport errors raise with a labelled message."""
+    _install_http_get(monkeypatch, outcome, [])
+    destination = tmp_path / "archive.tar.gz"
+
+    with pytest.raises(RuntimeError, match=re.escape(message)):
+        download_release("https://example.test/a.tar.gz", destination, 1500)
+    assert not destination.exists()
+
+
+def test_fetch_checksums_parses_body_and_converts_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 200 checksums body parses into a name-to-digest mapping."""
+    calls: list[tuple[str, float, bool]] = []
+    body = f"{EXPECTED_CHECKSUM}  cli.tar.gz\nnot a checksum line\n".encode()
+    _install_http_get(monkeypatch, _FakeHttpResponse(200, body), calls)
+
+    entries = fetch_checksums("https://example.test/checksums.txt", 1500)
+
+    assert entries == {"cli.tar.gz": EXPECTED_CHECKSUM}
+    assert calls == [
+        ("https://example.test/checksums.txt", EXPECTED_FETCH_TIMEOUT_SEC, True)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [
+        (_FakeHttpResponse(500), "checksums download failed with HTTP 500"),
+        (httpx.ReadTimeout("slow"), "checksums download failed (slow)"),
+    ],
+)
+def test_fetch_checksums_reports_http_and_transport_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: _FakeHttpResponse | Exception,
+    message: str,
+) -> None:
+    """Non-200 statuses and transport errors raise with a labelled message."""
+    _install_http_get(monkeypatch, outcome, [])
+
+    with pytest.raises(RuntimeError, match=re.escape(message)):
+        _ = fetch_checksums("https://example.test/checksums.txt", 1500)
