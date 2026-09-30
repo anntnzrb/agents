@@ -7,20 +7,58 @@
     "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1",
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
-    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20"
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "gpt-6.1-sol",
+    "BASH_DEFAULT_TIMEOUT_MS": "5000"
   },
-  "model": "sonnet[1m]",
+  "model": "opus[1m]",
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "medium"
     },
     "claude-sonnet-5-5": {
       "effortLevel": "high"
+    },
+    "gpt-6.1-sol": {
+      "effortLevel": "medium"
     }
   },
   "theme": "dark",
   "permissions": {
     "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebSearch is disabled. Use the parallel skill for web search and research.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebFetch is disabled. Use the firecrawl skill to fetch, scrape, or crawl URLs.\"}}'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '(.tool_input.skill // .tool_input.subagent_type // \"\") | test(\"^(update-config|claude-api|keybindings-help|claude-code-guide)$\")' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Built-in Claude Code and Claude API guidance can lag the installed release. Before relying on version-sensitive details (settings keys, environment variables, hook fields, model IDs, limits, prices), check the current docs with the firecrawl or parallel skill and the installed version with `claude --version`.\"}}'"
+          }
+        ]
+      }
+    ]
   },
   "skipDangerousModePermissionPrompt": true,
   "autoMemoryEnabled": false,
