@@ -298,6 +298,72 @@ def _declare_t3_host(home: Path, hostname: str) -> None:
     )
 
 
+def test_codex_server_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch, calls: list[list[str]]
+) -> None:
+    """An SSH app server is supervised only on opted-in hosts and survives resync."""
+    monkeypatch.setattr("socket.gethostname", lambda: "munich")
+    deployment = home / ".config" / "agents" / "tools" / "codex-server"
+    deployment.mkdir(parents=True)
+    manifest = deployment / "deployment.json"
+    _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
+    assert declared_user_units(_linux(home), gateway_host=False) == []
+
+    _ = manifest.write_text(json.dumps({"hosts": ["Munich"]}))
+    units = declared_user_units(_linux(home), gateway_host=False)
+    assert _names(units) == {"codex-app-server.service", "codex-app-server.timer"}
+    service = units[0].content
+    assert f"ExecStart={home}/.local/bin/codex app-server daemon start" in service
+    assert "Type=oneshot" in service
+    assert "KillMode=process" in service
+    assert "[Install]" not in service
+    assert "OnUnitActiveSec=300s" in units[1].content
+    assert "ws://" not in service
+    _reconcile(home, units)
+    assert ["systemctl", "--user", "enable", "--now", "codex-app-server.timer"] in calls
+    assert not any("restart" in call for call in calls)
+    calls.clear()
+    _reconcile(home, units)
+    assert calls == []
+
+    _ = manifest.write_text(json.dumps({"hosts": []}))
+    _reconcile(home, declared_user_units(_linux(home), gateway_host=False))
+    assert [
+        "systemctl",
+        "--user",
+        "disable",
+        "--now",
+        "codex-app-server.service",
+    ] in calls
+
+
+def test_codex_server_macos_health_check_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch, calls: list[list[str]]
+) -> None:
+    """A Mac adopts the native daemon without killing it on agent reload."""
+    deployment = home / ".config" / "agents" / "tools" / "codex-server"
+    deployment.mkdir(parents=True)
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut")
+    env = SyncEnv.from_home(str(home), platform="darwin")
+    manifest = deployment / "deployment.json"
+    _ = manifest.write_text(json.dumps({"hosts": ["munich"]}))
+    assert declared_launch_agents(env) == []
+    _ = manifest.write_text(json.dumps({"hosts": ["beirut"]}))
+    agents = declared_launch_agents(env)
+    assert _names(agents) == {"dev.agents.codex-server"}
+    content = agents[0].content
+    assert "<string>daemon</string><string>start</string>" in content
+    assert "<key>StartInterval</key><integer>300</integer>" in content
+    assert "<key>RunAtLoad</key><true/>" in content
+    assert "<key>AbandonProcessGroup</key><true/>" in content
+    assert "KeepAlive" not in content
+    asyncio.run(reconcile_services(env, gateway_host=False))
+    assert any("bootstrap" in call for call in calls)
+    calls.clear()
+    asyncio.run(reconcile_services(env, gateway_host=False))
+    assert calls == []
+
+
 def test_t3_model_refresh_timer_only_on_declared_t3_host(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

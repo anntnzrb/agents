@@ -49,6 +49,7 @@ SERVICE_TIMEOUT_MS = 30_000
 AMP_RUNNER_UNIT = "amp-runner-agents.service"
 AMP_RUNNER_LABEL = "com.amp.runner.agents"
 AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
+CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
 T3_REFRESH_UNIT = "t3-refresh-models"
 T3_REFRESH_INTERVAL_SECONDS = 900
@@ -196,9 +197,9 @@ def _short_hostname() -> str:
     return socket.gethostname().split(".", 1)[0].strip().lower()
 
 
-def _is_amp_runner_host(sync_env: SyncEnv) -> bool:
-    """Return True if tools/amp-runner/deployment.json lists this host."""
-    path = Path(sync_env.ssot_home).joinpath(*AMP_RUNNER_DEPLOYMENT)
+def _is_deployment_host(sync_env: SyncEnv, deployment: tuple[str, ...]) -> bool:
+    """Return True if the service deployment's hosts list includes this host."""
+    path = Path(sync_env.ssot_home).joinpath(*deployment)
     try:
         data = cast("object", json.loads(path.read_text()))
     except FileNotFoundError:
@@ -253,6 +254,41 @@ RestartSec=5
 WantedBy=default.target
 """
     return UserUnit(AMP_RUNNER_UNIT, content)
+
+
+def _codex_server_units(sync_env: SyncEnv) -> list[UserUnit]:
+    # Native Codex owns the detached daemon and its updater. The timer repairs
+    # missing processes; starting an already-running daemon is idempotent.
+    service = f"""\
+[Unit]
+Description=Ensure the native Codex app server and updater are running
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h
+Environment=PATH={_service_path(sync_env.home)}
+ExecStart={sync_env.home}/.local/bin/codex app-server daemon start
+UMask=0077
+# Detached native processes must survive the health-check command exiting.
+KillMode=process
+TimeoutStartSec=5min
+"""
+    timer = """\
+[Unit]
+Description=Periodic native Codex app-server health check
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=300s
+
+[Install]
+WantedBy=timers.target
+"""
+    return [
+        UserUnit("codex-app-server.service", service),
+        UserUnit("codex-app-server.timer", timer),
+    ]
 
 
 def _is_t3_host(sync_env: SyncEnv) -> bool:
@@ -318,8 +354,10 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
     units = _updater_units(sync_env) if _is_git_checkout(sync_env) else []
     if gateway_host:
         units.extend(_gateway_units(sync_env))
-    if _is_amp_runner_host(sync_env):
+    if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         units.append(_amp_runner_unit(sync_env))
+    if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
+        units.extend(_codex_server_units(sync_env))
     if _is_t3_host(sync_env):
         units.extend(_t3_refresh_units(sync_env))
     return units
@@ -452,11 +490,31 @@ def _amp_runner_agent(sync_env: SyncEnv) -> UserUnit:
     return UserUnit(AMP_RUNNER_LABEL, _plist(AMP_RUNNER_LABEL, body))
 
 
+def _codex_server_agent(sync_env: SyncEnv) -> UserUnit:
+    home = sync_env.home
+    label = "dev.agents.codex-server"
+    command = [f"{home}/.local/bin/codex", "app-server", "daemon", "start"]
+    log = f"{home}/Library/Logs/codex-app-server-health.log"
+    body = f"""\
+    <key>ProgramArguments</key><array>{_plist_args(command)}</array>
+    <key>WorkingDirectory</key><string>{home}</string>
+    <key>EnvironmentVariables</key><dict><key>PATH</key><string>{_service_path(home)}</string></dict>
+    <key>StartInterval</key><integer>300</integer>
+    <key>RunAtLoad</key><true/>
+    <key>AbandonProcessGroup</key><true/>
+    <key>StandardOutPath</key><string>{log}</string>
+    <key>StandardErrorPath</key><string>{log}</string>
+"""
+    return UserUnit(label, _plist(label, body))
+
+
 def declared_launch_agents(sync_env: SyncEnv) -> list[UserUnit]:
     """Return the launchd user agents this host should run, keyed by label."""
     agents = [_updater_agent(sync_env)] if _is_git_checkout(sync_env) else []
-    if _is_amp_runner_host(sync_env):
+    if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         agents.append(_amp_runner_agent(sync_env))
+    if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
+        agents.append(_codex_server_agent(sync_env))
     return agents
 
 
