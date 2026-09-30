@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import cast
 
 from sync.runtime.errors import warn
+from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict
 from sync.runtime.process import RunProcessOptions, run_process
 
@@ -88,8 +89,5 @@ def read_synced_commit(managed_state_home: str) -> str | None:
 
 def record_synced_commit(managed_state_home: str, commit: str) -> None:
     """Persist the commit that was just reconciled."""
-    path = _synced_state_path(managed_state_home)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    _ = tmp.write_text(json.dumps({"commit": commit}) + "\n")
-    _ = tmp.replace(path)
+    content = json.dumps({"commit": commit}) + "\n"
+    sync_text_file(_synced_state_path(managed_state_home), content)

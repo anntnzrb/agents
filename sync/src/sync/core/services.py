@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, cast
 from sync.core.cliproxy_config import AUTH_GATEWAY_ENV
 from sync.core.cliproxy_deployment import CLI_PROXY_SOURCE_DIR
 from sync.runtime.errors import panic_message, warn
+from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict, is_obj_list
 from sync.runtime.process import RunProcessOptions, command_exists, run_process
 
@@ -370,11 +371,8 @@ def _read_owned(sync_env: SyncEnv) -> set[str]:
 
 
 def _record_owned(sync_env: SyncEnv, names: set[str]) -> None:
-    path = _owned_state_path(sync_env)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    _ = tmp.write_text(json.dumps({"units": sorted(names)}) + "\n")
-    _ = tmp.replace(path)
+    content = json.dumps({"units": sorted(names)}) + "\n"
+    sync_text_file(_owned_state_path(sync_env), content)
 
 
 async def _service(*argv: str) -> bool:

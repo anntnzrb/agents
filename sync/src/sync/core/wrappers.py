@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
@@ -316,19 +314,9 @@ def write_managed_wrapper(
     except OSError as error:
         message = f"inspect wrapper {target_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = Path(f"{target_path}.{os.getpid()}.tmp")
     try:
-        with temp_path.open("w", encoding="utf-8") as f:
-            _ = f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        temp_path.chmod(WRAPPER_FILE_MODE)
-        _ = temp_path.replace(target)
+        sync_text_file(target, content, WRAPPER_FILE_MODE)
     except OSError as error:
-        with contextlib.suppress(OSError):
-            if temp_path.exists():
-                temp_path.unlink()
         message = f"replace wrapper {target_path} ({panic_message(error)})"
         raise RuntimeError(message) from error
     return "owned"
