@@ -18,6 +18,11 @@ from autommit.errors import AutommitError
 from autommit.git import run_git
 from autommit.proposal import (
     MAX_ATOMICITY_DIFF_CHARS,
+    CommitChange,
+    IndicesSelector,
+    LinesSelector,
+    _changed_new_lines,
+    build_commit_patch,
     compute_apply_order,
     normalize_atomicity_decision,
     normalize_proposal,
@@ -1226,6 +1231,114 @@ class AutommitUnitTests(unittest.TestCase):
             proposal, ("a.txt",), parse_file_diffs(diff)
         )
         self.assertTrue(any("Overlapping" in error for error in errors), errors)
+
+    def _stage_change(self, repo: Path, base: bytes, new: bytes) -> tuple[str, str]:
+        """Commit `base`, stage `new`, and return the staged and zero-context diffs."""
+
+        def git(*args: str) -> str:
+            return subprocess.run(
+                ["git", "-C", str(repo), *args],
+                check=True,
+                capture_output=True,
+            ).stdout.decode("utf-8")
+
+        _ = git("init", "-q")
+        _ = git("config", "core.autocrlf", "false")
+        target = repo / "f.txt"
+        _ = target.write_bytes(base)
+        _ = git("add", ".")
+        _ = git("-c", "user.email=a@b", "-c", "user.name=t", "commit", "-qm", "base")
+        _ = target.write_bytes(new)
+        _ = git("add", ".")
+        flags = ("diff", "--cached", "--no-color", "--src-prefix=a/", "--dst-prefix=b/")
+        return git(*flags), git(*flags, "-U0")
+
+    def _assert_patch_applies(self, repo: Path, patch: str) -> None:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo),
+                "apply",
+                "--check",
+                "--cached",
+                "--unidiff-zero",
+                "-R",
+            ],
+            input=patch.encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+
+    def test_hunk_selection_keeps_non_newline_separators(self) -> None:
+        for char in "\v\f\x1c\x1d\x1e\x85\u2028\u2029":
+            with (
+                self.subTest(char=f"U+{ord(char):04X}"),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                repo = Path(tmp)
+                diff, zero_diff = self._stage_change(
+                    repo,
+                    f"one\nsep{char}inside\ntwo\n".encode(),
+                    f"ONE\nsep{char}INSIDE\ntwo\n".encode(),
+                )
+                by_index = build_commit_patch(
+                    (CommitChange("f.txt", IndicesSelector((1,))),), diff, diff
+                )
+                self._assert_patch_applies(repo, by_index)
+                self.assertIn(f"sep{char}inside", by_index)
+
+                by_lines = build_commit_patch(
+                    (CommitChange("f.txt", LinesSelector(1, 2)),), zero_diff, zero_diff
+                )
+                self._assert_patch_applies(repo, by_lines)
+                self.assertIn(f"+sep{char}INSIDE", by_lines)
+
+                hunk = parse_file_diffs(diff)[0].hunks[0]
+                self.assertEqual(_changed_new_lines(hunk), (1, 2))
+
+    def test_hunk_selection_keeps_carriage_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            diff, _zero = self._stage_change(
+                repo, b"one\r\ntwo\r\nthree\r\n", b"ONE\r\ntwo\r\nthree\r\n"
+            )
+            patch = build_commit_patch(
+                (CommitChange("f.txt", IndicesSelector((1,))),), diff, diff
+            )
+            self.assertIn(" two\r\n three\r\n", patch)
+            self._assert_patch_applies(repo, patch)
+
+    def test_binary_detection_ignores_hunk_content(self) -> None:
+        text_diff = (
+            "diff --git a/a.py b/a.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/a.py\n"
+            "+++ b/a.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            '-x = "Binary files " in chunk or "GIT binary patch" in chunk\n'
+            '+x = "Binary files " in chunk\n'
+            ' y = "GIT binary patch"\n'
+        )
+        self.assertFalse(parse_file_diffs(text_diff)[0].is_binary)
+
+        binary_diffs = (
+            (
+                "diff --git a/b.bin b/b.bin\n"
+                "index 1111111..2222222 100644\n"
+                "Binary files a/b.bin and b/b.bin differ\n"
+            ),
+            (
+                "diff --git a/b.bin b/b.bin\n"
+                "index 1111111..2222222 100644\n"
+                "GIT binary patch\n"
+                "literal 1\n"
+                "IcmZQz00ITd0RR91\n"
+            ),
+        )
+        for diff in binary_diffs:
+            self.assertTrue(parse_file_diffs(diff)[0].is_binary, diff)
 
     def test_run_git(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

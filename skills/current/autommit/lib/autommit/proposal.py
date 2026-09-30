@@ -425,10 +425,13 @@ def parse_file_diffs(diff_text: str) -> tuple[ParsedFile, ...]:
     files: list[ParsedFile] = []
     for idx, part in enumerate(parts):
         chunk = part if idx == 0 else f"diff --git {part}"
-        lines = chunk.splitlines()
+        lines = _diff_lines(chunk)
         first_line = lines[0] if lines else ""
         filename = _diff_filename(first_line, chunk)
-        is_binary = "Binary files " in chunk or "GIT binary patch" in chunk
+        is_binary = any(
+            line.startswith("Binary files ") or line == "GIT binary patch"
+            for line in lines
+        )
         hunks: list[DiffHunk] = []
         hunk_idx = 1
         current_hunk_lines: list[str] = []
