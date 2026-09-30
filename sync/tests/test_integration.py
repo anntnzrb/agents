@@ -14,7 +14,7 @@ import threading
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeGuard
+from typing import TYPE_CHECKING, TypeGuard, override
 
 import pytest
 import yaml
@@ -679,7 +679,7 @@ def test_integration_owned_entry_cleanup_and_unmanaged_file_preservation(
 class _ReadyModelsHandler(BaseHTTPRequestHandler):
     """Answer CLIProxyAPI's /v1/models readiness probe with one model."""
 
-    def do_GET(self) -> None:  # noqa: N802 - http.server handler name
+    def do_GET(self) -> None:
         """Serve a non-empty model list for /v1/models, 404 otherwise."""
         if self.path != "/v1/models":
             self.send_error(404)
@@ -691,7 +691,8 @@ class _ReadyModelsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         _ = self.wfile.write(body)
 
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+    @override
+    def log_message(self, format: str, *args: object) -> None:
         """Keep test output quiet."""
         del format, args
 
