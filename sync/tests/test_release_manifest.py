@@ -60,7 +60,7 @@ def _install_get(
         assert response is not None
         return response
 
-    monkeypatch.setattr("sync.core.release_manifest.httpx.get", _fake_get)
+    monkeypatch.setattr("httpx.get", _fake_get)
 
 
 def test_fetch_manifest_parses_valid_payload_and_converts_timeout(

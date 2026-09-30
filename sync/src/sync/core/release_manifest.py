@@ -6,10 +6,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, ClassVar
 
-import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sync.runtime.errors import panic_message
+from sync.runtime.http import get_ok
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,8 +22,6 @@ __all__ = [
 
 COMPONENT_PATTERN = r"^[A-Za-z0-9._-]+$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
-HTTP_OK = 200
-MS_PER_SECOND = 1000.0
 
 
 class StaticReleaseAsset(BaseModel):
@@ -55,17 +53,7 @@ def fetch_static_release_manifest(
     """Fetch and validate a static release manifest from a URL."""
     if fetch is not None:
         return fetch(url, timeout_ms)
-    timeout_sec = timeout_ms / MS_PER_SECOND
-    try:
-        response = httpx.get(url, timeout=timeout_sec, follow_redirects=True)
-    except (httpx.HTTPError, OSError, ValueError, TypeError) as exc:
-        message = f"release manifest fetch failed ({panic_message(exc)})"
-        raise RuntimeError(message) from exc
-
-    if response.status_code != HTTP_OK:
-        message = f"release manifest fetch failed with HTTP {response.status_code}"
-        raise RuntimeError(message)
-
+    response = get_ok(url, timeout_ms, "release manifest fetch failed")
     try:
         parsed: object = json.loads(response.text)  # pyright: ignore[reportAny]
     except (ValueError, TypeError) as exc:

@@ -30,6 +30,7 @@ from sync.core.cliproxy_deployment import (
 )
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import is_executable
+from sync.runtime.http import get_ok
 from sync.runtime.jsonc import is_obj_dict, strip_jsonc
 
 TOOL_NAME = "cliproxyapi"
@@ -50,7 +51,6 @@ SHA256_HEX_LENGTH = 64
 DEFAULT_HEALTH_TIMEOUT_MS = 500
 EXECUTABLE_MODE = 0o755
 RECEIPT_INDENT = 2
-HTTP_OK = 200
 MS_PER_SECOND = 1000.0
 
 
@@ -178,17 +178,7 @@ def read_manifest(manifest_path: str | Path) -> ReleaseManifest:
 def download_release(url: str, destination: str | Path, timeout_ms: int) -> None:
     """Download a remote release archive to a local file destination."""
     dest_path = Path(destination)
-    timeout_sec = timeout_ms / MS_PER_SECOND
-    try:
-        response = httpx.get(url, timeout=timeout_sec, follow_redirects=True)
-    except (httpx.HTTPError, OSError, ValueError, TypeError) as exc:
-        message = f"download failed ({panic_message(exc)})"
-        raise RuntimeError(message) from exc
-
-    if response.status_code != HTTP_OK:
-        message = f"download failed with HTTP {response.status_code}"
-        raise RuntimeError(message)
-
+    response = get_ok(url, timeout_ms, "download failed")
     try:
         _ = dest_path.write_bytes(response.content)
     except OSError as exc:
@@ -300,17 +290,7 @@ def parse_checksums(text: str) -> dict[str, str]:
 
 def fetch_checksums(url: str, timeout_ms: int) -> dict[str, str]:
     """Download and parse a release checksums file."""
-    timeout_sec = timeout_ms / MS_PER_SECOND
-    try:
-        response = httpx.get(url, timeout=timeout_sec, follow_redirects=True)
-    except (httpx.HTTPError, OSError, ValueError, TypeError) as exc:
-        message = f"checksums download failed ({panic_message(exc)})"
-        raise RuntimeError(message) from exc
-
-    if response.status_code != HTTP_OK:
-        message = f"checksums download failed with HTTP {response.status_code}"
-        raise RuntimeError(message)
-
+    response = get_ok(url, timeout_ms, "checksums download failed")
     return parse_checksums(response.text)
 
 
