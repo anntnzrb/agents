@@ -134,7 +134,7 @@ status_line_use_colors = true
 
 [desktop]
 show-context-window-usage = true
-enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max"]
+enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max", "ultra"]
 
 # -----------------------------------------------------------------------------
 # AGENTS
