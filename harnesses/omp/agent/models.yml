@@ -17,6 +17,22 @@ providers:
           cacheWrite: 0
       gpt-6-astra:
         contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
+      gpt-6.1-sol:
+        reasoning: true
+        contextWindow: 320000 # 320K * 85% = 272K trigger, compacting at OpenAI's long-context pricing line (>272K input bills 2x input / 1.5x output)
+        maxTokens: 128000
+        thinking:
+          mode: effort
+          efforts:
+            - medium
+        input:
+          - text
+          - image
+        cost:
+          input: 2
+          output: 10
+          cacheRead: 0.1
+          cacheWrite: 2.5
       claude-opus-5-5:
         cost:
           input: 4
