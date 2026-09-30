@@ -20,6 +20,7 @@ const GATEWAY_TIMEOUT_MS = 5000;
 const CATALOG_URL = "https://models.dev/api.json";
 const CATALOG_TIMEOUT_MS = 10000;
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
+const MISSING_MODEL_RETRY_MS = 60 * 60 * 1000;
 const CATALOG_VERSION = 2;
 
 const FALLBACK_CONTEXT_WINDOW = 128000;
@@ -41,6 +42,8 @@ interface CatalogCache {
 let memoryCatalog: CatalogCache | undefined;
 let lastKnown: ProviderModelConfig[] = [];
 let builtinIndex: Map<string, BuiltinMetadata[]> | undefined;
+let lastCatalogAttempt = -Infinity;
+let fallbackModels = new Set<string>();
 
 type ModelMetadata = Pick<ProviderModelConfig, "compat" | "thinkingLevelMap">;
 
@@ -131,11 +134,15 @@ async function readCachedCatalog(): Promise<CatalogCache | undefined> {
 	return memoryCatalog;
 }
 
-async function loadCatalog(): Promise<CatalogCache | undefined> {
+async function loadCatalog(signal: AbortSignal, force = false): Promise<CatalogCache | undefined> {
 	const cached = await readCachedCatalog();
-	if (cached && Date.now() - cached.fetchedAt < CATALOG_TTL_MS) return cached;
+	if (!force && cached && Date.now() - cached.fetchedAt < CATALOG_TTL_MS) return cached;
+	if (signal.aborted) return cached;
+	lastCatalogAttempt = Date.now();
 	try {
-		const response = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) });
+		const response = await fetch(CATALOG_URL, {
+			signal: AbortSignal.any([signal, AbortSignal.timeout(CATALOG_TIMEOUT_MS)]),
+		});
 		if (!response.ok) return cached;
 		const providers = (await response.json()) as Record<string, { models?: Record<string, CatalogModel> }>;
 		const next: CatalogCache = {
