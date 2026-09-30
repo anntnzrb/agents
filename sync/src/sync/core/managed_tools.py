@@ -10,7 +10,6 @@ import os
 import platform
 import re
 import shutil
-import stat
 import tarfile
 import tempfile
 from collections.abc import Callable
@@ -30,6 +29,7 @@ from sync.core.cliproxy_deployment import (
     cliproxy_models_url,
 )
 from sync.runtime.errors import panic_message, warn
+from sync.runtime.fs import is_executable
 from sync.runtime.jsonc import strip_jsonc
 
 TOOL_NAME = "cliproxyapi"
@@ -273,21 +273,12 @@ def installed_tool_matches(
     receipt: str,
 ) -> bool:
     """Check if tool executable exists, is executable, and receipt matches."""
-    if not _is_executable_file(executable):
+    if not is_executable(executable):
         return False
     try:
         return receipt_path.read_text(encoding="utf-8") == receipt
     except (OSError, UnicodeDecodeError):
         return False
-
-
-def _is_executable_file(path: Path) -> bool:
-    """Return True when path is a regular file with an executable bit."""
-    try:
-        stat_info = path.stat()
-    except OSError:
-        return False
-    return stat.S_ISREG(stat_info.st_mode) and (stat_info.st_mode & 0o111) != 0
 
 
 def parse_checksums(text: str) -> dict[str, str]:
@@ -369,7 +360,7 @@ def installed_receipt_matches(
     expected: dict[str, str],
 ) -> bool:
     """Check an installed tool against receipt fields that exclude the checksum."""
-    if not _is_executable_file(executable):
+    if not is_executable(executable):
         return False
     try:
         parsed = cast("object", json.loads(receipt_path.read_text(encoding="utf-8")))
@@ -473,7 +464,7 @@ def _cached_tool(
         return None
     cached_version, cached_dir, _payload = cached
     executable = cached_dir / context.platform_key / context.executable_name
-    if not _is_executable_file(executable):
+    if not is_executable(executable):
         return None
     detail = panic_message(error)
     warn(f"CLIProxyAPI latest lookup failed; using cached {cached_version} ({detail})")

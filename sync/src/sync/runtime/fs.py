@@ -448,3 +448,12 @@ def sync_text_file(
         with contextlib.suppress(OSError):
             Path(temp_path).unlink()
         raise
+
+
+def is_executable(path: str | os.PathLike[str]) -> bool:
+    """Return True when path is a regular file with an executable bit."""
+    try:
+        st = Path(path).stat()
+    except OSError:
+        return False
+    return stat.S_ISREG(st.st_mode) and bool(st.st_mode & 0o111)

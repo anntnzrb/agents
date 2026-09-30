@@ -30,7 +30,7 @@ from sync.core.managed_tools import (
 )
 from sync.core.release_manifest import fetch_static_release_manifest
 from sync.runtime.errors import panic_message, warn
-from sync.runtime.fs import rm_entry
+from sync.runtime.fs import is_executable, rm_entry
 from sync.runtime.lock import acquire_cache_lock, release_sync_lock
 from sync.runtime.process import (
     ExecPlan,
@@ -66,7 +66,6 @@ PACKAGE_PATTERN: re.Pattern[str] = re.compile(
 SEMVER_PATTERN: re.Pattern[str] = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$")
 RELEASE_VERSION_PATTERN: re.Pattern[str] = re.compile(r"^\d+(?:\.\d+)*$")
 PACKAGE_KEY_LENGTH: int = 16
-EXEC_PERM_MASK: int = 0o111
 RELEASE_VERSIONS_SUBDIR: str = "_versions"
 RELEASE_CURRENT_LINK: str = "current"
 RELEASE_PREVIOUS_LINK: str = "previous"
@@ -788,13 +787,4 @@ def installed_package_matches(
             raw_dict.get("name") == spec.package and raw_dict.get("version") == version
         )
     except (OSError, json.JSONDecodeError, ValidationError, TypeError, ValueError):
-        return False
-
-
-def is_executable(target_path: str) -> bool:
-    """Check if the target path is an executable regular file."""
-    try:
-        st = Path(target_path).stat()
-        return stat.S_ISREG(st.st_mode) and bool(st.st_mode & EXEC_PERM_MASK)
-    except OSError:
         return False
