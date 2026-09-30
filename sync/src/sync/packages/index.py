@@ -11,9 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sync.packages.process import (
-    install_inferred_import_packages as install_inferred_import_packages_impl,
-)
-from sync.packages.process import (
+    install_inferred_import_packages,
     install_package_deps,
     run_package_build,
 )
@@ -185,7 +183,7 @@ async def ensure_package(
             if not await run_package_build(staging_dir, timeout_ms):
                 message = "build failed"
                 raise RuntimeError(message)
-            if not await install_inferred_import_packages_impl(staging_dir, timeout_ms):
+            if not await install_inferred_import_packages(staging_dir, timeout_ms):
                 message = "install inferred packages after build failed"
                 raise RuntimeError(message)
             healthy = package_is_healthy(staging_dir)
