@@ -26,6 +26,7 @@ Choose libraries for the analysis, not as substitutes for specialized tools. Pre
 | **Tabular Data & Log Metrics** | `polars` / `fastexcel` | Fast columnar filtering, group-by, aggregations, Excel `.xlsx` reads |
 | **Direct File SQL / OLAP** | `duckdb` | Zero-copy SQL over Parquet, JSONL, CSV, SQLite files without memory bloat |
 | **PDF & Document Extraction** | `pymupdf` | High-speed text/table extraction (`find_tables()`), layout & page rendering |
+| **Word `.docx` Editing & Extraction** | `python-docx` / `lxml` / `office_oxide` | Paragraph/table/style edits, surgical OOXML XPath fixes, fast Rust docx→Markdown/HTML reads and legacy `.doc`→`.docx` |
 | **Fuzzy Matching & Search** | `rapidfuzz` | `process.extract()`, Levenshtein distance, typo tolerance, error clustering |
 | **Dependency Graphs & Blast Radius** | `networkx` | Architectures, import/call graphs, cycle detection, shortest paths |
 | **HTTP & API Fetching** | `httpx2` | Sync/async REST requests (`httpx2.Client`/`AsyncClient`, HTTP/2) and structured JSON payload retrieval |
