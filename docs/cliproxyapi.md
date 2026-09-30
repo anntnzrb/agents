@@ -157,7 +157,7 @@ Do not make durable configuration changes in the control panel. Sync replaces th
 
 ## Rebuild the control-panel asset
 
-The panel is upstream `main` plus a local quota-card framework (`tools/cliproxyapi/panel.patch`) and the card definitions in `tools/cliproxyapi/quota-cards.ts`. Rebuild after changing a card or adopting upstream changes:
+The panel is upstream `main` plus local patches (`tools/cliproxyapi/panel.patch`) and the card definitions in `tools/cliproxyapi/quota-cards.ts`. The patch adds the quota-card framework and the **Quota Pool** page (`#/quota-pool`). That page combines each provider's credentials into one capacity (three Claude accounts = 300%) and shows a stacked bar per quota window with one slot per account. It shares the quota cache with Quota Management, and it fetches any credential that has no cached quota as soon as it opens. Rebuild after changing a card or adopting upstream changes:
 
 ```bash
 sh tools/cliproxyapi/panel.rebuild.sh
