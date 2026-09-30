@@ -2,7 +2,7 @@
 
 ## Scope
 
-- `HARNESS.md`: SSOT for global, harness-agnostic agent instructions; sync publishes it to every harness as its instruction file
+- `HARNESS.md`: SSOT for global, harness-agnostic agent instructions; sync publishes it to every harness as its instruction file. After editing it, run the final version against the "Model-facing text" rules in `docs/skills.md` and the prompting guidelines, then `git diff --check`
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - `tools/`: repo-only managed-tool sources
