@@ -336,7 +336,7 @@ autolearn:
 # ─────────────────────────────────────────────────────────────────────────────
 
 theme:
-  light: light-gruvbox
+  light: ef-elea-light
   dark: dark-volcanic
 
 composer:
