@@ -49,3 +49,13 @@ The models.dev snapshot is cached for 24 hours at `$XDG_CACHE_HOME/agents/models
 its own format version and is ignored when that version changes. A failed fetch reuses the cached
 snapshot, and a failed gateway request keeps the last catalog discovered in the running process.
 `PI_OFFLINE=1` disables discovery.
+
+If a discovered gateway model has no catalog context limit, discovery bypasses the cache TTL and
+fetches models.dev again before assigning fallback metadata. Missing-model retries are limited to
+one catalog fetch per hour in each running process (including failed fetches); a normal TTL refresh
+also counts as an attempt. Known models keep using the cached snapshot. Catalog requests honor the
+discovery abort signal. This is demand-driven during provider refresh, not a background timer.
+
+If the selected model still needs a fallback context limit, the extension warns once per model per
+extension load in UI sessions, on startup, model selection, or before the next agent run. `/reload`
+loads changed extension code; a fresh Pi process also picks it up.

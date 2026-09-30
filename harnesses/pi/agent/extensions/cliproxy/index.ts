@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
-import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import {
 	findBuiltinMetadata,
 	findStaticCatalogModel,
@@ -229,12 +229,38 @@ async function discover(signal: AbortSignal): Promise<ProviderModelConfig[]> {
 	if (!response.ok) return lastKnown;
 	const [payload, catalog] = await Promise.all([
 		response.json() as Promise<GatewayModelsResponse>,
-		loadCatalog(),
+		loadCatalog(signal),
 	]);
-	return gatewayModels(payload).map((entry) => toModel(entry.id, entry.ownedBy, catalog));
+	const gateway = gatewayModels(payload);
+	let resolvedCatalog = catalog;
+	if (
+		gateway.some((entry) => catalogModel(catalog, entry.id)?.limit?.context === undefined) &&
+		Date.now() - lastCatalogAttempt >= MISSING_MODEL_RETRY_MS
+	) {
+		resolvedCatalog = await loadCatalog(signal, true);
+	}
+	if (gateway.length > 0) {
+		fallbackModels = new Set(gateway
+			.filter((entry) => catalogModel(resolvedCatalog, entry.id)?.limit?.context === undefined)
+			.map((entry) => entry.id));
+	}
+	return gateway.map((entry) => toModel(entry.id, entry.ownedBy, resolvedCatalog));
 }
 
 export default function cliproxy(pi: ExtensionAPI): void {
+	const warnedModels = new Set<string>();
+	const warnFallback = (model: ExtensionContext["model"], ctx: ExtensionContext): void => {
+		if (!ctx.hasUI || model?.provider !== "cliproxy" || !fallbackModels.has(model.id) || warnedModels.has(model.id)) return;
+		warnedModels.add(model.id);
+		ctx.ui.notify(
+			`CLIProxyAPI: ${model.id} has no catalog context limit; using the ${FALLBACK_CONTEXT_WINDOW.toLocaleString()}-token fallback.`,
+			"warning",
+		);
+	};
+	pi.on("session_start", (_event, ctx) => warnFallback(ctx.model, ctx));
+	pi.on("model_select", (event, ctx) => warnFallback(event.model, ctx));
+	pi.on("before_agent_start", (_event, ctx) => warnFallback(ctx.model, ctx));
+
 	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel(id, undefined, undefined));
 	pi.registerProvider("cliproxy", {
 		name: "CLIProxyAPI",
