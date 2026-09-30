@@ -57,9 +57,11 @@ __all__ = [
     "npm_cache_layout",
     "prepare_npm_package",
     "prepare_static_release",
+    "running_executables",
 ]
 
 DEFAULT_LAUNCH_TIMEOUT_MS: int = 120_000
+RUNNING_EXECUTABLES_TIMEOUT_MS: int = 5_000
 PACKAGE_PATTERN: re.Pattern[str] = re.compile(
     r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$"
 )
@@ -116,6 +118,7 @@ class LauncherRuntime:
     run: (
         Callable[[Sequence[str], RunProcessOptions], Awaitable[ProcessResult]] | None
     ) = None
+    running_executables: Callable[[], Awaitable[set[Path] | None]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,7 +268,12 @@ async def _prepare_locked_package(
             layout, spec, resolved_version, options, timeout_ms
         )
         update_current_and_previous(layout, resolved_version)
-        prune_versions(layout)
+        detect_running = (
+            runtime.running_executables
+            if runtime and runtime.running_executables
+            else running_executables
+        )
+        prune_versions(layout, await detect_running())
 
         current_bin = package_bin_path(layout.current_link, spec.bin)
         _validate_current_bin(current_bin, spec.bin)
@@ -674,8 +682,57 @@ def replace_link(link_path: str, target: str) -> None:
         raise
 
 
-def prune_versions(layout: NpmCacheLayout) -> None:
-    """Remove versions not referenced by either current or previous links."""
+def _proc_running_executables() -> set[Path] | None:
+    """Read executables from /proc on Linux; None where /proc is unavailable."""
+    if not Path("/proc/self/exe").exists():
+        return None
+    running: set[Path] = set()
+    for entry in Path("/proc").iterdir():
+        if entry.name.isdigit():
+            with contextlib.suppress(OSError):
+                running.add(Path(os.path.realpath(entry / "exe")))
+    return running
+
+
+def _lsof_paths(stdout: str) -> set[Path]:
+    return {
+        Path(os.path.realpath(line[1:]))
+        for line in stdout.splitlines()
+        if line.startswith("n/")
+    }
+
+
+async def running_executables() -> set[Path] | None:
+    """Return the real paths of executables this user is running, or None if unknown.
+
+    Long-lived processes such as the Amp runner keep executing the version they
+    started from; pruning uses this so an update never deletes it underneath them.
+    Linux reads /proc; macOS asks lsof for each process's text (executable) mapping.
+    """
+    from_proc = await asyncio.to_thread(_proc_running_executables)
+    if from_proc is not None:
+        return from_proc
+    result = await run_process(
+        ["lsof", "-n", "-w", "-a", "-u", str(os.getuid()), "-d", "txt", "-Fn"],
+        RunProcessOptions(timeout_ms=RUNNING_EXECUTABLES_TIMEOUT_MS),
+    )
+    # lsof exits 1 when some processes could not be inspected; its listing still counts.
+    if result.timed_out or result.output_limited or not result.stdout:
+        return None
+    return await asyncio.to_thread(_lsof_paths, result.stdout)
+
+
+def _version_in_use(version_dir: Path, running: set[Path]) -> bool:
+    return any(path.is_relative_to(version_dir) for path in running)
+
+
+def prune_versions(layout: NpmCacheLayout, running: set[Path] | None) -> None:
+    """Remove versions not referenced by current, previous, or a running process.
+
+    ``running`` is None when running executables are unknown; then nothing is removed.
+    """
+    if running is None:
+        return
     keep: set[str] = set()
     for link_path in (layout.current_link, layout.previous_link):
         target = read_link_target(link_path)
@@ -690,6 +747,8 @@ def prune_versions(layout: NpmCacheLayout) -> None:
             if name.startswith((".stage-", ".stage.")):
                 continue
             if name in keep:
+                continue
+            if _version_in_use(Path(os.path.realpath(entry_path)), running):
                 continue
             if entry_path.is_dir() and not entry_path.is_symlink():
                 shutil.rmtree(entry_path, ignore_errors=True)

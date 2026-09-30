@@ -26,6 +26,7 @@ from sync.core.launcher import (
     npm_cache_layout,
     prepare_npm_package,
     prepare_static_release,
+    running_executables,
 )
 from sync.core.release_manifest import StaticReleaseAsset, StaticReleaseManifest
 from sync.core.tool_launchers import tool_launcher
@@ -37,7 +38,7 @@ from sync.runtime.process import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
 EXPECTED_INSTALLS: Final[int] = 2
 DEFAULT_PREPARE_TIMEOUT_MS: Final[int] = 1000
@@ -916,3 +917,88 @@ def test_npm_launcher_rejects_unmanaged_conflict_for_current_and_previous(
 
     with pytest.raises(RuntimeError, match="unmanaged conflict"):
         _ = asyncio.run(prepare_npm_package(spec, options))
+
+
+def _prepare_versions(
+    tmp_path: Path,
+    versions: Sequence[str],
+    running: Callable[[], Awaitable[set[Path] | None]],
+) -> Path:
+    """Prepare each version in order and return the package versions directory."""
+    version = versions[0]
+
+    async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
+        return version
+
+    async def mock_run(
+        cmd: Sequence[str],
+        _options: RunProcessOptions,
+    ) -> ProcessResult:
+        command = list(cmd)
+        if command and command[0] == "npm":
+            await asyncio.to_thread(
+                _setup_stage_binary, command[3], "demo", "demo-package", version
+            )
+        return _success()
+
+    spec = NpmPackageSpec(tool="demo", package="demo-package", bin="demo")
+    options = PreparePackageOptions(
+        home=str(tmp_path),
+        cache_home=str(tmp_path / "cache"),
+        runtime=LauncherRuntime(
+            resolve_version=mock_resolve,
+            run=mock_run,
+            running_executables=running,
+        ),
+        timeout_ms=DEFAULT_PREPARE_TIMEOUT_MS,
+    )
+    for version in versions:  # noqa: B007 - read by mock_resolve and mock_run
+        _ = asyncio.run(prepare_npm_package(spec, options))
+    layout = npm_cache_layout(str(tmp_path), spec, str(tmp_path / "cache"))
+    return Path(layout.versions_dir)
+
+
+def _version_names(versions_dir: Path) -> set[str]:
+    return {p.name for p in versions_dir.iterdir() if not p.name.startswith(".")}
+
+
+def test_npm_prune_keeps_a_version_whose_executable_is_still_running(
+    tmp_path: Path,
+) -> None:
+    """A long-lived process keeps its version after two newer versions land."""
+    versions_dir = tmp_path / "cache" / "npm-tools" / "demo"
+    in_use: set[Path] = set()
+
+    async def running() -> set[Path] | None:
+        return in_use
+
+    # 1.0.0 keeps running, like a runner started before two updates land.
+    _ = _prepare_versions(tmp_path, ["1.0.0"], running)
+    runner_bin = next(versions_dir.rglob("1.0.0/node_modules/.bin/demo")).resolve()
+    in_use.add(runner_bin)
+    versions = _prepare_versions(tmp_path, ["2.0.0", "3.0.0"], running)
+    assert _version_names(versions) == {"1.0.0", "2.0.0", "3.0.0"}
+
+    # Once it stops running, the next prune removes it like any stale version.
+    in_use.clear()
+    versions = _prepare_versions(tmp_path, ["4.0.0"], running)
+    assert _version_names(versions) == {"3.0.0", "4.0.0"}
+
+
+def test_npm_prune_keeps_every_version_when_running_processes_are_unknown(
+    tmp_path: Path,
+) -> None:
+    """If running executables cannot be listed, nothing is deleted."""
+
+    async def unknown() -> set[Path] | None:
+        return None
+
+    versions = _prepare_versions(tmp_path, ["1.0.0", "2.0.0", "3.0.0"], unknown)
+    assert _version_names(versions) == {"1.0.0", "2.0.0", "3.0.0"}
+
+
+def test_running_executables_lists_this_process_on_the_host_platform() -> None:
+    """The real detector sees the interpreter running this test (Linux and macOS)."""
+    running = asyncio.run(running_executables())
+    assert running is not None
+    assert Path(os.path.realpath(sys.executable)) in running
