@@ -63,6 +63,7 @@ From `sync/` directory:
 
 - **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen` followed by `uv run --no-sync sync-gates` (ruff check, ruff format check, basedpyright).
 - **`pre-push`**: Executes `uv sync --frozen` followed by `uv run --no-sync sync-gates --tests`, which runs the ruff gates, then basedpyright concurrently with the full test suite (`uv run --no-sync pytest -n auto`); basedpyright output is buffered and printed after pytest. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
+- **Git hook environment**: Git exports `GIT_DIR` to hooks run from a linked worktree. `tests/conftest.py` removes every variable listed by `git rev-parse --local-env-vars` so tests that shell out to git cannot modify this repository; keep that scrub when changing test bootstrap.
 
 ### Code Quality and Typing Policies
 

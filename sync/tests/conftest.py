@@ -22,6 +22,14 @@ if TYPE_CHECKING:
 
 SYNC_ROOT: Path = Path(__file__).resolve().parent.parent
 
+# Git exports GIT_DIR (and friends) to hooks run from linked worktrees. Scrub
+# every repository-locating variable so fixtures that shell out to git never
+# operate on this repository instead of their temporary one.
+for _git_env_var in subprocess.check_output(  # noqa: S603 - fixed git query
+    [shutil.which("git") or "git", "rev-parse", "--local-env-vars"], text=True
+).split():
+    _ = os.environ.pop(_git_env_var, None)
+
 # Resolve uv's configured paths before fixtures replace HOME/XDG_CACHE_HOME.
 # Workers share dependency caches, not test homes or installed releases.
 UV_BIN = shutil.which("uv") or "uv"

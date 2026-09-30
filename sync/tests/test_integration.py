@@ -1021,3 +1021,20 @@ def test_integration_wrapper_forwards_arguments_to_faked_runtime(
     assert "arg[0]=--sentinel" in result.stdout
     assert "arg[1]=one" in result.stdout
     assert "arg[2]=two three" in result.stdout
+
+
+def test_git_repository_env_is_scrubbed_for_test_subprocesses() -> None:
+    """Git hooks in linked worktrees export GIT_DIR; tests must not inherit it.
+
+    Otherwise every fixture that shells out to git (init, config, commit)
+    would operate on this repository instead of its temporary one.
+    """
+    git_bin = shutil.which("git") or "git"
+    local_vars = subprocess.run(  # noqa: S603 - fixed git query
+        [git_bin, "rev-parse", "--local-env-vars"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert local_vars
+    assert [name for name in local_vars if name in os.environ] == []
