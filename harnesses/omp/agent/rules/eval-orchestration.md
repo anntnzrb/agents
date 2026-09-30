@@ -4,12 +4,13 @@ description: Prefer eval for in-memory data distillation, OLAP, and complex algo
 condition:
   - '\b(?:python|node|bun)\s+-[ce]\b|(?:^|[|;&"]\s*)(?:jq|awk)\s|\bwhile\s+(?:true\b|read\b|\[|:|getopts\b)|\bfor\s+\w+\s+in\s|<<[A-Za-z_]'
   - '\b(?:subprocess\.(?:run|Popen|check_output|check_call)|os\.(?:system|popen|walk))\b|\.(?:read_text|write_text)\(|open\([^)\n]{0,40}[''"]'
+  - '(?:^|[;&"]\s*)eval\s+[''"\\]'
 scope:
   - tool:eval
   - tool:bash
 interruptMode: never
 ---
-Load `skill://python` before writing nontrivial Python in `eval`; skip it for a short aggregation over data you already hold. Use `eval` for in-memory data distillation, OLAP queries, complex algorithms, API aggregation, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash.
+Load `skill://python` before writing nontrivial Python in `eval`; skip it for a short aggregation over data you already hold. Use the `eval` tool (Python kernel) for in-memory data distillation, OLAP queries, complex algorithms, API aggregation, and dynamic `@tool` orchestration. Avoid heredocs, shell loops, inline interpreter one-liners, and quote-heavy Bash. In `bash`, run commands directly instead of wrapping them in `eval '…'`.
 
 **Tool-First Boundary:** Never use `eval` as a proxy to circumvent specialized harness tools:
 - Use `read` with line selectors to inspect code or text, not `Path.read_text()` or `open().read()`.
