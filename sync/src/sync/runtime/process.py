@@ -30,6 +30,7 @@ __all__ = [
     "TimedOut",
     "build_process_env",
     "command_exists",
+    "detail_from_output",
     "exec_process",
     "log_command_failure",
     "resolve_executable",
@@ -134,7 +135,8 @@ def exec_process(plan: ExecPlan) -> NoReturn:
     os.execve(plan.executable, [plan.executable, *plan.args], plan.env)  # noqa: S606
 
 
-def _detail_from_output(stdout: str, stderr: str) -> str:
+def detail_from_output(stdout: str, stderr: str) -> str:
+    """Summarize failed command output, preferring stderr, capped in length."""
     detail = stderr.strip() or stdout.strip() or "unknown error"
     if len(detail) > MAX_DETAIL_CHARS:
         return f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
@@ -404,7 +406,7 @@ async def run_command_outcome(
         return MissingCommand()
     if result.exit_code == EXIT_SUCCESS:
         return Success()
-    return Failure(detail=_detail_from_output(result.stdout, result.stderr))
+    return Failure(detail=detail_from_output(result.stdout, result.stderr))
 
 
 async def run_command(

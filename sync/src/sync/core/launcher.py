@@ -33,11 +33,11 @@ from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import rm_entry
 from sync.runtime.lock import acquire_cache_lock, release_sync_lock
 from sync.runtime.process import (
-    MAX_DETAIL_CHARS,
     ExecPlan,
     ProcessResult,
     RunProcessOptions,
     build_process_env,
+    detail_from_output,
     run_process,
 )
 
@@ -177,7 +177,7 @@ async def _install_staged_package(
         RunProcessOptions(timeout_ms=timeout_ms),
     )
     if install.timed_out or install.output_limited or install.exit_code != 0:
-        detail = _detail_from_result(install)
+        detail = detail_from_output(install.stdout, install.stderr)
         message = f"npm install failed: {detail}"
         raise RuntimeError(message)
 
@@ -201,7 +201,7 @@ async def _install_staged_package(
             ),
         )
         if smoke.timed_out or smoke.output_limited or smoke.exit_code != 0:
-            detail = _detail_from_result(smoke)
+            detail = detail_from_output(smoke.stdout, smoke.stderr)
             message = f"installed package smoke check failed: {detail}"
             raise RuntimeError(message)
 
@@ -798,10 +798,3 @@ def is_executable(target_path: str) -> bool:
         return stat.S_ISREG(st.st_mode) and bool(st.st_mode & EXEC_PERM_MASK)
     except OSError:
         return False
-
-
-def _detail_from_result(result: ProcessResult) -> str:
-    detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
-    if len(detail) > MAX_DETAIL_CHARS:
-        return f"{detail[:MAX_DETAIL_CHARS]}…[truncated]"
-    return detail
