@@ -62,7 +62,7 @@ From `sync/` directory:
 ### Hook Contracts
 
 - **`pre-commit`**: Runs `git diff --cached --check`, then changes into `sync/` and executes `uv sync --frozen` followed by `uv run --no-sync sync-gates` (ruff check, ruff format check, basedpyright).
-- **`pre-push`**: Executes `uv sync --frozen` followed by `uv run --no-sync sync-gates --tests`, which appends the full test suite (`uv run --no-sync pytest -n auto`) to the static gates. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
+- **`pre-push`**: Executes `uv sync --frozen` followed by `uv run --no-sync sync-gates --tests`, which runs the ruff gates, then basedpyright concurrently with the full test suite (`uv run --no-sync pytest -n auto`); basedpyright output is buffered and printed after pytest. No separate duplicate integration run is needed because `pytest -n auto` covers the full suite including integration tests.
 
 ### Code Quality and Typing Policies
 

@@ -22,6 +22,8 @@ uv sync --frozen
 uv run sync-gates --tests
 ```
 
+With `--tests`, the ruff gates run first and fail fast; basedpyright then runs alongside the test suite, and its buffered output prints after pytest finishes.
+
 Run only the static gates (ruff check, ruff format check, basedpyright) with `uv run sync-gates`. When iterating on one tool, invoke it directly (`uv run ruff check .`, `uv run basedpyright`, ...).
 
 ## Report code coverage
