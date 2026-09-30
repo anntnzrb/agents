@@ -145,9 +145,14 @@ def _walk_tree(root: str, current: str, hasher: _TreeHasher) -> None:
 
 def prepare_extension_hook_state(
     hook: ExtensionDepsHookPlan,
+    fingerprint: str | None = None,
 ) -> PreparedExtensionHookState:
-    """Evaluate current extension source fingerprint against recorded state."""
-    fingerprint = fingerprint_tree(hook.source_root)
+    """Evaluate current extension source fingerprint against recorded state.
+
+    Pass `fingerprint` to reuse one already computed for `hook.source_root`.
+    """
+    if fingerprint is None:
+        fingerprint = fingerprint_tree(hook.source_root)
     previous_state = load_extension_hook_state(hook.state_path)
     if previous_state is None or previous_state.fingerprint != fingerprint:
         return PreparedExtensionHookState(

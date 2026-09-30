@@ -541,13 +541,14 @@ def prepare_extension_hook_states(
 ) -> dict[str, ExtensionHookRuntimeState]:
     """Compute prepared states for all ExtensionDeps hooks."""
     states: dict[str, ExtensionHookRuntimeState] = {}
+    # Harnesses share the skills source; fingerprint each tree once per run.
+    fingerprints: dict[str, str] = {}
     for hook in hooks:
         if hook.kind != "ExtensionDeps":
             continue
-        states[hook.state_path] = ExtensionHookRuntimeState(
-            hook=hook,
-            state=prepare_extension_hook_state(hook),
-        )
+        state = prepare_extension_hook_state(hook, fingerprints.get(hook.source_root))
+        fingerprints[hook.source_root] = state.fingerprint
+        states[hook.state_path] = ExtensionHookRuntimeState(hook=hook, state=state)
     return states
 
 

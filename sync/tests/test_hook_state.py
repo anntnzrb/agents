@@ -25,6 +25,7 @@ from sync.core.hook_state import (
     prepare_extension_hook_state,
     record_extension_hook_state,
 )
+from sync.core.index import prepare_extension_hook_states
 from sync.core.managed_state import (
     load_recorded_entry_names,
     top_level_entry_names,
@@ -307,6 +308,47 @@ def test_prepare_extension_hook_state_produces_exact_serialized_fingerprint_and_
     assert state.fingerprint == fingerprint
     assert state.generated_entries == generated_entries
     assert state.preserve_paths == ["package.json"]
+
+
+def test_prepare_extension_hook_states_fingerprints_each_source_root_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hooks sharing a source root reuse one fingerprint within a run."""
+    shared_root = tmp_path / "shared"
+    other_root = tmp_path / "other"
+    for root in (shared_root, other_root):
+        root.mkdir()
+        _ = (root / "package.json").write_text(root.name, encoding="utf-8")
+    home = tmp_path / "home"
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "opencode")
+    harness = harness_from_adapter(adapter, str(home))
+    hooks = [
+        ExtensionDepsHookPlan(
+            harness=harness,
+            job_root=str(home),
+            root=str(home),
+            source_root=str(source_root),
+            relative_root="",
+            state_path=str(tmp_path / f"state-{index}.json"),
+            timeout_ms=1000,
+        )
+        for index, source_root in enumerate((shared_root, shared_root, other_root))
+    ]
+    fingerprinted: list[str] = []
+
+    def counting_fingerprint(root: str | os.PathLike[str]) -> str:
+        fingerprinted.append(str(root))
+        return fingerprint_tree(root)
+
+    monkeypatch.setattr("sync.core.hook_state.fingerprint_tree", counting_fingerprint)
+    states = prepare_extension_hook_states(hooks)
+
+    assert sorted(fingerprinted) == sorted([str(shared_root), str(other_root)])
+    assert [states[hook.state_path].state.fingerprint for hook in hooks] == [
+        fingerprint_tree(shared_root),
+        fingerprint_tree(shared_root),
+        fingerprint_tree(other_root),
+    ]
 
 
 def test_prepare_extension_hook_state_uses_empty_relative_root_without_dot_slash_prefix(
