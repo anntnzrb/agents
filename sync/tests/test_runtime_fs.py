@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 from sync.core.secret_template import render_secret_template, sync_secret_template
 from sync.runtime.fs import (
     CachedSourceContent,
-    copy_tree,
     is_identical_file,
     is_ignored_sync_entry,
     is_symlink,
@@ -78,32 +77,6 @@ def test_rm_entry(tmp_path: Path) -> None:
 
     rm_entry(missing)
     assert not missing.exists()
-
-
-def test_copy_tree(tmp_path: Path) -> None:
-    """copy_tree mirrors files and rejects source directory symlinks."""
-    src = tmp_path / "src"
-    dst = tmp_path / "dst"
-    cyclic = tmp_path / "cyclic"
-
-    (src / "sub").mkdir(parents=True)
-    _ = (src / "file1.txt").write_text("hello", encoding="utf-8")
-    _ = (src / "sub" / "file2.txt").write_text("world", encoding="utf-8")
-
-    copy_tree(src, dst)
-    assert (dst / "file1.txt").read_text(encoding="utf-8") == "hello"
-    assert (dst / "sub" / "file2.txt").read_text(encoding="utf-8") == "world"
-
-    # Copying a single file is allowed
-    single_dst = tmp_path / "single.txt"
-    copy_tree(src / "file1.txt", single_dst)
-    assert single_dst.read_text(encoding="utf-8") == "hello"
-
-    # A source directory symlink is rejected
-    cyclic.mkdir()
-    (cyclic / "self").symlink_to(cyclic, target_is_directory=True)
-    with pytest.raises(RuntimeError, match="refusing source directory symlink:"):
-        copy_tree(cyclic, tmp_path / "dst2")
 
 
 def test_sync_managed_children(tmp_path: Path) -> None:

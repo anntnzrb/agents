@@ -107,37 +107,6 @@ def rm_entry(target_path: str | os.PathLike[str]) -> None:
             raise
 
 
-def copy_tree(
-    src: str | os.PathLike[str],
-    dst: str | os.PathLike[str],
-) -> None:
-    """Recursively copy directory or file from src to dst, ignoring artifacts."""
-    src_str = os.fspath(src)
-    dst_str = os.fspath(dst)
-    metadata = _resolve_source_entry(src_str)
-    if stat.S_ISDIR(metadata.st_mode):
-        _copy_tree_recursive(src_str, dst_str)
-        return
-    Path(dst_str).parent.mkdir(parents=True, exist_ok=True)
-    _ = shutil.copy2(src_str, dst_str)
-
-
-def _copy_tree_recursive(src: str, dst: str) -> None:
-    Path(dst).mkdir(parents=True, exist_ok=True)
-    with os.scandir(src) as entries:
-        for entry in entries:
-            if is_ignored_sync_entry(entry.name):
-                continue
-            child_src = str(Path(src) / entry.name)
-            child_dst = str(Path(dst) / entry.name)
-            child_metadata = _resolve_source_entry(child_src)
-            if stat.S_ISDIR(child_metadata.st_mode):
-                _copy_tree_recursive(child_src, child_dst)
-            else:
-                Path(child_dst).parent.mkdir(parents=True, exist_ok=True)
-                _ = shutil.copy2(child_src, child_dst)
-
-
 def _get_dst_metadata(dst_str: str) -> os.stat_result | None:
     try:
         dst_path = Path(dst_str)
