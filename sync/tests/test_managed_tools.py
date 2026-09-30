@@ -159,7 +159,7 @@ def test_managed_tool_health_check_targets_deployment_client() -> None:
     """Verify is_cli_proxy_running requests models endpoint on deployment."""
     calls: list[str] = []
 
-    def mock_fetch(input_url: str) -> object:
+    def mock_fetch(input_url: str, _timeout: float) -> object:
         calls.append(input_url)
         return object()
 
@@ -248,7 +248,7 @@ def test_managed_tool_health_check_infallible_on_error(
 ) -> None:
     """is_cli_proxy_running returns False on any Exception without raising."""
 
-    def exploding_fetch(_url: str) -> object:
+    def exploding_fetch(_url: str, _timeout: float) -> object:
         message = "unexpected error in fetch"
         raise TypeError(message)
 

@@ -99,7 +99,7 @@ type DownloadFn = Callable[[str, str, int], None]
 type ExtractFn = Callable[[str, str, str, int], None]
 type ResolveVersionFn = Callable[[str, int], str]
 type FetchChecksumsFn = Callable[[str, int], dict[str, str]]
-type FetchImpl = Callable[..., object]
+type FetchImpl = Callable[[str, float], object]
 
 
 @dataclass(frozen=True)
@@ -671,18 +671,6 @@ def prepare_managed_tools(
     return [prepare_cli_proxy(sync_env, manifest_path, runtime)]
 
 
-def _invoke_fetch(
-    fetch_impl: FetchImpl,
-    url: str,
-    timeout_sec: float,
-) -> object:
-    """Invoke fetch implementation, passing a timeout when it accepts one."""
-    try:
-        return fetch_impl(url, timeout=timeout_sec)
-    except TypeError:
-        return fetch_impl(url)
-
-
 def is_cli_proxy_running(
     deployment: CliProxyDeployment,
     timeout_ms: int = DEFAULT_HEALTH_TIMEOUT_MS,
@@ -693,7 +681,7 @@ def is_cli_proxy_running(
         url = cliproxy_models_url(deployment)
         timeout_sec = timeout_ms / MS_PER_SECOND
         if fetch_impl is not None:
-            _ = _invoke_fetch(fetch_impl, url, timeout_sec)
+            _ = fetch_impl(url, timeout_sec)
         else:
             _ = httpx.get(url, timeout=timeout_sec)
     except Exception:
