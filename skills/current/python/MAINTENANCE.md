@@ -6,7 +6,7 @@ Maintainer procedure, not loaded by `SKILL.md`. Run it when asked to refresh the
 
 - Date: 2026-10-01
 - CPython checkout: `3.15` at 3.15.0rc2+dev (`021f634`); 3.15.0 final due the same day and treated as released
-- Result: 3.15 idioms added to `cookbook/modern.md` as `(3.15+)` rules (`lazy import`, `frozendict`, `sentinel`, closed `TypedDict`, comprehension unpacking, UTF-8 default); pointers in `patterns-composition.md`, `patterns-iterators.md`, and `harnesses/omp/agent/rules/py-modern.md`; skill targets stay at 3.14
+- Result: 3.15 idioms added to `cookbook/modern.md` as `(3.15+)` rules (`lazy import`, `frozendict`, `sentinel`, closed `TypedDict`, comprehension unpacking, UTF-8 default); pointers in `patterns-composition.md`, `patterns-iterators.md`, and `harnesses/omp/agent/rules/py-modern.md`. Skills stay at 3.14 and move to 3.15 one at a time when a 3.15 feature has a measured benefit (`docs/skills.md`); `market-hunter` moved first (`lazy from firecrawl`, `--help` 418 ms to 95 ms)
 
 Update this section at the end of every run.
 
