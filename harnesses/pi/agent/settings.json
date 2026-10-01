@@ -1,10 +1,7 @@
 {
   "cacheWarming": "idle",
   "collapseChangelog": true,
-  "codemode": {
-    "mode": "only"
-  },
-  "defaultTools": ["+codemode"],
+  "defaultTools": ["bash", "read", "write", "edit", "apply_patch", "find", "codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
   "find": {
@@ -12,7 +9,7 @@
   },
   "followUpMode": "all",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.99.2",
+  "lastChangelogVersion": "1.0.0",
   "enabledModels": [
     "cliproxy/claude-opus-5-5:medium",
     "cliproxy/gpt-6.1-sol:medium",
