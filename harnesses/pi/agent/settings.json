@@ -19,7 +19,7 @@
   "quietStartup": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
-  "theme": "ef-elea-dark",
+  "theme": "ef-elea-light/ef-elea-dark",
   "terminal": {
     "showImages": false
   }
