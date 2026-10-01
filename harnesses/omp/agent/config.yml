@@ -288,7 +288,7 @@ speechgen:
 task:
   showResolvedModelBadge: true
   # always: director plans and fans out; workers (@task/@smol) do the implementation
-  eager: always
+  # eager: always
   batch: true
   maxConcurrency: 32
   enableEffort: false
