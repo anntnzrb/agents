@@ -4,9 +4,9 @@ Maintainer procedure, not loaded by `SKILL.md`. Run it when asked to refresh the
 
 ## Last run
 
-- Date: 2026-09-27
-- CPython checkout: `main` at 3.16.0a0 (`baec764`); latest released: 3.14
-- Result: `cookbook/modern.md` consolidated from the three versioned guides; stack decisions below fixed across `SKILL.md`, cookbook, `references/`, and `harnesses/omp/agent/rules/py-*.md`
+- Date: 2026-10-01
+- CPython checkout: `3.15` at 3.15.0rc2+dev (`021f634`); 3.15.0 final due the same day and treated as released
+- Result: 3.15 idioms added to `cookbook/modern.md` as `(3.15+)` rules (`lazy import`, `frozendict`, `sentinel`, closed `TypedDict`, comprehension unpacking, UTF-8 default); pointers in `patterns-composition.md`, `patterns-iterators.md`, and `harnesses/omp/agent/rules/py-modern.md`; skill targets stay at 3.14
 
 Update this section at the end of every run.
 

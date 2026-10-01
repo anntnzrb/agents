@@ -45,7 +45,7 @@ cumprod = list(accumulate([1, 2, 3, 4], mul))
 assert cumprod == [1, 2, 6, 24]
 ```
 
-`chain.from_iterable()` efficiently flattens nested iterables; `accumulate()` supports running totals and cumulative operations.
+`chain.from_iterable()` efficiently flattens nested iterables; on 3.15+, `[*xs for xs in nested]` does the same inline (`cookbook/modern.md`). `accumulate()` supports running totals and cumulative operations.
 
 ## Batching and Pairing Recipes
 

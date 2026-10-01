@@ -25,6 +25,7 @@ Untagged rules work on 3.10+. A `(3.N+)` tag needs `requires-python >= 3.N`; bel
 - Merge mappings into a new dict with `a | b`; update in place with `a |= b`
 - Destructure with star unpacking instead of index arithmetic
 - Consecutive pairs: `itertools.pairwise`. Fixed-size chunks: `itertools.batched(xs, n)` (3.12+), with `strict=True` when a short final chunk is invalid (3.13+)
+- Flatten one level with unpacking in a comprehension: `[*xs for xs in groups]`, `{**d for d in layers}` (3.15+, PEP 798); below 3.15, `itertools.chain.from_iterable(groups)`
 - Sort and select with `key=`; prefer `operator.attrgetter`/`itemgetter` over trivial lambdas ("simpler and faster", `howto/sorting.rst`)
 - Bind a value once with `:=` only when it removes a repeated call
 
@@ -64,6 +65,8 @@ report = "\n".join(f"{row.name}: {row.total:,.2f}" for row in rows)
 - Money and other exact decimals use `decimal.Decimal` or integer minor units, never `float` (`faq/design.rst`); decode JSON with `json.loads(raw, parse_float=Decimal)`
 - Timestamps are timezone-aware: `datetime.now(UTC)` (3.11+; `timezone.utc` below)
 - Parse TOML with stdlib `tomllib` in binary mode (3.11+)
+- Constant lookup tables are `frozendict` (3.15+, `builtins/functions.rst`): `Final` only blocks rebinding the name, while `frozendict` rejects item assignment, is hashable, and serializes with `json`. Below 3.15, wrap the dict in `types.MappingProxyType`
+- Missing-argument markers are `MISSING = sentinel("MISSING")` (3.15+, PEP 661): it has a readable repr, keeps its identity through `copy` and through `pickle` when defined at module scope under its own name, and types as `int | MISSING`. Below 3.15, `MISSING = object()`
 
 ```python
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -83,6 +86,7 @@ secure = replace(endpoint, port=8443)
 - Mark every overriding method with `@override` (3.12+) so a renamed base method becomes a type error
 - Narrowing predicates return `TypeIs[T]` (3.13+), which also narrows the negative branch; `TypeGuard` does not
 - Dispatch on closed unions with `match`, ending in `case _ as unreachable: assert_never(unreachable)` (3.11+). Match constants with dotted names (`case Color.RED:`); a bare name is a capture pattern that always matches (`reference/compound_stmts.rst`)
+- Declare `TypedDict` payloads `closed=True` when an unknown key is a bug, or `extra_items=T` when extra keys are allowed but typed (3.15+, PEP 728, `library/typing.rst`)
 - Make parameters keyword-only with `*` when positional order is not self-evident; use `/` only for parameters whose names carry no meaning
 - Deprecate APIs with `@warnings.deprecated` (3.13+) so type checkers flag callers too
 - On 3.14+, write forward references unquoted and drop `from __future__ import annotations` (deprecated in 3.14, `whatsnew/3.14.rst`). Below 3.14, keep it where annotations need deferral. Read runtime annotations with `annotationlib.get_annotations` (3.14+)
@@ -131,9 +135,10 @@ except Exception as err:  # noqa: BLE001 - boundary catch to map error
 
 - Own every file, lock, socket, and client with `with`; group several in one parenthesized `with (...)`
 - Paths are `pathlib.Path` with `/`; read and write through `read_text`/`write_text`/`open`. On 3.14+, `Path.copy`/`copy_into`/`move`/`move_into` replace `shutil` for path objects (`copy` is always recursive)
-- Pass `encoding="utf-8"` to every text-mode open; the default is the locale encoding before 3.15 (`library/io.rst`, PEP 597 `EncodingWarning`)
+- Pass `encoding="utf-8"` to every text-mode open. Before 3.15 the default is the locale encoding (`library/io.rst`, PEP 597 `EncodingWarning`); 3.15 defaults to UTF-8, but `whatsnew/3.15.rst` still recommends an explicit `encoding` for code that runs on several versions
 - Run commands as argument lists with `check=True`: `subprocess.run(["git", "log", ref], check=True, capture_output=True, text=True)`
 - Log with lazy `%` arguments, `logger.info("sent %s in %d ms", msg_id, ms)`: formatting is deferred until a handler emits the record (`howto/logging.rst` Optimization)
+- Defer heavy imports with module-level `lazy import x` / `lazy from x import y` (3.15+, PEP 810) instead of imports inside function bodies. A failed lazy import raises at first use, so keep an import eager when its failure must be caught at startup. `lazy` is a `SyntaxError` inside functions, classes, and `try` blocks, and with `*` or `__future__` imports (`whatsnew/3.15.rst`)
 
 ```python
 with (
