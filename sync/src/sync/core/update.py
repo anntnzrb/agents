@@ -41,13 +41,23 @@ async def fast_forward_ssot(ssot_home: str) -> str | None:
     """Fast-forward a clean ``main`` checkout; return HEAD, or None to skip.
 
     Never merges, stashes, or resets. A failed fetch (offline) keeps the
-    current HEAD so an unsynced local commit is still reconciled.
+    current HEAD so an unsynced local commit is still reconciled. Every skip
+    and every refusal to fast-forward warns, so a stuck host is visible in the
+    updater log instead of silently drifting behind ``origin/main``.
     """
     ok, branch = await _git(ssot_home, "symbolic-ref", "--short", "-q", "HEAD")
     if not ok or branch != UPDATE_BRANCH:
+        where = branch if ok else "detached HEAD"
+        warn(f"update: skipped; checkout is on {where}, not {UPDATE_BRANCH}")
         return None
     ok, changes = await _git(ssot_home, "status", "--porcelain", "--untracked-files=no")
-    if not ok or changes:
+    if not ok:
+        warn(f"update: skipped; git status failed ({changes})")
+        return None
+    if changes:
+        _, names = await _git(ssot_home, "diff", "--name-only", "HEAD")
+        files = ", ".join(names.splitlines()) or changes
+        warn(f"update: skipped; uncommitted tracked changes block pull: {files}")
         return None
 
     upstream = f"{UPDATE_REMOTE}/{UPDATE_BRANCH}"
@@ -66,9 +76,24 @@ async def fast_forward_ssot(ssot_home: str) -> str | None:
             )
             if not merged:
                 warn(f"update: fast-forward failed; keeping local checkout ({detail})")
+        else:
+            await _warn_if_diverged(ssot_home, upstream)
 
     ok, head = await _git(ssot_home, "rev-parse", "HEAD")
     return head if ok else None
+
+
+async def _warn_if_diverged(ssot_home: str, upstream: str) -> None:
+    """Warn when local and upstream both have commits the other lacks."""
+    ok, counts = await _git(
+        ssot_home, "rev-list", "--left-right", "--count", f"HEAD...{upstream}"
+    )
+    if not ok:
+        return
+    local, remote = counts.split()
+    if remote != "0":
+        counts_note = f"{local} local, {remote} upstream"
+        warn(f"update: diverged from {upstream} ({counts_note}); push or rebase")
 
 
 def _synced_state_path(managed_state_home: str) -> Path:

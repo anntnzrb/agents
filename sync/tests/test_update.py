@@ -123,9 +123,9 @@ def test_update_retries_reconcile_after_failure(
 
 
 def test_update_leaves_dirty_checkout_untouched(
-    repos: tuple[Path, Path], syncs: list[str]
+    repos: tuple[Path, Path], syncs: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Uncommitted tracked changes mean someone is working here: do nothing."""
+    """Uncommitted tracked changes block the update, and the skip names them."""
     ssot, peer = repos
     before = _git(ssot, "rev-parse", "HEAD")
     _ = _push_new_commit(peer, "change")
@@ -135,12 +135,15 @@ def test_update_leaves_dirty_checkout_untouched(
     assert _git(ssot, "rev-parse", "HEAD") == before
     assert (ssot / "base").read_text() == "local edit"
     assert syncs == []
+    err = capsys.readouterr().err
+    assert "uncommitted" in err
+    assert "base" in err
 
 
 def test_update_ignores_checkouts_on_other_branches(
-    repos: tuple[Path, Path], syncs: list[str]
+    repos: tuple[Path, Path], syncs: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Only ``main`` follows origin; a feature branch is left alone."""
+    """Only ``main`` follows origin; the skip names the checked-out branch."""
     ssot, peer = repos
     _ = _git(ssot, "checkout", "-qb", "feature")
     before = _git(ssot, "rev-parse", "HEAD")
@@ -149,18 +152,38 @@ def test_update_ignores_checkouts_on_other_branches(
     assert update_main() == EXIT_OK
     assert _git(ssot, "rev-parse", "HEAD") == before
     assert syncs == []
+    assert "feature" in capsys.readouterr().err
 
 
 def test_update_never_merges_diverged_history(
-    repos: tuple[Path, Path], syncs: list[str]
+    repos: tuple[Path, Path], syncs: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Local unpushed commits are never merged; the local commit is reconciled."""
+    """Diverged history is never merged; the warning reports both sides."""
     ssot, peer = repos
     local = _commit(ssot, "local")
     _ = _push_new_commit(peer, "remote")
 
     assert update_main() == EXIT_OK
     assert _git(ssot, "rev-parse", "HEAD") == local
+    assert syncs == ["sync"]
+    err = capsys.readouterr().err
+    assert "diverged" in err
+    assert "1 local" in err
+    assert "1 upstream" in err
+
+
+def test_update_stays_quiet_when_up_to_date(
+    repos: tuple[Path, Path], syncs: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A clean checkout already on origin/main reports nothing."""
+    ssot, peer = repos
+    _ = _push_new_commit(peer, "change")
+    assert update_main() == EXIT_OK
+    _ = capsys.readouterr()
+
+    assert update_main() == EXIT_OK
+    assert capsys.readouterr().err == ""
+    assert _git(ssot, "status", "--porcelain") == ""
     assert syncs == ["sync"]
 
 
