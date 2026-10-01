@@ -15,7 +15,6 @@ from sync.core.release_manifest import (
 )
 
 VALID_SHA256 = "a" * 64
-VALID_SHA512 = "b" * 128
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,59 +104,6 @@ def test_fetch_manifest_ignores_unknown_fields(monkeypatch: pytest.MonkeyPatch) 
     )
 
     assert manifest.version == "1.2.3"
-
-
-def test_fetch_manifest_wraps_single_platform_document_under_target(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A per-target manifest becomes a one-entry platform map keyed by its target."""
-    payload: dict[str, object] = {
-        "version": "1.2.14",
-        "url": "https://cdn.example.test/cli_mac_arm64.tar.gz",
-        "sha512": VALID_SHA512,
-    }
-    _install_get(monkeypatch, response=_FakeResponse(200, json.dumps(payload)))
-
-    manifest = fetch_static_release_manifest(
-        "https://cdn.example.test/manifests/darwin_arm64.json",
-        1000,
-        target="darwin_arm64",
-    )
-
-    assert manifest.version == "1.2.14"
-    asset = manifest.platforms["darwin_arm64"]
-    assert asset.checksum == ("sha512", VALID_SHA512)
-
-
-def test_fetch_manifest_rejects_asset_without_checksum(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An asset must carry a SHA-256 or SHA-512 digest; neither fails closed."""
-    payload: dict[str, object] = {
-        "version": "1.2.3",
-        "platforms": {"darwin-arm64": {"url": "https://cdn.example.test/a.tar.gz"}},
-    }
-    _install_get(monkeypatch, response=_FakeResponse(200, json.dumps(payload)))
-
-    with pytest.raises(RuntimeError, match="invalid release manifest"):
-        _ = fetch_static_release_manifest(
-            "https://cdn.example.test/manifest.json", 1000
-        )
-
-
-def test_fetch_manifest_rejects_short_sha512(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A SHA-512 digest that is not 128 lowercase hex characters must be rejected."""
-    payload: dict[str, object] = {
-        "version": "1.2.3",
-        "url": "https://cdn.example.test/a.tar.gz",
-        "sha512": VALID_SHA256,
-    }
-    _install_get(monkeypatch, response=_FakeResponse(200, json.dumps(payload)))
-
-    with pytest.raises(RuntimeError, match="invalid release manifest"):
-        _ = fetch_static_release_manifest(
-            "https://cdn.example.test/manifest.json", 1000, target="darwin_arm64"
-        )
 
 
 @pytest.mark.parametrize("status_code", [301, 404, 500, 503])

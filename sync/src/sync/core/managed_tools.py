@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, ClassVar, cast
 
 if TYPE_CHECKING:
     from sync.core.harness import SyncEnv
-    from sync.core.release_manifest import ChecksumAlgorithm
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -248,15 +247,11 @@ def extract_archive(
     _extract_with_timeout(Path(archive), Path(destination), None, timeout_ms)
 
 
-def verify_checksum(
-    archive: str | Path,
-    expected: str,
-    algorithm: ChecksumAlgorithm = "sha256",
-) -> None:
-    """Verify an archive's lowerhex digest under the given hash algorithm."""
+def verify_checksum(archive: str | Path, expected: str) -> None:
+    """Verify SHA-256 checksum of an archive file against expected lowerhex."""
     archive_path = Path(archive)
     content = archive_path.read_bytes()
-    actual = hashlib.new(algorithm, content).hexdigest().lower()
+    actual = hashlib.sha256(content).hexdigest().lower()
     if actual != expected.lower():
         message = f"checksum mismatch for {archive_path.name}"
         raise RuntimeError(message)

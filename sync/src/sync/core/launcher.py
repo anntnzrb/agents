@@ -61,7 +61,6 @@ __all__ = [
 ]
 
 DEFAULT_LAUNCH_TIMEOUT_MS: int = 120_000
-MANIFEST_TARGET_PLACEHOLDER: str = "{target}"
 RUNNING_EXECUTABLES_TIMEOUT_MS: int = 5_000
 PACKAGE_PATTERN: re.Pattern[str] = re.compile(
     r"^(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+$"
@@ -404,8 +403,7 @@ async def _install_static_release(
     try:
         archive_path = stage_dir / f"release-{version}.tar.gz"
         await asyncio.to_thread(download, asset.url, str(archive_path), timeout_ms)
-        algorithm, digest = asset.checksum
-        await asyncio.to_thread(verify_checksum, str(archive_path), digest, algorithm)
+        await asyncio.to_thread(verify_checksum, str(archive_path), asset.sha256)
         await asyncio.to_thread(extract, str(archive_path), str(stage_dir), timeout_ms)
         await asyncio.to_thread(
             _promote_release_stage, stage_dir, version_dir, archive_path
@@ -533,33 +531,22 @@ async def prepare_static_release(
         return cached
 
 
-def _release_target(release: StaticRelease, runtime: ReleaseRuntime | None) -> str:
-    platform_key = _release_platform_key(runtime)
-    target = release.targets.get(platform_key)
-    if target is None:
-        message = f"static release has no target for {platform_key}"
-        raise RuntimeError(message)
-    return target
-
-
 async def _prepare_static_release_locked(
     release: StaticRelease,
     home: str,
     timeout_ms: int,
     runtime: ReleaseRuntime | None,
 ) -> PreparedStaticRelease:
-    per_target = MANIFEST_TARGET_PLACEHOLDER in release.manifest_url
-    target = _release_target(release, runtime) if per_target else None
     fetch = runtime.fetch_manifest if runtime is not None else None
     manifest = await asyncio.to_thread(
-        fetch_static_release_manifest,
-        release.manifest_url.replace(MANIFEST_TARGET_PLACEHOLDER, target or ""),
-        timeout_ms,
-        fetch,
-        target,
+        fetch_static_release_manifest, release.manifest_url, timeout_ms, fetch
     )
+
+    platform_key = _release_platform_key(runtime)
+    target = release.targets.get(platform_key)
     if target is None:
-        target = _release_target(release, runtime)
+        message = f"static release has no target for {platform_key}"
+        raise RuntimeError(message)
     asset = manifest.platforms.get(target)
     if asset is None:
         message = f"static release {manifest.version} missing platform {target}"
