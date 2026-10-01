@@ -7,6 +7,9 @@
   "defaultTools": ["+codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
+  "find": {
+    "classifier": "opencode/jev-1.13-free"
+  },
   "followUpMode": "all",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.99.2",
