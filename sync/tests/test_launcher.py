@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -1074,8 +1075,36 @@ def test_npm_prune_keeps_every_version_when_running_processes_are_unknown(
     assert _version_names(versions) == {"1.0.0", "2.0.0", "3.0.0"}
 
 
-def test_running_executables_lists_this_process_on_the_host_platform() -> None:
-    """The real detector sees the interpreter running this test (Linux and macOS)."""
-    running = asyncio.run(running_executables())
+def test_running_executables_lists_a_running_child_on_the_host_platform() -> None:
+    """The real detector sees a child process by the image the kernel reports.
+
+    The expected path comes from the kernel (``/proc/<pid>/exe`` on Linux, the
+    child's own lsof ``txt`` mapping on macOS), not from ``sys.executable``:
+    framework Python builds on macOS re-exec into ``Python.app``, so the
+    interpreter path differs from the image that actually runs.
+    """
+    script = "import time; time.sleep(30)"
+    child = subprocess.Popen([sys.executable, "-c", script])  # noqa: S603 - this interpreter
+    try:
+        running = asyncio.run(running_executables())
+        expected = _child_image(child.pid)
+    finally:
+        child.kill()
+        _ = child.wait()
     assert running is not None
-    assert Path(os.path.realpath(sys.executable)) in running
+    assert expected in running
+
+
+def _child_image(pid: int) -> Path:
+    """Return the executable image the kernel reports for ``pid``."""
+    proc_exe = Path(f"/proc/{pid}/exe")
+    if proc_exe.exists():
+        return Path(os.path.realpath(proc_exe))
+    listing = subprocess.run(  # noqa: S603 - fixed lsof invocation in tests
+        ["lsof", "-n", "-w", "-a", "-p", str(pid), "-d", "txt", "-Fn"],  # noqa: S607 - lsof from PATH
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout
+    first = next(line[1:] for line in listing.splitlines() if line.startswith("n/"))
+    return Path(os.path.realpath(first))
