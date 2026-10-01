@@ -15,7 +15,11 @@ if TYPE_CHECKING:
     from models import MarketplaceId, RawMarketListing, SearchTarget
 
 _LINK_HEAD_PAT = r"\[([^\]]+)\]\((https://www\.kinguin\.net/category/[^)]+)\)"
-_LINK_TAIL_PAT = r"[\s\S]*?([0-9]+(?:\.[0-9]+)?)\s*(?:USD|\$|EUR|€)"
+# Live markdown shows "From\n$6.01"; older layouts show "6.01 USD".
+_LINK_TAIL_PAT = (
+    r"[\s\S]*?(?:From\s*[$€]\s*([0-9]+(?:\.[0-9]+)?)"
+    r"|([0-9]+(?:\.[0-9]+)?)\s*(?:USD|\$|EUR|€))"
+)
 _LINK_RE = re.compile(f"{_LINK_HEAD_PAT}{_LINK_TAIL_PAT}")
 
 
@@ -46,7 +50,7 @@ class KinguinAdapter:
             for match in _LINK_RE.finditer(raw):
                 title = match.group(1).strip() if match.group(1) else ""
                 url = match.group(2)
-                price = match.group(3)
+                price = match.group(3) or match.group(4)
                 if title and price and "logo" not in title and "Sign in" not in title:
                     item: RawScrapedItem = {
                         "title": title,

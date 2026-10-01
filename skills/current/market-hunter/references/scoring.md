@@ -37,6 +37,7 @@ Where:
 - `STUDENT_PACK`: Base Score = $65$. Pre-activated educational pack credentials.
 - `SHARED_POOL`: Base Score = $30$. Shared account across multiple simultaneous users.
 - `SESSION_COOKIE`: Base Score = $0$. Raw session token or cookie injection.
+- `CREDENTIALS_REQUIRED`: Base Score = $0$. Seller logs into the buyer account (manual or login top-up). "Without login" and "redeem by yourself" wording overrides this class.
 
 ## 4. Warranty & Guarantee Score ($S_{\text{warranty}}$)
 
@@ -55,9 +56,16 @@ Where:
 - Short lifetime / change password in 1 hour: $-35\text{ pts}$.
 - No replacement warranty: $-30\text{ pts}$.
 - Reported ban risk: $-25\text{ pts}$.
+- Carrier bundle stock (Jio, telecom, SIM, carrier): $-40\text{ pts}$.
+- Family or group invite: $-15\text{ pts}$.
 
 ### Hard Circuit Breakers
 Any of the following immediately sets $S = 5$ and tier to `CONFIRMED_SCAM`:
 1. Format is `SESSION_COOKIE` or description contains cookie injection methods.
-2. Seller positive feedback is below $75\%$.
-3. Price ratio is extremely low on a dedicated account for a premium service.
+2. Format is `CREDENTIALS_REQUIRED`.
+3. Seller positive feedback is below $75\%$.
+4. Price ratio is extremely low on a dedicated account for a premium service.
+
+## Price per month
+
+When a title states a term (`12 Months`, `18-Month`, `1 Year`, `annual`), the deal carries `months` and `pricePerMonthUsd = priceUsd / months`, rounded to cents. Terms over 36 months are ignored as parse noise. The trust score does not use this field; rank by it when comparing mixed durations.

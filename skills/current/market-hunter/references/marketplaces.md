@@ -1,122 +1,47 @@
-# Marketplace Profiles, Catalog Breakdown & Priority Routing
+# Marketplace navigation and markup
 
-Comprehensive reference on supported marketplace adapters, catalog specialties, buyer protections, and optimal search priority routing.
+This page covers how each adapter reaches its marketplace, the markup each parser expects, and what listing wording means for buyer safety. It lists no products, category IDs, or prices. Find those live with the `parallel` and `firecrawl` skills.
 
-## Marketplace Catalog Specialties & Strengths
+## Navigation
 
-### 1. G2A (`g2a`)
-- **Primary Catalog Strengths**:
-  - Brand promotional trial and activation links (e.g. Google AI Gemini Pro multi-month activation links).
-  - Software license keys and global retail software.
-  - Gaming gift cards and prepaid subscription cards.
-- **Why It Is Good**:
-  - High inventory of legitimate brand partnership promo codes.
-  - Native PayPal and Apple Pay integration with instant automated key delivery.
-  - Strong buyer protection and dispute resolution.
-- **Top Product Sweet Spots**:
-  - Google Gemini Pro multi-month global activation links.
-  - Windows Pro and Office retail license keys.
-- **When to Prioritize G2A**: Prioritize when searching for Google AI / Gemini Advanced activation links or when PayPal payment protection is required.
+| Market | Default target | Discovery when the default fails |
+| --- | --- | --- |
+| `plati` | `plati.io/api/search.ashx` JSON search | None needed |
+| `g2a` | `g2a.com/search?query=`, scraped by Firecrawl | None needed |
+| `kinguin` | `kinguin.net/listing?phrase=`, scraped by Firecrawl | None needed |
+| `funpay` | `funpay.com/en/` home page, which has no offers | Pass category pages with `--url` |
+| `z2u` | `z2u.com/search?q=`, which renders client-side | Pass category pages with `--url` |
 
----
+To find FunPay or Z2U category pages, use either route:
 
-### 2. Plati.Market (`plati`)
-- **Primary Catalog Strengths**:
-  - Direct wholesale pre-activated AI accounts (`login:password` format).
-  - GitHub Copilot annual student and open-source developer packs.
-  - Windows, Office, and Microsoft OEM lifetime keys.
-  - Adobe Creative Cloud enterprise and student team seats.
-  - Canva Pro lifetime team invites.
-- **Why It Is Good**:
-  - The direct wholesale bazaar where resellers from other platforms source inventory.
-  - Lowest base prices on the web with minimal reseller markup.
-  - Automated instant text delivery (credentials displayed on screen seconds after payment).
-  - High-volume sellers with tens of thousands of verified positive sales.
-- **Top Product Sweet Spots**:
-  - ChatGPT Plus dedicated personal accounts with email access.
-  - GitHub Copilot 1-year developer accounts.
-  - Windows Pro lifetime retail keys.
-  - Canva Pro lifetime team access.
-- **When to Prioritize Plati**: Prioritize when looking for dedicated ChatGPT Plus accounts, GitHub Copilot annual licenses, or permanent software OEM keys.
+- The `parallel` skill: search for the product with the domain restricted to `funpay.com` or `z2u.com`.
+- The `firecrawl` skill: `map https://funpay.com --search <product>` or `map https://www.z2u.com --search <product>`.
 
----
+Pass listing pages, not single offers. FunPay listing pages look like `/en/lots/<id>/`. Z2U listing pages look like `/<slug>/<category>-<n>-<id>`.
 
-### 3. Kinguin (`kinguin`)
-- **Primary Catalog Strengths**:
-  - Perplexity Pro annual promotional keys (telecom and device partner codes).
-  - Gemini Advanced subscriptions.
-  - VPN subscriptions (NordVPN, Surfshark, ExpressVPN multi-year keys).
-  - Security, antivirus, and utility software licenses.
-- **Why It Is Good**:
-  - Clean payment checkout with low processing fees.
-  - Fast automated digital dispatch.
-  - High availability of annual promotional campaign codes.
-- **Top Product Sweet Spots**:
-  - Perplexity Pro 1-year promo redemption keys.
-  - Multi-year VPN accounts and security suites.
-- **When to Prioritize Kinguin**: Prioritize when looking for Perplexity Pro annual codes, VPN subscriptions, or clean payment checkouts.
+## Markup notes
 
----
+These parser assumptions broke against live pages. Check them first when a market shows up in `degraded_markets`.
 
-### 4. Z2U (`z2u`)
-- **Primary Catalog Strengths**:
-  - Cursor Pro pre-activated accounts and team seats.
-  - Claude Pro dedicated accounts and team workspace seats.
-  - Raw pre-created Google and Gmail accounts (PVA, aged profiles, bulk packs).
-  - Multi-account developer packs for automated scraping and agent load-balancing.
-- **Why It Is Good**:
-  - Built specifically for digital account transfers, PVA emails, and developer multi-accounts.
-  - Direct P2P seller live chat before and after purchase.
-  - Large inventory of aged, high-trust email accounts.
-- **Top Product Sweet Spots**:
-  - Cursor Pro monthly accounts.
-  - Claude Pro accounts.
-  - Bulk Gmail PVA accounts and aged Google accounts.
-- **When to Prioritize Z2U**: Prioritize when looking for Cursor Pro IDE accounts, Claude Pro access, or bulk Google/Gmail infrastructure.
+- FunPay serves complete offer HTML to a plain fetch. Offer anchors put `href` before `class="tc-item"`, so the parser matches either attribute order. Prices are in EUR unless the request sends the `cy=usd` cookie. `rating-mini-count` holds the seller review count.
+- Z2U category pages serve product cards to a plain fetch: `productCardStyle` anchors that contain `title`, `fromAttr`, and `priceTxt` spans. The card price is the cheapest seller's price.
+- Kinguin markdown from Firecrawl shows `From` and then `$X.XX`, with the symbol first. Detail pages often require login, so use list prices. Keys labeled "ONLY FOR NEW ACCOUNTS" need an eligibility check.
+- G2A listings state an activation region even on GLOBAL versions. Read the region label before you recommend a listing.
+- Adapters that cannot read seller ratings fill in a fixed default. Treat `positiveFeedbackPercent` from G2A, Kinguin, Z2U, and FunPay as unmeasured.
 
----
+## Delivery wording
 
-### 5. FunPay (`funpay`)
-- **Primary Catalog Strengths**:
-  - Discord Nitro annual gifts with server boosts.
-  - Telegram Premium annual subscriptions (via TON blockchain and regional gifts).
-  - Streaming family slot upgrades (Spotify Premium, YouTube Premium, Apple Music).
-  - Custom balance top-ups (Zhipu BigModel, DeepSeek prepaid credits).
-- **Why It Is Good**:
-  - Strict buyer-first escrow protection: the seller receives zero funds until the buyer tests the account and confirms the order.
-  - Direct peer-to-peer pricing with zero reseller markups.
-  - Seller online status indicators and live messaging.
-- **Top Product Sweet Spots**:
-  - Discord Nitro annual gifts.
-  - Telegram Premium annual subscriptions.
-  - YouTube Premium and Spotify Premium personal email family upgrades.
-- **When to Prioritize FunPay**: Prioritize for Discord Nitro, Telegram Premium, personal email streaming upgrades, or when strict escrow verification is required.
+| Listing wording | Verdict | CLI format |
+| --- | --- | --- |
+| Manual Top Up, Login Top Up, By logging in, Put into my account | Credentials required. Never recommend. | `CREDENTIALS_REQUIRED` |
+| Redeem Link, Self Redeem, Digital key, Activation Link, Activation Code, Without login | Buyer activates it. Safe default. | `PROMO_LINK_OR_CODE` |
+| Invite, Family Invitation, Family Plan Member, Slot | Family or group. Conditional, with lockout risk. | `BUYER_EMAIL_UPGRADE` |
 
----
+The CLI classifies from the title and any delivery label on the listing page. Confirm the delivery method on the product page, because sellers put carrier stock and login top-ups under self-redeem titles.
 
-## Optimal Product-to-Marketplace Priority Routing
+## Add a marketplace adapter
 
-When searching for specific services, query the highest-priority marketplaces first:
-
-| Target Category / Service | Primary Marketplace | Secondary Marketplace | Typical Savings vs Retail |
-| :--- | :--- | :--- | :---: |
-| **Google Gemini Advanced 2TB (3M/6M)** | **G2A** | **Kinguin** | Heavy Discount |
-| **ChatGPT Plus (Dedicated Account)** | **Plati.Market** | **FunPay** | Wholesale Level |
-| **GitHub Copilot (1 Year)** | **Plati.Market** | **Z2U** | Heavy Discount |
-| **Claude Pro (Dedicated / Team)** | **Z2U** | **FunPay** | Significant Savings |
-| **Perplexity Pro (1 Year Code)** | **Kinguin** | **Eneba** | Heavy Discount |
-| **Cursor Pro (Monthly)** | **Z2U** | **FunPay** | Significant Savings |
-| **Bulk Google / Gmail Accounts (PVA/Aged)** | **Z2U** | **Plati.Market** | Wholesale Rates |
-| **Discord Nitro & Telegram Premium** | **FunPay** | **Plati.Market** | Heavy Discount |
-| **Spotify & YouTube Premium (Family Upgrade)** | **FunPay** | **Plati.Market** | Heavy Discount |
-| **Windows 11 & Office 2024 (Retail/OEM)** | **Plati.Market** | **Kinguin** | Heavy Discount |
-
----
-
-## How to Add a New Marketplace Adapter
-
-To add a new marketplace (for example, `eneba` or `gamivo`):
-
-1. Create `lib/adapters/<name>.py` implementing the `MarketplaceAdapter` protocol.
-2. Register the adapter in `lib/adapters/__init__.py` using `register_adapter(NewAdapter())`.
-3. The core engine will automatically include the new marketplace in multi-market scans without requiring any changes to CLI or scoring logic.
+1. Create `lib/adapters/<name>.py` that implements the `MarketplaceAdapter` protocol in `lib/models.py`.
+2. Register it in `register_builtin_adapters` in `lib/adapters/__init__.py`.
+3. Make `<name>` appear as a label in the marketplace hostname, because `--url` routes each URL to the adapter whose `id` is one of the host's labels.
+4. Add a parser test built from real page markup to `tests/test_market_hunter.py`.

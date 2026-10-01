@@ -9,106 +9,60 @@ metadata:
 
 # Market Hunter
 
-Scan, verify, and score software subscriptions, developer accounts, and digital licenses across secondary digital marketplaces.
+Scan, verify, and score software subscriptions, developer accounts, and digital licenses on G2A, Kinguin, Plati.Market, Z2U, and FunPay.
 
-## Activation Triggers
+## Buyer gates
 
-- User asks to search, find deals, compare prices, or purchase discounted accounts or subscriptions (ChatGPT Plus, Claude Pro, Gemini Advanced, GitHub Copilot, Cursor Pro, Perplexity Pro, Windows/Office, VPNs).
-- User asks to check seller reliability, trust scores, or verify whether a digital marketplace listing is legitimate or a shared scam.
-- Marketplaces covered: G2A, Kinguin, Plati.Market, Z2U, and FunPay.
+Apply these on every recommendation:
 
-## Marketplace Strengths and Priority Routing
+- NEVER recommend a listing where the seller logs into the buyer account ("Manual Top Up", "Login Top Up", "By logging in"). The CLI classifies these as `CREDENTIALS_REQUIRED` and trips the circuit breaker.
+- Prefer self-activated links, codes, and keys. Self-redeem links usually require the target account to have no active paid subscription.
+- Treat carrier bundle stock (Jio, telecom, SIM) as revocable: providers audit the line and cancel the promo. Sellers relabel this stock under partner titles, so read the seller description, not just the title.
+- Recommend family or group invites only when the user allows them. Google allows one paid family-group switch per 12 months; a dead seller group strands the buyer for that window.
+- Rank by `pricePerMonthUsd`, not headline price. Prefer 12-month or longer terms.
+- Drop sellers whose only payment route the user cannot use. Ask about payment methods when unknown.
 
-- **Google Gemini Advanced 2TB (3M/6M)**: Prioritize **G2A** (promotional brand links) and **Kinguin**.
-- **ChatGPT Plus (Dedicated Accounts)**: Prioritize **Plati.Market** (direct wholesale personal accounts) and **FunPay**.
-- **GitHub Copilot (1-Year Packs)**: Prioritize **Plati.Market** (student and developer packs) and **Z2U**.
-- **Claude Pro (Dedicated / Team)**: Prioritize **Z2U** (pre-activated dedicated logins) and **FunPay**.
-- **Cursor Pro (Monthly)**: Prioritize **Z2U** and **FunPay**.
-- **Perplexity Pro (1-Year Keys)**: Prioritize **Kinguin** (promotional voucher codes).
-- **Bulk Google / Gmail Accounts (PVA/Aged)**: Prioritize **Z2U** and **Plati.Market**.
-- **Discord Nitro & Telegram Premium**: Prioritize **FunPay** (P2P escrow) and **Plati.Market**.
-- **Windows 11 & Office 2024 (OEM/Retail)**: Prioritize **Plati.Market** (lifetime retail keys) and **Kinguin**.
-
-## Public CLI Entrypoint
-
-Run via uv:
+## Public entrypoint
 
 ```text
 uv run --script skills/current/market-hunter/scripts/cli.py "<query>" [options]
 ```
 
-## Common Command Recipes
+Requires `FIRECRAWL_API_KEY` for scraped marketplaces (G2A, Kinguin).
 
-Search for ChatGPT Plus deals with a budget ceiling:
-```bash
-uv run --script skills/current/market-hunter/scripts/cli.py "ChatGPT Plus" --budget 15
+## Workflow
+
+1. Run a default scan: `<cli> "<query>" --json`. Plati, G2A, and Kinguin search directly.
+2. FunPay has no search, and Z2U search renders client-side, so their default targets return nothing useful. Find their category pages with the `parallel` skill (search restricted to `funpay.com` or `z2u.com`) or the `firecrawl` skill (`map <site> --search <product>`). Then scan those pages: `<cli> "<query>" --url <page> [--url <page>] --json`.
+3. Treat a market listed in `degraded_markets` as a parser or routing failure until proven otherwise. Scrape the page with the `firecrawl` skill and read the raw markup before concluding the market has no stock.
+4. Open the product page of each shortlisted offer and confirm the delivery method, region (for example "Can activate in <country>"), stock, and seller terms. Category labels hide login versus self-redeem differences.
+5. Present a short ranked list: $/mo, total, term, seller with sales count, direct link, and a one-line caveat each. End with one explicit pick.
+
+## Common calls
+
+```text
+<cli> "ChatGPT Plus" --budget 15
+<cli> "Claude Pro" --type account
+<cli> "Gemini Pro 12 Months" --markets g2a,kinguin,plati --json
+<cli> "Gemini Pro" --url https://funpay.com/en/lots/<id>/ --url https://www.z2u.com/<slug>/<category> --json
+<cli> "GitHub Copilot 1 Year" --full
 ```
 
-Search specifically for dedicated personal accounts:
-```bash
-uv run --script skills/current/market-hunter/scripts/cli.py "Claude Pro" --type account
-```
+`--url` replaces default targets and routes each page to the adapter that matches its host; an unsupported host exits `2`. `--full` keeps filtered low-trust listings for debugging.
 
-Search across specific marketplaces and output JSON:
-```bash
-uv run --script skills/current/market-hunter/scripts/cli.py "Gemini Pro 6 Months" --markets g2a,kinguin,plati --json
-```
+## Output contract
 
-Include all listings (including filtered low-trust offers) for debugging:
-```bash
-uv run --script skills/current/market-hunter/scripts/cli.py "GitHub Copilot 1 Year" --full
-```
+`--json` emits `{"ok":true,"schema_version":1,"command":"scan","data":{...}}`. `data` carries `query`, `budget`, `total_scanned`, `valid_deals_count`, `filtered_scams_count`, `top_deals`, `markets_queried`, and `degraded_markets`. Each deal carries `priceUsd`, `trustScore`, `trustTier`, `deliveryFormat`, `seller`, `detectedRedFlags`, and, when the title states a term, `months` and `pricePerMonthUsd`. Seller ratings that a marketplace does not expose are adapter defaults, not measurements.
 
-## Output Contract
-
-The CLI outputs clean, human-readable terminal reports by default and structured JSON when `--json` is supplied:
-
-```json
-{
-  "ok": true,
-  "schema_version": 1,
-  "command": "scan",
-  "data": {
-    "query": "ChatGPT Plus",
-    "budget": 15,
-    "total_scanned": 42,
-    "valid_deals_count": 8,
-    "filtered_scams_count": 34,
-    "top_deals": [
-      {
-        "id": "plati-4313142",
-        "marketplace": "plati",
-        "title": "ChatGPT Plus Dedicated Personal Account",
-        "url": "https://plati.market/itm/4313142",
-        "priceUsd": 9.03,
-        "trustScore": 92,
-        "trustTier": "STRONG_BUY",
-        "deliveryFormat": "DEDICATED_ACCOUNT",
-        "seller": {
-          "name": "DigitalKing",
-          "positiveFeedbackPercent": 99.8,
-          "totalSalesCount": 26240
-        },
-        "warrantyDays": 30,
-        "discountVsMsrpPercent": 55,
-        "recommendationSummary": "STRONG_BUY: Verified discount vs retail"
-      }
-    ],
-    "markets_queried": ["g2a", "kinguin", "plati", "z2u", "funpay"],
-    "degraded_markets": []
-  }
-}
-```
-
-## Exit Codes
+## Exit codes
 
 - `0`: Successful scan and report emission.
 - `1`: Unexpected runtime failure (stack trace on stderr).
-- `2`: Invalid command arguments.
+- `2`: Invalid arguments or unsupported `--url` host.
 
-## Required Follow-Up Reads
+## Required follow-up reads
 
 | Need | Read | When |
 |---|---|---|
-| Scoring formulas, Bayesian math & red flags | `references/scoring.md` | Inspecting or tuning the 0-100 Trust and Deal Scoring Engine |
-| Marketplace catalog profiles, routes & new adapters | `references/marketplaces.md` | Inspecting platform specialties or adding a new adapter |
+| Scoring formulas, Bayesian math, red flags | `references/scoring.md` | Inspecting or tuning the 0-100 trust and deal score |
+| Navigation, markup notes, delivery wording, new adapters | `references/marketplaces.md` | Finding category pages, debugging a degraded market, or adding an adapter |

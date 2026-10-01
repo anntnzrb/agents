@@ -19,6 +19,7 @@ from engine import execute_scan
 from models import (
     SCHEMA_VERSION,
     DealHunterEnvelope,
+    EngineError,
     ScanOptions,
     ScanResultData,
     ScoredDeal,
@@ -67,6 +68,11 @@ def _format_top_pick(lines: list[str], top_pick: ScoredDeal) -> None:
     score_str = js_number_to_str(top_pick["trustScore"])
     pos_str = js_number_to_str(seller["positiveFeedbackPercent"])
     lines.append(f"- Price: ${price_str} USD ({disc_str}% discount vs retail)")
+    if "pricePerMonthUsd" in top_pick:
+        per_month = js_to_fixed2(top_pick["pricePerMonthUsd"])
+        lines.append(
+            f"- Per Month: ${per_month} USD over {top_pick.get('months')} months"
+        )
     lines.append(f"- Trust & Deal Score: {score_str}/100 [{top_pick['trustTier']}]")
     lines.append(f"- Delivery Format: {top_pick['deliveryFormat']}")
     lines.append(f"- Seller: {seller['name']} ({pos_str}% positive{sales_suffix})")
@@ -95,6 +101,9 @@ def _format_ranked_deal(lines: list[str], rank: int, deal: ScoredDeal) -> None:
     )
     lines.append(f"   Title: {deal['title']}")
     lines.append(f"   Format: {fmt} | Seller: {seller_name} ({pos_str}%)")
+    if "pricePerMonthUsd" in deal:
+        per_month = js_to_fixed2(deal["pricePerMonthUsd"])
+        lines.append(f"   Per Month: ${per_month} over {deal.get('months')} months")
     lines.append(f"   Link: {deal['url']}")
     if len(deal["detectedRedFlags"]) > 0:
         lines.append(f"   Flags: {', '.join(deal['detectedRedFlags'])}")
@@ -185,6 +194,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of marketplaces (g2a, kinguin, plati, z2u, funpay)",
     )
     _ = parser.add_argument(
+        "--url",
+        action="append",
+        default=None,
+        help="Marketplace listing page to scan instead of default targets (repeat)",
+    )
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help="Emit raw JSON envelope only",
@@ -232,8 +247,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         options["budget"] = float(budget_raw)
     if markets is not None:
         options["markets"] = markets
+    urls_raw: object = getattr(args, "url", None)
+    if is_object_list(urls_raw):
+        options["urls"] = [str(u) for u in urls_raw]
 
-    result_data = execute_scan(options)
+    try:
+        result_data = execute_scan(options)
+    except EngineError as err:
+        print(f"market-hunter: {err.message}", file=sys.stderr)
+        return 2
 
     if bool(json_raw):
         emit_json(result_data)

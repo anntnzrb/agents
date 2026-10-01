@@ -14,6 +14,7 @@ type DeliveryFormat = Literal[
     "STUDENT_PACK",
     "SHARED_POOL",
     "SESSION_COOKIE",
+    "CREDENTIALS_REQUIRED",
     "UNKNOWN",
 ]
 
@@ -72,6 +73,8 @@ class ScoredDeal(RawMarketListing):
     isCircuitBreakerTripped: bool
     circuitBreakerReason: NotRequired[str]
     discountVsMsrpPercent: float
+    months: NotRequired[int]
+    pricePerMonthUsd: NotRequired[float]
     recommendationSummary: str
 
 
@@ -82,6 +85,7 @@ class SearchTarget(TypedDict):
     url: str
     format: Literal["json", "api", "html"]
     queryParams: NotRequired[dict[str, str]]
+    headers: NotRequired[dict[str, str]]
     waitForMs: NotRequired[int]
 
 
@@ -109,6 +113,7 @@ class ScanOptions(TypedDict):
     typeFilter: NotRequired[str]
     minScore: NotRequired[int]
     markets: NotRequired[list[str]]
+    urls: NotRequired[list[str]]
     timeoutSeconds: NotRequired[float]
     jsonOnly: NotRequired[bool]
     full: NotRequired[bool]

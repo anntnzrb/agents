@@ -59,7 +59,22 @@ RED_FLAG_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
         100,
         "Carded / Fraudulent Origin",
     ),
+    (
+        re.compile(r"\bjio\b|telecom|\bsim\b|carrier", re.IGNORECASE),
+        40,
+        "Carrier Bundle Stock (Provider Revokes After SIM Audit)",
+    ),
+    (
+        re.compile(r"family|invit", re.IGNORECASE),
+        15,
+        "Family/Group Invite (Platform Switch Lockout Risk)",
+    ),
 )
+
+_MONTHS_RE = re.compile(r"(\d{1,2})\s*-?\s*(?:months?|mo\b|m\b)", re.IGNORECASE)
+_YEARS_RE = re.compile(r"(\d)\s*-?\s*(?:years?|yr)\b", re.IGNORECASE)
+_ONE_YEAR_RE = re.compile(r"\b(?:annual|yearly|1y)\b", re.IGNORECASE)
+_MAX_MONTHS = 36
 
 
 # Price sanity ratio thresholds (priceUsd / msrp)
@@ -119,6 +134,19 @@ def estimate_msrp(title: str) -> int:
     return 20
 
 
+def parse_months(title: str) -> int | None:
+    """Return the subscription term in months stated by a title, if any."""
+    if match := _MONTHS_RE.search(title):
+        months = int(match.group(1))
+    elif match := _YEARS_RE.search(title):
+        months = int(match.group(1)) * 12
+    elif _ONE_YEAR_RE.search(title):
+        months = 12
+    else:
+        return None
+    return months if 0 < months <= _MAX_MONTHS else None
+
+
 def compute_price_sanity(price_usd: float, msrp: float) -> int:
     """Score the price-to-MSRP ratio against arbitrage sanity curves."""
     if price_usd <= 0 or msrp <= 0:
@@ -166,6 +194,7 @@ _FORMAT_SCORES: dict[str, int] = {
     "STUDENT_PACK": 65,
     "SHARED_POOL": 30,
     "SESSION_COOKIE": 0,
+    "CREDENTIALS_REQUIRED": 0,
 }
 
 
@@ -194,6 +223,8 @@ def _check_circuit_breaker(
     """Evaluate hard circuit breakers on suspicious or banned offers."""
     if listing["deliveryFormat"] == "SESSION_COOKIE" or "cookie" in searchable_text:
         return True, "High-risk session cookie injection detected"
+    if listing["deliveryFormat"] == "CREDENTIALS_REQUIRED":
+        return True, "Seller logs into the buyer account (credentials required)"
     if listing["seller"]["positiveFeedbackPercent"] < _MIN_SELLER_FEEDBACK_PERCENT:
         pct_str = js_number_to_str(listing["seller"]["positiveFeedbackPercent"])
         return True, f"Low seller feedback rating ({pct_str}%)"
@@ -303,5 +334,9 @@ def score_listing(listing: RawMarketListing) -> ScoredDeal:
         deal["description"] = listing["description"]
     if circuit_breaker_reason is not None:
         deal["circuitBreakerReason"] = circuit_breaker_reason
+    months = parse_months(listing["title"])
+    if months is not None:
+        deal["months"] = months
+        deal["pricePerMonthUsd"] = round(listing["priceUsd"] / months, 2)
 
     return deal

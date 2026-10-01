@@ -13,20 +13,11 @@ from adapters.common import (
 if TYPE_CHECKING:
     from models import MarketplaceId, RawMarketListing, SearchTarget
 
-CATEGORY_MAP: dict[str, str] = {
-    "chatgpt": "https://funpay.com/en/lots/1355/",
-    "claude": "https://funpay.com/en/lots/4187/",
-    "copilot": "https://funpay.com/en/lots/4150/",
-    "cursor": "https://funpay.com/en/lots/3736/",
-    "gemini": "https://funpay.com/en/lots/4093/",
-    "discord": "https://funpay.com/en/lots/596/",
-    "telegram": "https://funpay.com/en/lots/1266/",
-    "spotify": "https://funpay.com/en/lots/372/",
-}
-
+# Live markup puts href before class; match either attribute order.
 _OFFER_RE = re.compile(
-    r'<a[^>]*class="[^"]*tc-item[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>'
+    r'<a\b(?=[^>]*\bclass="[^"]*\btc-item\b)[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)</a>'
 )
+_REVIEWS_RE = re.compile(r'<span[^>]*class="[^"]*rating-mini-count[^"]*"[^>]*>(\d+)<')
 _DESC_RE = re.compile(r'<div[^>]*class="[^"]*tc-desc-text[^"]*"[^>]*>([\s\S]*?)</div>')
 _USER_RE = re.compile(
     r'<div[^>]*class="[^"]*media-user-name[^"]*"[^>]*>([\s\S]*?)</div>'
@@ -48,20 +39,15 @@ class FunPayAdapter:
     is_enabled_by_default: bool = True
 
     def build_search_target(self, query: str) -> SearchTarget:
-        """Build the FunPay lot-category URL for a query."""
-        q_lower = query.lower()
-        target_url = "https://funpay.com/en/lots/1355/"  # default to AI/chatgpt
-
-        for key, url in CATEGORY_MAP.items():
-            if key in q_lower:
-                target_url = url
-                break
-
+        """Build the FunPay fetch target; FunPay has no search, so pass --url."""
+        _ = query
         return {
             "marketplace": self.id,
-            "url": target_url,
+            "url": "https://funpay.com/en/",
             "waitForMs": 1500,
             "format": "api",  # Allows direct fast HTML fetch & parse
+            # Without this cookie FunPay prices in EUR.
+            "headers": {"Cookie": "cy=usd"},
         }
 
     def parse_listings(self, raw: object) -> list[RawMarketListing]:
@@ -82,6 +68,7 @@ class FunPayAdapter:
                 desc_match = _DESC_RE.search(block)
                 user_match = _USER_RE.search(block)
                 price_match = _PRICE_RE.search(block)
+                reviews_match = _REVIEWS_RE.search(block)
 
                 title = _strip_tags(desc_match.group(1)) if desc_match else ""
                 seller_name = (
@@ -104,6 +91,9 @@ class FunPayAdapter:
                             "sellerName": seller_name,
                             "priceUsd": price_raw,
                             "sellerRating": 99,
+                            "reviewsCount": (
+                                reviews_match.group(1) if reviews_match else "0"
+                            ),
                             "url": (
                                 href
                                 if href.startswith("http")

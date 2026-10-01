@@ -7,10 +7,12 @@ import subprocess
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, TypedDict
+from urllib.parse import urlsplit
 
 from adapters import register_builtin_adapters
 from firecrawl import Firecrawl
-from registry import resolve_adapters
+from models import EngineError
+from registry import get_available_adapters, resolve_adapters
 from scoring import score_listing
 
 if TYPE_CHECKING:
@@ -52,6 +54,7 @@ def _fetch_api_target(target: SearchTarget, timeout_seconds: float) -> object | 
                 "User-Agent": f"{ua_prefix} AppleWebKit/537.36",
                 "Accept": "application/json, text/html;q=0.9, */*;q=0.8",
                 "Accept-Language": "en-US,en;q=0.9",
+                **target.get("headers", {}),
             },
         )
         opener: Callable[..., AbstractContextManager[object]] = urllib.request.urlopen
@@ -180,9 +183,12 @@ def fetch_adapter_listings(
     query: str,
     firecrawl_api_key: str | None = None,
     timeout_seconds: float = _DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    url: str | None = None,
 ) -> list[RawMarketListing]:
     """Fetch and normalize listings for one adapter; degrade to [] on failure."""
     target = adapter.build_search_target(query)
+    if url is not None:
+        target["url"] = url
 
     if target["format"] == "api":
         raw_data = _fetch_api_target(target, timeout_seconds)
@@ -261,6 +267,29 @@ def _filter_deals(
     return valid_deals, filtered_scams_count
 
 
+def _resolve_jobs(
+    options: ScanOptions,
+) -> list[tuple[MarketplaceAdapter, str | None]]:
+    """Pair adapters with explicit --url pages by host, else default targets."""
+    urls = options.get("urls")
+    if not urls:
+        return [(a, None) for a in resolve_adapters(options.get("markets"))]
+    jobs: list[tuple[MarketplaceAdapter, str | None]] = []
+    for url in urls:
+        host = (urlsplit(url).hostname or "").lower()
+        adapter = next(
+            (a for a in get_available_adapters() if a.id in host.split(".")), None
+        )
+        if adapter is None:
+            raise EngineError(
+                "unsupported_url",
+                f"no marketplace adapter matches {host or url}",
+                {"url": url},
+            )
+        jobs.append((adapter, url))
+    return jobs
+
+
 def execute_scan(options: ScanOptions) -> ScanResultData:
     """Run the multi-marketplace scan and return the result payload."""
     register_builtin_adapters()
@@ -273,14 +302,15 @@ def execute_scan(options: ScanOptions) -> ScanResultData:
         cli_fallback_available=cli_fallback_available,
     )
 
-    adapters = resolve_adapters(options.get("markets"))
-    markets_queried: list[MarketplaceId] = [a.id for a in adapters]
+    jobs = _resolve_jobs(options)
+    markets_queried: list[MarketplaceId] = list(dict.fromkeys(a.id for a, _ in jobs))
     degraded_markets: list[MarketplaceId] = []
     timeout_seconds = _request_timeout(options)
 
-    def _run_adapter(adapter: MarketplaceAdapter) -> _AdapterRunResult:
+    def _run_adapter(job: tuple[MarketplaceAdapter, str | None]) -> _AdapterRunResult:
+        adapter, url = job
         listings = fetch_adapter_listings(
-            adapter, options["query"], timeout_seconds=timeout_seconds
+            adapter, options["query"], timeout_seconds=timeout_seconds, url=url
         )
         return {
             "id": adapter.id,
@@ -289,7 +319,7 @@ def execute_scan(options: ScanOptions) -> ScanResultData:
         }
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        adapter_results = list(pool.map(_run_adapter, adapters))
+        adapter_results = list(pool.map(_run_adapter, jobs))
 
     raw_listings: list[RawMarketListing] = []
     for r in adapter_results:

@@ -36,6 +36,17 @@ class RawScrapedItem(TypedDict, total=False):
     description: str
 
 
+# Seller logs into the buyer account: never a self-service delivery.
+_CREDENTIAL_PHRASES = (
+    r"top[\s-]*up",
+    r"by\s*logging",
+    r"log\s*in\s*to\s*(?:your|the|my)\s*account",
+    r"put\s*(?:it\s*)?into\s*(?:my|your)\s*account",
+)
+_CREDENTIALS_RE = re.compile("|".join(_CREDENTIAL_PHRASES))
+_SELF_SERVICE_RE = re.compile(
+    r"without\s*log|no\s*login|self[\s-]*redeem|redeem\s*by\s*yourself"
+)
 _FLOAT_PREFIX_RE = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)")
 _NON_NUMERIC_DOT_RE = re.compile(r"[^0-9.]")
 _NON_DIGIT_RE = re.compile(r"[^0-9]")
@@ -122,6 +133,8 @@ def detect_delivery_format(title: str, raw_type: object = None) -> DeliveryForma
         or "auth token" in combined
     ):
         return "SESSION_COOKIE"
+    if _CREDENTIALS_RE.search(combined) and not _SELF_SERVICE_RE.search(combined):
+        return "CREDENTIALS_REQUIRED"
     if (
         "shared" in combined
         or "family pool" in combined
@@ -134,7 +147,6 @@ def detect_delivery_format(title: str, raw_type: object = None) -> DeliveryForma
     if (
         "invite" in combined
         or "upgrade your" in combined
-        or "top up" in combined
         or "on your email" in combined
     ):
         return "BUYER_EMAIL_UPGRADE"

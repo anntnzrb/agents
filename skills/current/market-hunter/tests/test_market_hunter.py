@@ -59,6 +59,7 @@ from scoring import (
     compute_seller_score,
     compute_warranty_score,
     estimate_msrp,
+    parse_months,
     score_listing,
 )
 
@@ -249,9 +250,8 @@ class TestPlatformAdapters:
         )
 
         funpay = FunPayAdapter()
-        assert (
-            "funpay.com/en/lots/1355/"
-            in funpay.build_search_target("ChatGPT Plus")["url"]
+        assert funpay.build_search_target("ChatGPT Plus")["url"] == (
+            "https://funpay.com/en/"
         )
 
     def test_parses_listings_from_mock_api_response(self) -> None:
@@ -519,6 +519,11 @@ class TestCommonHelpers:
         assert detect_delivery_format("personal account") == "DEDICATED_ACCOUNT"
         assert detect_delivery_format("completely opaque") == "UNKNOWN"
         assert detect_delivery_format("plain", "invite link") == "BUYER_EMAIL_UPGRADE"
+        assert detect_delivery_format("Gemini Manual Top Up") == "CREDENTIALS_REQUIRED"
+        assert detect_delivery_format("Pro", "By logging in") == "CREDENTIALS_REQUIRED"
+        assert (
+            detect_delivery_format("Top Up WITHOUT LOGIN link") == "PROMO_LINK_OR_CODE"
+        )
 
     def test_normalize_raw_items_filters_and_defaults(self) -> None:
         items = [
@@ -626,12 +631,52 @@ class TestAdapterScrapeParsing:
         assert funpay.parse_listings({"items": [{"title": "T", "price": 3}]})
         assert funpay.parse_listings("no funpay host here") == []
 
-    def test_funpay_category_map_routing(self) -> None:
+    def test_funpay_live_attribute_order_reviews_and_usd_cookie(self) -> None:
         funpay = FunPayAdapter()
-        assert "1355" in funpay.build_search_target("ChatGPT Plus")["url"]
-        assert "4187" in funpay.build_search_target("claude pro")["url"]
-        assert "372" in funpay.build_search_target("spotify duo")["url"]
-        assert "1355" in funpay.build_search_target("unknown thing")["url"]
+        # Live markup (2026-10): href precedes class, extra attributes follow.
+        html = (
+            '<a href="https://funpay.com/en/lots/offer?id=77515940" '
+            'class="tc-item offer-promo" data-online="1">'
+            '<div class="tc-desc-text">ChatGPT Plus 1 Month</div>'
+            '<div class="media-user-name">\nJoister</div>'
+            '<span class="rating-mini-count">17538</span>'
+            '<div class="tc-price" data-s="9.74"><div>9.74 '
+            '<span class="unit">$</span></div></div></a>'
+        )
+        items = funpay.parse_listings(html)
+        assert len(items) == 1
+        assert items[0]["id"] == "77515940"
+        assert items[0]["seller"]["name"] == "Joister"
+        assert items[0]["seller"].get("totalSalesCount") == 17538
+        assert items[0]["priceUsd"] == 9.74
+        target = funpay.build_search_target("ChatGPT Plus")
+        assert target.get("headers") == {"Cookie": "cy=usd"}
+
+    def test_kinguin_symbol_first_from_price(self) -> None:
+        md = (
+            "### [Google AI Pro 12-Month Activation Link]"
+            "(https://www.kinguin.net/category/563150/google-ai-pro-12)\n\n"
+            "From\n\n$4.14\n\n-12%"
+        )
+        items = KinguinAdapter().parse_listings(md)
+        assert len(items) == 1
+        assert items[0]["id"] == "563150"
+        assert items[0]["priceUsd"] == 4.14
+
+    def test_z2u_parses_ssr_category_cards(self) -> None:
+        z2u = Z2uAdapter()
+        html = (
+            '<a class="productCardStyle-3 labelTopShow " '
+            'href="https://www.z2u.com/product-969034/Gemini-12-Months.html" >'
+            '<span class="title">Google AI Pro - 12 Months - Redeem Link</span>'
+            '<span class="fromAttr">Redeem Link</span>'
+            '<span class="priceTxt">$2.74</span></a>'
+        )
+        items = z2u.parse_listings(html)
+        assert len(items) == 1
+        assert items[0]["id"] == "969034"
+        assert items[0]["priceUsd"] == 2.74
+        assert items[0]["deliveryFormat"] == "PROMO_LINK_OR_CODE"
 
 
 class TestScoringEdges:
@@ -686,6 +731,27 @@ class TestScoringEdges:
         deal3 = score_listing(low_feedback)
         assert deal3["isCircuitBreakerTripped"] is True
         assert "seller feedback" in str(deal3.get("circuitBreakerReason", "")).lower()
+
+    def test_credentials_required_trips_breaker(self) -> None:
+        deal = score_listing(_make_listing(title="Gemini Pro Manual Top Up", price=5))
+        assert deal["isCircuitBreakerTripped"] is True
+        assert deal["trustTier"] == "CONFIRMED_SCAM"
+
+    def test_carrier_and_family_listings_are_flagged(self) -> None:
+        jio = score_listing(_make_listing(title="Gemini 18 Months Jio link", price=1))
+        assert any("Carrier" in f for f in jio["detectedRedFlags"])
+        fam = score_listing(_make_listing(title="YouTube Family invite", price=3))
+        assert any("Family" in f for f in fam["detectedRedFlags"])
+
+    def test_parse_months_and_price_per_month(self) -> None:
+        assert parse_months("Gemini Pro 12 Months") == 12
+        assert parse_months("Gemini 18-Month Link") == 18
+        assert parse_months("Copilot 1 Year") == 12
+        assert parse_months("Perplexity annual key") == 12
+        assert parse_months("ChatGPT Plus account") is None
+        deal = score_listing(_make_listing(title="Gemini Pro 12 Months link", price=6))
+        assert deal.get("months") == 12
+        assert deal.get("pricePerMonthUsd") == 0.5
 
     def test_score_listing_trust_tier_ladder(self) -> None:
         good = _make_listing(
@@ -752,6 +818,23 @@ class TestEngineIntegration:
 
         monkeypatch.setattr(engine, "_fetch_api_target", fake_api)
         monkeypatch.setattr(engine, "_scrape_target", fake_scrape)
+
+    def test_execute_scan_explicit_urls_route_by_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[str] = []
+
+        def fake_api(target: SearchTarget, _timeout_seconds: float) -> object | None:
+            seen.append(target["url"])
+            return None
+
+        monkeypatch.setattr(engine, "_fetch_api_target", fake_api)
+        url = "https://funpay.com/en/lots/3173/"
+        result = engine.execute_scan({"query": "claude", "urls": [url]})
+        assert seen == [url]
+        assert result["markets_queried"] == ["funpay"]
+        with pytest.raises(EngineError):
+            _ = engine.execute_scan({"query": "q", "urls": ["https://example.com/x"]})
 
     def test_execute_scan_end_to_end_degraded_markets(
         self, monkeypatch: pytest.MonkeyPatch
