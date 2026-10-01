@@ -20,6 +20,7 @@ from sync.core.harness_adapters import (
     HarnessAdapter,
     HarnessId,
     NpmLauncherSpec,
+    StaticReleaseLauncherSpec,
 )
 from sync.core.tool_launchers import TOOL_LAUNCHERS
 
@@ -38,9 +39,11 @@ EXPECTED_ADAPTER_ORDER: tuple[str, ...] = (
     "omp",
     "amp",
     "claude",
+    "antigravity",
 )
 
 VALID_PLATFORMS: frozenset[str] = frozenset({"darwin", "linux"})
+SUPPORTED_ARCHES: tuple[str, ...] = ("arm64", "x64")
 
 
 def _harness_id_values() -> tuple[str, ...]:
@@ -76,13 +79,26 @@ def _assert_unique_wrapper_bins(adapters: Sequence[HarnessAdapter]) -> None:
 
 
 def _assert_supported_platforms(adapters: Sequence[HarnessAdapter]) -> None:
-    """Require every adapter to declare at least one supported host platform."""
+    """Require every adapter to run on exactly the supported host platforms."""
     for adapter in adapters:
-        assert adapter.platforms, f"{adapter.id} must declare platforms"
-        unsupported = sorted(set(adapter.platforms) - VALID_PLATFORMS)
-        assert not unsupported, (
-            f"{adapter.id} declares unsupported platforms: {unsupported}"
+        assert set(adapter.platforms) == VALID_PLATFORMS, (
+            f"{adapter.id} must support {sorted(VALID_PLATFORMS)}, "
+            f"got {sorted(adapter.platforms)}"
         )
+
+
+def _assert_static_release_targets(adapters: Sequence[HarnessAdapter]) -> None:
+    """Require static releases to map every declared platform and architecture."""
+    for adapter in adapters:
+        if not isinstance(adapter.launcher, StaticReleaseLauncherSpec):
+            continue
+        expected = {
+            f"{platform}-{arch}"
+            for platform in adapter.platforms
+            for arch in SUPPORTED_ARCHES
+        }
+        missing = sorted(expected - set(adapter.launcher.release.targets))
+        assert not missing, f"{adapter.id} static release lacks targets: {missing}"
 
 
 def _assert_registry_invariants(adapters: Sequence[HarnessAdapter]) -> None:
@@ -91,6 +107,7 @@ def _assert_registry_invariants(adapters: Sequence[HarnessAdapter]) -> None:
     _assert_safe_path_components(adapters)
     _assert_unique_wrapper_bins(adapters)
     _assert_supported_platforms(adapters)
+    _assert_static_release_targets(adapters)
 
 
 def test_harness_id_alias_matches_adapter_registry() -> None:
@@ -158,11 +175,38 @@ def test_invariants_reject_wrapper_bin_colliding_with_tool_launcher() -> None:
         _assert_unique_wrapper_bins([colliding])
 
 
-def test_invariants_reject_unsupported_platforms() -> None:
-    """An unsupported host platform must fail the platform invariant."""
-    unsupported = replace(
+@pytest.mark.parametrize(
+    "platforms",
+    [("windows",), ("darwin",), ("linux",)],
+    ids=["unsupported", "darwin-only", "linux-only"],
+)
+def test_invariants_reject_non_cross_platform_adapters(
+    platforms: tuple[str, ...],
+) -> None:
+    """An adapter missing darwin or linux, or adding another OS, must fail."""
+    adapter = replace(
         HARNESS_ADAPTERS[0],
-        platforms=cast("tuple[HostPlatform, ...]", ("windows",)),
+        platforms=cast("tuple[HostPlatform, ...]", platforms),
     )
-    with pytest.raises(AssertionError, match="unsupported platforms"):
-        _assert_supported_platforms([unsupported])
+    with pytest.raises(AssertionError, match="must support"):
+        _assert_supported_platforms([adapter])
+
+
+def test_invariants_reject_static_release_missing_arch_target() -> None:
+    """A static release without a linux-arm64 target must fail the target invariant."""
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "antigravity")
+    assert isinstance(adapter.launcher, StaticReleaseLauncherSpec)
+    targets = {
+        key: value
+        for key, value in adapter.launcher.release.targets.items()
+        if key != "linux-arm64"
+    }
+    broken = replace(
+        adapter,
+        launcher=replace(
+            adapter.launcher,
+            release=replace(adapter.launcher.release, targets=targets),
+        ),
+    )
+    with pytest.raises(AssertionError, match="linux-arm64"):
+        _assert_static_release_targets([broken])

@@ -12,7 +12,7 @@ Sync supports macOS and Linux; `tools/cliproxyapi/release.json` lists the platfo
 | --- | --- |
 | `id` | Adapter ID, source directory name, package-cache name, and launch argument |
 | `homeSegments` | Path components from the user home to the generated harness home |
-| `platforms` | Host platforms on which sync enables the adapter |
+| `platforms` | Host platforms on which sync enables the adapter; every adapter declares both `darwin` and `linux`, and static release `targets` cover `arm64` and `x64` on each |
 | `launcher` | npm or static release launcher specification |
 | `launcher.defaultArgs` | Arguments that sync places in the wrapper before caller arguments |
 | `launcher.env` | Environment variables baked into the wrapper as `export` lines and applied to every launch; they override both the parent environment and `.env` |
