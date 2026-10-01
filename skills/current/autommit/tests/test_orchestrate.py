@@ -129,6 +129,11 @@ class _Sandbox(unittest.TestCase):
             check=True,
             capture_output=True,
             text=True,
+            env={
+                **os.environ,
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CONFIG_NOSYSTEM": "1",
+            },
         )
         return completed.stdout
 
