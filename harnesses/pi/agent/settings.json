@@ -20,7 +20,7 @@
     "cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh",
     "cliproxy/opencode-go/deepseek-v4.1-flash:max"
   ],
-  "quietStartup": true,
+  "quietStartup": "header",
   "showHardwareCursor": true,
   "steeringMode": "all",
   "theme": "ef-elea-light/ef-elea-dark",
