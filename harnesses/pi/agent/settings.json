@@ -1,6 +1,10 @@
 {
   "cacheWarming": "idle",
   "collapseChangelog": true,
+  "codemode": {
+    "mode": "on",
+    "inlineBudget": 6000
+  },
   "defaultTools": ["bash", "read", "write", "edit", "apply_patch", "find", "codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
