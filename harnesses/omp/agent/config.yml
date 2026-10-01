@@ -273,10 +273,10 @@ vault:
   enabled: false
 
 github:
-  enabled: false
+  enabled: true
 
 security:
-  enabled: false
+  enabled: true
 
 generate_image:
   enabled: false
