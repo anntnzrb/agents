@@ -2,9 +2,21 @@
 
 `find` is a semantic code search tool. The model describes a behavior in plain language and gets back the file line ranges that implement it. A classifier model checks each range. For known strings or symbols, use `grep` or `rg`.
 
-The tool registers with `codemode` exposure. It is never declared to the model directly: scripts call it as `await tools.find({ query, path? })`, and the `codemode` description lists its declaration. It requires the `codemode` tool to be active (`"defaultTools": ["+codemode"]`). The registration replaces Pi's built-in glob `find`, which is not active by default.
+The tool registers with `direct` exposure: the model can call it directly, and active codemode scripts can also call `await tools.find({ query, path? })`. The registration replaces Pi's built-in glob `find`.
 
-The design is a smaller port of [oh-my-pi's `find`](https://github.com/can1357/oh-my-pi/tree/main/packages/coding-agent/src/tools/jfind) (MIT, see [LICENSE](LICENSE)). It drops oh-my-pi's sketch-routing wave, internal URL scopes, and custom rendering.
+The design is a smaller port of [oh-my-pi's `find`](https://github.com/can1357/oh-my-pi/tree/main/packages/coding-agent/src/tools/jfind) (MIT, see [LICENSE](LICENSE)). It drops oh-my-pi's sketch-routing wave and internal URL scopes.
+
+## Compact display
+
+Direct calls keep the query and optional search scope visible during composition, execution, and completion. The pending label changes from `composing` to `searching`. Completed searches show unique-file and range counts, accented paths, muted line ranges, and classifier scores as percentages. Scores are model judgments, not guarantees of correctness. Compact mode omits snippets; expansion adds snippets and the classifier model.
+
+Compact results group by directory, relative to the explicit search scope when provided. Each row keeps `filename:lines · score` together. Groups are ordered by their strongest score, and ranges within each group by score. Long directory headings elide middle components with `…` when space requires it, unless that would create duplicate headings. Expansion shows full working-directory-relative paths. Scores of 90% or higher use green, 75–89% use normal text, and lower scores use yellow; these are visual bands, not calibrated confidence thresholds.
+
+Compact mode shows the four strongest directories and at most three result ranges per directory. Directory headings include their best score. Header totals cover all returned results. A muted footer separately counts omitted directories and omitted ranges within shown directories, without counting ranges inside omitted directories twice. Expansion displays all returned results.
+
+Compact groups use one to four columns, choosing the largest column count whose complete blocks fit the available pane width, measured in visible terminal columns with a small gutter. Remaining groups continue in another grid row. Layout is recalculated on resize; expansion stays stacked for readable snippets. Query, totals, and omission footer remain outside the columns.
+
+No verified hits use a warning label, not an error. Failures retain the query and show a short diagnostic preview; expansion shows the full returned diagnostic. Codemode owns the surrounding UI for nested calls, so direct-call rendering does not replace codemode's display.
 
 ## Configure the classifier
 

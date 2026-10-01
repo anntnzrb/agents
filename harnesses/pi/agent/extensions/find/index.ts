@@ -13,6 +13,7 @@ import { relative, resolve } from "node:path";
 import { Type, type ClassifierApi, type ClassifierContext, type ClassifierModel, type Usage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { eligible, fileScore, idf, keywords, selectWindows, windows } from "./search.ts";
+import { renderFindCall, renderFindResult } from "./render.ts";
 
 const CANDIDATES = 96;
 const NAME_BATCH = 48;
@@ -205,6 +206,15 @@ export default function (pi: ExtensionAPI) {
       query: Type.String({ description: "Plain-language description of the behavior, e.g. 'retry backoff for failed uploads'. Quote exact phrases or identifiers." }),
       path: Type.Optional(Type.String({ description: "Directory to search (default: working directory)" })),
     }),
+    renderCall(args, theme, context) {
+      return renderFindCall(args, context, theme);
+    },
+    renderResult(result, { expanded }, theme, context) {
+      const output = result.content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+      return renderFindResult(result.details, output, {
+        expanded, isError: context.isError, scope: context.args.path, cwd: context.cwd,
+      }, theme);
+    },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const query = params.query.trim();
       if (!query) throw new Error("find: query must describe what to find");
