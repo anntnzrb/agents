@@ -25,6 +25,7 @@ For implementation, refactoring, or review, loading this file alone is incomplet
 ## Inspect real source
 
 1. Inspect project manifests, lockfiles, imports, installed exports, and declarations.
+   Before writing Effect code, read the installed `effect/AGENTS.md` completely and follow its links as needed. If absent, read the matching upstream `LLMS.md`.
 2. Inspect the vendored `Effect-TS/effect` source checkout (or upstream repository) for implementation, tests, examples, `LLMS.md`, and `MIGRATION.md`.
 3. If the checkout is absent or stale, follow the global vendored-source policy to create or fast-forward its lightweight clone.
 4. If the checkout revision differs from the project version, state the mismatch. Inspect the matching tag or installed package. Never treat current `main` as proof for a pinned release.
@@ -42,7 +43,7 @@ bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 ```
 
 - For library resolution or sub-packages, use `bun x ctx7@latest library "Effect" "<topic>"`.
-- For official guides and API reference, consult <https://www.effect.website/docs>.
+- For official v4 guides and API reference, consult <https://effect.website/docs/v4>. Append `.md` to guide URLs for Markdown.
 - For implementation patterns, inspect vendored `Effect-TS/effect` source or upstream repository (`LLMS.md`, `MIGRATION.md`, tests).
 - Missing or unclear coverage: fall back to matching vendored source, `gh`, or `firecrawl`.
 
@@ -50,7 +51,7 @@ bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 
 - Version-sensitive guidance MUST inspect manifests, lockfiles, imports, exports, and declarations.
 - The project version MUST override conflicting vendored `main` or upstream documentation.
-- New applications use the current matching v4 channel in `references/application-engineering.md`: RC now, stable v4 after release.
+- New applications use stable v4 as described in `references/application-engineering.md`.
 - Existing v3 applications receive matching v3 maintenance guidance. Do not silently apply v4 APIs or initiate migration.
 - State every material version or source mismatch. Never guess.
 

@@ -4,15 +4,15 @@ Read this reference when creating or materially changing a user-owned Effect app
 
 ## Version and source policy
 
-Use Effect v4 for new applications. Inspect installed metadata or query registry JSON with Bun and `fetch` to identify the current release channel. Do not invoke npm for registry lookup. While v4 is on the release-candidate channel, use:
+Use stable Effect v4 for new applications. Inspect installed metadata or query registry JSON with Bun and `fetch` to verify versions. Do not invoke npm for registry lookup.
 
 ```text
-bun add effect@rc @effect/platform-bun@rc
+bun add effect@4 @effect/platform-bun@4
 bun add --dev @effect/tsgo
 bunx @effect/tsgo setup
 ```
 
-When stable v4 is published, use stable v4 packages unless the project pins an RC. Keep every Effect package on the same version and release channel.
+Keep Effect runtime packages on the same version. Tooling such as `@effect/tsgo` uses its own version series.
 
 Verify the installed TypeScript, Effect, platform, and `@effect/tsgo` versions. Do not trust dist-tags to be compatible. Do not silently downgrade TypeScript or Effect. Report exact incompatibilities and ask for a decision.
 
@@ -82,10 +82,10 @@ For a standalone Bun application, run the final program at the process boundary 
 
 Use `Context.Service` and `Layer` for databases, APIs, configuration, filesystems, clocks, queues, and other capabilities that tests or deployments replace. Add each service only for a concrete boundary or reuse need.
 
-For CLI applications, use the current v4 CLI modules from `effect/unstable/cli`:
+For CLI applications, use the v4 CLI modules from `effect/cli`:
 
 ```ts
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 
 const searchCommand = Command.make("search", {
   query: Argument.string("query").pipe(
@@ -107,24 +107,26 @@ const searchCommand = Command.make("search", {
 For HTTP applications, use the current v4 HTTP modules and Bun platform adapter:
 
 ```ts
-import * as Http from "effect/unstable/http"
-import * as HttpApi from "effect/unstable/httpapi"
+import * as Http from "effect/http"
+import * as HttpApi from "effect/http-api"
 ```
 
 Do not add Express, Fastify, Hono, or Elysia by default.
 
-For SQL applications, use `effect/unstable/sql` and the current matching driver. Use `@rc` while v4 is on RC; omit the tag after stable v4. Add only the required driver:
+For SQL applications, use `effect/sql` and the matching v4 driver. Add only the required driver:
 
 ```text
-bun add @effect/sql-sqlite-bun@rc
-bun add @effect/sql-pg@rc
+bun add @effect/sql-sqlite-bun@4
+bun add @effect/sql-pg@4
 ```
 
 Use Effect SQL directly unless the user requests an ORM. Do not add Prisma, Drizzle, Sequelize, or TypeORM by default.
 
-For new OTLP export, prefer `effect/unstable/observability`. Add `@effect/opentelemetry` only to integrate with an existing OpenTelemetry setup.
+For new OTLP export, prefer `effect/observability`. Add `@effect/opentelemetry` only to integrate with an existing OpenTelemetry setup.
 
-Do not add Effect AI packages because an AI agent writes the code. Use `effect/unstable/ai` or `@effect/ai-*` only for requested AI functionality.
+Do not add Effect AI packages because an AI agent writes the code. Use `effect/ai` or `@effect/ai-*` only for requested AI functionality.
+
+Stable v4 does not stabilize every API. Check the installed API's `@stability` tag. Unstable APIs can break in minor releases; experimental APIs can break in patch releases.
 
 Do not add cluster, workflow, persistence, reactivity, workers, sockets, event-log, or other advanced modules unless a requirement specifically needs them.
 
@@ -193,7 +195,7 @@ Report the implementation, changed files, dependencies, commands, diagnostics, t
 
 Use sources in this order:
 
-1. Project manifest, lockfile, installed exports, and declarations.
+1. Project manifest, lockfile, installed `effect/AGENTS.md`, exports, and declarations.
 2. Matching vendored Effect implementation, tests, examples, `LLMS.md`, and `MIGRATION.md`.
 3. Current official documentation and source:
    - <https://www.effect.website/docs/v4>
