@@ -15,7 +15,9 @@ Keep development credentials in the root ignored `.env` file (`.env.example` at 
 
 ## Validate Python skills (standard)
 
-All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in `all` type-checking mode, and optionally pytest. Dependency environments for Basedpyright and pytest are derived automatically from the PEP 723 block in `scripts/cli.py`. Python skill code follows the `python` skill (`skills/current/python/SKILL.md` and `cookbook/modern.md`) and targets Python 3.14.
+All new skills and changed Python skills use the central code-gate runner in `skill-creator`. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in `all` type-checking mode, and optionally pytest. Basedpyright and pytest run on the interpreter allowed by `requires-python` in the `scripts/cli.py` PEP 723 block, with dependency environments derived from the same block. Python skill code follows the `python` skill (`skills/current/python/SKILL.md` and `cookbook/modern.md`) and targets Python 3.14.
+
+Raise a skill to Python 3.15 only when it uses a 3.15 feature with a measured benefit, such as `lazy import` removing a slow import from every run. Change `requires-python` in `scripts/cli.py`, Ruff `target-version = "py315"`, and Basedpyright `pythonVersion = "3.15"` together, run `uv lock` if the skill has a `uv.lock`, then run the gates.
 
 Run static checks (Ruff format-check, Ruff lint, Basedpyright):
 

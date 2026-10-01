@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urlsplit
 
 from adapters import register_builtin_adapters
-from firecrawl import Firecrawl
 from models import EngineError
 from registry import get_available_adapters, resolve_adapters
 from scoring import score_listing
+lazy from firecrawl import Firecrawl
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping

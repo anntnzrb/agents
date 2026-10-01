@@ -246,7 +246,7 @@ assert numbers == (1, 2, 3)  # Unchanged
 assert new_numbers == (1, 2, 3, 4)
 ```
 
-Tip: `MappingProxyType` creates a read-only dictionary view; use tuples instead of lists for immutable sequences.
+Tip: `MappingProxyType` creates a read-only view of a dict that can still change underneath it. For a constant mapping on 3.15+, use `frozendict` instead (`cookbook/modern.md`, Data modeling). Use tuples instead of lists for immutable sequences.
 
 ## Copy-on-Write Pattern
 Update data structures without mutating the original.
