@@ -40,12 +40,14 @@ interface CatalogCache {
 }
 
 let memoryCatalog: CatalogCache | undefined;
-let lastKnown: ProviderModelConfig[] = [];
+let lastKnown: ChatModelConfig[] = [];
 let builtinIndex: Map<string, BuiltinMetadata[]> | undefined;
 let lastCatalogAttempt = -Infinity;
 let fallbackModels = new Set<string>();
 
-type ModelMetadata = Pick<ProviderModelConfig, "compat" | "thinkingLevelMap">;
+// Pi does not export the chat member of the ProviderModelConfig union; the gateway serves chat models only.
+type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
+type ModelMetadata = Pick<ChatModelConfig, "compat" | "thinkingLevelMap">;
 
 interface BuiltinMetadata {
 	provider: string;
@@ -186,7 +188,7 @@ function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogMod
 	);
 }
 
-function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ProviderModelConfig {
+function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ChatModelConfig {
 	const entry = catalogModel(catalog, id);
 	const inputs = entry?.modalities?.input ?? ["text"];
 	const metadata = builtinMetadata(id);
@@ -214,15 +216,14 @@ function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache 
 }
 
 function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; ownedBy?: string }> {
-	return (payload.data ?? [])
-		.map((model) => ({
-			id: model.id,
-			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
-		}))
-		.filter((entry): entry is { id: string; ownedBy?: string } => typeof entry.id === "string" && entry.id.length > 0);
+	return (payload.data ?? []).flatMap((model) =>
+		typeof model.id === "string" && model.id.length > 0
+			? [{ id: model.id, ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined }]
+			: [],
+	);
 }
 
-async function discover(signal: AbortSignal): Promise<ProviderModelConfig[]> {
+async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	const response = await fetch(`${BASE_URL}/models`, {
 		signal: AbortSignal.any([signal, AbortSignal.timeout(GATEWAY_TIMEOUT_MS)]),
 	});

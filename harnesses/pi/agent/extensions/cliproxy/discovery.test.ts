@@ -2,7 +2,7 @@ import { expect, mock, spyOn, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, ProviderConfig } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
 // Catalog discovery does not need Pi's bundled request-dialect metadata.
 mock.module("@earendil-works/pi-ai/providers/all", () => ({
@@ -27,7 +27,8 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
   let ids = ["known"];
   let catalogRequests = 0;
   let failure = false;
-  const network = spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+  // Bun's fetch type adds preconnect, which the mock does not need.
+  const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
     if (String(url).endsWith("/models")) {
       return Response.json({ data: ids.map((id) => ({ id, owned_by: "openai" })) });
     }
@@ -50,7 +51,8 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
         return () => {};
       },
     } as unknown as ExtensionAPI);
-    const refresh = () => config.refreshModels!({ signal: new AbortController().signal } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0]);
+    // cliproxy registers chat models only.
+    const refresh = async () => (await config.refreshModels!({ signal: new AbortController().signal } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0])) as Extract<ProviderModelConfig, { type?: "chat" }>[];
     expect((await refresh())[0]?.contextWindow).toBe(200000);
     expect(catalogRequests).toBe(0);
 
