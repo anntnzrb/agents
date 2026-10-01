@@ -155,6 +155,9 @@ compaction:
   supersedeReads: true
   dropUseless: true
 
+branchSummary:
+  enabled: true
+
 snapcompact:
   toolResults: true
 
