@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { PATCH_GRAMMAR } from "./grammar.ts";
 import { CODEX_GPT_MODELS } from "./model-catalog.ts";
+import { renderPatchCall, renderPatchResult } from "./render.ts";
 
 export function supportsApplyPatch(model: { id: string } | undefined): boolean {
   if (!model) return false;
@@ -86,6 +87,13 @@ Failures or cancellation may leave earlier file changes applied; inspect the rep
     exposure: "direct",
     defaultActive: false,
     executionMode: "sequential",
+    renderCall(args, theme, context) {
+      return renderPatchCall(args.input ?? "", context, theme);
+    },
+    renderResult(result, { expanded }, theme, context) {
+      const output = result.content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+      return renderPatchResult(output, context.isError, expanded, theme);
+    },
     async execute(_id, { input }, signal, _onUpdate, ctx) {
       if (!supportsApplyPatch(ctx.model)) throw new Error("apply_patch is available only for GPT models supported by the Codex catalog");
       signal?.throwIfAborted();

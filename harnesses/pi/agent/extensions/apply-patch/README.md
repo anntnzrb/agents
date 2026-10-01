@@ -24,6 +24,14 @@ The [grammar](grammar.ts) comes from [OpenAI Codex](https://github.com/openai/co
 
 Multi-file execution is not transactional. On failure or cancellation, earlier changes may remain applied. Error output includes the native engine's report. Results over Pi's output limits are truncated, with the complete output saved to a temporary file whose path appears in the result.
 
+## Compact display
+
+While the model composes a patch, the tool shows complete file headers as they arrive, with colored `A`, `M`, `D`, and `R` indicators. Execution changes the label to `applying`. Moves show both paths. These are this patch's requested operations, not Git working-tree status.
+
+After successful execution, the compact view shows file operations and colored added/removed line counts instead of raw arguments or success boilerplate. Counts describe submitted patch lines, not a measured filesystem diff; whole-file deletions have no line count because their contents are absent from the patch. Expansion retains the native engine output.
+
+Failures replace the file summary with a partial-change warning and a short diagnostic preview. Expand for the full returned diagnostic. The renderer does not claim that requested files were all changed when execution fails.
+
 The [pi-codex-conversion reference](https://github.com/IgorWarzocha/howaboua-pi-stuff/tree/main/packages/pi-codex-conversion) informed the tool shape and mutation queue integration. This extension uses the existing Codex installation rather than vendoring its Rust engine or replacing Pi's providers.
 
 ## Load and validate
