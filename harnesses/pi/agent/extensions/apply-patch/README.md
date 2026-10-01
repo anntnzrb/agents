@@ -2,6 +2,12 @@
 
 This Pi extension replaces active `edit` and `write` tools with `apply_patch` for GPT models whose Codex metadata declares patch support. OpenAI-compatible transport alone does not activate it.
 
+## Compact script preview
+
+The extension also wraps Pi's native codemode call renderer. Collapsed scripts replace quoted strings beginning with `*** Begin Patch` with `<PATCH>`, including unfinished strings during streaming. Other script content stays visible, capped at three visual lines below the title with an expansion hint when needed. Only renderer arguments are copied and shortened: the model context, executed script, transcript, and result renderer remain unchanged. Pi's tool expansion shortcut reveals the full highlighted script. This display change applies to codemode with any model, not only GPT.
+
+Pi may report that its built-in codemode extension was replaced. This extension registers the native codemode definition with only its call renderer wrapped.
+
 ## Model selection
 
 Codex enables the tool when `model_info.apply_patch_tool_type` is present. Its model lookup uses the longest matching catalog slug prefix, then retries after one simple provider namespace, such as `command-code/gpt-6.1-sol`. Matching is case-sensitive. Unknown models receive fallback metadata with no patch capability.
@@ -37,7 +43,7 @@ pi --no-extensions -e ./harnesses/pi/agent/extensions/apply-patch/index.ts
 With Pi's host packages available to Bun, run:
 
 ```sh
-bun test harnesses/pi/agent/extensions/apply-patch/index.test.ts
+bun test harnesses/pi/agent/extensions/apply-patch/
 git diff --check
 ```
 
