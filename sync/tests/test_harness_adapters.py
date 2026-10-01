@@ -39,7 +39,6 @@ EXPECTED_ADAPTER_ORDER: tuple[str, ...] = (
     "omp",
     "amp",
     "claude",
-    "antigravity",
 )
 
 VALID_PLATFORMS: frozenset[str] = frozenset({"darwin", "linux"})
@@ -194,7 +193,7 @@ def test_invariants_reject_non_cross_platform_adapters(
 
 def test_invariants_reject_static_release_missing_arch_target() -> None:
     """A static release without a linux-arm64 target must fail the target invariant."""
-    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "antigravity")
+    adapter = next(a for a in HARNESS_ADAPTERS if a.id == "devin")
     assert isinstance(adapter.launcher, StaticReleaseLauncherSpec)
     targets = {
         key: value

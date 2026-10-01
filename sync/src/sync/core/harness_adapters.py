@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 
 type HostPlatform = Literal["darwin", "linux"]
 
-type HarnessId = Literal[
-    "amp", "antigravity", "claude", "codex", "devin", "opencode", "pi", "omp"
-]
+type HarnessId = Literal["amp", "claude", "codex", "devin", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
 DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
@@ -206,28 +204,6 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
         ),
         instruction_file="CLAUDE.md",
         cliproxy_templates=("settings.json",),
-    ),
-    HarnessAdapter(
-        id="antigravity",
-        home_segments=(".gemini", "config"),
-        platforms=("darwin", "linux"),
-        launcher=StaticReleaseLauncherSpec(
-            bin="agy",
-            release=StaticReleaseSpec(
-                manifest_url=(
-                    "https://antigravity-cli-auto-updater-974169037036"
-                    ".us-central1.run.app/manifests/{target}.json"
-                ),
-                install_segments=(".local", "share", "antigravity", "cli"),
-                executable_segments=("antigravity",),
-                targets={
-                    "darwin-arm64": "darwin_arm64",
-                    "darwin-x64": "darwin_amd64",
-                    "linux-arm64": "linux_arm64",
-                    "linux-x64": "linux_amd64",
-                },
-            ),
-        ),
     ),
 )
 
