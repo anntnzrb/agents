@@ -297,6 +297,32 @@ class TestPayloadNormalization:
         assert post.get("quote_id") == "999"
         assert post.get("reply_to_id") == "998"
 
+    def test_normalize_post_expands_community_note_url_facets(self) -> None:
+        raw = {
+            **SAMPLE_POST,
+            "community_note": {
+                "text": "Misleading. See t.co/x for the filing.",
+                "facets": [
+                    {
+                        "type": "url",
+                        "indices": [16, 22],
+                        "replacement": "https://sec.gov/filing",
+                    },
+                    {"type": "mention", "indices": [0, 4]},
+                ],
+            },
+        }
+        post = normalize_post(raw)
+        assert post.get("community_note") == (
+            "Misleading. See https://sec.gov/filing for the filing."
+        )
+        assert summary_post(dict(post)).get("community_note") == (
+            post.get("community_note")
+        )
+        assert "community_note" not in normalize_post(
+            {**SAMPLE_POST, "community_note": None}
+        )
+
     def test_missing_optional_post_values_are_omitted(self) -> None:
         minimal_post = {
             "id": "1002",

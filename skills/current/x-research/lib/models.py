@@ -141,6 +141,7 @@ class PostData(TypedDict, total=False):
     media: MediaDict
     quote_id: str
     reply_to_id: str
+    community_note: str
 
 
 class StatusPayloadData(TypedDict):

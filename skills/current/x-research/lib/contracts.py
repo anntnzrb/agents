@@ -31,6 +31,7 @@ MEDIA_OBJECTS = ("external", "mosaic", "broadcast")
 _HTTPS_DEFAULT_PORT = 443
 _COUNT_MIN = 1
 _COUNT_MAX = 100
+_FACET_SPAN_LEN = 2
 
 
 def actual_type(value: object) -> str:
@@ -498,7 +499,38 @@ def normalize_post(raw: object, field_name: str = "post") -> PostData:
     if reply_to_id is not None:
         result["reply_to_id"] = reply_to_id
 
+    note = _community_note_text(obj.get("community_note"))
+    if note is not None:
+        result["community_note"] = note
+
     return result
+
+
+def _community_note_text(raw: object) -> str | None:
+    """Return note text with URL facets expanded to their full targets."""
+    if not _is_dict(raw):
+        return None
+    text = raw.get("text")
+    if not isinstance(text, str) or not text:
+        return None
+    facets = raw.get("facets")
+    if not _is_list(facets):
+        return text
+    spans: list[tuple[int, int, str]] = []
+    for facet in facets:
+        if not _is_dict(facet) or facet.get("type") != "url":
+            continue
+        indices, target = facet.get("indices"), facet.get("replacement")
+        if not _is_list(indices) or not isinstance(target, str):
+            continue
+        if len(indices) != _FACET_SPAN_LEN:
+            continue
+        start, end = indices
+        if isinstance(start, int) and isinstance(end, int) and 0 <= start <= end:
+            spans.append((start, end, target))
+    for start, end, target in sorted(spans, reverse=True):
+        text = text[:start] + target + text[end:]
+    return text
 
 
 def normalize_status_payload(payload: object) -> StatusPayloadData:

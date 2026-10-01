@@ -45,7 +45,16 @@ def summary_author(author: dict[str, object]) -> dict[str, object]:
 
 def summary_post(post: dict[str, object]) -> dict[str, object]:
     summary: dict[str, object] = {}
-    for key in ("id", "url", "text", "created_at", "lang", "quote_id", "reply_to_id"):
+    for key in (
+        "id",
+        "url",
+        "text",
+        "created_at",
+        "lang",
+        "quote_id",
+        "reply_to_id",
+        "community_note",
+    ):
         if key in post and post[key] is not UNDEFINED:
             summary[key] = post[key]
     author = post.get("author")

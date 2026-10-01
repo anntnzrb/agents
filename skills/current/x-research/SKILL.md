@@ -17,7 +17,8 @@ Use this skill for explicit public X/Twitter post URLs or IDs, bounded user time
 - Make one bounded request per command. Never retry, auto-page, scrape HTML, use browser automation, use credentials, cache results, or silently switch providers
 - Treat every result as unofficial, possibly incomplete evidence. A missing result does not establish deletion, suspension, or nonexistence
 - Keep sentiment sample-scoped. The consuming agent classifies returned text and cites post IDs/URLs; this CLI does not infer public opinion
-- For news, X posts are leads/evidence. Corroborate material claims with independent `web_search`/`read` sources
+- For news, X posts are leads/evidence. Corroborate material claims with independent sources through the `parallel` skill (search) and the `firecrawl` skill (scrape)
+- Read-only work never needs X auth. Refuse write actions (post, reply, like, repost, DM, follow); this skill cannot perform them
 
 ## Commands
 
@@ -55,7 +56,16 @@ Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --cou
 
 ### X-plus-web news exploration
 
-Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --count COUNT --feed latest --summary [--pretty]` for bounded X discovery/evidence, then use `web_search` and `read` for independent primary or credible sources. Use unflagged full output only when optional metrics or media are needed. Separate X evidence from independently verified claims, show timestamps and source roles, describe agreement/conflict, and retain uncertainty when either source set is incomplete.
+Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --count COUNT --feed latest --summary [--pretty]` for bounded X discovery/evidence, then use the `parallel` skill for independent primary or credible sources. Use unflagged full output only when optional metrics or media are needed. Separate X evidence from independently verified claims, show timestamps and source roles, describe agreement/conflict, and retain uncertainty when either source set is incomplete.
+
+### Thread and controversy research
+
+1. `fetch` the lead post. Read `community_note` and `quote_id` before summarizing: the note carries corrections and primary-source links, and the quoted post is often the claim under debate. `fetch` the quoted ID too.
+2. Run `conversation` for replies and self-thread follow-ups.
+3. When `search` fails or returns nothing, find permalinks with the `parallel` skill restricted to `x.com`, then `fetch` each status ID for full text. Do not scrape X HTML.
+4. When the thread cites data (a repo, benchmark file, or leaderboard), scrape the raw artifact with the `firecrawl` skill and compute rankings from it. Quote the artifact over post prose when they disagree.
+5. For a story still in motion, re-pull the subject's own primary page (company site, notice, repo, status page) at answer time, log each claim with its timestamp, and name what is unresolved.
+6. Attribute each accusation to whoever measured it. Do not promote one party's evidence to settled fact, and do not treat a denial as disproof.
 
 ## Required follow-up reads
 
@@ -63,4 +73,4 @@ Run `uv run --script skills/current/x-research/scripts/cli.py search QUERY --cou
 | --- | --- | --- |
 | Provider endpoints, response keys, status semantics | `references/provider.md` | Before interpreting provider fields, errors, or cursors |
 | Detailed normalization and completeness caveats | `references/provider.md` | When optional fields are missing or a page is incomplete |
-| News or sentiment workflow | This file | Before routing evidence to `web_search`/`read` or making sample-scoped classifications |
+| News, sentiment, or thread workflow | This file | Before routing evidence to the `parallel` or `firecrawl` skill or making sample-scoped classifications |

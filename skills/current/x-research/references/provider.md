@@ -42,6 +42,7 @@ Every normalized post has exactly the useful contract fields below; unknown or u
 - `lang` is retained when it is a non-empty string
 - `media` is retained only in the provider's recognized JSON-compatible media shape
 - `quote_id` is taken from a recognized quoted-post ID; `reply_to_id` is taken from a recognized replying-to post ID
+- `community_note` is the note's `text` with each `url` facet span replaced by its full `replacement` URL. It is omitted when the provider returns `null` or no text
 
 A page may additionally include a normalized `profile` with `id`, `handle`, `name`, `url`, and `verified` where available. Raw avatars, banners, descriptions, follower counts, polls, sensitive flags, and other provider-only fields are not part of this contract unless represented by one of the fields above.
 
@@ -49,7 +50,7 @@ A page may additionally include a normalized `profile` with `id`, `handle`, `nam
 
 The default output is the complete normalized compact envelope. `--summary` is a deterministic projection of its `data` object for routine use; the command envelope remains `ok`, `schema_version`, `command`, and `data`. It does not truncate post text or make a completeness claim. At the data root, when present, it retains exactly these request metadata, pagination/completeness, and provenance fields: `requested_id`, `requested_url`, `handle`, `query`, `feed`, `ranking_mode`, `requested_count`, `returned_count`, `cursor`, `has_more`, `complete`, `complete_reason`, `provider`, `official`, `auth_mode`, `source_url`, `endpoint`, `fetched_at`, and `provider_status`.
 
-The projection recursively handles post-bearing values at `post`, `posts`, `target`, `thread`, and `replies`; `profile` uses the identity projection. A summary author retains only `id`, `handle`, `name`, `url`, and `verified` when present. A summary post retains `id`, `url`, full `text`, `created_at`, the projected `author`, and optional `lang`, `quote_id`, and `reply_to_id` when present. It omits `metrics`, `media`, and unknown fields rather than inventing values.
+The projection recursively handles post-bearing values at `post`, `posts`, `target`, `thread`, and `replies`; `profile` uses the identity projection. A summary author retains only `id`, `handle`, `name`, `url`, and `verified` when present. A summary post retains `id`, `url`, full `text`, `created_at`, the projected `author`, and optional `lang`, `quote_id`, `reply_to_id`, and `community_note` when present. It omits `metrics`, `media`, and unknown fields rather than inventing values.
 
 `--pretty` changes only JSON whitespace and emits machine-valid JSON with two-space indentation and a trailing newline. Neither flag changes provider behavior. The CLI performs no semantic or model-generated sentiment/news summary; sentiment classification and news interpretation remain the consuming agent's work.
 
