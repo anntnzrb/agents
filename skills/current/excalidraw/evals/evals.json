@@ -1,0 +1,53 @@
+{
+  "skill_name": "excalidraw",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Draw a diagram of a web app: a load balancer in front of two web servers that both talk to one Postgres database. I want to watch it in my browser.",
+      "expected_output": "Runs `status` or `start` and gives the user the canvas URL, creates shapes with custom ids and bound arrows in one `add` or `apply`, then runs `describe` to check the layout.",
+      "files": [],
+      "expectations": [
+        "Runs commands through `uv run --script <skill-dir>/scripts/cli.py`, not bare `bun x` or browser automation",
+        "Gives the user the canvas URL",
+        "Creates four labeled shapes with custom ids in one batch call",
+        "Binds arrows with `startElementId` and `endElementId`",
+        "Runs `describe` after creating elements"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I just moved some boxes around on the excalidraw canvas and renamed the cache box. Make the cache box red and connect it to the API box.",
+      "expected_output": "Runs `describe` first to read the current scene, finds both elements by id or label, then updates color and adds a bound arrow with `apply` or `update` plus `add`.",
+      "files": [],
+      "expectations": [
+        "Runs `describe` or `query` before changing anything",
+        "Targets elements by id, not by coordinates",
+        "Uses a red stroke and fill pair",
+        "Adds an arrow bound to both element ids"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Save the current excalidraw diagram into docs/architecture.excalidraw in this repo, then wipe the canvas so I can start something new.",
+      "expected_output": "Exports to the requested path before clearing, and saves a snapshot or relies on the export before running `clear --yes`.",
+      "files": [],
+      "expectations": [
+        "Runs `export --out docs/architecture.excalidraw`",
+        "Exports before running `clear --yes`",
+        "Does not run `share`",
+        "Does not run `stop`"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Take a screenshot of the excalidraw canvas so you can check the arrows look right.",
+      "expected_output": "Runs `screenshot --out` to a temp path; on exit code 4 asks the user to open the canvas URL instead of opening a browser itself.",
+      "files": [],
+      "expectations": [
+        "Runs `screenshot --out` with a file path",
+        "On exit code 4, asks the user to open the canvas URL",
+        "Does not launch or drive a browser itself"
+      ]
+    }
+  ]
+}

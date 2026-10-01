@@ -1,0 +1,64 @@
+[project]
+name = "excalidraw"
+version = "0.1.0"
+description = "Drive a live Excalidraw canvas and stop its server when idle"
+readme = "SKILL.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = ["basedpyright>=1.21", "ruff>=0.8", "pytest>=8"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "A002",
+  "CPY001", # docs/skills.md: No license headers in non-Markdown files
+  "COM812",
+  "D203",
+  "D213",
+  "EM101",
+  "EM102",
+  "ERA001",
+  "PERF401",
+  "PLR0911",
+  "PLR0912",
+  "S603",
+  "S607",
+  "SLF001",
+  "TRY003",
+  "TRY301",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ANN", "D", "PLR2004", "INP001"]
+"scripts/**/*.py" = ["T201", "INP001"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.14"
+pythonPlatform = "All"
+include = ["scripts", "tests"]
+extraPaths = ["scripts"]
+reportUnusedCallResult = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedVariable = "error"
+reportPrivateUsage = "error"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
