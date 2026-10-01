@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.14"
+# requires-python = ">=3.15"
 # dependencies = ["firecrawl-py>=4"]
 # ///
 """Search and score digital subscriptions and software across deal marketplaces."""
