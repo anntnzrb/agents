@@ -197,8 +197,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "find",
     label: "Find",
-    // Reached only through codemode scripts, so the description carries all usage guidance.
-    exposure: "codemode",
+    exposure: "direct",
     annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       "Semantic code search: describe a behavior in plain language, get `path:start-end probability snippet` lines for the code that implements it, strongest first, verified by a classifier. Call it first, before rg or grep, when you can describe a behavior but don't know the identifier or file, then read the returned ranges. Use rg only for known strings or symbols. No hits is weak evidence of absence: confirm with rg before concluding.",

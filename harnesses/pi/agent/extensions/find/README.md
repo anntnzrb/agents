@@ -46,6 +46,6 @@ pi --approve --no-extensions -e builtin:codemode -e "$T/find/index.ts" --no-sess
 
 In the JSONL output, check three things:
 
-- The first system message's `toolsAdded` lists `codemode` but not `find`.
+- The first system message's `toolsAdded` lists both `codemode` and `find`.
 - A `tool_execution_start` event for `find` follows the `codemode` call.
 - In the `find` `tool_execution_end` event, `result.details.model` names the classifier that answered.
