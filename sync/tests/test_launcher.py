@@ -780,6 +780,83 @@ def test_static_release_missing_platform_asset_raises(tmp_path: Path) -> None:
         )
 
 
+def test_static_release_per_target_manifest_verifies_sha512(tmp_path: Path) -> None:
+    """A ``{target}`` manifest URL resolves per platform and verifies SHA-512."""
+    bundle = tmp_path / "bundle.tar.gz"
+    _ = _make_release_bundle(bundle, tmp_path / "stage")
+    sha512 = hashlib.sha512(bundle.read_bytes()).hexdigest()
+    fetched: list[str] = []
+
+    def fetch_manifest(url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        fetched.append(url)
+        return StaticReleaseManifest(
+            version=RELEASE_VERSION,
+            platforms={
+                "linux_amd64": StaticReleaseAsset(
+                    url="https://example.test/bundle.tar.gz", sha512=sha512
+                )
+            },
+        )
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(bundle, destination)
+
+    release = StaticRelease(
+        manifest_url="https://example.test/manifests/{target}.json",
+        install_segments=(".local", "share", "devin", "cli"),
+        executable_segments=("bin", "devin"),
+        targets={"linux-x64": "linux_amd64"},
+    )
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+    )
+
+    prepared = asyncio.run(
+        prepare_static_release(
+            release, str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+        )
+    )
+
+    assert fetched == ["https://example.test/manifests/linux_amd64.json"]
+    assert Path(prepared.executable).is_file()
+
+
+def test_static_release_rejects_sha512_mismatch(tmp_path: Path) -> None:
+    """A SHA-512 digest that does not match the archive must abort the install."""
+    bundle = tmp_path / "bundle.tar.gz"
+    _ = _make_release_bundle(bundle, tmp_path / "stage")
+
+    def fetch_manifest(_url: str, _timeout_ms: int) -> StaticReleaseManifest:
+        return StaticReleaseManifest(
+            version=RELEASE_VERSION,
+            platforms={
+                RELEASE_TARGET: StaticReleaseAsset(
+                    url="https://example.test/bundle.tar.gz", sha512="0" * 128
+                )
+            },
+        )
+
+    def download(_url: str, destination: str, _timeout_ms: int) -> None:
+        _ = shutil.copyfile(bundle, destination)
+
+    runtime = ReleaseRuntime(
+        arch="x86_64",
+        platform="linux",
+        fetch_manifest=fetch_manifest,
+        download=download,
+    )
+
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        _ = asyncio.run(
+            prepare_static_release(
+                _release_spec(), str(tmp_path), DEFAULT_PREPARE_TIMEOUT_MS, runtime
+            )
+        )
+
+
 def test_static_release_harness_launch_dispatches_prepared_binary(
     tmp_path: Path,
 ) -> None:

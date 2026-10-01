@@ -112,7 +112,7 @@ After preparing the harness, the wrapper process is replaced by the harness exec
 
 The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions, plus any older version whose executable a running process still uses: a long-lived process such as the Amp runner keeps running the version it started from until it restarts, so an update never deletes it underneath that process. Running executables come from `/proc` on Linux and `lsof` on macOS; when they cannot be determined, pruning is skipped for that launch. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
 
-A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
+A static release launcher resolves the adapter's manifest, verifies the archive SHA-256 or SHA-512 digest, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
 
 ## User services
 
