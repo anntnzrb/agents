@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -16,7 +16,8 @@ afterEach(async () => {
 });
 
 async function workspace() {
-  const cwd = await mkdtemp(join(tmpdir(), "pi-apply-patch-test-"));
+  // Resolve platform temp symlinks (macOS /var -> /private/var) so expected paths are canonical.
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), "pi-apply-patch-test-")));
   directories.push(cwd);
   return cwd;
 }
