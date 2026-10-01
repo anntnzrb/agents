@@ -122,6 +122,37 @@ def test_update_retries_reconcile_after_failure(
     assert calls == [False, True]
 
 
+def test_update_reconciles_again_after_runtime_switch(
+    repos: tuple[Path, Path], home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reconcile that installs a new sync runtime is not recorded as done.
+
+    The running (old) runtime cannot know adapters the pulled commit adds, so the
+    next run must reconcile the same commit again under the new runtime.
+    """
+    _, peer = repos
+    _ = _push_new_commit(peer, "change")
+    runtime = home / ".local" / "share" / "agents"
+    (runtime / "release-old").mkdir(parents=True)
+    (runtime / "release-new").mkdir()
+    (runtime / "sync-current").symlink_to("release-old")
+    calls: list[str] = []
+
+    async def _sync(_env: SyncEnv, **_kwargs: object) -> bool:
+        calls.append("sync")
+        current = runtime / "sync-current"
+        current.unlink()
+        current.symlink_to("release-new")
+        return True
+
+    monkeypatch.setattr("sync.core.index.run_sync", _sync)
+
+    assert update_main() == EXIT_OK
+    assert update_main() == EXIT_OK
+    assert update_main() == EXIT_OK
+    assert calls == ["sync", "sync"]
+
+
 def test_update_leaves_dirty_checkout_untouched(
     repos: tuple[Path, Path], syncs: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:

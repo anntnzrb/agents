@@ -337,6 +337,14 @@ def update_main() -> int:
     return asyncio.run(_async_update_main())
 
 
+def _runtime_release(sync_env: SyncEnv) -> str | None:
+    """Return the sync runtime release the ``sync-current`` link points at."""
+    try:
+        return str((Path(sync_env.runtime_home) / "sync-current").readlink())
+    except OSError:
+        return None
+
+
 async def _async_update_main() -> int:
     """Fast-forward the SSOT and reconcile a commit not yet synced.
 
@@ -354,9 +362,14 @@ async def _async_update_main() -> int:
         head = await fast_forward_ssot(sync_env.ssot_home)
         if head is None or head == read_synced_commit(sync_env.managed_state_home):
             return EXIT_OK
+        runtime_before = _runtime_release(sync_env)
         exit_code = await run_sync_with_deadline(sync_env)
-        if exit_code == EXIT_OK:
+        if exit_code != EXIT_OK:
+            return exit_code
+        if _runtime_release(sync_env) == runtime_before:
             record_synced_commit(sync_env.managed_state_home, head)
+        else:
+            warn("update: sync runtime changed; reconciling again on the next run")
         return exit_code
     finally:
         release_sync_lock(lock)

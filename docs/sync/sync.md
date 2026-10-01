@@ -144,7 +144,7 @@ Sync installs a per-user schedule — a systemd timer on Linux, a launch agent o
 2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout. Each of these cases logs a `sync: warning: update: …` line naming the blocker (the changed files, the branch, or the local and upstream commit counts), so a host that stops converging shows why in its updater log; an up-to-date run logs nothing.
 3. Reconciles only when the checked-out commit differs from the last one it reconciled successfully (`sync-managed/update.json`). A failed reconcile is retried on the next run.
 
-The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled once by the previous runtime; the new runtime takes over from the next run or launch.
+The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled first by the previous runtime, which cannot know about anything the new code adds, such as a new harness adapter. When that reconcile installs a new runtime, the updater does not record the commit as synced and logs `update: sync runtime changed; reconciling again on the next run`; the next run reconciles the same commit with the new runtime.
 
 The schedule needs no credentials because `origin` is public over HTTPS.
 
