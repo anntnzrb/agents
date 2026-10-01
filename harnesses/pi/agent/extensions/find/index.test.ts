@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai";
+import type { ClassifierApi, ClassifierContext, ClassifierModel, ClassifierResult } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { report, resolveClassifier, search } from "./index.ts";
 import { eligible, keywords, selectWindows, windows } from "./search.ts";
@@ -39,7 +39,7 @@ const MODELS = [
   { provider: "acme", id: "judge/v1" },
   { provider: "acme", id: "broken" },
   { provider: "other", id: "nocreds" },
-];
+] as ClassifierModel<ClassifierApi>[]; // The fake registry and search read only provider and id.
 
 /** Fake registry: answers each bool question with `judge(state, id)`; `acme/broken` returns errors. */
 function registry(judge: (state: ClassifierContext["state"], id: string) => number) {
