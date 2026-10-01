@@ -10,7 +10,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { PATCH_GRAMMAR } from "./grammar.ts";
 import { CODEX_GPT_MODELS } from "./model-catalog.ts";
-import { registerCompactCodemode } from "./codemode-preview.ts";
 
 export function supportsApplyPatch(model: { id: string } | undefined): boolean {
   if (!model) return false;
@@ -109,7 +108,6 @@ Failures or cancellation may leave earlier file changes applied; inspect the rep
 }
 
 export default function applyPatch(pi: ExtensionAPI) {
-  registerCompactCodemode(pi);
   const tool = createApplyPatchTool(pi);
   // Initially inactive, but declarable so --tools apply_patch can select it.
   // session_start hides it before any non-GPT model request.
