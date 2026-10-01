@@ -4,7 +4,8 @@
 Dispatched via ``scripts/cli.py gates <skill-dir> [--tests]``; never imported
 by other skills. Tools always resolve latest via ``uvx`` (unpinned by policy).
 Dependency truth is the PEP 723 block in the skill's ``scripts/cli.py``; the
-basedpyright and pytest steps derive their ``--with`` environments from it.
+basedpyright and pytest steps derive their ``--with`` environments and their
+``--python`` interpreter from it.
 """
 
 import subprocess
@@ -62,16 +63,16 @@ def _load_toml(text: str) -> dict[str, object]:
     return tomllib.loads(text)
 
 
-def pep723_deps(skill_dir: Path) -> list[str]:
-    """Read runtime dependencies from the scripts/cli.py PEP 723 block."""
+def _pep723_block(skill_dir: Path) -> dict[str, object]:
+    """Parse the scripts/cli.py PEP 723 block; empty when absent."""
     cli = skill_dir / "scripts" / "cli.py"
     if not cli.is_file():
-        return []
+        return {}
     lines = cli.read_text(encoding="utf-8").splitlines()
     try:
         start = lines.index("# /// script")
     except ValueError:
-        return []
+        return {}
     try:
         end = lines.index("# ///", start + 1)
     except ValueError:
@@ -82,29 +83,45 @@ def pep723_deps(skill_dir: Path) -> list[str]:
         for line in lines[start + 1 : end]
     )
     try:
-        data = _load_toml(body)
+        return _load_toml(body)
     except tomllib.TOMLDecodeError as exc:
         msg = f"malformed PEP 723 block in {cli}: {exc}"
         raise _GatesError(msg) from exc
-    raw_deps = data.get("dependencies", [])
+
+
+def pep723_deps(skill_dir: Path) -> list[str]:
+    """Read runtime dependencies from the scripts/cli.py PEP 723 block."""
+    raw_deps = _pep723_block(skill_dir).get("dependencies", [])
     if not _is_str_list(raw_deps):
+        cli = skill_dir / "scripts" / "cli.py"
         msg = f"PEP 723 dependencies in {cli} must be a list of strings"
         raise _GatesError(msg)
     return list(raw_deps)
 
 
-_pep723_deps = pep723_deps
+def pep723_python(skill_dir: Path) -> str | None:
+    """Read requires-python from the scripts/cli.py PEP 723 block."""
+    requires = _pep723_block(skill_dir).get("requires-python")
+    if requires is not None and not isinstance(requires, str):
+        cli = skill_dir / "scripts" / "cli.py"
+        msg = f"PEP 723 requires-python in {cli} must be a string"
+        raise _GatesError(msg)
+    return requires
 
 
-def _with_prefix(deps: Sequence[str]) -> tuple[str, ...]:
-    """Build the uvx prefix carrying the skill's dependency environment."""
+def _with_prefix(deps: Sequence[str], python: str | None) -> tuple[str, ...]:
+    """Build the uvx prefix carrying the skill's interpreter and dependency env."""
     prefix: list[str] = ["uvx"]
+    if python is not None:
+        prefix.extend(["--python", python])
     for dep in deps:
         prefix.extend(["--with", dep])
     return tuple(prefix)
 
 
-def _static_steps(deps: Sequence[str], *, has_tests: bool) -> list[tuple[str, ...]]:
+def _static_steps(
+    deps: Sequence[str], python: str | None, *, has_tests: bool
+) -> list[tuple[str, ...]]:
     """Return the static gate steps; only basedpyright needs the skill env."""
     # Tests legitimately import pytest; it must be resolvable when the
     # basedpyright step type-checks a tests/ directory.
@@ -112,13 +129,13 @@ def _static_steps(deps: Sequence[str], *, has_tests: bool) -> list[tuple[str, ..
     return [
         ("uvx", "ruff", "format", "--check", "."),
         ("uvx", "ruff", "check", "."),
-        (*_with_prefix(pyright_deps), "basedpyright"),
+        (*_with_prefix(pyright_deps, python), "basedpyright"),
     ]
 
 
-def _pytest_step(deps: Sequence[str]) -> tuple[str, ...]:
+def _pytest_step(deps: Sequence[str], python: str | None) -> tuple[str, ...]:
     """Return the pytest step with pytest plus the skill env added."""
-    return (*_with_prefix(["pytest", *deps]), "pytest", "tests")
+    return (*_with_prefix(["pytest", *deps], python), "pytest", "tests")
 
 
 def main(argv: Sequence[str] | None = None, runner: GateRunner = _run_step) -> int:
@@ -142,18 +159,19 @@ def main(argv: Sequence[str] | None = None, runner: GateRunner = _run_step) -> i
         return EXIT_USAGE
     try:
         deps = pep723_deps(skill_dir)
+        python = pep723_python(skill_dir)
     except _GatesError as exc:
         print(f"gates: {exc}", file=sys.stderr)
         return EXIT_USAGE
     steps: list[tuple[str, ...]] = []
     has_tests = (skill_dir / "tests").is_dir()
     if _has_python(skill_dir):
-        steps.extend(_static_steps(deps, has_tests=has_tests))
+        steps.extend(_static_steps(deps, python, has_tests=has_tests))
     else:
         print("(no Python files, skipping static gates)")
     if with_tests:
         if has_tests:
-            steps.append(_pytest_step(deps))
+            steps.append(_pytest_step(deps, python))
         else:
             print("(no tests/ directory, skipping pytest)")
     return run_gates(steps, skill_dir, runner)

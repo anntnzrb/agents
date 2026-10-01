@@ -64,7 +64,7 @@ def test_main_runs_static_gates_only_by_default(tmp_path: Path) -> None:
     skill = _skill_dir(tmp_path)
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] != "--with" else step[-1] for step, _ in seen]
+    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
     assert tools == ["ruff", "ruff", "basedpyright"]
     assert all(cwd == skill for _, cwd in seen)
 
@@ -75,7 +75,7 @@ def test_main_appends_pytest_with_tests_flag(tmp_path: Path) -> None:
     (skill / "tests").mkdir()
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill), "--tests"], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] != "--with" else step[-1] for step, _ in seen]
+    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
     assert tools == ["ruff", "ruff", "basedpyright", "tests"]
     pytest_step = list(seen[-1][0])
     assert "--with" in pytest_step
@@ -94,6 +94,17 @@ def test_basedpyright_step_includes_pytest_when_tests_exist(
     assert pyright_step[-1] == "basedpyright"
     assert "pytest" in pyright_step
     assert "PyYAML>=6.0" in pyright_step
+
+
+def test_gate_envs_use_the_skill_python_requirement(tmp_path: Path) -> None:
+    """Basedpyright and pytest run on the interpreter the PEP 723 block requires."""
+    skill = _skill_dir(tmp_path)
+    (skill / "tests").mkdir()
+    seen: list[tuple[Sequence[str], Path]] = []
+    assert main([str(skill), "--tests"], _fake_runner(seen)) == 0
+    for step, _ in seen[2:]:
+        argv = list(step)
+        assert argv[argv.index("--python") + 1] == ">=3.14"
 
 
 def test_basedpyright_step_omits_pytest_without_tests_dir(
