@@ -1,7 +1,8 @@
-"""Private inference facade: CLIProxyAPI chat and native System One classification.
+"""Private facade: CLIProxyAPI chat and panel, plus native System One classification.
 
 Run with an installed JSON config. This listener trusts its private network;
-public access must pass through the separately authenticated gateway.
+public access must pass through the separately authenticated gateway, which
+rejects the management routes this facade forwards to the private network.
 """
 
 from __future__ import annotations
@@ -35,6 +36,11 @@ HOP_HEADERS = frozenset(
         "upgrade",
     }
 )
+# CLIProxyAPI's management surface (its server_middleware.go). The panel sends its
+# own management key, which CLIProxyAPI checks, so these keep their credentials.
+MANAGEMENT_PREFIXES = ("/v0/management/", "/v8/management/", "/v0/resource/plugins/")
+MANAGEMENT_PATHS = frozenset({"/management.html", "/v0/management", "/v8/management"})
+MANAGEMENT_CREDENTIALS = frozenset({"authorization", "x-management-key"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,7 +324,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
             and "\\" not in decoded_path
             and "%" not in decoded_path
         )
-        ordinary = (
+        management = safe_path and (
+            parsed.path in MANAGEMENT_PATHS
+            or parsed.path.startswith(MANAGEMENT_PREFIXES)
+        )
+        ordinary = management or (
             safe_path
             and (
                 parsed.path.startswith(
@@ -379,12 +389,15 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 "cookie",
                 "x-api-key",
             }
+            if management:
+                excluded -= MANAGEMENT_CREDENTIALS
             headers = {
                 key: value
                 for key, value in self.headers.items()
                 if key.lower() not in excluded
             }
-            headers["Authorization"] = "Bearer keyless"
+            if not management:
+                headers["Authorization"] = "Bearer keyless"
             if websocket:
                 headers["Connection"] = "Upgrade"
                 headers["Upgrade"] = "websocket"
