@@ -22,6 +22,7 @@ EXIT_USAGE: Final[int] = 2
 RUFF: Final[str] = "ruff==0.16.10"
 BASEDPYRIGHT: Final[str] = "basedpyright==1.40.1"
 PYTEST: Final[str] = "pytest==9.1.1"
+PYTEST_SOCKET: Final[str] = "pytest-socket==0.7.0"
 
 type GateRunner = Callable[[Sequence[str], Path], int]
 
@@ -140,7 +141,14 @@ def _static_steps(
 
 def _pytest_step(deps: Sequence[str], python: str | None) -> tuple[str, ...]:
     """Return the pytest step with pytest plus the skill env added."""
-    return (*_with_prefix(deps, python), PYTEST, "tests")
+    return (
+        *_with_prefix([PYTEST_SOCKET, *deps], python),
+        PYTEST,
+        "--disable-socket",
+        "--allow-hosts=127.0.0.1,::1,localhost",
+        "--allow-unix-socket",
+        "tests",
+    )
 
 
 def main(argv: Sequence[str] | None = None, runner: GateRunner = _run_step) -> int:

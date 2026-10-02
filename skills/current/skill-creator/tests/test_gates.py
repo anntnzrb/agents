@@ -1,6 +1,8 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests for the skill code-gate runner."""
 
+import subprocess
+from textwrap import dedent
 from typing import TYPE_CHECKING, Final
 
 from scripts.gates import EXIT_USAGE, GateRunner, main, pep723_deps, run_gates
@@ -184,3 +186,44 @@ def test_pep723_deps_missing_cli_returns_empty(tmp_path: Path) -> None:
     skill = tmp_path / "bare-skill"
     skill.mkdir()
     assert pep723_deps(skill) == []
+
+
+def test_pytest_gate_blocks_external_sockets_and_preserves_loopback(
+    tmp_path: Path,
+) -> None:
+    """Exercise the real test process, including its offline socket policy."""
+    skill = _skill_dir(tmp_path)
+    tests = skill / "tests"
+    tests.mkdir()
+    _ = (tests / "test_network.py").write_text(
+        dedent("""
+            import socket
+            import pytest
+            from pytest_socket import SocketConnectBlockedError
+
+            def test_external_connection_is_rejected():
+                with socket.socket() as connection:
+                    with pytest.raises(SocketConnectBlockedError):
+                        connection.connect(("192.0.2.1", 443))
+
+            def test_local_fixture_still_works():
+                with socket.socket() as listener:
+                    listener.bind(("127.0.0.1", 0))
+                    listener.listen(1)
+                    address = listener.getsockname()
+                    client = socket.create_connection(address, timeout=1)
+                    with client:
+                        server, _ = listener.accept()
+                        with server:
+                            server.sendall(b"fixture")
+                            assert client.recv(7) == b"fixture"
+            """),
+        encoding="utf-8",
+    )
+
+    def run_test_step(step: Sequence[str], cwd: Path) -> int:
+        if step[-1] != "tests":
+            return 0
+        return subprocess.run(list(step), cwd=cwd, check=False).returncode
+
+    assert main([str(skill), "--tests"], run_test_step) == 0
