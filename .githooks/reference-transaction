@@ -1,0 +1,65 @@
+#!/bin/sh
+# Keep main equal to origin/main and reroute local work to a branch.
+#
+# When a ref update moves main to a commit that is not on origin/main (commit,
+# --no-verify commit, merge, rebase, reset, or `git update-ref`), this hook
+# copies that commit to a new work/<8-hex> branch, puts main back where it was,
+# and points every worktree that had main checked out at the new branch. The
+# index and working tree already match the new branch tip, so work continues
+# there.
+#
+# Some commands (rebase, checkout -B) attach HEAD to main after moving it.
+# The hook leaves a marker naming the new branch and the Git process that
+# moved main; when that same process attaches HEAD to main, the hook
+# redirects HEAD to the new branch. Markers from other processes are ignored.
+set -eu
+
+[ "$1" = committed ] || exit 0
+[ -z "${AGENTS_MAIN_REROUTE:-}" ] || exit 0
+export AGENTS_MAIN_REROUTE=1
+
+zero=0000000000000000000000000000000000000000
+
+in_tree() {
+	tree=$1
+	shift
+	env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX git -C "$tree" "$@"
+}
+
+while read -r old new ref; do
+	if [ "$ref" = HEAD ] && [ "$new" = ref:refs/heads/main ]; then
+		marker=$(git rev-parse --git-path agents-main-reroute)
+		[ -f "$marker" ] || continue
+		read -r pid branch <"$marker" || true
+		rm -f "$marker"
+		[ "$pid" = "$PPID" ] || continue
+		git symbolic-ref -m "reroute from main" HEAD "refs/heads/$branch"
+		continue
+	fi
+
+	[ "$ref" = refs/heads/main ] || continue
+	case "$new" in "$zero" | ref:*) continue ;; esac
+	git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null || continue
+	git merge-base --is-ancestor "$new" refs/remotes/origin/main && continue
+
+	until
+		branch=work/$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')
+		git update-ref -m "reroute from main" "refs/heads/$branch" "$new" "" 2>/dev/null
+	do :; done
+
+	# Some updates (fast-forward rebase, checkout -B) do not report the old
+	# value; the reflog entry before this update still has it.
+	if [ "$old" = "$zero" ]; then
+		old=$(git rev-parse --verify --quiet 'refs/heads/main@{1}' || git rev-parse refs/remotes/origin/main)
+	fi
+	git update-ref -m "reroute to $branch" refs/heads/main "$old" "$new"
+
+	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r tree; do
+		if [ "$(in_tree "$tree" symbolic-ref --quiet HEAD || true)" = refs/heads/main ]; then
+			in_tree "$tree" symbolic-ref -m "reroute from main" HEAD "refs/heads/$branch"
+		fi
+	done
+	printf '%s %s\n' "$PPID" "$branch" >"$(git rev-parse --git-path agents-main-reroute)"
+
+	echo "main is protected: moved $(git rev-parse --short "$new") to $branch; worktrees on main now use $branch. Push it and open a pull request." >&2
+done
