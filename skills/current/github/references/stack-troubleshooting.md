@@ -7,7 +7,7 @@ Safe default: stop at uncertainty; preserve evidence/current state; re-read loca
 
 Writes: conflict resolution; rebase continue/abort; force-with-lease push; stack unstack/prune; branch deletion; PR retarget/merge; API recovery. Require explicit authorization and owning manager at every write boundary.
 
-Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` graph/manager ownership; `git-worktrees` worktree lifecycle; `autommit` staging/history; `gh-contrib` contribution policy; `api.md` custom endpoint recovery.
+Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` graph/manager ownership; `git-worktrees` worktree lifecycle; `autommit` staging/history; `api.md` custom endpoint recovery.
 
 ## Any failure
 1. Record command, target host/repository, branch/PR/stack IDs, exit code, stdout, stderr, and whether a write was attempted.

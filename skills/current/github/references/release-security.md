@@ -82,7 +82,7 @@ Treat license text as repository content, not as permission to change the reposi
 If a license endpoint or subcommand is absent, use `api.md` only for the documented
 read endpoint and report detection uncertainty. Adding or replacing a repository
 license is a repository content/policy write; route the actual contribution through
-`gh-contrib` after authorization.
+the repository's contribution process after authorization.
 
 ## Preview and permission caveats
 

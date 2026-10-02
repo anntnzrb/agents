@@ -6,7 +6,7 @@ Safe default: one strictly linear stack in one repository; plan bottom→top; on
 
 Write boundaries: branch creation/rewrites, staging/commits, pushes, PR creation, stack linking, and stack restructuring are separate local/remote writes. Obtain authorization for each applicable boundary; afterward re-read local `view --json` and remote PR/stack state.
 
-Ownership handoff: `git-worktrees` owns worktree lifecycle; `autommit` owns staging, commit segmentation, and message policy; `gh-contrib` owns contribution rules, push policy, and ordinary PR creation/review; external branch managers own their local state. Return to `stack-commands.md` only after this design is sound.
+Ownership handoff: `git-worktrees` owns worktree lifecycle; `autommit` owns staging, commit segmentation, and message policy; external branch managers own their local state. Return to `stack-commands.md` only after this design is sound.
 
 ## Model
 
@@ -50,7 +50,7 @@ For each layer, record:
 |Middle|`<branch-2>`|`<branch-1>`|`<owner>`|`<dependent change>`|`<commit handoff>`|
 |Top|`<branch-3>`|`<branch-2>`|`<owner>`|`<dependent change>`|`<commit handoff>`|
 
-Where repository policy allows, every PR title/body should state its layer and dependency. Labels, reviewers, and draft/ready state belong to `gh-contrib`/`collaboration.md`; this reference requires only an observable dependency relationship.
+Where repository policy allows, every PR title/body should state its layer and dependency. Labels, reviewers, and draft/ready state belong to `collaboration.md`; this reference requires only an observable dependency relationship.
 
 ## Local manager and handoffs
 

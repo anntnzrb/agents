@@ -33,7 +33,7 @@ Read the listed reference whenever its trigger applies. Use `references/core.md`
 
 - Shared invocation, hosts, auth, aliases, config, completion, output, prompts, exits → `references/core.md`.
 - Repository discovery, cloning, browsing, search, gists, organizations, or Codespaces → `references/repositories.md`; keep local Git/worktree actions local.
-- Issues, pull requests, discussions, projects, reviews, or labels → `references/collaboration.md`; ordinary contribution policy → `gh-contrib`.
+- Issues, pull requests, discussions, projects, reviews, or labels → `references/collaboration.md`.
 - Actions, workflows, caches, secrets, or variables → `references/automation.md`; keep account and repository writes gated.
 - Releases, artifact attestations, rulesets, keys, or licenses → `references/release-security.md`; preserve key and permission boundaries.
 - REST, GraphQL, pagination, previews, or custom endpoints; any `gh api` surface → `references/api.md`; use `gh api` only with explicit target and method.
@@ -47,4 +47,4 @@ Read the listed reference whenever its trigger applies. Use `references/core.md`
 
 For explicit stack intent, read all three stack references (`references/stack-design.md`, `references/stacked-pr-workflow.md`, and `references/stack-commands.md`) before branch or PR mutation; use local references. Check `gh extension list`; NEVER auto-install extensions. Missing capability, 404, or stack exit 9 means availability/rollout failure, not permission to silently use ordinary PR commands.
 
-Ownership: `git-worktrees` owns worktree lifecycle; `autommit` owns staging and history; `gh-contrib` owns contribution policy and ordinary PR review. This skill owns GitHub CLI routing and stack-specific remote state only.
+Ownership: `git-worktrees` owns worktree lifecycle; `autommit` owns staging and history. This skill owns GitHub CLI routing and stack-specific remote state only.

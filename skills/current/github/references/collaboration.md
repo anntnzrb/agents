@@ -3,9 +3,9 @@
 Covers `issue`, `pr`, `discussion`, `project`, `label`; JSON selection, checks, reviews, post-write verification.
 
 ## Defaults and boundaries
-- Safe default: identify explicit host/repository/object; read current state; use structured output. Ordinary contribution policy → `gh-contrib`.
+- Safe default: identify explicit host/repository/object; read current state; use structured output.
 - External writes: create, edit, comment, close, reopen, merge, request review, resolve threads, change labels/projects/milestones. MUST obtain explicit authorization at mutation boundary; re-read resulting object. NEVER put secrets in issue/PR bodies or comments.
-- Shared rules → `core.md`; Actions checks/logs → `automation.md`; dependent PRs → `stack-design.md`, `stack-commands.md`; repository contribution policy and ordinary PR review → `gh-contrib`.
+- Shared rules → `core.md`; Actions checks/logs → `automation.md`; dependent PRs → `stack-design.md`, `stack-commands.md`.
 
 ## Common reads
 Bind target explicitly:
@@ -30,7 +30,6 @@ Discover fields with `--json` without a field list when installed options drift.
 - `gh pr diff --patch` remains a read.
 - `gh pr checkout` changes local branch/worktree state; route lifecycle decisions to `git-worktrees` and inspect current worktree ownership first.
 - Writes: `gh pr create`, `edit`, `close`, `reopen`, `comment`, `review`, `ready`, `lock`, `unlock`, `update-branch`, `merge`. Before execution, confirm base/head/repository, draft state, body, reviewers, and requested authorization.
-- Ordinary single-PR contribution sequencing, repository rules, push policy, and issue/PR creation → `gh-contrib`; this file owns CLI selection and state verification only.
 - `gh pr merge` is an ordinary PR path, NOT a stacked-PR merge path. Explicit stack intent → `stack-commands.md`, which owns merge order and queue state.
 
 ## Discussions

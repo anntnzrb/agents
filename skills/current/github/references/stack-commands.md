@@ -4,7 +4,7 @@ Public preview; version-sensitive. Safe default: verify capability, target, remo
 
 Writes: `add` staging/commit, checkout/rebase/navigation, submit, sync, push, link, unstack, and merge change local or remote state. Require explicit authorization for each external write, plus local authorization when an assigned worktree changes; afterward re-read local `view --json`, branches, PRs, and stack state.
 
-Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees`, `autommit`, and `gh-contrib` remain authorities for local lifecycle, staging/history, and ordinary contribution policy.
+Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees` and `autommit` remain authorities for local lifecycle and staging/history.
 
 ## Capability and target gate
 

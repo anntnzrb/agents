@@ -12,7 +12,7 @@ Codespaces creation/deletion are writes. Require authorization and re-read after
 remote writes. Do not delete or archive as a discovery shortcut.
 
 **Adjacent handoff:** use `core.md` for target/auth/output rules; use `git-worktrees`
-for worktree lifecycle, `gh-contrib` for contribution policy, and
+for worktree lifecycle and
 `collaboration.md` for issues/PRs/projects/labels.
 
 ## Repository and local context
