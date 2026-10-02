@@ -57,6 +57,12 @@ remain temporary. `UV_CACHE_DIR` and `UV_PYTHON_INSTALL_DIR` overrides are honor
 The suite does not delete these uv-owned caches. A cold cache still needs its
 initial downloads; subsequent runs reuse them.
 
+Tests run real reconciles, which call `systemctl --user`. That client finds the
+live user manager through `XDG_RUNTIME_DIR` or D-Bus, not `HOME`, so a temporary
+home alone does not isolate it. `tests/conftest.py` points the whole session at a
+nonexistent manager; without that, the suite reloads and restarts the host's real
+services.
+
 ## Run a focused test
 
 Pass the test file to pytest:
