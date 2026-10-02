@@ -33,10 +33,10 @@ There is no fallback model. The call fails with the reason when the setting is m
 ## How a search runs
 
 1. `rg` lists the files that are not ignored. It skips lockfiles, build output, binaries, and credential files. It also counts query keywords per file to build an IDF-weighted lexical rank.
-2. The classifier judges the top 96 lexical candidates by path, in batches of `bool` questions.
-3. The tool cuts the 12 strongest files into windows of about 2.5 KB. It sends the 8 strongest windows of each file to the classifier, which checks whether each window implements part of the query.
+2. Lexical rank determines processing order only. There is no path-judgment gate or file shortlist.
+3. Bounded workers read files and classify every window. Long lines are split without discarding their suffixes; split passages retain the original line number. Raw transcript JSON is searched as text, not parsed into conversation messages. Memory retains a bounded number of file buffers plus verified results, rather than all corpus contents; a single large file still needs memory for its contents and windows.
 
-The result lists ranges with probability at least 0.5, strongest file first, with at most 2 ranges for each of 8 files. Classifier token usage is returned as the tool result's `usage`, so it counts toward session cost. Cancellation follows the calling turn's signal.
+The tool returns passages with probability at least 0.5, strongest first. Classifier token usage is counted once per actual request and returned as the tool result's `usage`, so it counts toward session cost. Cancellation follows the calling turn's signal. Errors reject the batch rather than presenting partial coverage as success; in-flight workers settle before the search returns.
 
 ## Validate
 

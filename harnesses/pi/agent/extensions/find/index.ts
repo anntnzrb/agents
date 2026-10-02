@@ -118,55 +118,29 @@ export async function search(options: SearchOptions): Promise<{ hits: Hit[]; usa
       }
     }),
   ]);
-  if (listing.code !== 0) throw new Error(`find: rg --files failed: ${listing.stderr.trim()}`);
+  signal?.throwIfAborted();
+  if (listing.code !== 0 && !(listing.code === 1 && !listing.stdout && !listing.stderr)) throw new Error(`find: rg --files failed: ${listing.stderr.trim()}`);
   const files = listing.stdout.split("\n").map(strip).filter((rel) => rel && eligible(rel));
   const weights = idf(counts, words.length, files.length);
   const ranked = files
     .map((rel) => ({ rel, lex: fileScore(counts.get(rel), weights, rel, words), name: 0 }))
-    .sort((a, b) => b.lex - a.lex || (a.rel < b.rel ? -1 : 1))
-    .slice(0, CANDIDATES);
+    .sort((a, b) => b.lex - a.lex || (a.rel < b.rel ? -1 : 1));
 
-  // Wave 1: judge candidates by path.
-  const batches = Array.from({ length: Math.ceil(ranked.length / NAME_BATCH) }, (_, b) => ranked.slice(b * NAME_BATCH, (b + 1) * NAME_BATCH));
-  await pool(batches, async (batch) => {
-    const ps = await ask(
-      {
-        state: { search: query, files: Object.fromEntries(batch.map((f, i) => [key(i), f.rel])) },
-        questions: questions(batch.length, "Is file $KEY likely to contain code or text matching the search? Judge by its path.", {
-          true: "Plausibly contains a matching implementation or definition",
-          false: "Unrelated by name and location",
-        }),
-      },
-      batch.length,
-    );
-    batch.forEach((f, i) => (f.name = ps[i]!));
-  });
-  // The two strongest lexical files are always read; the rest follow the path judgment.
-  const selected = new Set(ranked.slice(0, 2).map((f) => f.rel));
-  for (const f of [...ranked].sort((a, b) => b.name - a.name || b.lex - a.lex)) {
-    if (selected.size >= FILES) break;
-    selected.add(f.rel);
-  }
-
-  // Wave 2: verify the strongest windows of each selected file.
-  const jobs = (
-    await Promise.all(
-      [...selected].map(async (rel) => {
-        const buffer = await readFile(resolve(root, rel)).catch(() => undefined);
-        if (!buffer || buffer.subarray(0, 8192).includes(0)) return [];
-        const passages = selectWindows(windows(buffer.toString("utf8"), WINDOW_BYTES, words, weights), WINDOWS_PER_FILE);
-        return Array.from({ length: Math.ceil(passages.length / VERIFY_BATCH) }, (_, b) => ({ rel, passages: passages.slice(b * VERIFY_BATCH, (b + 1) * VERIFY_BATCH) }));
-      }),
-    )
-  ).flat();
   const hits: Hit[] = [];
-  await pool(jobs, async ({ rel, passages }) => {
+  // Read a bounded number of files at once, and classify every passage in each.
+  await pool(ranked, async ({ rel }) => {
+    signal?.throwIfAborted();
+    const buffer = await (options.read ?? readFile)(resolve(root, rel));
+    if (buffer.includes(0)) return;
+    const all = windows(buffer.toString("utf8"), WINDOW_BYTES, words, weights);
+    for (let offset = 0; offset < all.length; offset += VERIFY_BATCH) {
+    const passages = all.slice(offset, offset + VERIFY_BATCH);
     const ps = await ask(
       {
-        state: { search: query, file: rel, passages: Object.fromEntries(passages.map((p, i) => [key(i), p.text])) },
+        state: { search: query, file: rel, ranges: passages.map((p) => ({ start: p.start, end: p.end })), passages: Object.fromEntries(passages.map((p, i) => [key(i), p.text])) },
         questions: questions(passages.length, "Does passages.$KEY substantively implement, define, or explain part of the search? Apply criteria.", {
-          true: "Contains an implementation, definition, or substantive explanation of an important part of the search. A helper implementing one requested step counts.",
-          false: "Only mentions, calls, imports, tests, or configures the subject, or is unrelated code sharing keywords.",
+          true: "Supplies direct evidence for an important part of the search: an implementation, definition, substantive explanation, relevant transcript statement, or log event. A helper implementing one requested step counts.",
+          false: "Does not supply the requested evidence. For implementation searches, mere calls, imports, or keyword mentions do not count; for transcript, log, or documentation searches, directly relevant statements do count.",
         }),
       },
       passages.length,
