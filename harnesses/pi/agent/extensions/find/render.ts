@@ -6,14 +6,14 @@ import type { Hit } from "./index.ts";
 type FindTheme = Pick<Theme, "fg" | "bold">;
 
 export function renderFindCall(
-  args: { query?: string; path?: string },
+  args: { query?: string; path?: string; searches?: { query: string; path?: string }[] },
   context: { executionStarted: boolean; isPartial: boolean; isError: boolean },
   theme: FindTheme,
 ): Text {
   const title = theme.fg("toolTitle", theme.bold("find"));
   const status = context.isError ? theme.fg("error", "failed")
     : context.isPartial ? theme.fg("muted", context.executionStarted ? "searching" : "composing") : "";
-  const query = (args.query ?? "").replace(/\s+/g, " ").trim();
+  const query = (args.query ?? args.searches?.map((s) => `${s.query} (${s.path ?? "."})`).join("; ") ?? "").replace(/\s+/g, " ").trim();
   const scope = args.path ? ` · ${theme.fg("muted", args.path)}` : "";
   return new Text(`${title}${status ? ` · ${status}` : ""}${query ? `\n  “${query}”${scope}` : scope}`, 0, 0);
 }

@@ -10,6 +10,8 @@ The design is a smaller port of [oh-my-pi's `find`](https://github.com/can1357/o
 
 Direct calls keep the query and optional search scope visible during composition, execution, and completion. The pending label changes from `composing` to `searching`. Completed searches show unique-file and range counts, accented paths, muted line ranges, and classifier scores as percentages. Scores are model judgments, not guarantees of correctness. Compact mode omits snippets; expansion adds snippets and the classifier model.
 
+Multi-search calls show their queries and scopes in the call label and use an indexed text report rather than merging differently attributed hits into the single-search grid. Expand the report to see all searches.
+
 Compact results group by directory, relative to the explicit search scope when provided. Each row keeps `filename:lines · score` together. Groups are ordered by their strongest score, and ranges within each group by score. Long directory headings elide middle components with `…` when space requires it, unless that would create duplicate headings. Expansion shows full working-directory-relative paths. Scores of 90% or higher use green, 75–89% use normal text, and lower scores use yellow; these are visual bands, not calibrated confidence thresholds.
 
 Compact mode shows the four strongest directories and at most three result ranges per directory. Directory headings include their best score. Header totals cover all returned results. A muted footer separately counts omitted directories and omitted ranges within shown directories, without counting ranges inside omitted directories twice. Expansion displays all returned results.

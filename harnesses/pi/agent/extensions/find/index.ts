@@ -58,10 +58,16 @@ export async function resolveClassifier(registry: Registry, setting: unknown): P
 /** Run `run` over `items` with at most {@link PARALLEL} in flight. */
 async function pool<T>(items: readonly T[], run: (item: T) => Promise<void>): Promise<void> {
   let next = 0;
+  let failed = false;
+  let failure: unknown;
   const worker = async () => {
-    while (next < items.length) await run(items[next++]!);
+    while (!failed && next < items.length) {
+      try { await run(items[next++]!); }
+      catch (error) { if (!failed) failure = error; failed = true; }
+    }
   };
   await Promise.all(Array.from({ length: Math.min(PARALLEL, items.length) }, worker));
+  if (failed) throw failure;
 }
 
 /** One `bool` question per item, keyed `k000`, `k001`, …; the `state` entries use the same keys. */
@@ -78,6 +84,7 @@ export interface SearchOptions {
   query: string;
   path?: string;
   signal?: AbortSignal;
+  read?: (path: string) => Promise<Buffer>;
 }
 
 /** @throws on the first classifier failure: a partial search would hide coverage loss. */
