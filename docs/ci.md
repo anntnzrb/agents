@@ -35,13 +35,13 @@ uvx --python 3.14 pytest==9.1.1 .github/tests -q
 
 The final `CI required` check succeeds only when every selected suite succeeds. A skipped matrix is acceptable only when the plan selected no owners for that matrix. Failures, cancellations, missing results, and unexpected skips block this check.
 
-## Keep offline checks separate from live checks
+## Keep CI deterministic
 
-PR checks use deterministic tests without provider credentials. Live tests are disabled in that workflow. The separate live-smoke workflow exercises public sources and does not participate in `CI required`.
+CI uses recorded fixtures and local test servers without provider credentials. Live tests are disabled. Python skill gates reject sockets outside loopback; Unix sockets remain available for local process coordination. Extension tests preload an HTTP guard, so calls using the default fetch transport fail instead of contacting a provider.
 
-Run or inspect the scheduled workflows from GitHub's **Actions** tab. Manual dispatch and scheduled CI select all active code suites. Live checks can fail because an upstream source changed or became unavailable; investigate that failure separately from a code regression.
+Run or inspect the workflow from GitHub's **Actions** tab. Manual dispatch and scheduled CI select all active code suites. The workflow does not invoke harness CLIs, inference providers, automatic agent reviews, or model evaluations.
 
-Credentialed smoke tests and model-based skill evaluations remain explicit operations owned by the skill. They require credentials or paid inference and do not run on PRs. Structural skill validation does not establish instruction quality or activation accuracy.
+Live smoke tests, native harness integration tests, and model-based skill evaluations remain explicit manual operations owned by their source. They do not run in CI. Structural skill validation does not establish instruction quality or activation accuracy.
 
 ## Maintain merge protection
 

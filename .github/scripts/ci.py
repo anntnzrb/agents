@@ -20,10 +20,10 @@ HARNESS_ROOTS = {
 }
 
 
-def run(command: list[str], *, cwd: Path) -> None:
+def run(command: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> None:
     """Run a bounded check and propagate failure to the workflow."""
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=cwd, check=True, timeout=1200)
+    subprocess.run(command, cwd=cwd, env=env, check=True, timeout=1200)
 
 
 def plan(root: Path, base: str | None) -> dict[str, list[str]]:
@@ -99,7 +99,22 @@ def harness(root: Path, name: str) -> None:
             ignore=shutil.ignore_patterns("node_modules", ".git"),
         )
         run(["bun", "install", "--frozen-lockfile"], cwd=target)
-        run(["bun", "test"], cwd=target)
+        paths = [str(target / "node_modules/.bin")]
+        if name == "pi":
+            # Search tests use a standalone, pinned ripgrep binary.
+            bundled = sorted((target / "node_modules/@vscode").glob("ripgrep-*/bin"))
+            if not bundled:
+                raise ValueError(
+                    "Pinned ripgrep package did not include its executable"
+                )
+            paths.extend(str(path) for path in bundled)
+        paths.append(os.environ["PATH"])
+        env = os.environ | {"PATH": os.pathsep.join(paths)}
+        run(
+            ["bun", "test", "--preload", str(root / ".github/scripts/offline-bun.ts")],
+            cwd=target,
+            env=env,
+        )
 
 
 def is_str_dict(value: object) -> TypeIs[dict[str, object]]:
