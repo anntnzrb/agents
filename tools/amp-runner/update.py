@@ -4,7 +4,8 @@
 The `amp` wrapper downloads new releases on every launch, but a long-lived
 runner keeps executing the version it started with. This script refreshes the
 wrapper's cache, compares it with the running executable, and restarts the
-systemd unit only when the runner is behind and no thread shows activity.
+service (systemd unit on Linux, launch agent on macOS) only when the runner is
+behind and no thread shows activity.
 
 Busy evidence comes from the runner's JSON log: any thread event in the last
 IDLE_MINUTES, or a thread whose last agent state is not idle and that moved
@@ -22,7 +23,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
+IS_MACOS = sys.platform == "darwin"
+# Names must match the service declarations in sync/src/sync/core/services.py.
 UNIT = "amp-runner-agents.service"
+LABEL = "com.amp.runner.agents"
 WRAPPER = Path.home() / ".local" / "bin" / "amp"
 LOG = Path.home() / ".cache" / "amp" / "logs" / "runner-agents.log"
 LOG_TAIL_BYTES = 4 * 1024 * 1024
@@ -34,20 +38,48 @@ def say(msg: str) -> None:
     print(f"amp-runner: {msg}", flush=True)
 
 
-def systemctl(*args: str) -> str:
+def output(*argv: str) -> str:
     return subprocess.run(
-        ["systemctl", "--user", *args], capture_output=True, text=True, check=False
+        argv, capture_output=True, text=True, check=False, timeout=60
     ).stdout.strip()
 
 
+def service_target() -> str:
+    return f"gui/{os.getuid()}/{LABEL}"
+
+
+def running_pid() -> str | None:
+    if IS_MACOS:
+        listing = output("launchctl", "print", service_target())
+        pids = [
+            line.split("=", 1)[1].strip()
+            for line in listing.splitlines()
+            if line.strip().startswith("pid =")
+        ]
+        pid = pids[0] if pids else ""
+    else:
+        pid = output("systemctl", "--user", "show", UNIT, "-p", "MainPID", "--value")
+    return pid if pid.isdigit() and pid != "0" else None
+
+
 def running_exe() -> Path | None:
-    pid = systemctl("show", UNIT, "-p", "MainPID", "--value")
-    if not pid.isdigit() or pid == "0":
+    pid = running_pid()
+    if pid is None:
         return None
+    if IS_MACOS:
+        names = output("lsof", "-n", "-w", "-a", "-p", pid, "-d", "txt", "-Fn")
+        paths = [line[1:] for line in names.splitlines() if line.startswith("n")]
+        return Path(paths[0]) if paths else None
     try:
         return Path(os.readlink(f"/proc/{pid}/exe"))
     except OSError:
         return None
+
+
+def restart() -> int:
+    if IS_MACOS:
+        return subprocess.call(["launchctl", "kickstart", "-k", service_target()])
+    return subprocess.call(["systemctl", "--user", "restart", UNIT])
 
 
 def cached_exe(running: Path) -> Path | None:
@@ -117,7 +149,7 @@ def busy_threads(now: datetime) -> list[str]:
 def main() -> int:
     running = running_exe()
     if running is None:
-        say(f"{UNIT} is not running; nothing to update")
+        say("the runner is not running; nothing to update")
         return 0
     latest = cached_exe(running)
     if latest is None:
@@ -137,7 +169,7 @@ def main() -> int:
         )
         return 0
     say(f"restarting {_version(running)} -> {_version(latest)}")
-    rc = subprocess.call(["systemctl", "--user", "restart", UNIT])
+    rc = restart()
     if rc != 0:
         return rc
     # The wrapper execs into the cached binary shortly after systemd starts it.

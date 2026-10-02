@@ -378,6 +378,8 @@ def busy_threads() -> int:
 def cmd_auto_update(args: argparse.Namespace) -> int:
     """Update to the channel head, but only when behind and no turn is running."""
     require_declared_host()
+    if active_version() is None:
+        die("T3 is not installed on this host; run `t3ctl.py install` first")
     head = channel_head()
     running, launcher = active_version(), launcher_version()
     if running == head and launcher == head:

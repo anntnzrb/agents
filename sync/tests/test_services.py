@@ -20,8 +20,11 @@ import pytest
 from sync.core.harness import SyncEnv
 from sync.core.services import (
     AMP_RUNNER_LABEL,
+    AMP_RUNNER_UPDATE_LABEL,
     AUTH_GATEWAY_ENV,
     LAUNCHD_LABEL,
+    T3_REFRESH_LABEL,
+    T3_UPDATE_LABEL,
     UserUnit,
     declared_launch_agents,
     declared_user_units,
@@ -407,11 +410,37 @@ def test_darwin_declares_updater_and_runner_launch_agents(
 
     agents = {a.name: a.content for a in declared_launch_agents(darwin)}
 
-    assert set(agents) == {LAUNCHD_LABEL, AMP_RUNNER_LABEL}
+    assert set(agents) == {LAUNCHD_LABEL, AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL}
     runner = agents[AMP_RUNNER_LABEL]
     assert "<string>--runner-id</string><string>beirut</string>" in runner
     assert "<key>KeepAlive</key><true/>" in runner
     assert f"<key>WorkingDirectory</key><string>{home}</string>" in runner
+    updater = agents[AMP_RUNNER_UPDATE_LABEL]
+    assert f"{home}/.config/agents/tools/amp-runner/update.py" in updater
+    assert "<key>StartCalendarInterval</key>" in updater
+    assert "KeepAlive" not in updater
+
+
+def test_darwin_declares_t3_agents_only_on_declared_t3_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Mac T3 host gets the same model refresh and nightly update as Linux."""
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut.local")
+    darwin = SyncEnv.from_home(str(home), platform="darwin")
+    _declare_t3_hosts(home, ["munich"])
+    assert declared_launch_agents(darwin) == []
+
+    _declare_t3_hosts(home, ["munich", "beirut"])
+    agents = {a.name: a.content for a in declared_launch_agents(darwin)}
+    assert set(agents) == {T3_REFRESH_LABEL, T3_UPDATE_LABEL}
+    t3ctl = f"{home}/.config/agents/tools/t3/t3ctl.py"
+    refresh = agents[T3_REFRESH_LABEL]
+    assert f"<string>{t3ctl}</string><string>refresh-models</string>" in refresh
+    assert "<key>StartInterval</key><integer>900</integer>" in refresh
+    update = agents[T3_UPDATE_LABEL]
+    assert f"<string>{t3ctl}</string><string>auto-update</string>" in update
+    assert "<key>StartCalendarInterval</key>" in update
+    assert "KeepAlive" not in update
 
 
 def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
@@ -430,7 +459,7 @@ def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
     bootstrapped = [c[3] for c in calls if c[:2] == ["launchctl", "bootstrap"]]
     assert sorted(
         p.rsplit("/", 1)[1].removesuffix(".plist") for p in bootstrapped
-    ) == sorted([LAUNCHD_LABEL, AMP_RUNNER_LABEL])
+    ) == sorted([LAUNCHD_LABEL, AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL])
 
     calls.clear()
     asyncio.run(reconcile_services(darwin, gateway_host=False))
