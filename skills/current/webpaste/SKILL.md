@@ -1,6 +1,6 @@
 ---
 name: webpaste
-description: "Use when sharing, uploading, or fetching code, diffs, or logs via pastes.dev; not for local clipboard copying."
+description: "Use when sharing or fetching text, screenshots, recordings, or archives via anonymous URLs; not for clipboard copying."
 license: AGPL-3.0-or-later
 metadata:
   author: anonymous
@@ -8,13 +8,7 @@ metadata:
 
 # Webpaste
 
-Upload code snippets, git diffs, command logs, or text files to https://pastes.dev.
-
-## When to use
-
-- Share code snippets, traces, logs, or diffs via a web URL.
-- Upload file contents or pipe stdin to pastes.dev.
-- Inspect or retrieve existing pastes by key.
+Share one file or stdin anonymously. Uploads are public. Inspect content for secrets before publishing.
 
 ## Public entrypoint
 

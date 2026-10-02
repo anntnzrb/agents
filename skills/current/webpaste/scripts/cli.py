@@ -6,17 +6,21 @@
 #     "httpx2>=2.13.1",
 # ]
 # ///
-"""Upload code, diffs, and text to pastes.dev."""
+"""Share text and binary files through verified anonymous links."""
 
 import argparse
 import gzip
+import hashlib
 import http
 import json
+import mimetypes
 import re
 import sys
 from dataclasses import dataclass
+from email.message import Message
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeIs, TypedDict
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -86,6 +90,11 @@ class UploadPayload:
     output_json: bool
     output_raw: bool
     output_raw_url: bool
+    provider: str = "pastes"
+    filename: str = "upload.txt"
+    mime_type: str = "text/plain"
+    verify: bool = True
+    ascii_check: bool = False
 
 
 class UploadResponse(TypedDict):
@@ -333,6 +342,82 @@ def get_content_type(language: str) -> str:
     return f"text/{canonical}"
 
 
+def sniff_content(content: bytes, path: Path | None) -> tuple[bool, str]:
+    """Classify UTF-8 text and common binary signatures without changing bytes."""
+    for signature, mime in (
+        (b"\x89PNG\r\n\x1a\n", "image/png"),
+        (b"\xff\xd8\xff", "image/jpeg"),
+        (b"GIF8", "image/gif"),
+        (b"%PDF-", "application/pdf"),
+        (b"PK\x03\x04", "application/zip"),
+        (b"\x1f\x8b", "application/gzip"),
+    ):
+        if content.startswith(signature):
+            return False, mime
+    mime = mimetypes.guess_type(str(path))[0] if path else None
+    try:
+        _ = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return False, mime or "application/octet-stream"
+    if b"\0" in content or (
+        mime
+        and (
+            mime.startswith(("image/", "audio/", "video/", "font/"))
+            or mime
+            in {
+                "application/pdf",
+                "application/zip",
+                "application/gzip",
+                "application/octet-stream",
+            }
+        )
+    ):
+        return False, mime or "application/octet-stream"
+    return True, mime if mime and (
+        mime.startswith("text/")
+        or mime in {"application/json", "application/xml", "application/javascript"}
+        or mime.endswith(("+json", "+xml"))
+    ) else "text/plain"
+
+
+def resolve_fetch_url(base_url: str, value: str) -> str:
+    """Resolve supported viewer links to raw URLs, preserving custom API URLs."""
+    parsed = urlsplit(value)
+    if parsed.scheme:
+        base = urlsplit(base_url)
+        if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+            raise ValueError("expected an HTTP URL without credentials")
+        if parsed.hostname == "pastes.dev":
+            return f"{DEFAULT_BASE_URL}{parsed.path.strip('/')}"
+        if parsed.netloc not in {
+            "api.pastes.dev",
+            "files.catbox.moe",
+            "litter.catbox.moe",
+            base.netloc,
+        }:
+            raise ValueError("unsupported provider URL")
+        return value
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        raise ValueError("expected a paste key or supported URL")
+    return f"{base_url.rstrip('/')}/{value}"
+
+
+def ascii_diagnostic(content: bytes) -> str | None:
+    """List non-ASCII codepoints and their Windows-1252 misdecoding."""
+    text = content.decode("utf-8")
+    characters = sorted({char for char in text if not char.isascii()}, key=ord)
+    if not characters:
+        return None
+    displays = (
+        char.encode("utf-8").decode("cp1252", errors="replace") for char in characters
+    )
+    details = "; ".join(
+        f"U+{ord(char):04X} {char!r} displays as {display!r}"
+        for char, display in zip(characters, displays, strict=True)
+    )
+    return f"non-ASCII text without charset=utf-8: {details}"
+
+
 EPILOG_EXAMPLES: Final[str] = """
 examples:
   # Upload a local file (auto-detects language from extension)
@@ -362,7 +447,7 @@ supported languages:
 def build_parser() -> argparse.ArgumentParser:
     """Construct command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="Upload code or text to pastes.dev.",
+        description="Share text and binaries with verified anonymous direct links.",
         epilog=EPILOG_EXAMPLES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -418,6 +503,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable gzip payload compression",
     )
+    _ = parser.add_argument("--provider", choices=("pastes", "catbox", "litterbox"))
+    _ = parser.add_argument("--filename", help="Override the uploaded filename")
+    _ = parser.add_argument(
+        "--no-verify", action="store_true", help="Skip download verification"
+    )
+    _ = parser.add_argument(
+        "--ascii-check",
+        action="store_true",
+        help="Fail on non-ASCII text without a UTF-8 charset",
+    )
+    _ = parser.add_argument("--sha256", help="Expected SHA-256 for --get")
     return parser
 
 
@@ -429,7 +525,10 @@ def read_input(
         input_path = Path(file_arg)
         if not input_path.exists() or not input_path.is_file():
             return Err(AppError(f"file not found: {file_arg}", EXIT_USAGE_ERROR))
-        return Ok((input_path.read_bytes(), input_path))
+        try:
+            return Ok((input_path.read_bytes(), input_path))
+        except OSError as exc:
+            return Err(AppError(f"cannot read file: {exc}", EXIT_USAGE_ERROR))
 
     no_input_guide = (
         "no input provided. Pass a file path or pipe content via stdin.\n"
@@ -499,39 +598,121 @@ def format_upload_response(key: str, payload: UploadPayload) -> str:
     return f"{view_url}\n"
 
 
-def execute_upload(payload: UploadPayload) -> Result[str, AppError]:
-    """Post prepared payload to bytebin endpoint."""
-    if not payload.content:
-        return Err(AppError("cannot upload empty content", EXIT_USAGE_ERROR))
-
+def post_pastes(client: httpx2.Client, payload: UploadPayload) -> tuple[str, str]:
+    """Post text to a pastes-compatible API and validate its key."""
     post_url = f"{payload.base_url.rstrip('/')}/post"
     content_type = get_content_type(payload.language)
-
     headers = {
         "User-Agent": payload.user_agent,
         "Content-Type": content_type,
         "Accept": "application/json",
     }
-
     body = payload.content
     if payload.use_gzip:
         body = gzip.compress(payload.content)
         headers["Content-Encoding"] = "gzip"
+    resp = client.post(post_url, headers=headers, content=body)
+    _ = resp.raise_for_status()
+    decode_json: Callable[..., object] = resp.json
+    raw = decode_json()
+    if not _is_str_dict(raw):
+        raise ValueError("malformed server response")
+    key = raw.get("key")
+    if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", key):
+        raise ValueError("missing or invalid key in server response")
+    return key, f"{payload.base_url.rstrip('/')}/{key}"
+
+
+def post_catbox(client: httpx2.Client, payload: UploadPayload) -> tuple[str, str]:
+    """Post a single anonymous file to Catbox or Litterbox."""
+    endpoint = (
+        "https://catbox.moe/user/api.php"
+        if payload.provider == "catbox"
+        else "https://litterbox.catbox.moe/resources/internals/api.php"
+    )
+    data = {"reqtype": "fileupload"}
+    if payload.provider == "litterbox":
+        data["time"] = "72h"
+    resp = client.post(
+        endpoint,
+        headers={"User-Agent": payload.user_agent},
+        data=data,
+        files={"fileToUpload": (payload.filename, payload.content, payload.mime_type)},
+    )
+    _ = resp.raise_for_status()
+    raw_url = resp.text.strip()
+    parsed = urlsplit(raw_url)
+    host = "files.catbox.moe" if payload.provider == "catbox" else "litter.catbox.moe"
+    if parsed.scheme != "https" or parsed.netloc != host or not parsed.path.strip("/"):
+        raise ValueError("invalid upload URL in server response")
+    return parsed.path.rsplit("/", 1)[-1], raw_url
+
+
+def verify_upload(
+    client: httpx2.Client,
+    payload: UploadPayload,
+    raw_url: str,
+) -> Result[tuple[str | None, str | None], AppError]:
+    """Download the published bytes and inspect the served MIME metadata."""
+    downloaded = client.get(raw_url, headers={"User-Agent": payload.user_agent})
+    if downloaded.status_code == http.HTTPStatus.NOT_FOUND:
+        return Err(AppError(f"blank upload: 404 at {raw_url}", EXIT_NETWORK_ERROR))
+    _ = downloaded.raise_for_status()
+    if (
+        not downloaded.content
+        or hashlib.sha256(downloaded.content).digest()
+        != hashlib.sha256(payload.content).digest()
+    ):
+        return Err(
+            AppError(
+                f"blank upload or SHA-256 mismatch at {raw_url}", EXIT_NETWORK_ERROR
+            )
+        )
+    content_type = downloaded.headers.get("content-type")
+    message = Message()
+    if content_type:
+        message["content-type"] = content_type
+    charset = message.get_content_charset()
+    if payload.ascii_check and charset != "utf-8":
+        diagnostic = ascii_diagnostic(payload.content)
+        if diagnostic:
+            return Err(AppError(diagnostic, EXIT_NETWORK_ERROR))
+    if not payload.output_json:
+        metadata = f"Served content-type: {content_type or 'unknown'}"
+        print(
+            f"{metadata}; charset: {charset or 'undeclared'}",
+            file=sys.stderr,
+        )
+    return Ok((content_type, charset))
+
+
+def execute_upload(payload: UploadPayload) -> Result[str, AppError]:
+    """Upload once, then verify the returned direct URL before printing it."""
+    if not payload.content:
+        return Err(AppError("cannot upload empty content", EXIT_USAGE_ERROR))
+    if payload.provider == "pastes" and payload.ascii_check:
+        diagnostic = ascii_diagnostic(payload.content)
+        if diagnostic:
+            return Err(AppError(diagnostic, EXIT_USAGE_ERROR))
 
     try:
-        with httpx2.Client(timeout=payload.timeout) as client:
-            resp = client.post(post_url, headers=headers, content=body)
-            decode_json: Callable[..., object] = resp.json
-            raw = decode_json()
-            if not _is_str_dict(raw):
-                return Err(AppError("malformed server response", EXIT_NETWORK_ERROR))
-            key = raw.get("key")
-            if not isinstance(key, str) or not key:
-                return Err(
-                    AppError("missing key in server response", EXIT_NETWORK_ERROR)
-                )
-
-            return Ok(format_upload_response(key, payload))
+        with httpx2.Client(timeout=payload.timeout, follow_redirects=True) as client:
+            if payload.provider == "pastes":
+                key, raw_url = post_pastes(client, payload)
+            else:
+                key, raw_url = post_catbox(client, payload)
+            content_type = None
+            charset = None
+            if payload.verify or payload.ascii_check:
+                verified = verify_upload(client, payload, raw_url)
+                if isinstance(verified, Err):
+                    return verified
+                content_type, charset = verified.value
+            return Ok(
+                format_upload_response(key, payload, raw_url, content_type, charset)
+            )
+    except ValueError as exc:
+        return Err(AppError(f"malformed server response: {exc}", EXIT_NETWORK_ERROR))
     except httpx2.HTTPStatusError as exc:
         return Err(
             AppError(
@@ -599,22 +780,51 @@ def run_pipeline(args: argparse.Namespace, *, is_atty: bool) -> Result[str, AppE
 
     input_res = read_input(file_arg, is_atty=is_atty)
 
-    def to_payload(pair: tuple[bytes, Path | None]) -> UploadPayload:
+    def to_payload(pair: tuple[bytes, Path | None]) -> Result[UploadPayload, AppError]:
         content, path = pair
         language = detect_language(path, content, lang)
-        return UploadPayload(
-            content=content,
-            language=language,
-            base_url=base_url,
-            user_agent=user_agent,
-            timeout=timeout,
-            use_gzip=use_gzip,
-            output_json=output_json,
-            output_raw=output_raw,
-            output_raw_url=output_raw_url,
+        is_text, mime = sniff_content(content, path)
+        provider = _optional_str(args, "provider") or (
+            "pastes" if is_text else "catbox"
+        )
+        if provider == "pastes" and not is_text:
+            return Err(
+                AppError(
+                    "pastes supports text only; use catbox for binary files",
+                    EXIT_USAGE_ERROR,
+                )
+            )
+        if _config_bool(args, "ascii_check") and not is_text:
+            return Err(AppError("--ascii-check requires UTF-8 text", EXIT_USAGE_ERROR))
+        if provider != "pastes" and base_url != DEFAULT_BASE_URL:
+            return Err(AppError("--base-url applies only to pastes", EXIT_USAGE_ERROR))
+        filename = _optional_str(args, "filename") or (
+            path.name if path else "upload.txt"
+        )
+        if not filename or any(char in filename for char in "\r\n/\\"):
+            return Err(
+                AppError("--filename must be a nonempty basename", EXIT_USAGE_ERROR)
+            )
+        return Ok(
+            UploadPayload(
+                content=content,
+                language=language,
+                base_url=base_url,
+                user_agent=user_agent,
+                timeout=timeout,
+                use_gzip=use_gzip,
+                output_json=output_json,
+                output_raw=output_raw,
+                output_raw_url=output_raw_url,
+                provider=provider,
+                filename=filename,
+                mime_type=mime,
+                verify=not _config_bool(args, "no_verify"),
+                ascii_check=_config_bool(args, "ascii_check"),
+            )
         )
 
-    return input_res.map(to_payload).and_then(execute_upload)
+    return input_res.and_then(to_payload).and_then(execute_upload)
 
 
 def main(argv: list[str] | None = None) -> int:
