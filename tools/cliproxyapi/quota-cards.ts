@@ -39,27 +39,6 @@ const clampPercent = (value: unknown): number | null => {
 const remainingFromUsed = (usedPercent: number | null): number | null =>
   usedPercent === null ? null : Math.max(0, Math.min(100, 100 - usedPercent));
 
-const parseUnixSecondsToMs = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.floor(value * 1000);
-  }
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    const sec = Number(value.trim());
-    if (Number.isSafeInteger(sec) && sec > 0) {
-      return sec * 1000;
-    }
-  }
-  return null;
-};
-
-const parseProtoPercent = (value: unknown, resetAtMs: number | null): number | null => {
-  const clamped = clampPercent(value);
-  if (clamped !== null) return clamped;
-  // Proto3 JSON omits zero-valued numeric fields. If reset timestamp is present, treat missing percent as 0%.
-  if (resetAtMs !== null) return 0;
-  return null;
-};
-
 const readBaseUrl = (file: AuthFileItem): string => {
   const record = file as unknown as Record<string, unknown>;
   for (const candidate of [record.baseUrl, record['base-url'], record.base_url, record.BaseURL]) {
@@ -162,77 +141,4 @@ const clinePassCard: QuotaCard = {
   },
 };
 
-/** Devin: `https://server.codeium.com` (Cognition Devin Pro quota via Codeium SeatManagementService). */
-const devinCard: QuotaCard = {
-  id: 'devin',
-  title: 'Devin',
-  matches: (file) => {
-    const provider = String(file.provider ?? file.type ?? '')
-      .trim()
-      .toLowerCase()
-      .replace(/_/g, '-');
-    return provider === 'devin';
-  },
-  request: () => ({
-    method: 'POST',
-    url: 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus',
-    header: {
-      Authorization: 'Basic $TOKEN$-$TOKEN$',
-      'Connect-Protocol-Version': '1',
-      'Content-Type': 'application/json',
-    },
-    data: JSON.stringify({
-      metadata: {
-        ideName: 'chisel',
-        ideVersion: '3000.10.21',
-        apiKey: '$TOKEN$',
-        locale: 'en',
-        os: 'linux',
-        extensionVersion: '3000.10.21',
-        extensionName: 'chisel',
-      },
-    }),
-  }),
-  parse: (payload) => {
-    let obj = payload;
-    if (typeof obj === 'string') {
-      try {
-        obj = JSON.parse(obj);
-      } catch {
-        return null;
-      }
-    }
-    if (!isRecord(obj)) return null;
-    const userStatus = isRecord(obj.userStatus) ? obj.userStatus : null;
-    const planStatus = isRecord(userStatus?.planStatus)
-      ? userStatus.planStatus
-      : isRecord(obj.planStatus)
-        ? obj.planStatus
-        : null;
-    if (!planStatus) return null;
-
-    const dailyResetAtMs = parseUnixSecondsToMs(planStatus.dailyQuotaResetAtUnix);
-    const dailyRemaining = parseProtoPercent(planStatus.dailyQuotaRemainingPercent, dailyResetAtMs);
-
-    const weeklyResetAtMs = parseUnixSecondsToMs(planStatus.weeklyQuotaResetAtUnix);
-    const weeklyRemaining = parseProtoPercent(planStatus.weeklyQuotaRemainingPercent, weeklyResetAtMs);
-
-    const windows: CustomQuotaWindow[] = [
-      {
-        id: 'daily',
-        label: 'Daily',
-        remainingPercent: dailyRemaining,
-        resetAtMs: dailyResetAtMs,
-      },
-      {
-        id: 'weekly',
-        label: 'Weekly',
-        remainingPercent: weeklyRemaining,
-        resetAtMs: weeklyResetAtMs,
-      },
-    ];
-    return windows;
-  },
-};
-
-export const QUOTA_CARDS: readonly QuotaCard[] = [openCodeGoCard, clinePassCard, devinCard];
+export const QUOTA_CARDS: readonly QuotaCard[] = [openCodeGoCard, clinePassCard];
