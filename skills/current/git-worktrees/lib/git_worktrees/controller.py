@@ -6,7 +6,7 @@ import sqlite3
 import stat
 import sys
 import time
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -66,7 +66,7 @@ class Controller:
                     {"path": str(directory)},
                 ) from error
             self._validate_private_directory(directory)
-        with self.connect(write=True) as connection:
+        with closing(self.connect(write=True)) as connection:
             _ = connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS repository_names (

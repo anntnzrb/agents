@@ -6,7 +6,7 @@ import re
 import secrets
 import sqlite3
 import subprocess
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from hashlib import sha256
 from threading import Lock, Thread
 from typing import TYPE_CHECKING, BinaryIO, NoReturn, TypeIs
@@ -391,7 +391,7 @@ def _assert_fresh_identity(initial: Repository, refreshed: Repository) -> None:
 def _locked_lease_repository(
     controller: Controller, lease_id: str
 ) -> Generator[Repository]:
-    with controller.connect(write=False) as connection:
+    with closing(controller.connect(write=False)) as connection:
         initial_lease = _lease(connection, lease_id)
     initial_repository = git_inspect_repository(initial_lease.primary_path)
     if (
@@ -542,7 +542,7 @@ def inspect_repository(
     visible_slug: str | None = None
     if active_controller.state_exists():
         try:
-            with active_controller.connect(write=False) as connection:
+            with closing(active_controller.connect(write=False)) as connection:
                 rows = _fetchall(
                     connection.execute(
                         _SELECT_LEASES_BY_COMMON_DIR, (str(repository.common_git_dir),)
@@ -699,7 +699,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
 def status(controller: Controller, lease_id: str) -> dict[str, object]:
     """Report lease status and release safety."""
     _require_text(lease_id, "lease_id")
-    with controller.connect(write=False) as connection:
+    with closing(controller.connect(write=False)) as connection:
         lease = _lease(connection, lease_id)
         active = _active_handoffs(connection, lease_id)
     blockers: list[dict[str, object]] = []
