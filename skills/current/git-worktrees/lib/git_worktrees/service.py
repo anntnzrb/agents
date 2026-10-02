@@ -6,7 +6,7 @@ import re
 import secrets
 import sqlite3
 import subprocess
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from hashlib import sha256
 from threading import Lock, Thread
 from typing import TYPE_CHECKING, BinaryIO, NoReturn, TypeIs
@@ -391,7 +391,7 @@ def _assert_fresh_identity(initial: Repository, refreshed: Repository) -> None:
 def _locked_lease_repository(
     controller: Controller, lease_id: str
 ) -> Generator[Repository]:
-    with controller.connect(write=False) as connection:
+    with closing(controller.connect(write=False)) as connection:
         initial_lease = _lease(connection, lease_id)
     initial_repository = git_inspect_repository(initial_lease.primary_path)
     if (
@@ -542,7 +542,7 @@ def inspect_repository(
     visible_slug: str | None = None
     if active_controller.state_exists():
         try:
-            with active_controller.connect(write=False) as connection:
+            with closing(active_controller.connect(write=False)) as connection:
                 rows = _fetchall(
                     connection.execute(
                         _SELECT_LEASES_BY_COMMON_DIR, (str(repository.common_git_dir),)
@@ -684,7 +684,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
             _ = _assert_managed_target(after_setup, lease)
         except DomainError as error:
             _raise_acquire_failure(controller, lease_id, "setup_failed", error)
-        token = secrets.token_urlsafe(32)
+        token = "cap_" + secrets.token_urlsafe(32)
         now = utc_now()
         with _write_transaction(controller) as connection:
             _ = connection.execute(
@@ -699,7 +699,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
 def status(controller: Controller, lease_id: str) -> dict[str, object]:
     """Report lease status and release safety."""
     _require_text(lease_id, "lease_id")
-    with controller.connect(write=False) as connection:
+    with closing(controller.connect(write=False)) as connection:
         lease = _lease(connection, lease_id)
         active = _active_handoffs(connection, lease_id)
     blockers: list[dict[str, object]] = []
@@ -889,7 +889,7 @@ def handoff(
                 {"handoff_id": active[0].handoff_id},
             )
         handoff_id = str(uuid4())
-        token = secrets.token_urlsafe(32)
+        token = "cap_" + secrets.token_urlsafe(32)
         now = utc_now()
         _ = connection.execute(
             """INSERT INTO handoffs(handoff_id, lease_id, actor, session_actor,
