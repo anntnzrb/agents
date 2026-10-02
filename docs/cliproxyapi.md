@@ -228,7 +228,11 @@ The script clones upstream (ref `main`; export `PANEL_REF` to pin a tag, branch,
 }
 ```
 
-The gateway substitutes the selected credential for `$TOKEN$` and routes the call through `/v0/management/api-call`, so API keys never reach the browser. After editing cards:
+OpenRouter uses this same card framework: each configured key gets its own card, quota cache entry, and refresh action. Sync registers the keys with CLIProxyAPI for management queries but gives the provider an empty chat-model list. Adding keys does not publish classifiers as chat models. Quota inspection remains available with the classification listener disabled.
+
+The card reads the provider's [current-key endpoint](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key). It shows the key's remaining USD spending allowance and spend totals, not the account's prepaid balance. Keys without a cap show no-limit status and spend totals. Budget reset periods are labels, not invented reset timestamps. Account-wide credits need an OpenRouter management key and are outside this integration.
+
+Quota requests identify the selected credential by its `auth_index` and use `$TOKEN$` substitution through `/v8/management/requests/api-call`; the browser does not call OpenRouter directly. The authenticated management API retains its existing access to provider configuration. Quota discovery reads the native `/v0/management/openai-compatibility` metadata because the editable v8 configuration omits per-key auth indices; provider edits keep using the v8 configuration API. After editing cards:
 
 ```bash
 sh tools/cliproxyapi/panel.rebuild.sh

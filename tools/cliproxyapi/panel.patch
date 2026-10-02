@@ -53,10 +53,10 @@ index d483264..ad361d6 100644
  
  export function IconSidebarSystem({ size = 20, ...props }: IconProps) {
 diff --git a/src/features/authFiles/components/AuthFileCard.tsx b/src/features/authFiles/components/AuthFileCard.tsx
-index b63e692..e7f9fc1 100644
+index 1189ea3..44f0e4c 100644
 --- a/src/features/authFiles/components/AuthFileCard.tsx
 +++ b/src/features/authFiles/components/AuthFileCard.tsx
-@@ -59,6 +59,7 @@ export type AuthFileCardProps = {
+@@ -60,6 +60,7 @@ export type AuthFileCardProps = {
    onToggleSelect: (name: string) => void;
  };
  
@@ -137,36 +137,38 @@ index a584a12..31c53d6 100644
  
  export const OAUTH_PROVIDER_PRESETS = [
 diff --git a/src/features/authFiles/hooks/useAuthFilesData.ts b/src/features/authFiles/hooks/useAuthFilesData.ts
-index 6147926..336951f 100644
+index 480be1b..533824d 100644
 --- a/src/features/authFiles/hooks/useAuthFilesData.ts
 +++ b/src/features/authFiles/hooks/useAuthFilesData.ts
-@@ -1,6 +1,7 @@
+@@ -1,8 +1,9 @@
  import { useCallback, useEffect, useRef, useState, type ChangeEvent, type RefObject } from 'react';
  import { useTranslation } from 'react-i18next';
 -import { apiClient, authFilesApi } from '@/services/api';
 +import { apiClient, authFilesApi, providersApi } from '@/services/api';
+ import type { AuthFileRefreshResult } from '@/services/api/authFiles';
+ import { getAuthFileRefreshKey } from '@/features/authFiles/manualRefresh';
 +import { mergeQuotaCompatAuthFiles } from '@/utils/quota';
  import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
  import { useNotificationStore } from '@/stores';
  import type { AuthFileItem } from '@/types';
-@@ -204,9 +205,13 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
+@@ -222,9 +223,13 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
        }
  
        try {
 -        const data = await authFilesApi.list();
 +        const [data, openaiCompat] = await Promise.all([
 +          authFilesApi.list(),
-+          providersApi.getOpenAIProviders().catch(() => []),
++          providersApi.getQuotaOpenAIProviders().catch(() => []),
 +        ]);
-         if (requestId !== loadRequestIdRef.current) return; // 已被更新的请求/变更取代
+         if (!isCurrentRequest()) return; // 已被更新的请求/连接/变更取代
 -        setFiles(data?.files || []);
 +        // Synthesize quota-capable API-key rows when they are absent from /auth-files.
 +        setFiles(mergeQuotaCompatAuthFiles(data?.files || [], openaiCompat || []));
          setError('');
        } catch (err: unknown) {
-         if (requestId !== loadRequestIdRef.current) return;
+         if (!isCurrentRequest()) return;
 diff --git a/src/features/quota/QuotaPage.tsx b/src/features/quota/QuotaPage.tsx
-index 1bd1570..32909ba 100644
+index 1bd1570..73b88e1 100644
 --- a/src/features/quota/QuotaPage.tsx
 +++ b/src/features/quota/QuotaPage.tsx
 @@ -10,7 +10,7 @@
@@ -213,7 +215,7 @@ index 1bd1570..32909ba 100644
 -      const data = await authFilesApi.list();
 +      const [data, openaiCompat] = await Promise.all([
 +        authFilesApi.list(),
-+        providersApi.getOpenAIProviders().catch(() => []),
++        providersApi.getQuotaOpenAIProviders().catch(() => []),
 +      ]);
        if (!isCurrent()) return;
 -      setFiles(data?.files || []);
@@ -476,7 +478,7 @@ index 0000000..70dcc02
 +}
 diff --git a/src/features/quota/QuotaPoolPage.tsx b/src/features/quota/QuotaPoolPage.tsx
 new file mode 100644
-index 0000000..d6cb49d
+index 0000000..a935594
 --- /dev/null
 +++ b/src/features/quota/QuotaPoolPage.tsx
 @@ -0,0 +1,325 @@
@@ -579,7 +581,7 @@ index 0000000..d6cb49d
 +    try {
 +      const [data, openaiCompat] = await Promise.all([
 +        authFilesApi.list(),
-+        providersApi.getOpenAIProviders().catch(() => []),
++        providersApi.getQuotaOpenAIProviders().catch(() => []),
 +      ]);
 +      if (!isCurrent()) return;
 +      setFiles(mergeQuotaCompatAuthFiles(data?.files || [], openaiCompat || []));
@@ -902,10 +904,10 @@ index 0420d45..3136ca1 100644
  }
 diff --git a/src/features/quota/providers/custom/CustomQuotaBody.tsx b/src/features/quota/providers/custom/CustomQuotaBody.tsx
 new file mode 100644
-index 0000000..fb605e4
+index 0000000..1deb894
 --- /dev/null
 +++ b/src/features/quota/providers/custom/CustomQuotaBody.tsx
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,63 @@
 +import { useMemo } from 'react';
 +import { useTranslation } from 'react-i18next';
 +import type { CustomQuotaState } from '@/types';
@@ -950,14 +952,19 @@ index 0000000..fb605e4
 +              <span className={classes.quotaModel}>{window.label}</span>
 +              <div className={classes.quotaMeta}>
 +                <span className={classes.quotaPercent}>
-+                  {remaining === null ? '--' : `${Math.round(remaining)}%`}
++                  {window.displayValue ?? (remaining === null ? '--' : `${Math.round(remaining)}%`)}
 +                </span>
 +                {resetDisplay && (
 +                  <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
 +                )}
 +              </div>
 +            </div>
-+            <QuotaMeter percent={remaining} classes={classes} index={index} />
++            {window.displayDetail && (
++              <div className={classes.quotaAmount}>{window.displayDetail}</div>
++            )}
++            {(remaining !== null || !window.displayValue) && (
++              <QuotaMeter percent={remaining} classes={classes} index={index} />
++            )}
 +          </div>
 +        );
 +      })}
@@ -966,10 +973,10 @@ index 0000000..fb605e4
 +}
 diff --git a/src/features/quota/providers/custom/data.ts b/src/features/quota/providers/custom/data.ts
 new file mode 100644
-index 0000000..c7bcb11
+index 0000000..294d9b2
 --- /dev/null
 +++ b/src/features/quota/providers/custom/data.ts
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,82 @@
 +/**
 + * Generic quota provider: all cards defined by `@/utils/quota/custom/cards`.
 + */
@@ -996,10 +1003,7 @@ index 0000000..c7bcb11
 +  return fallback;
 +};
 +
-+const fetchCustomQuota = async (
-+  file: AuthFileItem,
-+  t: TFunction
-+): Promise<CustomQuotaData> => {
++const fetchCustomQuota = async (file: AuthFileItem, t: TFunction): Promise<CustomQuotaData> => {
 +  const card = getQuotaCard(file);
 +  if (!card) throw new Error(t('custom_quota.no_card'));
 +
@@ -1011,25 +1015,24 @@ index 0000000..c7bcb11
 +    result = await apiCallApi.request({ authIndex, ...card.request(file) });
 +  } catch (err: unknown) {
 +    const message = err instanceof Error ? err.message : t('custom_quota.request_failed');
-+    throw createStatusError(
-+      t('custom_quota.request_failed_with_message', { message }),
-+      undefined
-+    );
++    throw createStatusError(t('custom_quota.request_failed_with_message', { message }), undefined);
 +  }
 +
 +  if (result.statusCode < 200 || result.statusCode >= 300) {
 +    const fallback = getApiCallErrorMessage(result);
-+    throw createStatusError(
-+      mapStatusError(result.statusCode, fallback, t),
-+      result.statusCode
-+    );
++    throw createStatusError(mapStatusError(result.statusCode, fallback, t), result.statusCode);
 +  }
 +
 +  const windows = card.parse(result.body ?? result.bodyText);
 +  if (!windows || windows.length === 0) {
 +    throw new Error(t('custom_quota.invalid_response'));
 +  }
-+  if (!windows.some((window) => window.remainingPercent !== null || window.resetAtMs != null)) {
++  if (
++    !windows.some(
++      (window) =>
++        window.remainingPercent !== null || window.resetAtMs != null || window.displayValue
++    )
++  ) {
 +    throw new Error(t('custom_quota.empty_data'));
 +  }
 +  return { cardId: card.id, cardTitle: card.title, windows };
@@ -1057,7 +1060,7 @@ index 0000000..c7bcb11
 +  }),
 +};
 diff --git a/src/features/quota/providers/index.ts b/src/features/quota/providers/index.ts
-index 796915a..3539ed1 100644
+index f812121..ecb20fc 100644
 --- a/src/features/quota/providers/index.ts
 +++ b/src/features/quota/providers/index.ts
 @@ -25,6 +25,8 @@ import { KIMI_CONFIG } from './kimi/data';
@@ -1069,7 +1072,7 @@ index 796915a..3539ed1 100644
  
  /** 所有 provider 额度状态的公共骨架（各 *QuotaState 的结构子集）。 */
  export interface QuotaCardState {
-@@ -59,6 +61,7 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
+@@ -60,6 +62,7 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
    kimi: { ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter,
    meta: { ...META_CONFIG, Body: MetaQuotaBody } as unknown as QuotaAdapter,
    xai: { ...XAI_CONFIG, Body: XaiQuotaBody } as unknown as QuotaAdapter,
@@ -1078,7 +1081,7 @@ index 796915a..3539ed1 100644
  
  export type QuotaMapUpdater = (
 diff --git a/src/features/quota/providers/types.ts b/src/features/quota/providers/types.ts
-index 5f9eb36..b17f516 100644
+index 6962137..3816af8 100644
 --- a/src/features/quota/providers/types.ts
 +++ b/src/features/quota/providers/types.ts
 @@ -11,6 +11,7 @@ import type {
@@ -1445,7 +1448,7 @@ index aba0a0e..d7a2538 100644
  export const isQuotaSortMode = (value: unknown): value is QuotaSortMode =>
    typeof value === 'string' && QUOTA_SORT_MODE_SET.has(value);
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 5800662..4c5e00f 100644
+index f356196..53f583f 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
 @@ -103,6 +103,7 @@
@@ -1464,7 +1467,7 @@ index 5800662..4c5e00f 100644
      "plugins": "Plugin toggles & config",
      "plugin_store": "Discover & install plugins",
      "logs": "Request tracing",
-@@ -407,7 +409,9 @@
+@@ -433,7 +435,9 @@
      "quota_refresh_single": "Refresh quota",
      "quota_refresh_hint": "Refresh quota only for this credential",
      "quota_refresh_success": "Quota refreshed for \"{{name}}\"",
@@ -1475,7 +1478,7 @@ index 5800662..4c5e00f 100644
    },
    "antigravity_subscription": {
      "plan_unknown": "Unknown",
-@@ -1338,7 +1342,7 @@
+@@ -1545,7 +1549,7 @@
      "search_empty_desc": "Try another filename or email, or clear the search.",
      "search_clear": "Clear search",
      "title": "Quota Management",
@@ -1484,7 +1487,7 @@ index 5800662..4c5e00f 100644
      "refresh_all_credentials": "Refresh all credentials",
      "sort_label": "Sort",
      "sort_default": "Default",
-@@ -1347,7 +1351,7 @@
+@@ -1554,7 +1558,7 @@
      "meta_loaded": "{{count}} loaded",
      "meta_attention": "{{count}} need attention",
      "empty_title": "No quota-capable credentials",
@@ -1493,7 +1496,7 @@ index 5800662..4c5e00f 100644
      "windows_title": "Quota windows",
      "windows_span_weekly": "two weeks",
      "windows_span_session": "three days",
-@@ -1378,6 +1382,15 @@
+@@ -1585,6 +1589,15 @@
      "weekday_fri": "Fri",
      "weekday_sat": "Sat"
    },
@@ -1509,10 +1512,10 @@ index 5800662..4c5e00f 100644
    "plugin_management": {
      "title": "Plugin Management",
      "description": "Review discovered and registered plugins, then manage instance toggles, config fields, and resource links.",
-@@ -1910,5 +1923,23 @@
-     "modelCatalog": {
-       "notLoaded": "Not loaded"
-     }
+@@ -2225,5 +2238,23 @@
+     "unavailable": "Resets are currently unavailable.",
+     "rate_limited": "Request rate limited.",
+     "auth_error": "Authorization was refused."
 +  },
 +  "custom_quota": {
 +    "title": "Custom Quota",
@@ -1534,7 +1537,7 @@ index 5800662..4c5e00f 100644
    }
  }
 diff --git a/src/i18n/locales/ru.json b/src/i18n/locales/ru.json
-index 965d658..b8ae069 100644
+index b420bf3..f5171df 100644
 --- a/src/i18n/locales/ru.json
 +++ b/src/i18n/locales/ru.json
 @@ -103,6 +103,7 @@
@@ -1553,7 +1556,7 @@ index 965d658..b8ae069 100644
      "plugins": "Переключатели и ресурсы плагинов",
      "plugin_store": "Поиск и установка плагинов",
      "logs": "Трассировка запросов",
-@@ -410,7 +412,9 @@
+@@ -436,7 +438,9 @@
      "quota_refresh_single": "Обновить квоту",
      "quota_refresh_hint": "Обновить квоту только для этих учётных данных",
      "quota_refresh_success": "Квота для \"{{name}}\" обновлена",
@@ -1564,7 +1567,7 @@ index 965d658..b8ae069 100644
    },
    "antigravity_subscription": {
      "plan_unknown": "Неизвестно",
-@@ -1341,7 +1345,7 @@
+@@ -1548,7 +1552,7 @@
      "search_empty_desc": "Попробуйте другое имя файла или адрес электронной почты либо очистите поиск.",
      "search_clear": "Очистить поиск",
      "title": "Управление квотами",
@@ -1573,7 +1576,7 @@ index 965d658..b8ae069 100644
      "refresh_all_credentials": "Обновить все учётные данные",
      "sort_label": "Сортировка",
      "sort_default": "По умолчанию",
-@@ -1350,7 +1354,7 @@
+@@ -1557,7 +1561,7 @@
      "meta_loaded": "{{count}} загружено",
      "meta_attention": "{{count}} требуют внимания",
      "empty_title": "Нет учётных данных с квотами",
@@ -1582,7 +1585,7 @@ index 965d658..b8ae069 100644
      "windows_title": "Окна квот",
      "windows_span_weekly": "две недели",
      "windows_span_session": "три дня",
-@@ -1381,6 +1385,19 @@
+@@ -1588,6 +1592,19 @@
      "weekday_fri": "Пт",
      "weekday_sat": "Сб"
    },
@@ -1602,10 +1605,10 @@ index 965d658..b8ae069 100644
    "plugin_management": {
      "title": "Управление плагинами",
      "description": "Просматривайте найденные и зарегистрированные плагины, управляйте переключателями экземпляров, полями конфигурации и ссылками на ресурсы.",
-@@ -1904,5 +1921,23 @@
-     "modelCatalog": {
-       "notLoaded": "Не загружено"
-     }
+@@ -2219,5 +2236,23 @@
+     "unavailable": "Сбросы временно недоступны.",
+     "rate_limited": "Слишком много запросов.",
+     "auth_error": "Авторизация отклонена."
 +  },
 +  "custom_quota": {
 +    "title": "Пользовательская квота",
@@ -1627,7 +1630,7 @@ index 965d658..b8ae069 100644
    }
  }
 diff --git a/src/i18n/locales/zh-CN.json b/src/i18n/locales/zh-CN.json
-index e8cdbbd..33110f4 100644
+index fce60cb..943d5d7 100644
 --- a/src/i18n/locales/zh-CN.json
 +++ b/src/i18n/locales/zh-CN.json
 @@ -103,6 +103,7 @@
@@ -1646,7 +1649,7 @@ index e8cdbbd..33110f4 100644
      "plugins": "插件启停与配置",
      "plugin_store": "发现并安装插件",
      "logs": "请求追踪与排查",
-@@ -405,7 +407,9 @@
+@@ -431,7 +433,9 @@
      "quota_refresh_single": "刷新额度",
      "quota_refresh_hint": "仅刷新该认证文件的额度",
      "quota_refresh_success": "已刷新 \"{{name}}\" 的额度",
@@ -1657,7 +1660,7 @@ index e8cdbbd..33110f4 100644
    },
    "antigravity_subscription": {
      "plan_unknown": "未知",
-@@ -1336,7 +1340,7 @@
+@@ -1543,7 +1547,7 @@
      "search_empty_desc": "请尝试其他文件名或邮箱，或清空搜索。",
      "search_clear": "清空搜索",
      "title": "配额管理",
@@ -1666,7 +1669,7 @@ index e8cdbbd..33110f4 100644
      "refresh_all_credentials": "刷新全部凭证",
      "sort_label": "排序",
      "sort_default": "默认",
-@@ -1345,7 +1349,7 @@
+@@ -1552,7 +1556,7 @@
      "meta_loaded": "{{count}} 个已加载",
      "meta_attention": "{{count}} 个需关注",
      "empty_title": "暂无可查额度的凭证",
@@ -1675,7 +1678,7 @@ index e8cdbbd..33110f4 100644
      "windows_title": "配额窗口",
      "windows_span_weekly": "两周",
      "windows_span_session": "三天",
-@@ -1376,6 +1380,15 @@
+@@ -1583,6 +1587,15 @@
      "weekday_fri": "五",
      "weekday_sat": "六"
    },
@@ -1691,10 +1694,10 @@ index e8cdbbd..33110f4 100644
    "plugin_management": {
      "title": "插件管理",
      "description": "查看已发现和已注册的插件，管理实例开关、配置字段和资源入口。",
-@@ -1908,5 +1921,23 @@
-     "modelCatalog": {
-       "notLoaded": "未加载"
-     }
+@@ -2223,5 +2236,23 @@
+     "unavailable": "重置暂不可用。",
+     "rate_limited": "请求过于频繁。",
+     "auth_error": "授权被拒绝。"
 +  },
 +  "custom_quota": {
 +    "title": "自定义额度",
@@ -1716,7 +1719,7 @@ index e8cdbbd..33110f4 100644
    }
  }
 diff --git a/src/i18n/locales/zh-TW.json b/src/i18n/locales/zh-TW.json
-index f94353c..f3d4b8b 100644
+index cee344d..eaeee6d 100644
 --- a/src/i18n/locales/zh-TW.json
 +++ b/src/i18n/locales/zh-TW.json
 @@ -103,6 +103,7 @@
@@ -1735,7 +1738,7 @@ index f94353c..f3d4b8b 100644
      "plugins": "插件啟停與設定",
      "plugin_store": "探索並安裝插件",
      "logs": "請求追蹤與排查",
-@@ -405,7 +407,9 @@
+@@ -431,7 +433,9 @@
      "quota_refresh_single": "重新整理配額",
      "quota_refresh_hint": "僅重新整理該驗證檔案的配額",
      "quota_refresh_success": "已重新整理「{{name}}」的配額",
@@ -1746,7 +1749,7 @@ index f94353c..f3d4b8b 100644
    },
    "antigravity_subscription": {
      "plan_unknown": "未知",
-@@ -1362,7 +1366,7 @@
+@@ -1569,7 +1573,7 @@
      "search_empty_desc": "請嘗試其他檔案名稱或電子郵件，或清除搜尋。",
      "search_clear": "清除搜尋",
      "title": "配額管理",
@@ -1755,7 +1758,7 @@ index f94353c..f3d4b8b 100644
      "refresh_all_credentials": "重新整理全部憑證",
      "sort_label": "排序",
      "sort_default": "預設",
-@@ -1371,7 +1375,7 @@
+@@ -1578,7 +1582,7 @@
      "meta_loaded": "{{count}} 個已載入",
      "meta_attention": "{{count}} 個需關注",
      "empty_title": "暫無可查配額的憑證",
@@ -1764,7 +1767,7 @@ index f94353c..f3d4b8b 100644
      "windows_title": "配額視窗",
      "windows_span_weekly": "兩週",
      "windows_span_session": "三天",
-@@ -1402,6 +1406,15 @@
+@@ -1609,6 +1613,15 @@
      "weekday_fri": "五",
      "weekday_sat": "六"
    },
@@ -1780,10 +1783,10 @@ index f94353c..f3d4b8b 100644
    "plugin_management": {
      "title": "插件管理",
      "description": "查看已發現和已註冊的插件，管理實例開關、設定欄位和資源入口。",
-@@ -1934,5 +1947,23 @@
-     "modelCatalog": {
-       "notLoaded": "未載入"
-     }
+@@ -2249,5 +2262,23 @@
+     "unavailable": "重置暫不可用。",
+     "rate_limited": "請求過於頻繁。",
+     "auth_error": "授權遭拒。"
 +  },
 +  "custom_quota": {
 +    "title": "自訂額度",
@@ -1824,6 +1827,38 @@ index 880c869..1f4a042 100644
    ...(supportsPlugin
      ? [
          { path: '/plugin-pages/:pluginId/:menuIndex', element: <PluginResourcePage /> },
+diff --git a/src/services/api/providers.ts b/src/services/api/providers.ts
+index 199f0c3..135ab1a 100644
+--- a/src/services/api/providers.ts
++++ b/src/services/api/providers.ts
+@@ -538,6 +538,27 @@ export const providersApi = {
+   async getVertexConfigs() {
+     return normalizeProviderGroups(await getGroups('vertex')) as ProviderKeyConfig[];
+   },
++  // Quota rows need server-owned auth indices, which v8 editable config omits.
++  // Keep this read-only metadata boundary separate from provider edit snapshots.
++  async getQuotaOpenAIProviders(): Promise<OpenAIProviderConfig[]> {
++    const assertConnection = guardConfigConnection();
++    const { apiBase } = useAuthStore.getState();
++    const raw = await apiClient.get<unknown>(`${apiBase}/v0/management/openai-compatibility`);
++    assertConnection();
++    if (!isRecord(raw) || !Array.isArray(raw['openai-compatibility'])) {
++      throw new Error('Invalid quota provider metadata');
++    }
++    const groups = raw['openai-compatibility'].map((provider: unknown) => {
++      if (
++        !isRecord(provider) ||
++        (provider['api-key-entries'] != null && !Array.isArray(provider['api-key-entries']))
++      ) {
++        throw new Error('Invalid quota provider credential metadata');
++      }
++      return { ...provider, keys: provider['api-key-entries'] ?? [] };
++    });
++    return normalizeProviderGroups(groups, true) as OpenAIProviderConfig[];
++  },
+   async getOpenAIProviders() {
+     return normalizeProviderGroups(
+       await getGroups('openai-compatibility'),
 diff --git a/src/stores/useQuotaStore.ts b/src/stores/useQuotaStore.ts
 index 1dd1ac2..bcb85e8 100644
 --- a/src/stores/useQuotaStore.ts
@@ -1888,16 +1923,18 @@ index 1dd1ac2..bcb85e8 100644
      }),
  }));
 diff --git a/src/types/quota.ts b/src/types/quota.ts
-index f2c0c22..c494d1f 100644
+index 4d0a2dc..f200dd3 100644
 --- a/src/types/quota.ts
 +++ b/src/types/quota.ts
-@@ -356,6 +356,23 @@ export interface KimiQuotaState {
+@@ -374,6 +374,25 @@ export interface KimiQuotaState {
    errorStatus?: number;
  }
  
 +export interface CustomQuotaWindow {
 +  id: string;
 +  label: string;
++  displayValue?: string;
++  displayDetail?: string;
 +  remainingPercent: number | null;
 +  resetLabel?: string | null;
 +  resetAtMs?: number | null;
@@ -2139,6 +2176,176 @@ index 83f973b..603fe7c 100644
  export * from './xaiPaid';
 +export * from './compat';
 +export * from './custom';
+diff --git a/tests/openRouterQuota.test.tsx b/tests/openRouterQuota.test.tsx
+new file mode 100644
+index 0000000..4e06748
+--- /dev/null
++++ b/tests/openRouterQuota.test.tsx
+@@ -0,0 +1,164 @@
++import { describe, expect, test } from 'bun:test';
++import { renderToStaticMarkup } from 'react-dom/server';
++import i18n from '@/i18n';
++import { QUOTA_CARDS } from '@/utils/quota/custom';
++import { mergeQuotaCompatAuthFiles } from '@/utils/quota/compat';
++import { classifyQuotaFiles, filterEntriesByTab, buildTabCounts } from '@/features/quota/logic';
++import { CUSTOM_CONFIG } from '@/features/quota/providers/custom/data';
++import { CustomQuotaBody } from '@/features/quota/providers/custom/CustomQuotaBody';
++import { QUOTA_CLASS_KEYS } from '@/features/quota/types';
++import { apiClient } from '@/services/api/client';
++import { providersApi } from '@/services/api/providers';
++import { useAuthStore } from '@/stores/useAuthStore';
++import type { QuotaClassMap } from '@/features/quota/types';
++
++const card = () => QUOTA_CARDS.find((entry) => entry.id === 'openrouter')!;
++const payload = (data: Record<string, unknown>) => ({
++  data: { limit: 10, limit_remaining: 7.5, usage: 2.5, limit_reset: 'monthly', ...data },
++});
++const classes = Object.fromEntries(
++  QUOTA_CLASS_KEYS.map((key) => [key, key])
++) as unknown as QuotaClassMap;
++const render = (data: Record<string, unknown>) =>
++  renderToStaticMarkup(
++    <CustomQuotaBody
++      quota={{ status: 'success', windows: card().parse(payload(data))! }}
++      classes={classes}
++    />
++  );
++
++describe('OpenRouter key budgets', () => {
++  test('uses the authenticated key endpoint and exact provider URL', () => {
++    expect(card()?.request({ name: 'key' })).toMatchObject({
++      method: 'GET',
++      url: 'https://openrouter.ai/api/v1/key',
++      header: { Authorization: 'Bearer $TOKEN$' },
++    });
++    expect(card()?.matchesBaseUrl?.('https://openrouter.ai/api/v1/')).toBe(true);
++    expect(card()?.matchesBaseUrl?.('https://openrouter.ai.attacker.invalid/api/v1')).toBe(false);
++  });
++  test('renders remaining dollars, cap and spend without inventing a reset instant', () => {
++    const windows = card().parse(payload({ usage_daily: 0.000042, usage_monthly: 2.5 }))!;
++    expect(windows[0].remainingPercent).toBe(75);
++    expect(windows.every((window) => window.resetAtMs == null)).toBe(true);
++    const html = render({ usage_daily: 0.000042, usage_monthly: 2.5 });
++    expect(html).toContain('$7.50 left');
++    expect(html).toContain('Cap $10.00');
++    expect(html).toContain('Resets monthly');
++    expect(html).toContain('$0.000042');
++    expect(html).toContain('width:75%');
++  });
++  test('unlimited keys still show spend with no percentage bar', () => {
++    const html = render({ limit: null, limit_remaining: null, usage: 3 });
++    expect(html).toContain('No key limit');
++    expect(html).toContain('$3.00');
++    expect(html).not.toContain('quotaBar');
++  });
++  test('zero-dollar limits remain finite and visibly exhausted', () => {
++    expect(card().parse(payload({ limit: 0, limit_remaining: 0 }))?.[0].remainingPercent).toBe(0);
++    expect(render({ limit: 0, limit_remaining: 0 })).toContain('$0.00 left');
++  });
++  test.each([
++    {},
++    { data: [] },
++    payload({ limit: '10' }),
++    payload({ limit_remaining: NaN }),
++    payload({ usage: -1 }),
++    payload({ usage_daily: '0' }),
++    payload({ limit: null, limit_remaining: 'invalid' }),
++  ])('rejects malformed key payloads', (input) => {
++    expect(card().parse(input)).toBeNull();
++  });
++  test('two keys get separate standard rows, dedup and provider tab counts', () => {
++    const providers = [
++      {
++        name: 'openrouter',
++        baseUrl: 'https://openrouter.ai/api/v1',
++        apiKeyEntries: [{ authIndex: 'key-one' }, { authIndex: 'key-two' }],
++      },
++    ];
++    const rows = mergeQuotaCompatAuthFiles([], providers);
++    expect(rows).toHaveLength(2);
++    expect(mergeQuotaCompatAuthFiles(rows, providers)).toHaveLength(2);
++    const entries = classifyQuotaFiles(rows);
++    expect(filterEntriesByTab(entries, 'custom:openrouter')).toHaveLength(2);
++    expect(buildTabCounts(entries)['custom:openrouter']).toBe(2);
++  });
++  test('real management requests preserve per-key identity and show unlimited/error states', async () => {
++    const requests: Record<string, unknown>[] = [];
++    const server = Bun.serve({
++      hostname: '127.0.0.1',
++      port: 0,
++      async fetch(request) {
++        const path = new URL(request.url).pathname;
++        if (path === '/v0/management/openai-compatibility') {
++          return Response.json({
++            'openai-compatibility': [
++              { name: 'keyless-local', 'base-url': 'http://127.0.0.1:1/v1', models: [] },
++              {
++                name: 'openrouter',
++                'base-url': 'https://openrouter.ai/api/v1',
++                'api-key-entries': [
++                  { 'api-key': 'fake-one', 'auth-index': 'key-one' },
++                  { 'api-key': 'fake-two', 'auth-index': 'key-two' },
++                ],
++              },
++            ],
++          });
++        }
++        expect(path).toBe('/v8/management/requests/api-call');
++        const body = (await request.json()) as Record<string, unknown>;
++        requests.push(body);
++        const forbidden = body.authIndex === 'denied';
++        return Response.json({
++          status_code: forbidden ? 401 : 200,
++          body: forbidden
++            ? { error: { message: 'denied' } }
++            : payload({ limit: null, limit_remaining: null, usage: 1 }),
++        });
++      },
++    });
++    apiClient.setConfig({
++      apiBase: `http://127.0.0.1:${server.port}`,
++      managementKey: 'fake-management',
++    });
++    try {
++      useAuthStore.getState().apiBase = `http://127.0.0.1:${server.port}`;
++      const providers = await providersApi.getQuotaOpenAIProviders();
++      const rows = mergeQuotaCompatAuthFiles([], providers);
++      expect(rows).toHaveLength(2);
++      expect(rows.map((row) => row.auth_index)).toEqual(['key-one', 'key-two']);
++      for (const authIndex of rows.map((row) => String(row.auth_index))) {
++        const result = await CUSTOM_CONFIG.fetchQuota(
++          { name: authIndex, auth_index: authIndex, baseUrl: 'https://openrouter.ai/api/v1' },
++          i18n.t
++        );
++        expect(result.windows[0].remainingPercent).toBeNull();
++        expect(result.windows[0].displayValue).toBe('No key limit');
++      }
++      await expect(
++        CUSTOM_CONFIG.fetchQuota(
++          { name: 'denied', auth_index: 'denied', baseUrl: 'https://openrouter.ai/api/v1' },
++          i18n.t
++        )
++      ).rejects.toThrow();
++      expect(requests.map((request) => request.authIndex)).toEqual([
++        'key-one',
++        'key-two',
++        'denied',
++      ]);
++      expect(requests.every((request) => request.url === 'https://openrouter.ai/api/v1/key')).toBe(
++        true
++      );
++      expect(
++        requests.every(
++          (request) => (request.header as Record<string, string>).Authorization === 'Bearer $TOKEN$'
++        )
++      ).toBe(true);
++    } finally {
++      server.stop(true);
++      apiClient.setConfig({ apiBase: '', managementKey: '' });
++      useAuthStore.getState().apiBase = '';
++    }
++  });
++});
 diff --git a/tests/providerTabsRegression.test.ts b/tests/providerTabsRegression.test.ts
 new file mode 100644
 index 0000000..133263b
@@ -2403,3 +2610,17 @@ index 04569a7..34a826a 100644
    test('writing one preference preserves the other', () => {
      writeQuotaUiState({ sortMode: 'soonest' });
      writeQuotaUiState({ tab: 'kimi' });
+diff --git a/src/utils/quota/identity.ts b/src/utils/quota/identity.ts
+index fbc3d65..04e99a7 100644
+--- a/src/utils/quota/identity.ts
++++ b/src/utils/quota/identity.ts
+@@ -17,6 +17,9 @@ export function getQuotaCacheKey(file: AuthFileItem): string {
+ 
+ /** Disambiguate same-name Devin cards without ever falling back to account (a secret). */
+ export function getQuotaDisplayName(file: AuthFileItem): string {
++  if (file.source === 'openai-compatibility') {
++    return normalizeRecentRequestAuthIndex(file.authIndex) || file.name;
++  }
+   if (!isDevinFile(file)) return file.name;
+   const identity = file.email?.trim() || normalizeRecentRequestAuthIndex(file.authIndex);
+   return identity ? `${file.name} · ${identity}` : file.name;

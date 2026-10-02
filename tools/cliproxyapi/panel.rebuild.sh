@@ -17,7 +17,7 @@ set -eu
 
 REPO="https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
 REF="${PANEL_REF:-main}"
-BASE="b87b9487f63e08ad97b1fb4e7c17b4adb811b922"
+BASE="752e0ee772220ce49aae1221a3f39f23236590d7"
 OUT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 CARDS="$OUT_DIR/quota-cards.ts"
 WORK="$(mktemp -d)"
