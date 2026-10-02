@@ -141,8 +141,10 @@ jobs:
           version: '0.12.22'
           enable-cache: true
           # A shard must not restore another shard's incomplete immutable cache.
-          cache-suffix: skills-v2-${{ matrix.shard.id }}-${{ join(matrix.shard.skills, '-') }}
+          cache-suffix: skills-v3-${{ matrix.shard.id }}-${{ join(matrix.shard.skills, '-') }}
           cache-python: true
+          # Retain source-built wheels without transferring disposable build trees.
+          prune-cache: true
           cache-dependency-glob: ${{ matrix.shard.cache-inputs }}
       - name: Run owning skill gates and tests for this shard
         env:
