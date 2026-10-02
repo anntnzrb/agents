@@ -291,6 +291,7 @@ def test_amp_runner_unit_only_on_declared_hosts(
     assert f"ExecStart={home}/.local/bin/amp --no-tui --runner-id munich " in runner
     assert f"--discover-dirs={home}/repos" in runner
     assert f"--dir {home}/.config/agents" in runner
+    assert " --desktop " in runner
     assert "[Install]" in runner
     updater = units["amp-runner-update.service"].content
     assert "Type=oneshot" in updater
@@ -415,6 +416,7 @@ def test_darwin_declares_updater_and_runner_launch_agents(
     assert "<string>--runner-id</string><string>beirut</string>" in runner
     assert "<key>KeepAlive</key><true/>" in runner
     assert f"<key>WorkingDirectory</key><string>{home}</string>" in runner
+    assert "--desktop" not in runner
     updater = agents[AMP_RUNNER_UPDATE_LABEL]
     assert f"{home}/.config/agents/tools/amp-runner/update.py" in updater
     assert "<key>StartCalendarInterval</key>" in updater
