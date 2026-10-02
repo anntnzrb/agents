@@ -289,14 +289,17 @@ def test_amp_runner_unit_only_on_declared_hosts(
     assert f"--discover-dirs={home}/repos" in runner
     assert f"--dir {home}/.config/agents" in runner
     assert "[Install]" in runner
+    updater = units["amp-runner-update.service"].content
+    assert "Type=oneshot" in updater
+    assert f"{home}/.config/agents/tools/amp-runner/update.py" in updater
+    assert "[Install]" not in updater
+    assert "OnCalendar=" in units["amp-runner-update.timer"].content
 
 
-def _declare_t3_host(home: Path, hostname: str) -> None:
+def _declare_t3_hosts(home: Path, hosts: list[str]) -> None:
     deployment = home / ".config" / "agents" / "tools" / "t3"
     deployment.mkdir(parents=True, exist_ok=True)
-    _ = (deployment / "deployment.json").write_text(
-        json.dumps({"server": {"hostname": hostname}})
-    )
+    _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": hosts}))
 
 
 def test_codex_server_only_on_declared_hosts(
@@ -365,17 +368,26 @@ def test_codex_server_macos_health_check_only_on_declared_hosts(
     assert calls == []
 
 
-def test_t3_model_refresh_timer_only_on_declared_t3_host(
+def test_t3_model_refresh_timer_only_on_declared_t3_hosts(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The T3 host refreshes Claude's gateway models on a timer, off the sync path."""
+    """Each T3 host refreshes Claude's gateway models on a timer, off the sync path."""
     monkeypatch.setattr("socket.gethostname", lambda: "munich")
-    _declare_t3_host(home, "oulu")
+    _declare_t3_hosts(home, ["oulu"])
     assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
 
-    _declare_t3_host(home, "Munich")
+    _declare_t3_hosts(home, ["oulu", "Munich"])
     units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
-    assert set(units) == {"t3-refresh-models.service", "t3-refresh-models.timer"}
+    assert set(units) == {
+        "t3-refresh-models.service",
+        "t3-refresh-models.timer",
+        "t3-update.service",
+        "t3-update.timer",
+    }
+    updater = units["t3-update.service"].content
+    assert f"{home}/.config/agents/tools/t3/t3ctl.py auto-update" in updater
+    assert "[Install]" not in updater
+    assert "OnCalendar=" in units["t3-update.timer"].content
     service = units["t3-refresh-models.service"].content
     assert "Type=oneshot" in service
     assert "sync-current/.venv/bin/python " in service
