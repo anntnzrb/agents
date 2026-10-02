@@ -50,15 +50,21 @@ SERVICE_TIMEOUT_MS = 30_000
 # starting a second one that would crash-loop on the working-directory lock.
 AMP_RUNNER_UNIT = "amp-runner-agents.service"
 AMP_RUNNER_LABEL = "com.amp.runner.agents"
+AMP_RUNNER_UPDATE_LABEL = "dev.agents.amp-runner-update"
 AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
 CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
 T3_REFRESH_UNIT = "t3-refresh-models"
 T3_REFRESH_INTERVAL_SECONDS = 900
+T3_REFRESH_LABEL = "dev.agents.t3-refresh-models"
+T3_UPDATE_LABEL = "dev.agents.t3-update"
 # Nightly attempts for restarting long-lived servers onto new releases; an
 # attempt that finds the server busy or current is a no-op, so a busy night
 # still gets later chances.
-NIGHTLY_UPDATE_CALENDAR = "*-*-* 03..05:00:00"
+NIGHTLY_UPDATE_HOURS = (3, 4, 5)
+NIGHTLY_UPDATE_CALENDAR = (
+    f"*-*-* {NIGHTLY_UPDATE_HOURS[0]}..{NIGHTLY_UPDATE_HOURS[-1]}:00:00"
+)
 
 # Services start with a bare PATH; every unit declares one so it never depends
 # on hand-made service-manager environment. Missing directories are harmless.
@@ -507,6 +513,34 @@ def _amp_runner_agent(sync_env: SyncEnv) -> UserUnit:
     return UserUnit(AMP_RUNNER_LABEL, _plist(AMP_RUNNER_LABEL, body))
 
 
+def _python_job_agent(
+    sync_env: SyncEnv, label: str, args: Sequence[str], *, nightly: bool
+) -> UserUnit:
+    """Run a runtime-Python job from launchd, nightly or every refresh interval."""
+    home = sync_env.home
+    command = _plist_args([_runtime_python(sync_env), *args])
+    log = f"{home}/Library/Logs/{label.removeprefix('dev.agents.')}.log"
+    if nightly:
+        minute = "<key>Minute</key><integer>0</integer>"
+        hours = "".join(
+            f"<dict><key>Hour</key><integer>{h}</integer>{minute}</dict>"
+            for h in NIGHTLY_UPDATE_HOURS
+        )
+        schedule = f"<key>StartCalendarInterval</key><array>{hours}</array>"
+    else:
+        interval = T3_REFRESH_INTERVAL_SECONDS
+        schedule = f"<key>StartInterval</key><integer>{interval}</integer>"
+    body = f"""\
+    <key>ProgramArguments</key><array>{command}</array>
+    <key>EnvironmentVariables</key><dict><key>PATH</key><string>{_service_path(home)}</string></dict>
+    {schedule}
+    <key>ProcessType</key><string>Background</string>
+    <key>StandardOutPath</key><string>{log}</string>
+    <key>StandardErrorPath</key><string>{log}</string>
+"""
+    return UserUnit(label, _plist(label, body))
+
+
 def _codex_server_agent(sync_env: SyncEnv) -> UserUnit:
     home = sync_env.home
     label = "dev.agents.codex-server"
@@ -530,8 +564,26 @@ def declared_launch_agents(sync_env: SyncEnv) -> list[UserUnit]:
     agents = [_updater_agent(sync_env)] if _is_git_checkout(sync_env) else []
     if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         agents.append(_amp_runner_agent(sync_env))
+        updater = str(Path(sync_env.ssot_home) / "tools" / "amp-runner" / "update.py")
+        agents.append(
+            _python_job_agent(
+                sync_env, AMP_RUNNER_UPDATE_LABEL, [updater], nightly=True
+            )
+        )
     if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
         agents.append(_codex_server_agent(sync_env))
+    if _is_deployment_host(sync_env, T3_DEPLOYMENT):
+        t3ctl = str(Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py")
+        agents.extend(
+            [
+                _python_job_agent(
+                    sync_env, T3_REFRESH_LABEL, [t3ctl, "refresh-models"], nightly=False
+                ),
+                _python_job_agent(
+                    sync_env, T3_UPDATE_LABEL, [t3ctl, "auto-update"], nightly=True
+                ),
+            ]
+        )
     return agents
 
 
