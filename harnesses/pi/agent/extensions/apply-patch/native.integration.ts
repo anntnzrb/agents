@@ -58,4 +58,3 @@ test("reports malformed patches and failed context as tool failures", async () =
   }
   expect(await readFile(join(cwd, "example.txt"), "utf8")).toBe("original\n");
 }, 30000);
-
