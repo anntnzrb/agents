@@ -159,21 +159,50 @@ def main() -> int:
         _ = sys.stderr.write(f"clip: not a file: {args.file}\n")
         return 2
 
-    data = read_input(args.file)
+    try:
+        data = read_input(args.file)
+    except OSError as exc:
+        _ = sys.stderr.write(f"clip: cannot read input: {exc}\n")
+        return 2
     if not data:
         return 0
 
-    target, is_outer_tty = get_output_channel()
-    use_tmux = os.environ.get("TMUX") is not None and not is_outer_tty
-    osc = build_osc52(data, use_tmux_passthrough=use_tmux)
+    native_error = 1
+    if command := native_command():
+        try:
+            _ = subprocess.run(command, input=data, check=True, timeout=10)
+        except subprocess.CalledProcessError as exc:
+            native_error = exc.returncode
+            _ = sys.stderr.write(
+                f"clip: {command[0]} failed ({exc.returncode}); trying OSC 52\n"
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            _ = sys.stderr.write(
+                f"clip: native clipboard failed: {exc}; trying OSC 52\n"
+            )
+        else:
+            _ = sys.stderr.write(f"clip: copied using {Path(command[0]).name}\n")
+            return 0
 
     try:
-        _ = target.write(osc)
-        target.flush()
+        target, is_outer_tty = get_output_channel()
+        use_tmux = os.environ.get("TMUX") is not None and not is_outer_tty
+        osc = build_osc52(data, use_tmux_passthrough=use_tmux)
+        if os.environ.get("STY") and not is_outer_tty and not use_tmux:
+            osc = b"\x1bP" + osc + b"\x1b\\"
+        context = (
+            nullcontext(target) if target is sys.stdout.buffer else closing(target)
+        )
+        with context:
+            _ = target.write(osc)
+            target.flush()
     except OSError as exc:
-        _ = sys.stderr.write(f"clip: write failed: {exc}\n")
-        return 1
+        _ = sys.stderr.write(f"clip: copy failed: {exc}\n")
+        return native_error
 
+    _ = sys.stderr.write(
+        "clip: OSC 52 sent; terminal clipboard acceptance is unverified\n"
+    )
     return 0
 
 
