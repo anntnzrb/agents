@@ -175,7 +175,7 @@ Only loopback networking is available. Dropping capabilities also keeps filesyst
 
 ## Expose the gateway through Tailscale Funnel
 
-Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
+Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. The auth gateway answers `404` for CLIProxyAPI's management surface before it checks the token, so the control panel is never reachable from the internet, even with a valid client token. It matches the decoded, slash-normalized path, so encoded or doubled slashes cannot bypass the check. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
 
 The Funnel mapping itself lives in Tailscale's state, not in this repository. Recreate it on a new gateway host:
 
