@@ -89,8 +89,27 @@ export function windows(text: string, bytes: number, words: readonly string[], w
     let body = "";
     while (end < lines.length) {
       const line = lines[end]!.replace(/\r$/, "");
+      if (Buffer.byteLength(line) > bytes) {
+        if (end > start) break;
+        let chunk = "";
+        let size = 0;
+        for (const character of line) {
+          const length = Buffer.byteLength(character);
+          if (size + length > bytes && chunk) {
+            const lower = chunk.toLowerCase();
+            out.push({ start: end + 1, end: end + 1, text: chunk, score: words.reduce((sum, word, k) => sum + weights[k]! * Math.log1p(occurrences(lower, word)), 0) });
+            chunk = "";
+            size = 0;
+          }
+          chunk += character;
+          size += length;
+        }
+        body = chunk;
+        end++;
+        break;
+      }
       if (end > start && Buffer.byteLength(body) + Buffer.byteLength(line) + 1 > bytes) break;
-      body += `${end === start ? line.slice(0, bytes) : line}\n`;
+      body += `${line}\n`;
       end++;
     }
     const lower = body.toLowerCase();
