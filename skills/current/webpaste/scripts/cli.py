@@ -465,7 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
     _ = parser.add_argument(
         "--json",
         action="store_true",
-        help="Output structured JSON payload (key, url, and raw_url)",
+        help="Output URLs, SHA-256, verification, MIME, and retention as JSON",
     )
     _ = parser.add_argument(
         "--raw",
