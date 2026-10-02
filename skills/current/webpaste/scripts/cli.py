@@ -479,8 +479,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = parser.add_argument(
         "--get",
-        metavar="KEY",
-        help="Fetch content of an existing paste by key",
+        metavar="KEY_OR_URL",
+        help="Fetch exact bytes from a paste key or supported provider URL",
     )
     _ = parser.add_argument(
         "--base-url",
@@ -549,22 +549,30 @@ def read_input(
 
 
 def execute_fetch(
-    base_url: str, raw_key: str, user_agent: str, timeout: float
-) -> Result[str, AppError]:
-    """Fetch existing paste content from bytebin."""
-    key = raw_key.strip().rstrip("/").split("/")[-1]
-    url = f"{base_url.rstrip('/')}/{key}"
+    base_url: str,
+    raw_key: str,
+    user_agent: str,
+    timeout: float,
+    expected_sha256: str | None = None,
+) -> Result[bytes, AppError]:
+    """Fetch exact bytes from a key or supported provider URL."""
+    try:
+        url = resolve_fetch_url(base_url, raw_key)
+    except ValueError as exc:
+        return Err(AppError(str(exc), EXIT_USAGE_ERROR))
     headers = {"User-Agent": user_agent}
     try:
-        with httpx2.Client(timeout=timeout) as client:
+        with httpx2.Client(timeout=timeout, follow_redirects=True) as client:
             resp = client.get(url, headers=headers)
             if resp.status_code == http.HTTPStatus.NOT_FOUND:
-                return Err(
-                    AppError(f"paste not found for key: {key}", EXIT_NETWORK_ERROR)
-                )
+                return Err(AppError(f"content not found: {url}", EXIT_NETWORK_ERROR))
             _ = resp.raise_for_status()
-            text = resp.text
-            return Ok(text if text.endswith("\n") else text + "\n")
+            if (
+                expected_sha256
+                and hashlib.sha256(resp.content).hexdigest() != expected_sha256.lower()
+            ):
+                return Err(AppError("SHA-256 mismatch", EXIT_NETWORK_ERROR))
+            return Ok(resp.content)
     except httpx2.HTTPStatusError as exc:
         return Err(
             AppError(
@@ -774,15 +782,29 @@ def _config_bool(args: argparse.Namespace, field: str) -> bool:
     raise TypeError(msg)
 
 
-def run_pipeline(args: argparse.Namespace, *, is_atty: bool) -> Result[str, AppError]:
+def run_pipeline(
+    args: argparse.Namespace, *, is_atty: bool
+) -> Ok[str] | Ok[bytes] | Err[AppError]:
     """Execute upload or fetch workflow."""
     get_key = _optional_str(args, "get")
+    expected_sha256 = _optional_str(args, "sha256")
+    if expected_sha256 and (
+        not get_key or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256)
+    ):
+        return Err(
+            AppError(
+                "--sha256 requires --get and a 64-digit hex hash", EXIT_USAGE_ERROR
+            )
+        )
+    if _config_float(args, "timeout") <= 0:
+        return Err(AppError("--timeout must be positive", EXIT_USAGE_ERROR))
     if get_key:
         return execute_fetch(
             _config_str(args, "base_url"),
             get_key,
             _config_str(args, "user_agent"),
             _config_float(args, "timeout"),
+            expected_sha256,
         )
 
     file_arg = _optional_str(args, "file")
@@ -853,7 +875,10 @@ def main(argv: list[str] | None = None) -> int:
     res = run_pipeline(args, is_atty=is_atty)
 
     if isinstance(res, Ok):
-        _ = sys.stdout.write(res.value)
+        if isinstance(res.value, bytes):
+            _ = sys.stdout.buffer.write(res.value)
+        else:
+            _ = sys.stdout.write(res.value)
         return EXIT_SUCCESS
     _ = sys.stderr.write(f"Error: {res.error.message}\n")
     return res.error.exit_code
