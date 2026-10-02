@@ -24,6 +24,7 @@ from sync.core.cliproxy_deployment import (
     ListenConfig,
     ServerConfig,
 )
+from sync.core.cliproxy_gateway import read_gateway_profile
 
 REPOSITORY_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 EXPECTED_PORT: Final[int] = 9443
@@ -154,11 +155,21 @@ def test_committed_template_renders_with_example_secrets() -> None:
     secrets: object = json.loads(secrets_text)  # pyright: ignore[reportAny]
     assert _is_obj_dict(secrets)
 
-    rendered = render_cliproxy_config(template, secrets, DEPLOYMENT)
+    profile = read_gateway_profile(template_path.with_name("gateway.json"))
+    rendered = render_cliproxy_config(
+        template, secrets, DEPLOYMENT, gateway_profile=profile
+    )
     parsed: object = yaml.safe_load(rendered)  # pyright: ignore[reportAny]
     assert isinstance(parsed, dict)
     assert parsed["host"] == "100.64.0.42"
     assert parsed["port"] == EXPECTED_PORT
+
+    assert parsed["openai-compatibility"][-1] == {
+        "name": "openrouter",
+        "base-url": profile.system_one.base_url,
+        "models": [],
+        "api-key-entries": [{"api-key": "replace-me", "weight": 1}],
+    }
 
 
 def test_cliproxy_render_config_rejects_missing_credential_pools() -> None:

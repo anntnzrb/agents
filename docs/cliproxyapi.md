@@ -288,6 +288,8 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 | Managed command | `~/.local/bin/cli-proxy-api` |
 | Funnel auth gateway source | `tools/cliproxyapi/auth-gateway.py` |
 | Installed auth gateway and its env file | `~/.cli-proxy-api/auth-gateway.py`, `~/.cli-proxy-api/auth-gateway.env` |
+| System One facade source and upstream allowlist | `tools/cliproxyapi/gateway.py`, `tools/cliproxyapi/gateway.json` |
+| Installed facade and its private configuration | `~/.cli-proxy-api/gateway.py`, `~/.cli-proxy-api/gateway.json` |
 
 Sync verifies the selected release's SHA-256 checksum and extracts only the manifest's executable.
 
@@ -305,6 +307,8 @@ Sync prepares the managed binary and wrapper only on the gateway host. Client ho
 | `client.baseUrl` | HTTP or HTTPS `/v1` URL without credentials, query, or fragment | Endpoint used by harnesses and readiness checks |
 
 Sync rejects wildcard listeners, unspecified IPv6 addresses, unknown fields, malformed client URLs, raw query or fragment delimiters, and invalid ports. It renders the listener into `~/.cli-proxy-api/config.yaml` and replaces `${CLIPROXY_CLIENT_BASE_URL}` (the `/v1` URL) and `${CLIPROXY_CLIENT_ORIGIN}` (the same URL without `/v1`) in configured harness targets.
+
+The optional `gateway` listener uses the same validation rules as `listen`. Omitting it leaves CLIProxyAPI as the only managed inference listener. See [Enable the facade](#enable-the-facade) for the migration procedure.
 
 Sync compares the local OS hostname with `server.hostname` to choose the host role:
 
@@ -335,6 +339,8 @@ Each credential account accepts these fields:
 Pool names start with a lowercase letter and contain lowercase letters, digits, or hyphens. Every pool must contain at least one account. The template must reference every pool in the secrets file.
 
 The renderer rejects unknown account fields, duplicate keys within a pool, invalid weights, missing pools, and unreferenced pools.
+
+The optional OpenRouter pool uses the same credential shape as the other pools. It is required when the facade listener is configured; see [System One classification](#system-one-classification). The gateway host reads the ignored secrets file at `~/.config/agents/secrets.local.json`. Runtime credentials are rendered into installed private files rather than read by harnesses.
 
 ## Generated files and credentials
 

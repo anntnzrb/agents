@@ -18,6 +18,7 @@ from sync.core.cliproxy_deployment import (
     is_cliproxy_gateway_host,
     read_cliproxy_deployment,
 )
+from sync.core.cliproxy_gateway import GATEWAY_SCRIPT
 from sync.core.harness import (
     DEFAULT_PACKAGE_CACHE_SUBDIR,
     SKILLS_DST_DIR,
@@ -388,6 +389,13 @@ def _config_jobs(
             FileJob(
                 src=str(ssot / CLI_PROXY_SOURCE_DIR / "auth-gateway.py"),
                 dst=str(home / ".cli-proxy-api" / "auth-gateway.py"),
+            )
+        )
+    if gateway_host and deployment.gateway is not None:
+        jobs.append(
+            FileJob(
+                src=str(ssot / CLI_PROXY_SOURCE_DIR / GATEWAY_SCRIPT),
+                dst=str(home / ".cli-proxy-api" / GATEWAY_SCRIPT),
             )
         )
     jobs.append(
