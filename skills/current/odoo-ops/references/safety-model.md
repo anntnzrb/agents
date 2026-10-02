@@ -22,7 +22,8 @@ Production is read-only by default. Read operations do not require per-query use
 Every `rpc` invocation requires the mechanical `--allow-rpc` flag. The flag may be placed before or after the operation subcommand (e.g. `rpc --allow-rpc search_read ...` or `rpc search_read ... --allow-rpc`). Placing RPC flags before the `rpc` command itself produces a hint and exits 2. The flag acknowledges remote execution; it prevents unintended execution when commands are pasted into non-RPC contexts.
 
 ### Data Privacy and Secret Handling
-- No PII masking: the user owns production data and requires exact, unmangled values for operational correctness.
+- Operational accuracy: preserve exact values in private import files, mutation plans, and comparisons. Do not replace an actual identifier with a masked value in a write payload.
+- Evidence and handoffs: mask PII in chat. Use synthetic identities and consistent fictitious relation IDs in offline fixtures. Inspect free-text descriptions and notes as well as structured fields. Follow [Import and audit workflow](import-and-audit-workflow.md) before preparing a sanitized export.
 - Request discipline: query only the specific fields needed (`--fields`). `search_read` defaults to `--limit 10` and warns on truncation. Never dump full tables or broad `search_read` sets into the conversation context.
 - Secret protection: NEVER print connection tokens, passwords, or `.env` values into stdout or chat. NEVER read secrets or credentials from `ir_config_parameter` into user-visible output.
 - Data confinement: NEVER upload replica or production data, dumps, or query exports to public file hosts, external pastebins, or third-party web services.
@@ -46,6 +47,8 @@ Any mutation command executed without `--write` creates a dry-run plan (both on 
    The `apply` command verifies record state against the plan pre-image. If any target record has changed since the plan was created, `apply` aborts immediately to prevent overwriting concurrent updates. Upon successful application, it automatically stores a rollback backup.
 5. **Postcheck:** Verify the updated state immediately using read-only queries (`read` or `search_read`).
 6. **Authorization Consumed:** Applying the plan consumes the authorization. The environment returns to read-only status immediately. Any subsequent mutation batch requires a fresh dry-run plan and distinct approval.
+
+An application can commit some RPC groups before a later group fails. A transport timeout can leave the last call's outcome unknown. Do not retry the full plan blindly. Read all planned IDs, compare actual values with the intended changes, and prepare a fresh plan for the verified remainder. See [partial-apply recovery](import-and-audit-workflow.md#recover-a-partially-applied-batch).
 
 ### Plan and Backup Storage
 Plans and backups are automatically managed within the skill state directory (`ODOO_OPS_STATE_DIR` or XDG state directory `odoo-ops`). The user and agent never supply filesystem paths for plan storage.
