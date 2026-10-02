@@ -1,6 +1,6 @@
 ---
 name: react-best-practices
-description: "Use when optimizing React or Next.js performance, waterfalls, bundle sizes, or Server Actions; not for visual styling."
+description: "Use when building or optimizing React or Next.js rendering, data fetching, bundles, or Server Actions, not styling."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

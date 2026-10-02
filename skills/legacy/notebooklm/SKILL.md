@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: notebooklm
-description: "Use when the user asks to query a NotebookLM notebook or knowledge base through the nlm CLI."
+description: "Use when managing NotebookLM notebooks, sources, chats, or generated artifacts through the nlm CLI."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: web-design-guidelines
-description: "Use when auditing web UI code for design, UX, accessibility, or guideline compliance."
+description: "Use when auditing web UI code against Vercel Web Interface Guidelines."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

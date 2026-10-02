@@ -1,6 +1,6 @@
 ---
 name: ship
-description: "Use when asked to ship, take an issue or PR through merge, or file a discovered problem for later."
+description: "Use when asked to ship, get an issue or PR merge-ready or merged, or file a discovered problem for later."
 license: AGPL-3.0-or-later
 ---
 

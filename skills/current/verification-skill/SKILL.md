@@ -1,6 +1,6 @@
 ---
 name: verification-skill
-description: "Use when creating or auditing a project-local verify-APP skill that drives the real app and captures proof."
+description: "Use when an app lacks repeatable behavioral verification or its project-local verification skill needs an audit."
 license: AGPL-3.0-or-later
 ---
 

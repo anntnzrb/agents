@@ -1,6 +1,6 @@
 ---
 name: market-hunter
-description: "Use when searching G2A, Kinguin, or Plati for discounted AI subscriptions, software keys, accounts, or seller trust."
+description: "Use when finding or vetting software subscriptions, keys, or accounts on G2A, Kinguin, Plati, Z2U, or FunPay."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

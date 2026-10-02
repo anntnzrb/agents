@@ -1,6 +1,6 @@
 ---
 name: research
-description: "Use when a task requires research, fact-checking, comparison, evidence gathering, or source selection."
+description: "Use when selecting sources for evidence-backed research, fact-checking, or comparisons across source types."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

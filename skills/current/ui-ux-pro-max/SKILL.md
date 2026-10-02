@@ -1,6 +1,6 @@
 ---
 name: ui-ux-pro-max
-description: "Use when designing web or mobile UI/UX, design systems, responsive layouts, styling, typography, or UI components."
+description: "Use when designing or reviewing web or mobile UI/UX, accessibility, responsive layouts, styling, or components."
 license: AGPL-3.0-or-later
 ---
 

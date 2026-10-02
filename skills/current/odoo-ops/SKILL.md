@@ -1,6 +1,6 @@
 ---
 name: odoo-ops
-description: "Use when developing or testing Odoo 17 modules, replica databases, XML views, Server Actions, or safe JSON-RPC calls."
+description: "Use when developing, testing, or operating Odoo 17 modules, replica DBs, XML views, Server Actions, or safe RPC."
 license: AGPL-3.0-or-later
 ---
 

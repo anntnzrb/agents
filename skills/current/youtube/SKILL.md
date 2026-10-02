@@ -1,6 +1,6 @@
 ---
 name: youtube
-description: "Use when downloading or extracting YouTube videos, audio, subtitles, or media URLs with yt-dlp, not for web scraping."
+description: "Use when downloading or extracting YouTube or other yt-dlp-supported media, audio, subtitles, or direct media URLs."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

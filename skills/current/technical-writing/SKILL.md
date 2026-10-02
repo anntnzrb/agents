@@ -1,6 +1,6 @@
 ---
 name: technical-writing
-description: "Use when writing developer docs, READMEs, RFCs, architecture guides, or PR descriptions, not for automated changelogs."
+description: "Use when writing developer docs, RFCs, architecture guides, PR descriptions, or commit messages; not changelogs."
 license: AGPL-3.0-or-later
 ---
 

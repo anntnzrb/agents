@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: darksouls3
-description: "Use for Dark Souls 3 builds, mechanics, routes, achievements, PC mods, or spoiler-safe help."
+description: "Use for Dark Souls 3 builds, mechanics, routes, .sl2 saves, achievements, PC mods, or spoiler-safe help."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

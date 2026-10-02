@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: vox-interpres
-description: "Use when audio needs tempo, key, section, energy, metadata, codec, or segment analysis."
+description: "Use when analyzing or chatting with local audio about tempo, key, structure, energy, metadata, codecs, or segments."
 license: AGPL-3.0-or-later
 compatibility: Requires `uv`, `ffmpeg`/`ffprobe`, and local audio files.
 metadata:

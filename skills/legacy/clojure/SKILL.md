@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: clojure
-description: "Use when Clojure, ClojureScript, deps.edn, REPL, spec, macros, or functional code are involved."
+description: "Use when writing Clojure or ClojureScript, editing deps.edn, using the REPL, specs, macros, or Clojure tests."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb

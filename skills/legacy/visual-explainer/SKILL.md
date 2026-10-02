@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: visual-explainer
-description: "Use when the user asks for a self-contained HTML visual explanation, diagram, plan review, diff review, or recap."
+description: "Use when creating self-contained HTML explanations, diagrams, slide decks, visual reviews, recaps, or comparisons."
 license: AGPL-3.0-or-later
 compatibility: Requires a browser to view generated HTML files. Optional surf-cli for AI image generation.
 metadata:
@@ -103,4 +103,3 @@ Before delivery, verify:
 - slides fit one viewport, include carousel dots, and preserve source coverage;
 - visual hierarchy makes the main idea obvious in the first viewport;
 - styling would still be recognizable if compared against a generic dark/violet template
-
