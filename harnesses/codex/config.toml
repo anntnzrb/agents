@@ -37,6 +37,7 @@ default_permissions = ":danger-full-access"
 name = "CLIProxyAPI"
 base_url = "${CLIPROXY_CLIENT_BASE_URL}"
 wire_api = "responses"
+supports_websockets = true
 
 # Command-backed auth flags the provider as fetching its model catalog:
 # codex then pulls {base_url}/models?client_version=... (which CLIProxyAPI serves
