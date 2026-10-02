@@ -19,6 +19,21 @@ Discovery order per refresh:
 4. Unknown ids fall back to `FALLBACK_CONTEXT_WINDOW` (128K) and `FALLBACK_MAX_TOKENS` (16.4K), which
    are pi defaults for metadata-free models.
 
+## System One classifiers
+
+The gateway's optional System One facade serves classification at `POST {baseUrl}/systemone`; see
+`docs/cliproxyapi.md` in the repository root. The extension registers the facade's allowlisted models
+(`SYSTEM_ONE_MODELS`, mirroring `tools/cliproxyapi/gateway.json`) as `cliproxy` classifier models with
+the `typesafe-system-one` API and Pi's shipped TypeSafe transport. Price, context window, and display
+name come from Pi's catalog entry for the facade's upstream provider, OpenRouter, so classifier usage
+counts toward session cost.
+
+Classifiers are not discovered: the facade keeps them out of `/models`, so the extension registers them
+statically and returns them with every catalog refresh. A model the installed Pi catalog does not know
+is skipped. Select one for the `find` tool with `"find": { "classifier": "cliproxy/typesafe/jev-1.13" }`.
+
+A request reaches the facade only when the gateway host deploys it; otherwise the gateway answers `404`.
+
 Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
 use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
 field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
@@ -59,3 +74,14 @@ discovery abort signal. This is demand-driven during provider refresh, not a bac
 If the selected model still needs a fallback context limit, the extension warns once per model per
 extension load in UI sessions, on startup, model selection, or before the next agent run. `/reload`
 loads changed extension code; a fresh Pi process also picks it up.
+
+## Validate
+
+Pi's host packages are installed only in the synced home. Run the tests from a copy that links them:
+
+```sh
+T=$(mktemp -d); cp -R harnesses/pi/agent/extensions/cliproxy "$T/cliproxy"
+ln -s ~/.pi/agent/extensions/node_modules "$T/node_modules"
+(cd "$T" && bun test cliproxy/)
+git diff --check
+```

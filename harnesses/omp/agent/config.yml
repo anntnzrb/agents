@@ -12,7 +12,7 @@ modelRoles:
   advisor: "@gem"
   tiny: local/lfm2.5-230m,@gem
   web: web/parallel
-  judge: opencode-zen-jev/jev-1.13-free
+  judge: cliproxy-jev/typesafe/jev-1.13
 
   opus: cliproxy/claude-opus-5-5:medium
   sonnet: cliproxy/claude-sonnet-5-5:high

@@ -208,20 +208,20 @@ providers:
             - low
             - max
           defaultLevel: low
-  opencode-zen-jev:
-    # Zen serves Jev over native System One (POST {baseUrl}/v1/systemone); its catalog/cliproxy rows are chat-only.
-    # Free tier needs a Zen account key (keyless is rejected); reuse the /login opencode-zen credential.
-    baseUrl: https://opencode.ai/zen
-    apiKey: "!omp token opencode-zen"
+  cliproxy-jev:
+    # The gateway's System One facade serves Jev at POST {origin}/v1/systemone through its pooled OpenRouter keys;
+    # the `typesafe` API appends /v1/systemone, so baseUrl is the origin. Mirrors tools/cliproxyapi/gateway.json.
+    baseUrl: "${CLIPROXY_CLIENT_ORIGIN}"
+    apiKey: keyless
     api: typesafe
     models:
-      - id: jev-1.13-free
-        name: Jev 1.13 (Zen free)
+      - id: typesafe/jev-1.13
+        name: Jev 1.13 (openrouter)
         input:
           - text
         supportsTools: false
         cost:
-          input: 0
+          input: 0.042
           output: 0
           cacheRead: 0
           cacheWrite: 0

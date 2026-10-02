@@ -9,7 +9,7 @@
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
   "find": {
-    "classifier": "opencode/jev-1.13-free"
+    "classifier": "cliproxy/typesafe/jev-1.13"
   },
   "followUpMode": "all",
   "hideThinkingBlock": true,
