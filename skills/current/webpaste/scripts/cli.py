@@ -576,11 +576,19 @@ def execute_fetch(
         return Err(AppError(f"Network error: {exc}", EXIT_NETWORK_ERROR))
 
 
-def format_upload_response(key: str, payload: UploadPayload) -> str:
+def format_upload_response(
+    key: str,
+    payload: UploadPayload,
+    raw_url: str,
+    content_type: str | None,
+    charset: str | None,
+) -> str:
     """Format final output string based on CLI presentation flags."""
-    raw_url = f"{payload.base_url.rstrip('/')}/{key}"
     view_url = (
-        f"https://pastes.dev/{key}" if "pastes.dev" in payload.base_url else raw_url
+        f"https://pastes.dev/{key}"
+        if payload.provider == "pastes"
+        and urlsplit(payload.base_url).hostname == "api.pastes.dev"
+        else raw_url
     )
 
     if payload.output_json:
@@ -589,6 +597,15 @@ def format_upload_response(key: str, payload: UploadPayload) -> str:
             "url": view_url,
             "raw_url": raw_url,
             "language": payload.language,
+            "provider": payload.provider,
+            "content_type": content_type,
+            "charset": charset,
+            "bytes": len(payload.content),
+            "sha256": hashlib.sha256(payload.content).hexdigest(),
+            "verified": payload.verify or payload.ascii_check,
+            "retention": {"pastes": "90d", "catbox": "2y-inactive", "litterbox": "72h"}[
+                payload.provider
+            ],
         }
         return json.dumps(res_obj) + "\n"
     if payload.output_raw:
