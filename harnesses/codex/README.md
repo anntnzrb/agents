@@ -8,6 +8,10 @@
 
 The app proxies WebSocket traffic over SSH to the local Unix socket. No app-server TCP listener, Tailscale Serve entry, or Funnel is needed. The provider in `config.toml` is published by sync; CLIProxyAPI does not require a separate OpenAI login. Host availability and model execution are separate checks.
 
+## Provider transport
+
+The custom provider advertises Responses WebSocket support. The gateway's Codex OAuth credentials must also enable their native `websockets` metadata through the private management API. This repository does not automatically change credential metadata. These model-request connections are separate from the app-server connection over SSH. Use the private gateway endpoint: the public Funnel auth gateway forwards HTTP streams and does not tunnel WebSocket upgrades.
+
 ## Service ownership
 
 `tools/codex-server/deployment.json` selects hosts. Sync installs a periodic health check that runs the installed wrapper's `codex app-server daemon start`. It leaves a healthy daemon running and ensures its native updater exists. Linux uses a systemd user timer; macOS uses a launch agent at login. Linux user lingering is required for boot and logout availability; a Mac must be awake with a logged-in user session.
