@@ -20,6 +20,14 @@ uv run --script .github/scripts/ci.py metadata
 
 Run a selected skill's gates using [Manage shared skills](skills.md#validate-python-skills-standard). Run sync checks using [Develop the sync application](sync/development.md#run-the-full-checks). Harness validation stays beside its source.
 
+Reproduce a skill shard by copying its `SKILLS` JSON array from the job's environment:
+
+```bash
+SKILLS='["skill-creator"]' uv run --script .github/scripts/ci.py skills
+```
+
+The command runs each owner's full gates sequentially and prints its elapsed time. It stops at the first failed owner. Other shards continue independently.
+
 Check CI orchestration behavior with its adjacent tests:
 
 ```bash
@@ -42,6 +50,14 @@ CI uses recorded fixtures and local test servers without provider credentials. L
 Run or inspect the workflow from GitHub's **Actions** tab. Manual dispatch and scheduled CI select all active code suites. The workflow does not invoke harness CLIs, inference providers, automatic agent reviews, or model evaluations.
 
 Live smoke tests, native harness integration tests, and model-based skill evaluations remain explicit manual operations owned by their source. They do not run in CI. Structural skill validation does not establish instruction quality or activation accuracy.
+
+## Compare performance without skipping validation
+
+Skill shards share uv's dependency and tool environments within a runner. Cache keys separate shard membership and platforms, and include inline dependency declarations as well as tool configuration. This prevents one parallel job's incomplete cache from becoming every job's immutable cache hit. Managed Python installations are cached too.
+
+Caches store dependencies and interpreters, never successful check results. Every selected owner runs its gates on both supported platforms. Keep the platform matrix and shard count in the workflow and planner, respectively; do not tune them by omitting owners or weakening the required check.
+
+For a local comparison, use fresh `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, and `UV_TOOL_DIR` directories for each group. Run the same owners with the same concurrency, first with empty caches and then again with those caches retained. Compare total elapsed time and the sum of group durations separately. Keep source, interpreter requirements, and gate commands unchanged. Local timings exclude GitHub runner provisioning, checkout, and cache transfer; Darwin measurements require a Darwin runner.
 
 ## Maintain merge protection
 

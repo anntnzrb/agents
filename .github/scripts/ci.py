@@ -12,12 +12,14 @@ import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import perf_counter
 from typing import TypeIs
 
 HARNESS_ROOTS = {
     "opencode": Path("harnesses/opencode"),
     "pi": Path("harnesses/pi/agent/extensions"),
 }
+SKILL_SHARDS = 4
 
 
 def run(command: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> None:
@@ -89,6 +91,28 @@ def metadata(root: Path) -> None:
     print(f"Validated {len(skills)} active skills", flush=True)
 
 
+def skills(root: Path, raw: str) -> None:
+    """Run one shard sequentially, reusing uv's tool and dependency caches."""
+    names: object = json.loads(raw)
+    if not is_str_list(names) or not names:
+        raise ValueError("SKILLS must be a nonempty array of skill names")
+    for name in names:
+        started = perf_counter()
+        run(
+            [
+                "uv",
+                "run",
+                "--script",
+                "skills/current/skill-creator/scripts/cli.py",
+                "gates",
+                f"skills/current/{name}",
+                "--tests",
+            ],
+            cwd=root,
+        )
+        print(f"{name}: {perf_counter() - started:.2f}s", flush=True)
+
+
 def harness(root: Path, name: str) -> None:
     """Install frozen test dependencies in a temporary copy of the owner."""
     with TemporaryDirectory(prefix=f"agents-ci-{name}-") as temporary:
@@ -120,6 +144,16 @@ def harness(root: Path, name: str) -> None:
 def is_str_dict(value: object) -> TypeIs[dict[str, object]]:
     """Narrow JSON objects at the workflow boundary."""
     return isinstance(value, dict)
+
+
+def is_object_list(value: object) -> TypeIs[list[object]]:
+    """Narrow JSON arrays before checking their elements."""
+    return isinstance(value, list)
+
+
+def is_str_list(value: object) -> TypeIs[list[str]]:
+    """Narrow the planned shard's skill names at the workflow boundary."""
+    return is_object_list(value) and all(isinstance(name, str) for name in value)
 
 
 def required(raw: str) -> None:
@@ -154,6 +188,7 @@ def main() -> int:
     selection = commands.add_parser("plan")
     selection.add_argument("--base")
     commands.add_parser("metadata")
+    commands.add_parser("skills")
     commands.add_parser("required")
     extension = commands.add_parser("harness")
     extension.add_argument("name", choices=sorted(HARNESS_ROOTS))
@@ -167,8 +202,27 @@ def main() -> int:
                 with Path(output).open("a", encoding="utf-8") as stream:
                     for key, names in selected.items():
                         stream.write(f"{key}={json.dumps(names)}\n")
+                    shards: list[dict[str, object]] = []
+                    for index in range(min(SKILL_SHARDS, len(selected["skills"]))):
+                        names = selected["skills"][index::SKILL_SHARDS]
+                        inputs = [
+                            f"skills/current/{name}/{file}"
+                            for name in names
+                            for file in ("scripts/cli.py", "pyproject.toml")
+                        ]
+                        inputs.append("skills/current/skill-creator/scripts/*.py")
+                        shards.append(
+                            {
+                                "id": index,
+                                "skills": names,
+                                "cache-inputs": "\n".join(inputs),
+                            }
+                        )
+                    stream.write(f"skill-shards={json.dumps(shards)}\n")
         elif args.command == "metadata":
             metadata(root)
+        elif args.command == "skills":
+            skills(root, os.environ["SKILLS"])
         elif args.command == "required":
             required(os.environ["CI_NEEDS"])
         else:

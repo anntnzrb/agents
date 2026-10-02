@@ -111,7 +111,7 @@ class GitWorktreesCliContractTests(unittest.TestCase):
     @override
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
-        self.temp_path = Path(self.temporary_directory.name)
+        self.temp_path = Path(self.temporary_directory.name).resolve()
         self.home = self.temp_path / "home"
         self.home.mkdir()
         self.data_home = self.temp_path / "data-home"

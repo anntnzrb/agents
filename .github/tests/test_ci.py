@@ -120,6 +120,101 @@ def test_no_base_runs_every_owned_suite(repo: Path) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("count", "groups"),
+    [
+        (0, []),
+        (1, [["alpha"]]),
+        (4, [["alpha"], ["beta"], ["delta"], ["epsilon"]]),
+        (7, [["alpha", "eta"], ["beta", "gamma"], ["delta", "zeta"], ["epsilon"]]),
+    ],
+)
+def test_plan_emits_balanced_nonempty_shards(
+    repo: Path, count: int, groups: list[list[str]]
+) -> None:
+    git(repo, "rm", "-r", "skills/current")
+    names = ["alpha", "beta", "delta", "epsilon", "eta", "gamma", "zeta"][:count]
+    for name in reversed(names):
+        write(repo, f"skills/current/{name}/SKILL.md")
+        write(repo, f"skills/current/{name}/scripts/cli.py")
+    (repo / "skills/current").mkdir(parents=True, exist_ok=True)
+    output = repo / "outputs"
+    subprocess.run(
+        [sys.executable, str(SCRIPT), "plan"],
+        cwd=repo,
+        env=os.environ | {"GITHUB_OUTPUT": str(output)},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    expected = [
+        {
+            "id": index,
+            "skills": group,
+            "cache-inputs": "\n".join(
+                [
+                    path
+                    for name in group
+                    for path in (
+                        f"skills/current/{name}/scripts/cli.py",
+                        f"skills/current/{name}/pyproject.toml",
+                    )
+                ]
+                + ["skills/current/skill-creator/scripts/*.py"]
+            ),
+        }
+        for index, group in enumerate(groups)
+    ]
+    assert json.loads(outputs["skill-shards"]) == expected
+    assert json.loads(outputs["skills"]) == names
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_skill_shard_runs_each_owner_and_stops_on_failure(
+    repo: Path, fail: bool
+) -> None:
+    binary = repo / "bin/uv"
+    write(
+        repo,
+        "bin/uv",
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "with open(os.environ['CALLS'], 'a') as log:\n"
+        "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "sys.exit(1 if os.environ['FAIL'] == '1' "
+        "and sys.argv[-2].endswith('/beta') else 0)\n",
+    )
+    binary.chmod(0o755)
+    calls = repo / "calls.jsonl"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "skills"],
+        cwd=repo,
+        env=os.environ
+        | {
+            "PATH": f"{binary.parent}{os.pathsep}{os.environ['PATH']}",
+            "SKILLS": json.dumps(["alpha", "beta", "gamma"]),
+            "CALLS": str(calls),
+            "FAIL": str(int(fail)),
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == int(fail)
+    expected = ["alpha", "beta"] if fail else ["alpha", "beta", "gamma"]
+    assert [json.loads(line) for line in calls.read_text().splitlines()] == [
+        [
+            "run",
+            "--script",
+            "skills/current/skill-creator/scripts/cli.py",
+            "gates",
+            f"skills/current/{name}",
+            "--tests",
+        ]
+        for name in expected
+    ]
+
+
 def test_missing_base_fails_instead_of_silently_skipping(repo: Path) -> None:
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "plan", "--base", "missing-ref"],
