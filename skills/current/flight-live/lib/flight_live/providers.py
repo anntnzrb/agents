@@ -101,8 +101,6 @@ def fetch_kiwi_web_calendar(  # noqa: PLR0913 - public provider surface mirrors 
     stay_max: int | None,
 ) -> list[PlannerOffer]:
     """Fetch planner offers across the departure window via agent-browser scraping."""
-    _ensure_agent_browser_available()
-
     origin_place = _lookup_kiwi_place(origin, locale=locale)
     destination_place = _lookup_kiwi_place(destination, locale=locale)
 

@@ -16,7 +16,7 @@ configured `.ts` file paths, even though the migration documentation shows them.
 From a temporary copy of `harnesses/opencode/` (to avoid installing dependencies into the SSOT):
 
 ```sh
-bun install
+bun install --frozen-lockfile
 bun test ./tests/plugins.test.ts
 bun x --package typescript tsc --noEmit --strict --skipLibCheck --types node \
   --target esnext --module nodenext --moduleResolution nodenext \
@@ -25,3 +25,11 @@ bun x --package typescript tsc --noEmit --strict --skipLibCheck --types node \
 
 Tests exercise the continuation hook and model discovery with mocked HTTP responses, validate model
 records against the v2 schema, check transform replay, and preserve inventory on gateway failure.
+
+Run the same isolated test command as CI from the repository root:
+
+```bash
+uv run --script .github/scripts/ci.py harness opencode
+```
+
+The runner copies the owning harness into a temporary directory and uses the committed Bun lockfile. It does not change the installed harness or require provider credentials.

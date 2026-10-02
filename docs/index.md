@@ -13,6 +13,8 @@ Choose a page by the task you need to complete. Sync application documentation l
 
 ## Develop
 
+- [Verify a change in CI](ci.md) runs repository checks, diagnoses failures, and explains the required merge check.
+
 - [Develop the sync application](sync/development.md) runs checks and changes sync or harness integration.
 - [Manage shared skills](skills.md) changes, validates, publishes, and archives skills; it is also the skill gate.
 

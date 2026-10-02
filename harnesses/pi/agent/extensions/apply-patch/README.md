@@ -49,7 +49,13 @@ bun test harnesses/pi/agent/extensions/apply-patch/
 git diff --check
 ```
 
-The native engine tests require `codex` on `PATH`. For a fresh runtime check, use an authenticated GPT provider in a temporary working directory:
+CI runs the offline unit tests without invoking a harness or provider. Native engine assertions remain in `native.integration.ts`, outside Bun's default test discovery. Run them manually from an extension checkout with its dependencies installed and `codex` on `PATH`:
+
+```bash
+bun test ./apply-patch/native.integration.ts
+```
+
+This invokes the native patch engine locally without authentication or inference. Do not add this command to CI. For a fresh runtime check, use an authenticated GPT provider in a temporary working directory:
 
 ```sh
 pi --no-extensions -e /absolute/path/to/apply-patch/index.ts \

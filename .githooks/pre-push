@@ -3,4 +3,6 @@ set -eu
 
 cd sync
 uv sync --frozen
-uv run --no-sync sync-gates --tests
+uv run --no-sync sync-gates
+# Keep local validation serial, including on production hosts.
+uv run --no-sync pytest -n 0 -o addopts="" -q

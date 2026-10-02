@@ -354,7 +354,7 @@ def sniff_content(content: bytes, path: Path | None) -> tuple[bool, str]:
     ):
         if content.startswith(signature):
             return False, mime
-    mime = mimetypes.guess_type(str(path))[0] if path else None
+    mime = mimetypes.MimeTypes().guess_type(str(path))[0] if path else None
     try:
         _ = content.decode("utf-8")
     except UnicodeDecodeError:

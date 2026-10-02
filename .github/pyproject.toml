@@ -1,0 +1,10 @@
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+include = ["scripts", "tests"]
+pythonVersion = "3.14"

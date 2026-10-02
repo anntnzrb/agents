@@ -4,6 +4,8 @@ __pycache__/
 node_modules/
 bun.lock
 !sync/bun.lock
+!harnesses/pi/agent/extensions/bun.lock
+!harnesses/opencode/bun.lock
 package-lock.json
 skills/*/*/.env
 skills/*/*/.env.local

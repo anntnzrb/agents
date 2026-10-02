@@ -1,6 +1,8 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests for the skill code-gate runner."""
 
+import subprocess
+from textwrap import dedent
 from typing import TYPE_CHECKING, Final
 
 from scripts.gates import EXIT_USAGE, GateRunner, main, pep723_deps, run_gates
@@ -64,7 +66,12 @@ def test_main_runs_static_gates_only_by_default(tmp_path: Path) -> None:
     skill = _skill_dir(tmp_path)
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
+    tools = [
+        step[1].split("==")[0]
+        if step[1].startswith("ruff==")
+        else step[-1].split("==")[0]
+        for step, _ in seen
+    ]
     assert tools == ["ruff", "ruff", "basedpyright"]
     assert all(cwd == skill for _, cwd in seen)
 
@@ -75,7 +82,12 @@ def test_main_appends_pytest_with_tests_flag(tmp_path: Path) -> None:
     (skill / "tests").mkdir()
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill), "--tests"], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
+    tools = [
+        step[1].split("==")[0]
+        if step[1].startswith("ruff==")
+        else step[-1].split("==")[0]
+        for step, _ in seen
+    ]
     assert tools == ["ruff", "ruff", "basedpyright", "tests"]
     pytest_step = list(seen[-1][0])
     assert "--with" in pytest_step
@@ -91,8 +103,8 @@ def test_basedpyright_step_includes_pytest_when_tests_exist(
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
     pyright_step = list(seen[2][0])
-    assert pyright_step[-1] == "basedpyright"
-    assert "pytest" in pyright_step
+    assert pyright_step[-1].startswith("basedpyright==")
+    assert any(arg.startswith("pytest==") for arg in pyright_step)
     assert "PyYAML>=6.0" in pyright_step
 
 
@@ -115,8 +127,8 @@ def test_basedpyright_step_omits_pytest_without_tests_dir(
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
     pyright_step = list(seen[2][0])
-    assert pyright_step[-1] == "basedpyright"
-    assert "pytest" not in pyright_step
+    assert pyright_step[-1].startswith("basedpyright==")
+    assert not any(arg.startswith("pytest==") for arg in pyright_step)
     assert "PyYAML>=6.0" in pyright_step
 
 
@@ -174,3 +186,44 @@ def test_pep723_deps_missing_cli_returns_empty(tmp_path: Path) -> None:
     skill = tmp_path / "bare-skill"
     skill.mkdir()
     assert pep723_deps(skill) == []
+
+
+def test_pytest_gate_blocks_external_sockets_and_preserves_loopback(
+    tmp_path: Path,
+) -> None:
+    """Exercise the real test process, including its offline socket policy."""
+    skill = _skill_dir(tmp_path)
+    tests = skill / "tests"
+    tests.mkdir()
+    _ = (tests / "test_network.py").write_text(
+        dedent("""
+            import socket
+            import pytest
+            from pytest_socket import SocketConnectBlockedError
+
+            def test_external_connection_is_rejected():
+                with socket.socket() as connection:
+                    with pytest.raises(SocketConnectBlockedError):
+                        connection.connect(("192.0.2.1", 443))
+
+            def test_local_fixture_still_works():
+                with socket.socket() as listener:
+                    listener.bind(("127.0.0.1", 0))
+                    listener.listen(1)
+                    address = listener.getsockname()
+                    client = socket.create_connection(address, timeout=1)
+                    with client:
+                        server, _ = listener.accept()
+                        with server:
+                            server.sendall(b"fixture")
+                            assert client.recv(7) == b"fixture"
+            """),
+        encoding="utf-8",
+    )
+
+    def run_test_step(step: Sequence[str], cwd: Path) -> int:
+        if step[-1] != "tests":
+            return 0
+        return subprocess.run(list(step), cwd=cwd, check=False).returncode
+
+    assert main([str(skill), "--tests"], run_test_step) == 0

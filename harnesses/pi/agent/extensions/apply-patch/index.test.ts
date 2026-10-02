@@ -1,9 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { convertResponsesTools } from "@earendil-works/pi-ai/api/openai-responses-shared";
 import { createGrammarToolInputProperties } from "@earendil-works/pi-ai/api/constrained-sampling";
 import { withFileMutationQueue, type ExtensionAPI, type ExtensionToolContext } from "@earendil-works/pi-coding-agent";
@@ -22,18 +20,8 @@ async function workspace() {
   return cwd;
 }
 
-const executeFile = promisify(execFile);
-const exec: ExtensionAPI["exec"] = async (command, args, options) => {
-  try {
-    const result = await executeFile(command, args, { cwd: options?.cwd, signal: options?.signal });
-    return { ...result, code: 0, killed: false };
-  } catch (error) {
-    if (!(error instanceof Error) || !("stdout" in error) || !("stderr" in error)) throw error;
-    return {
-      stdout: String(error.stdout), stderr: String(error.stderr), code: 1,
-      killed: "killed" in error && error.killed === true,
-    };
-  }
+const exec: ExtensionAPI["exec"] = async () => {
+  throw new Error("Native execution belongs to native.integration.ts");
 };
 
 function context(cwd: string, id = "gpt-6.1-sol") {
@@ -108,28 +96,6 @@ test("switches tools on startup and model selection, preserving unrelated tools 
   handlers.get("model_select")!({ model: { id: "gpt-5.5" } }, {});
   expect(active).toEqual(["read", "edit", "write"]);
 });
-
-test("adds, updates with anchors and EOF context, moves, and deletes using the native engine", async () => {
-  const cwd = await workspace();
-  const tool = createApplyPatchTool({ exec });
-  const run = (input: string) => tool.execute("test", { input }, undefined, undefined, context(cwd));
-  await run("*** Begin Patch\n*** Add File: nested/example.txt\n+header\n+old\n+tail\n*** Add File: gone.txt\n+delete me\n*** End Patch");
-  expect(await readFile(join(cwd, "nested/example.txt"), "utf8")).toBe("header\nold\ntail\n");
-  await run("*** Begin Patch\n*** Update File: nested/example.txt\n*** Move to: moved.txt\n@@ header\n-old\n+new\n tail\n*** End of File\n*** Delete File: gone.txt\n*** End Patch");
-  expect(await readFile(join(cwd, "moved.txt"), "utf8")).toBe("header\nnew\ntail\n");
-  expect(await readFile(join(cwd, "gone.txt")).catch((error) => error.code)).toBe("ENOENT");
-  expect(await readFile(join(cwd, "nested/example.txt")).catch((error) => error.code)).toBe("ENOENT");
-}, 30000);
-
-test("reports malformed patches and failed context as tool failures", async () => {
-  const cwd = await workspace();
-  await writeFile(join(cwd, "example.txt"), "original\n");
-  const tool = createApplyPatchTool({ exec });
-  for (const input of ["garbage", "*** Begin Patch\n*** Update File: example.txt\n@@\n-missing\n+changed\n*** End Patch"]) {
-    await expect(tool.execute("test", { input }, undefined, undefined, context(cwd))).rejects.toThrow("apply_patch failed");
-  }
-  expect(await readFile(join(cwd, "example.txt"), "utf8")).toBe("original\n");
-}, 30000);
 
 test("resolves aliases and both sides of moves into unique sorted mutation targets", async () => {
   const cwd = await workspace();

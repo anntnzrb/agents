@@ -27,4 +27,4 @@ files.
 
 Quality gates (`sync-gates` console script, defined in `sync/src/sync/gates.py`):
 - `pre-commit`: runs `git diff --cached --check`, followed by `sync-gates` (ruff check, ruff format check, basedpyright).
-- `pre-push`: runs `sync-gates --tests`, which appends the full test suite (`pytest -n auto`) to the static gates.
+- `pre-push`: runs the static gates with `sync-gates`, then the full test suite serially with `pytest -n 0 -o addopts="" -q`. Clearing configured pytest options prevents parallel workers on production hosts.

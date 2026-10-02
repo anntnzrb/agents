@@ -19,3 +19,13 @@ git commit -m "pi, omp: update herdr integrations"
 The overridden `HOME` and agent directories point `install` at the SSOT. The OMP command needs its own `HOME` because Herdr refuses to install OMP when it resolves to Pi's extension directory. `status` reads the synced homes, so it reports `current` only after sync publishes the new files.
 
 Other Herdr integrations are not tracked. The Claude Code, Codex, and Devin installs write absolute hook paths into `settings.json`, `hooks.json`, and `config.json`. Those are sync-managed files in a public repository, and those integrations report only session identity; state still comes from Herdr's screen detection. The OpenCode install also edits `cli.json` and `tui.jsonc`.
+
+## Validate active extensions
+
+Run the test suite from the repository root:
+
+```bash
+uv run --script .github/scripts/ci.py harness pi
+```
+
+The CI runner copies active extension sources to a temporary directory, installs the committed Bun lockfile with `--frozen-lockfile`, and runs module tests with HTTP transport blocked. Host modules and standalone ripgrep are development dependencies in `agent/extensions/package.json`; the runner exposes packaged ripgrep on `PATH`. CI does not invoke Pi, Codex, or provider APIs. Legacy extensions are excluded. Native apply-patch integration remains a [manual check](agent/extensions/apply-patch/README.md#load-and-validate).
