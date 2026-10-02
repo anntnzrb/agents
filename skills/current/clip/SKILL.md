@@ -1,20 +1,20 @@
 ---
 name: clip
-description: "Use when copying terminal output, files, or stdin to the system clipboard via OSC 52; not for web pastebin uploads."
+description: "Use when copying output, files, or stdin to the system clipboard; not for web pastebin uploads."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
 ---
 
-# OSC 52 clipboard copier
+# Clipboard copier
 
-Copy a file or stdin to the host clipboard using the OSC 52 escape sequence. Works from terminals, SSH sessions, tmux, and Windows consoles without a native clipboard API.
+Copy a file or stdin to the client clipboard. The script selects a native tool locally and OSC 52 over SSH.
 
 ## When to use
 
 - The user asks to copy output, a file, or a snippet to the clipboard.
-- The agent is in a terminal, SSH session, or tmux pane and cannot call a GUI clipboard manager.
-- The destination is the local terminal's host clipboard.
+- The destination is the clipboard on the computer running the terminal client.
+- Use this entrypoint without asking the user to select a platform or transport.
 
 ## Public entrypoint
 

@@ -4,12 +4,15 @@
 # dependencies = []
 # ///
 # Copyright (c) 2026
-"""Copy stdin or a file to the host clipboard via OSC 52."""
+"""Copy stdin or a file using a native clipboard tool or OSC 52."""
 
 import argparse
 import base64
 import os
+import shutil
+import subprocess
 import sys
+from contextlib import closing, nullcontext
 from pathlib import Path
 from typing import BinaryIO
 
@@ -21,7 +24,7 @@ class _Args(argparse.Namespace):
 def arguments() -> _Args:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Copy stdin or a file to the host clipboard via OSC 52.",
+        description="Copy stdin or a file to the client clipboard automatically.",
     )
     _ = parser.add_argument(
         "file",
