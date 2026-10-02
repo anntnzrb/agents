@@ -55,6 +55,10 @@ CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
 T3_REFRESH_UNIT = "t3-refresh-models"
 T3_REFRESH_INTERVAL_SECONDS = 900
+# Nightly attempts for restarting long-lived servers onto new releases; an
+# attempt that finds the server busy or current is a no-op, so a busy night
+# still gets later chances.
+NIGHTLY_UPDATE_CALENDAR = "*-*-* 03..05:00:00"
 
 # Services start with a bare PATH; every unit declares one so it never depends
 # on hand-made service-manager environment. Missing directories are harmless.
@@ -256,6 +260,35 @@ WantedBy=default.target
     return UserUnit(AMP_RUNNER_UNIT, content)
 
 
+def _nightly_update_units(
+    sync_env: SyncEnv, name: str, what: str, command: str
+) -> list[UserUnit]:
+    """Restart a long-lived server onto its newest release while it is idle."""
+    service = f"""\
+[Unit]
+Description=Update {what} when idle
+
+[Service]
+Type=oneshot
+Environment=PATH={_service_path(sync_env.home)}
+ExecStart={_runtime_python(sync_env)} {command}
+TimeoutStartSec=15min
+"""
+    timer = f"""\
+[Unit]
+Description=Nightly {what} update
+
+[Timer]
+OnCalendar={NIGHTLY_UPDATE_CALENDAR}
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
+    return [UserUnit(f"{name}.service", service), UserUnit(f"{name}.timer", timer)]
+
+
 def _codex_server_units(sync_env: SyncEnv) -> list[UserUnit]:
     # Native Codex owns the detached daemon and its updater. The timer repairs
     # missing processes; starting an already-running daemon is idempotent.
@@ -289,21 +322,6 @@ WantedBy=timers.target
         UserUnit("codex-app-server.service", service),
         UserUnit("codex-app-server.timer", timer),
     ]
-
-
-def _is_t3_host(sync_env: SyncEnv) -> bool:
-    """Return True if tools/t3/deployment.json declares this host."""
-    path = Path(sync_env.ssot_home).joinpath(*T3_DEPLOYMENT)
-    try:
-        data = cast("object", json.loads(path.read_text()))
-    except FileNotFoundError:
-        return False
-    except (OSError, ValueError) as error:
-        warn(f"services: unreadable {path} ({panic_message(error)})")
-        return False
-    server = data.get("server") if is_obj_dict(data) else None
-    hostname = server.get("hostname") if is_obj_dict(server) else None
-    return isinstance(hostname, str) and hostname.lower() == _short_hostname()
 
 
 def _t3_refresh_units(sync_env: SyncEnv) -> list[UserUnit]:
@@ -348,10 +366,22 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
         units.extend(_gateway_units(sync_env))
     if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         units.append(_amp_runner_unit(sync_env))
+        updater = Path(sync_env.ssot_home) / "tools" / "amp-runner" / "update.py"
+        units.extend(
+            _nightly_update_units(
+                sync_env, "amp-runner-update", "the Amp runner", str(updater)
+            )
+        )
     if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
         units.extend(_codex_server_units(sync_env))
-    if _is_t3_host(sync_env):
+    if _is_deployment_host(sync_env, T3_DEPLOYMENT):
         units.extend(_t3_refresh_units(sync_env))
+        t3ctl = Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py"
+        units.extend(
+            _nightly_update_units(
+                sync_env, "t3-update", "T3 Code", f"{t3ctl} auto-update"
+            )
+        )
     return units
 
 
