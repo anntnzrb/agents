@@ -684,7 +684,7 @@ def acquire(controller: Controller, request: AcquireRequest) -> dict[str, object
             _ = _assert_managed_target(after_setup, lease)
         except DomainError as error:
             _raise_acquire_failure(controller, lease_id, "setup_failed", error)
-        token = secrets.token_urlsafe(32)
+        token = "cap_" + secrets.token_urlsafe(32)
         now = utc_now()
         with _write_transaction(controller) as connection:
             _ = connection.execute(
@@ -889,7 +889,7 @@ def handoff(
                 {"handoff_id": active[0].handoff_id},
             )
         handoff_id = str(uuid4())
-        token = secrets.token_urlsafe(32)
+        token = "cap_" + secrets.token_urlsafe(32)
         now = utc_now()
         _ = connection.execute(
             """INSERT INTO handoffs(handoff_id, lease_id, actor, session_actor,

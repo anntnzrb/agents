@@ -435,6 +435,50 @@ class GitWorktreesCliContractTests(unittest.TestCase):
         self.assertFalse(failed.get("ready"))
         self.assertTrue(self.lease_path(failed).is_dir())
 
+    def test_capability_tokens_are_safe_as_separate_cli_arguments(self) -> None:
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(SKILL_ROOT / "lib"))
+        from git_worktrees.controller import Controller
+        from git_worktrees.models import AcquireRequest
+        from git_worktrees.service import acquire, handoff
+
+        controller = Controller(self.data_home / "agents" / "worktrees")
+        request = AcquireRequest(
+            repo=self.repo,
+            owner="owner",
+            session_actor="owner-session",
+            task="dash-prefixed entropy regression",
+            name="token-regression",
+            mode="new-branch",
+            base=self.base,
+            branch=None,
+        )
+        with patch("secrets.token_urlsafe", return_value="-test-entropy"):
+            result = acquire(controller, request)
+            lease = result["lease"]
+            capabilities = result["capabilities"]
+            assert _is_lease_payload(lease)
+            assert _is_capabilities(capabilities)
+            owner_token = capabilities["owner_token"]
+            self.assertFalse(owner_token.startswith("-"))
+            transferred = handoff(
+                controller, lease["lease_id"], owner_token, "worker", "worker-session"
+            )
+            handoff_capabilities = transferred["capabilities"]
+            assert _is_handoff_capabilities(handoff_capabilities)
+            handoff_token = handoff_capabilities["handoff_token"]
+            self.assertFalse(handoff_token.startswith("-"))
+        _ = self.success(
+            "complete-handoff",
+            "--lease-id",
+            lease["lease_id"],
+            "--handoff-token",
+            handoff_token,
+            "--quiescent",
+        )
+        _ = self.release(lease["lease_id"], owner_token)
+
     def test_handoff_refuses_a_removed_managed_worktree(self) -> None:
         lease, owner_token = self.acquire("missing-handoff")
         path = self.assert_ready_new_branch(lease, "missing-handoff")
