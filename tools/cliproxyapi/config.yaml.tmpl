@@ -26,7 +26,9 @@ request-retry: 3
 max-retry-credentials: 0
 max-retry-interval: 30
 disable-cooling: false
-save-cooldown-status: true
+# Cooldowns stay in memory: a restart clears stale ones after an upstream quota reset;
+# a still-exhausted credential re-enters cooldown on its next 429.
+save-cooldown-status: false
 
 # Transient upstream failures rely on the retry rounds instead of a flat 60s cooldown.
 transient-error-cooldown-seconds: -1
