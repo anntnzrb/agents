@@ -4,6 +4,9 @@ Tailscale Funnel publishes this listener to the internet so hosted clients
 (Amp) can reach the gateway. CLIProxyAPI itself accepts any client key, so the
 token checked here is the only credential on the public path. Sync installs
 this file and renders GATEWAY_SECRET and CLIPROXY_UPSTREAM into its env file.
+
+The management panel stays on the private network: its routes are refused
+here before authentication, so a leaked client token never reaches it.
 """
 
 import hmac
@@ -11,10 +14,24 @@ import os
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import unquote, urlsplit
 
 SECRET_KEY = os.environ["GATEWAY_SECRET"].encode()
 UPSTREAM = os.environ["CLIPROXY_UPSTREAM"]
-LISTEN = ("127.0.0.1", 8318)  # the Funnel mapping proxies to this address
+# The Funnel mapping proxies to 127.0.0.1:8318; the override exists for tests.
+LISTEN = ("127.0.0.1", int(os.environ.get("GATEWAY_PORT", "8318")))
+# CLIProxyAPI's management surface (its server_middleware.go).
+MANAGEMENT_PREFIXES = ("/v0/management", "/v8/management", "/v0/resource/plugins")
+
+
+def management_route(raw_path):
+    """Match on the decoded path so encoded or doubled slashes cannot hide a route."""
+    path = "/" + "/".join(
+        part for part in unquote(urlsplit(raw_path).path).split("/") if part
+    )
+    return path.startswith("/management") or any(
+        path == prefix or path.startswith(prefix + "/") for prefix in MANAGEMENT_PREFIXES
+    )
 
 
 class ProxyHandler(BaseHTTPRequestHandler):
@@ -41,6 +58,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def forward(self, method):
+        if management_route(self.path):
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":{"message":"Not found"}}')
+            return
         if not self.authorized():
             return
         length = int(self.headers.get("Content-Length", 0))

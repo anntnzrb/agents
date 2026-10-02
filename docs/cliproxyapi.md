@@ -137,7 +137,7 @@ The facade in `tools/cliproxyapi/gateway.py` sends `POST /v1/systemone` to the u
 
 Chat requests and model discovery pass through to CLIProxyAPI. Classifiers do not appear in `/v1/models`: listing a classifier as a chat model would make clients invoke the wrong protocol. CLIProxyAPI retains its own routing, retries, and statistics for chat. Classification calls bypass that pipeline, so their budget and usage controls belong to the upstream provider. Set a spending limit on each OpenRouter key in the provider dashboard.
 
-The facade accepts client requests without authentication on its private listener. It exposes inference routes rather than management routes; access the control panel through the original CLIProxyAPI listener. The public Funnel path retains its separate bearer-token gate.
+The facade accepts client requests without authentication on its private listener. It forwards inference routes and CLIProxyAPI's management surface (`/management.html`, `/v0/management/`, `/v8/management/`, and `/v0/resource/plugins/`), so the control panel stays on the client endpoint. Management requests keep their `Authorization` and `X-Management-Key` headers because CLIProxyAPI checks the panel's own key; inference requests have client credentials replaced. The public Funnel path keeps its separate bearer-token gate and refuses the management surface; see [Expose the gateway through Tailscale Funnel](#expose-the-gateway-through-tailscale-funnel).
 
 The facade buffers request bodies, caps System One bodies at 16 MiB, and uses a 120-second I/O timeout while leaving forwarded CLIProxyAPI uploads uncapped.
 
@@ -175,7 +175,7 @@ Only loopback networking is available. Dropping capabilities also keeps filesyst
 
 ## Expose the gateway through Tailscale Funnel
 
-Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
+Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. The auth gateway answers `404` for CLIProxyAPI's management surface before it checks the token, so the control panel is never reachable from the internet, even with a valid client token. It matches the decoded, slash-normalized path, so encoded or doubled slashes cannot bypass the check. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
 
 The Funnel mapping itself lives in Tailscale's state, not in this repository. Recreate it on a new gateway host:
 
@@ -191,9 +191,11 @@ Rotate the token:
 
 ## Open the control panel
 
-Open `http://<listen-host>:<listen-port>/management.html` with the values from `tools/cliproxyapi/deployment.json`.
+Open `<client-origin>/management.html`, where `<client-origin>` is `client.baseUrl` from `tools/cliproxyapi/deployment.json` without the trailing `/v1`. When the facade is enabled, it forwards the panel to CLIProxyAPI's private listener.
 
 The panel uses `remote-management.secret-key` from `tools/cliproxyapi/config.yaml.tmpl`. Treat that value as a credential. Do not expose the panel through the public internet, Tailscale Funnel, or an untrusted LAN.
+
+CLIProxyAPI bans a client IP for 30 minutes after five failed management-key attempts. Behind the facade, every panel request reaches CLIProxyAPI from the loopback address, so repeated wrong keys lock out every panel user until the ban expires or `cliproxyapi.service` restarts.
 
 Do not make durable configuration changes in the control panel. Sync replaces the generated configuration from `tools/cliproxyapi/config.yaml.tmpl` and `secrets.local.json`.
 

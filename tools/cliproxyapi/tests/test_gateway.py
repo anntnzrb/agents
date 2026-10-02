@@ -68,6 +68,8 @@ def upstream():
 
         do_POST = respond
         do_GET = respond
+        do_PUT = respond
+        do_OPTIONS = respond
 
         def log_message(self, *_args):
             pass
@@ -240,10 +242,41 @@ def test_catalog_and_sse_passthrough(gateway):
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("GET", "/v0/management/config"),
-        ("POST", "/v1/management/config"),
         ("GET", "/management.html"),
+        ("GET", "/v0/management/config"),
+        ("PUT", "/v0/management/config"),
+        ("POST", "/v8/management/requests/api-call"),
+        ("OPTIONS", "/v8/management/config"),
+        ("GET", "/v0/resource/plugins/quota/card.js"),
+    ],
+)
+def test_management_routes_reach_cliproxyapi_with_their_key(gateway, method, path):
+    """The panel authenticates to CLIProxyAPI with its own key, so it passes through."""
+    port, cpa, router, _ = gateway
+    status, _, _ = request(
+        port,
+        method,
+        path,
+        b"{}" if method in {"POST", "PUT"} else None,
+        {"Authorization": "Bearer panel-key", "X-Management-Key": "panel-key"},
+    )
+    assert status == 200
+    seen_method, seen_path, headers, _ = cpa.get(timeout=1)
+    assert (seen_method, seen_path) == (method, path)
+    assert headers["Authorization"] == "Bearer panel-key"
+    assert headers["X-Management-Key"] == "panel-key"
+    assert router.empty()
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("POST", "/v1/management/config"),
+        ("GET", "/v0/managementx"),
+        ("GET", "/management.html.bak"),
         ("GET", "/v1/../v0/management/config"),
+        ("GET", "/v0/management/../../v1/models"),
+        ("GET", "/v0/management/%2e%2e/config"),
         ("GET", "/v1/%2e%2e/v0/management/config"),
         ("POST", "/v1/systemone?upstream=evil"),
         ("POST", "/v1/systemone/"),
