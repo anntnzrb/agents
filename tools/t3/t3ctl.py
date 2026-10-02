@@ -21,8 +21,10 @@ import argparse
 import http.client
 import json
 import os
+import re
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -42,6 +44,7 @@ T3_HOME = Path(os.environ.get("T3CODE_HOME") or Path.home() / ".t3")
 STATE_FILE = T3_HOME / "runtime" / "service-state.json"
 RUNTIME_JSON = T3_HOME / "userdata" / "server-runtime.json"
 SETTINGS_TARGET = T3_HOME / "userdata" / "settings.json"
+STATE_DB = T3_HOME / "userdata" / "state.sqlite"
 BOOT_LOG = T3_HOME / "userdata" / "logs" / "boot-service.log"
 UNIT = "t3code.service"
 ENVIRONMENT_PATH = "/.well-known/t3/environment"
@@ -97,10 +100,11 @@ def str_field(dotted: str) -> str | None:
 DEPLOYMENT = load_deployment()
 
 
-def declared_host() -> str:
-    return str_field("server.hostname") or die(
-        "deployment.json is missing server.hostname"
-    )
+def declared_hosts() -> list[str]:
+    hosts = field("hosts")
+    if not isinstance(hosts, list) or not hosts:
+        die("deployment.json needs a non-empty hosts list")
+    return [h for h in hosts if isinstance(h, str)]
 
 
 def current_host() -> str:
@@ -108,14 +112,15 @@ def current_host() -> str:
 
 
 def is_declared_host() -> bool:
-    return current_host().strip().lower() == declared_host().strip().lower()
+    short = current_host().split(".", 1)[0].strip().lower()
+    return short in {h.strip().lower() for h in declared_hosts()}
 
 
 def require_declared_host() -> None:
     if not is_declared_host():
         die(
-            f"declared host is '{declared_host()}'; this host is '{current_host()}'."
-            + " Update tools/t3/deployment.json first if this host should run T3."
+            f"declared hosts are {declared_hosts()}; this host is '{current_host()}'."
+            + " Add it to hosts in tools/t3/deployment.json if it should run T3."
         )
 
 
@@ -279,7 +284,7 @@ def lines_arg(args: argparse.Namespace, default: int = 30) -> int:
 
 def cmd_status(_args: argparse.Namespace) -> int:
     match = "match" if is_declared_host() else "MISMATCH"
-    print(f"declared host : {declared_host()}")
+    print(f"declared hosts: {', '.join(declared_hosts())}")
     print(f"this host     : {current_host()} ({match})")
     print(f"channel       : {channel()}")
     enabled, active = service_enabled_active()
@@ -324,6 +329,69 @@ def cmd_update(args: argparse.Namespace) -> int:
     if rc == 0:
         return cmd_apply_settings(args)
     return rc
+
+
+def channel_head() -> str:
+    # npm carries its own CA handling; a uv-managed Python on NixOS has none.
+    spec = f"t3@{channel()}"
+    out = subprocess.run(
+        ["npm", "view", spec, "version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    version = out.stdout.strip()
+    if out.returncode != 0 or not version:
+        die(f"npm view {spec} failed: {out.stderr.strip() or 'no version'}")
+    return version
+
+
+def launcher_version() -> str | None:
+    """Version of the launcher the service unit pins; in-app updates never move it."""
+    unit = LAUNCHD_PLIST.read_text() if IS_MACOS else systemctl("cat", UNIT).stdout
+    match = re.search(r"/runtime/versions/([^/\s<]+)/t3", unit)
+    return match.group(1) if match else None
+
+
+def busy_threads() -> int:
+    """Count threads mid-turn, by the predicate startup reconcile treats as live.
+
+    Upstream: apps/server/src/serverRuntimeStartup.ts (orphaned sessions).
+    An unreadable database raises, so an unknown state never restarts.
+    """
+    conn = sqlite3.connect(f"file:{STATE_DB}?mode=ro", uri=True, timeout=10)
+    try:
+        row = cast(
+            "tuple[int]",
+            conn.execute(
+                "SELECT count(*) FROM projection_thread_sessions"
+                + " WHERE status IN ('starting', 'running')"
+                + " OR active_turn_id IS NOT NULL"
+            ).fetchone(),
+        )
+        return row[0]
+    finally:
+        conn.close()
+
+
+def cmd_auto_update(args: argparse.Namespace) -> int:
+    """Update to the channel head, but only when behind and no turn is running."""
+    require_declared_host()
+    head = channel_head()
+    running, launcher = active_version(), launcher_version()
+    if running == head and launcher == head:
+        print(f"t3: current at {head}")
+        return 0
+    try:
+        busy = busy_threads()
+    except sqlite3.Error as error:
+        die(f"cannot tell whether threads are running ({error}); not updating")
+    if busy:
+        print(f"t3: {busy} thread(s) running; postponing {running} -> {head}")
+        return 0
+    print(f"t3: updating runtime {running} / launcher {launcher} -> {head}")
+    return cmd_update(args)
 
 
 def cmd_install(_args: argparse.Namespace) -> int:
@@ -458,10 +526,11 @@ def write_settings(live: JsonObject) -> None:
 
 
 def apply_settings() -> None:
-    if not SETTINGS_TARGET.exists():
-        die(f"{SETTINGS_TARGET} missing; is the service installed?")
+    if not SETTINGS_TARGET.parent.is_dir():
+        die(f"{SETTINGS_TARGET.parent} missing; is the service installed?")
     desired = load_json_object(SETTINGS_PATH)
-    live = load_json_object(SETTINGS_TARGET)
+    # A fresh server writes settings.json only once a value leaves its default.
+    live = load_json_object(SETTINGS_TARGET) if SETTINGS_TARGET.exists() else {}
     if desired is None or live is None:
         die("settings files must contain a JSON object")
     deep_merge(live, desired)
@@ -535,6 +604,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "doctor": cmd_doctor,
     "restart": cmd_restart,
     "update": cmd_update,
+    "auto-update": cmd_auto_update,
     "apply-settings": cmd_apply_settings,
     "refresh-models": cmd_refresh_models,
     "pair": cmd_pair,
@@ -554,6 +624,7 @@ def main() -> int:
         ("doctor", "status plus unit, state, and recent logs"),
         ("restart", "restart the service and wait for the endpoint"),
         ("update", "install/update/repair the service on the declared channel"),
+        ("auto-update", "update only when behind the channel and no thread runs"),
         ("apply-settings", "merge server-settings.json offline, then restart"),
         ("refresh-models", "reload Claude's model list from the gateway, live"),
         ("pair", "mint a tailnet pairing link (extra args forwarded)"),
