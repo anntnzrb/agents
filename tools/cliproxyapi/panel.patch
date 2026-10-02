@@ -85,6 +85,36 @@ index b346b57..487418a 100644
      if (file.disabled) return;
      if (quota?.status === 'loading') return;
  
+diff --git a/src/features/authFiles/components/ProviderTabs.tsx b/src/features/authFiles/components/ProviderTabs.tsx
+index 47acac8..43f8969 100644
+--- a/src/features/authFiles/components/ProviderTabs.tsx
++++ b/src/features/authFiles/components/ProviderTabs.tsx
+@@ -13,6 +13,7 @@ import styles from './ProviderTabs.module.scss';
+ 
+ export type ProviderTabsProps = {
+   types: string[];
++  labels?: Record<string, string>;
+   counts: Record<string, number>;
+   active: string;
+   resolvedTheme: ResolvedTheme;
+@@ -25,6 +26,7 @@ export type ProviderTabsProps = {
+  */
+ export function ProviderTabs({
+   types,
++  labels,
+   counts,
+   active,
+   resolvedTheme,
+@@ -46,7 +48,8 @@ export function ProviderTabs({
+     <div ref={tabsRef} className={styles.tabs} role="group" aria-label={t('auth_files.filter_all')}>
+       {types.map((type) => {
+         const isActive = active === type;
+-        const label = type === 'all' ? t('auth_files.filter_all') : getTypeLabel(t, type);
++        const label =
++          labels?.[type] ?? (type === 'all' ? t('auth_files.filter_all') : getTypeLabel(t, type));
+         const iconSrc = type === 'all' ? null : getAuthFileIcon(type, resolvedTheme);
+ 
+         return (
 diff --git a/src/features/authFiles/constants.ts b/src/features/authFiles/constants.ts
 index a584a12..31c53d6 100644
 --- a/src/features/authFiles/constants.ts
@@ -136,7 +166,7 @@ index 6147926..336951f 100644
        } catch (err: unknown) {
          if (requestId !== loadRequestIdRef.current) return;
 diff --git a/src/features/quota/QuotaPage.tsx b/src/features/quota/QuotaPage.tsx
-index 1bd1570..8f4470a 100644
+index 1bd1570..32909ba 100644
 --- a/src/features/quota/QuotaPage.tsx
 +++ b/src/features/quota/QuotaPage.tsx
 @@ -10,7 +10,7 @@
@@ -148,15 +178,35 @@ index 1bd1570..8f4470a 100644
  import { Button } from '@/components/ui/Button';
  import { EmptyState } from '@/components/ui/EmptyState';
  import { IconSearch, IconX } from '@/components/ui/icons';
-@@ -22,6 +22,7 @@ import { useRevealGroup } from '@/hooks/motion';
+@@ -21,7 +21,9 @@ import { useNow } from '@/hooks/useNow';
+ import { useRevealGroup } from '@/hooks/motion';
  import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
  import type { AuthFileItem, ResolvedTheme } from '@/types';
++import { QUOTA_CARDS } from '@/utils/quota/custom';
  import { getQuotaCacheKey } from '@/utils/quota/identity';
 +import { mergeQuotaCompatAuthFiles } from '@/utils/quota';
  import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
  import { QuotaHeader } from './components/QuotaHeader';
  import { QuotaCard } from './components/QuotaCard';
-@@ -101,9 +102,14 @@ export function QuotaPage() {
+@@ -31,6 +33,7 @@ import {
+   QUOTA_PAGE_SIZE,
+   QUOTA_SORT_MODES,
+   QUOTA_TAB_ORDER,
++  getQuotaTabIds,
+   type QuotaSortMode,
+   type QuotaTabId,
+ } from './constants';
+@@ -53,7 +56,8 @@ import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
+ import { readQuotaUiState, writeQuotaUiState } from './uiState';
+ import styles from './QuotaPage.module.scss';
+ 
+-const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
++const TAB_IDS = getQuotaTabIds();
++const TAB_LABELS = Object.fromEntries(QUOTA_CARDS.map((card) => [`custom:${card.id}`, card.title]));
+ const SKELETON_CARD_COUNT = 6;
+ 
+ /**
+@@ -101,9 +105,14 @@ export function QuotaPage() {
      setLoading(true);
      setError('');
      try {
@@ -173,7 +223,7 @@ index 1bd1570..8f4470a 100644
        setFilesGeneration(sessionGeneration);
      } catch (err: unknown) {
        if (!isCurrent()) return;
-@@ -133,6 +139,7 @@ export function QuotaPage() {
+@@ -133,6 +142,7 @@ export function QuotaPage() {
    const kimiQuota = useQuotaStore((state) => state.kimiQuota);
    const metaQuota = useQuotaStore((state) => state.metaQuota);
    const xaiQuota = useQuotaStore((state) => state.xaiQuota);
@@ -181,17 +231,55 @@ index 1bd1570..8f4470a 100644
  
    const quotaByType = useMemo<Record<QuotaProviderType, Record<string, QuotaCardState>>>(
      () =>
-@@ -144,8 +151,9 @@ export function QuotaPage() {
+@@ -144,8 +154,18 @@ export function QuotaPage() {
          kimi: kimiQuota,
          meta: metaQuota,
          xai: xaiQuota,
 +        custom: customQuota,
        }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
 -    [antigravityQuota, claudeQuota, codexQuota, devinQuota, kimiQuota, metaQuota, xaiQuota]
-+    [antigravityQuota, claudeQuota, codexQuota, devinQuota, kimiQuota, metaQuota, xaiQuota, customQuota]
++    [
++      antigravityQuota,
++      claudeQuota,
++      codexQuota,
++      devinQuota,
++      kimiQuota,
++      metaQuota,
++      xaiQuota,
++      customQuota,
++    ]
    );
  
    const getQuota = useCallback(
+@@ -328,6 +348,7 @@ export function QuotaPage() {
+         <div className={styles.tabsRow} data-reveal>
+           <ProviderTabs
+             types={TAB_IDS}
++            labels={TAB_LABELS}
+             counts={tabCounts}
+             active={tab}
+             resolvedTheme={resolvedTheme}
+@@ -392,14 +413,18 @@ export function QuotaPage() {
+                 ? t('quota_management.search_empty_title')
+                 : tab === 'all'
+                   ? t('quota_management.empty_title')
+-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_title`)
++                  : t(
++                      `${QUOTA_ADAPTERS[tab.startsWith('custom:') ? 'custom' : (tab as QuotaProviderType)].i18nPrefix}.empty_title`
++                    )
+             }
+             description={
+               search.trim()
+                 ? t('quota_management.search_empty_desc')
+                 : tab === 'all'
+                   ? t('quota_management.empty_desc')
+-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_desc`)
++                  : t(
++                      `${QUOTA_ADAPTERS[tab.startsWith('custom:') ? 'custom' : (tab as QuotaProviderType)].i18nPrefix}.empty_desc`
++                    )
+             }
+             action={
+               search.trim() ? (
 diff --git a/src/features/quota/QuotaPoolPage.module.scss b/src/features/quota/QuotaPoolPage.module.scss
 new file mode 100644
 index 0000000..70dcc02
@@ -718,10 +806,15 @@ index 0000000..d6cb49d
 +  );
 +}
 diff --git a/src/features/quota/constants.ts b/src/features/quota/constants.ts
-index b5252af..8cc6116 100644
+index b5252af..3812c99 100644
 --- a/src/features/quota/constants.ts
 +++ b/src/features/quota/constants.ts
-@@ -7,6 +7,7 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
+@@ -1,3 +1,4 @@
++import { QUOTA_CARDS } from '@/utils/quota/custom';
+ import type { QuotaProviderType } from './providers/types';
+ 
+ /** tab 顺序 = 旧页五分区的纵向顺序，'全部' tab 下卡片也按此分组排列。 */
+@@ -7,11 +8,19 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
    'codex',
    'xai',
    'kimi',
@@ -729,11 +822,32 @@ index b5252af..8cc6116 100644
    'devin',
    'meta',
  ];
+ 
+-export type QuotaTabId = 'all' | QuotaProviderType;
++export type QuotaTabId = 'all' | QuotaProviderType | `custom:${string}`;
++
++export const getQuotaTabIds = (): QuotaTabId[] => [
++  'all',
++  ...QUOTA_TAB_ORDER.flatMap((type): QuotaTabId[] =>
++    type === 'custom' ? QUOTA_CARDS.map((card) => `custom:${card.id}` as const) : [type]
++  ),
++];
+ 
+ /** 页级分页固定 20/页，同时把「刷新全部」的上游并发限制在 20。 */
+ export const QUOTA_PAGE_SIZE = 20;
 diff --git a/src/features/quota/logic.ts b/src/features/quota/logic.ts
-index 0420d45..db43b73 100644
+index 0420d45..3136ca1 100644
 --- a/src/features/quota/logic.ts
 +++ b/src/features/quota/logic.ts
-@@ -11,6 +11,7 @@ import { DEVIN_CONFIG } from './providers/devin/data';
+@@ -3,6 +3,7 @@
+  * React-free —— 由 tests/quotaPageLogic.test.ts 直接消费。
+  */
+ 
++import { getQuotaCard } from '@/utils/quota/custom';
+ import type { AuthFileItem } from '@/types';
+ import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
+ import { CLAUDE_CONFIG } from './providers/claude/data';
+@@ -11,6 +12,7 @@ import { DEVIN_CONFIG } from './providers/devin/data';
  import { KIMI_CONFIG } from './providers/kimi/data';
  import { META_CONFIG } from './providers/meta/data';
  import { XAI_CONFIG } from './providers/xai/data';
@@ -741,7 +855,7 @@ index 0420d45..db43b73 100644
  import type { QuotaProviderType } from './providers/types';
  import { QUOTA_TAB_ORDER, type QuotaSortMode, type QuotaTabId } from './constants';
  
-@@ -22,6 +23,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
+@@ -22,6 +24,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
    kimi: KIMI_CONFIG.filterFn,
    meta: META_CONFIG.filterFn,
    xai: XAI_CONFIG.filterFn,
@@ -749,6 +863,43 @@ index 0420d45..db43b73 100644
  };
  
  export interface QuotaFileEntry {
+@@ -43,7 +46,8 @@ export function canRefreshQuotaAfterList(
+ }
+ 
+ export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType | null =>
+-  QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;
++  QUOTA_TAB_ORDER.find((type) => type !== 'custom' && QUOTA_FILTER_MAP[type](file)) ??
++  (CUSTOM_CONFIG.filterFn(file) ? 'custom' : null);
+ 
+ /**
+  * 把文件列表归类为额度条目：不支持额度或已停用的文件被过滤，
+@@ -63,7 +67,11 @@ export function classifyQuotaFiles(files: AuthFileItem[]): QuotaFileEntry[] {
+ 
+ export function filterEntriesByTab(entries: QuotaFileEntry[], tab: QuotaTabId): QuotaFileEntry[] {
+   if (tab === 'all') return entries;
+-  return entries.filter((entry) => entry.type === tab);
++  return entries.filter((entry) =>
++    tab.startsWith('custom:')
++      ? entry.type === 'custom' && `custom:${getQuotaCard(entry.file)?.id}` === tab
++      : entry.type === tab
++  );
+ }
+ 
+ /** Search public account identifiers only; account may contain an API key. */
+@@ -119,6 +127,13 @@ export function buildTabCounts(entries: QuotaFileEntry[]): Record<string, number
+   }
+   for (const entry of entries) {
+     counts[entry.type] += 1;
++    if (entry.type === 'custom') {
++      const card = getQuotaCard(entry.file);
++      if (card) {
++        const id = `custom:${card.id}`;
++        counts[id] = (counts[id] ?? 0) + 1;
++      }
++    }
+   }
+   return counts;
+ }
 diff --git a/src/features/quota/providers/custom/CustomQuotaBody.tsx b/src/features/quota/providers/custom/CustomQuotaBody.tsx
 new file mode 100644
 index 0000000..fb605e4
@@ -1265,6 +1416,34 @@ index 884468e..a052a34 100644
  
      const credits = (
        (quota as { rateLimitResetCredits?: ResetCreditLike[] }).rateLimitResetCredits ?? []
+diff --git a/src/features/quota/uiState.ts b/src/features/quota/uiState.ts
+index aba0a0e..d7a2538 100644
+--- a/src/features/quota/uiState.ts
++++ b/src/features/quota/uiState.ts
+@@ -1,9 +1,4 @@
+-import {
+-  QUOTA_SORT_MODES,
+-  QUOTA_TAB_ORDER,
+-  type QuotaSortMode,
+-  type QuotaTabId,
+-} from './constants';
++import { QUOTA_SORT_MODES, getQuotaTabIds, type QuotaSortMode, type QuotaTabId } from './constants';
+ 
+ /** 额度页 UI 偏好：会话级持久化（sessionStorage），跨会话不携带。 */
+ export type QuotaUiState = {
+@@ -13,11 +8,10 @@ export type QuotaUiState = {
+ 
+ const QUOTA_UI_STATE_KEY = 'quotaPage.uiState';
+ 
+-const QUOTA_TAB_ID_SET = new Set<string>(['all', ...QUOTA_TAB_ORDER]);
+ const QUOTA_SORT_MODE_SET = new Set<string>(QUOTA_SORT_MODES);
+ 
+ export const isQuotaTabId = (value: unknown): value is QuotaTabId =>
+-  typeof value === 'string' && QUOTA_TAB_ID_SET.has(value);
++  typeof value === 'string' && getQuotaTabIds().includes(value as QuotaTabId);
+ 
+ export const isQuotaSortMode = (value: unknown): value is QuotaSortMode =>
+   typeof value === 'string' && QUOTA_SORT_MODE_SET.has(value);
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
 index 5800662..4c5e00f 100644
 --- a/src/i18n/locales/en.json
@@ -1960,6 +2139,73 @@ index 83f973b..603fe7c 100644
  export * from './xaiPaid';
 +export * from './compat';
 +export * from './custom';
+diff --git a/tests/providerTabsRegression.test.ts b/tests/providerTabsRegression.test.ts
+new file mode 100644
+index 0000000..133263b
+--- /dev/null
++++ b/tests/providerTabsRegression.test.ts
+@@ -0,0 +1,61 @@
++import { expect, test } from 'bun:test';
++import { classifyQuotaFiles, filterEntriesByTab, buildTabCounts } from '@/features/quota/logic';
++import { QUOTA_CARDS, type QuotaCard } from '@/utils/quota/custom';
++import { getQuotaTabIds } from '@/features/quota/constants';
++import type { AuthFileItem } from '@/types';
++const files = [
++  { name: 'devin.json', provider: 'devin' },
++  { name: 'go.json', provider: 'openai', baseUrl: 'https://opencode.ai/zen/go' },
++  { name: 'cline.json', provider: 'openai', baseUrl: 'https://api.cline.bot/api/v1' },
++] as AuthFileItem[];
++test('native Devin and custom providers have separate tabs and counts', () => {
++  const entries = classifyQuotaFiles(files);
++  expect(filterEntriesByTab(entries, 'devin').map((e) => e.file.name)).toEqual(['devin.json']);
++  expect(filterEntriesByTab(entries, 'custom:opencode-go').map((e) => e.file.name)).toEqual([
++    'go.json',
++  ]);
++  expect(filterEntriesByTab(entries, 'custom:cline-pass').map((e) => e.file.name)).toEqual([
++    'cline.json',
++  ]);
++  expect(buildTabCounts(entries)).toMatchObject({
++    all: 3,
++    devin: 1,
++    'custom:opencode-go': 1,
++    'custom:cline-pass': 1,
++  });
++});
++test('a new registry provider gets its own tab without page edits', () => {
++  const card = {
++    id: 'future',
++    title: 'Future',
++    matches: (f: AuthFileItem) => f.provider === 'future',
++    request: () => ({ method: 'GET', url: 'https://example.invalid' }),
++    parse: () => [],
++  };
++  const cards = QUOTA_CARDS as QuotaCard[];
++  cards.push(card);
++  try {
++    expect(getQuotaTabIds()).toContain('custom:future');
++    const entries = classifyQuotaFiles([{ name: 'new.json', provider: 'future' } as AuthFileItem]);
++    expect(filterEntriesByTab(entries, 'custom:future')).toHaveLength(1);
++    expect(buildTabCounts(entries)['custom:future']).toBe(1);
++  } finally {
++    cards.pop();
++  }
++});
++
++test('native providers win even when a custom matcher overlaps', () => {
++  const cards = QUOTA_CARDS as QuotaCard[];
++  cards.push({
++    id: 'overlap',
++    title: 'Overlap',
++    matches: () => true,
++    request: () => ({ method: 'GET', url: 'https://example.invalid' }),
++    parse: () => [],
++  });
++  try {
++    expect(classifyQuotaFiles([files[0]])[0].type).toBe('devin');
++  } finally {
++    cards.pop();
++  }
++});
 diff --git a/tests/quotaPageLogic.test.ts b/tests/quotaPageLogic.test.ts
 index 746e25e..fc5e15e 100644
 --- a/tests/quotaPageLogic.test.ts
@@ -2137,3 +2383,23 @@ index 0000000..5930a1e
 +    expect(poolLimitsFor('claude', { status: 'loading' })).toEqual([]);
 +  });
 +});
+diff --git a/tests/quotaUiState.test.ts b/tests/quotaUiState.test.ts
+index 04569a7..34a826a 100644
+--- a/tests/quotaUiState.test.ts
++++ b/tests/quotaUiState.test.ts
+@@ -56,6 +56,15 @@ describe('quota ui state', () => {
+     expect(readQuotaUiState()).toEqual({ tab: 'devin', sortMode: 'soonest' });
+   });
+ 
++  test('retains registered custom tabs and rejects removed or unknown tabs', () => {
++    writeQuotaUiState({ tab: 'custom:opencode-go', sortMode: 'default' });
++    expect(readQuotaUiState()?.tab).toBe('custom:opencode-go');
++    storage.setItem(KEY, JSON.stringify({ tab: 'custom:missing' }));
++    expect(readQuotaUiState()?.tab).toBeUndefined();
++    storage.setItem(KEY, JSON.stringify({ tab: 'custom' }));
++    expect(readQuotaUiState()?.tab).toBeUndefined();
++  });
++
+   test('writing one preference preserves the other', () => {
+     writeQuotaUiState({ sortMode: 'soonest' });
+     writeQuotaUiState({ tab: 'kimi' });
