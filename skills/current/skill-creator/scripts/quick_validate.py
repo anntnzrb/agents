@@ -101,7 +101,7 @@ def _validate_description(description: object) -> tuple[bool, str]:
         return False, f"Description must be a string, got {type(description).__name__}"
     description = description.strip()
     if not description:
-        return True, ""
+        return False, "Description must contain a nonempty trigger contract"
     if "<" in description or ">" in description:
         return False, "Description cannot contain angle brackets (< or >)"
     if len(description) > MAX_DESCRIPTION_CHARS:
@@ -110,6 +110,14 @@ def _validate_description(description: object) -> tuple[bool, str]:
             (
                 f"Description is too long ({len(description)} characters). "
                 f"Maximum is {MAX_DESCRIPTION_CHARS} characters."
+            ),
+        )
+    if not re.match(r"^Use (?:when|for|before) \S", description):
+        return (
+            False,
+            (
+                "Description must start with 'Use when', 'Use for', or 'Use before' "
+                "followed by trigger wording, not a synopsis"
             ),
         )
     return True, ""

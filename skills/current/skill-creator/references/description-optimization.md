@@ -33,9 +33,15 @@ Queries must be realistic: concrete, specific, with file paths, context, casual 
 
 ## Checking a description
 
+Run `quick-validate` for the deterministic gate: nonempty trigger wording, an approved opener, the length cap, and allowed characters. Passing this gate does not prove semantic quality. `Use when you need a comprehensive toolkit.` passes the grammar but gives no useful trigger.
+
+During authoring review, require a concrete user situation, scope consistent with the body, and a boundary from neighboring capabilities where needed. Reject synopsis wording even when an approved opener precedes it. Compare a positive request with a plausible near-miss. Record why each should or should not load the skill. Keep this review separate from the deterministic validator.
+
 Checking is harness-agnostic: present the full enabled skill listing (every `name: description` line) and one query to a model, ask which skill it would load or none, and compare against the expected label. Run each query at least 3 times and treat the majority as the result. Use any model the environment provides; prefer the model the user works with, since trigger behavior varies by model.
 
 Tune on about 60% of the queries and score the final description on the held-out 40% to avoid overfitting. When a description loses to a sibling, fix both triggers, not only one.
+
+Use repeated model evaluation when investigating trigger failures or comparing candidate wording. Do not require network access or a model judge for ordinary metadata validation. Report model routing scores separately from structural validation results.
 
 ## Apply the result
 

@@ -5,12 +5,14 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
+import pytest
+
 SKILL: Final[Path] = Path(__file__).resolve().parents[1]
 CLI: Final[Path] = SKILL / "scripts" / "cli.py"
 
 _VALID_FRONTMATTER: Final[str] = """---
 name: fixture-skill
-description: Fixture skill for validator contract tests.
+description: Use when checking skill metadata.
 ---
 """
 
@@ -42,6 +44,50 @@ def test_valid_skill_passes(tmp_path: Path) -> None:
     result = run_validate(write_skill(tmp_path / "ok", _VALID_FRONTMATTER))
     assert result.returncode == 0
     assert "Skill is valid!" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "",
+        "   ",
+        "A toolkit for reviewing code.",
+        "Use whenever reviewing code.",
+        "Use when",
+    ],
+)
+def test_description_without_trigger_fails(tmp_path: Path, description: str) -> None:
+    """Empty descriptions and synopsis wording fail the public validator."""
+    frontmatter = f'---\nname: fixture-skill\ndescription: "{description}"\n---\n'
+    result = run_validate(write_skill(tmp_path / "invalid-trigger", frontmatter))
+    assert result.returncode == 1
+    assert "trigger" in result.stdout.lower()
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Use when reviewing a PR.",
+        "Use for Advent of Code puzzles.",
+        "Use before refactoring code.",
+        "Use when you need a comprehensive toolkit.",
+    ],
+)
+def test_trigger_openers_pass(tmp_path: Path, description: str) -> None:
+    """Trigger grammar passes without claiming to judge semantic quality."""
+    frontmatter = f'---\nname: fixture-skill\ndescription: "{description}"\n---\n'
+    result = run_validate(write_skill(tmp_path / "trigger", frontmatter))
+    assert result.returncode == 0
+
+
+def test_description_angle_brackets_fail(tmp_path: Path) -> None:
+    """Trigger wording does not bypass the existing character restriction."""
+    frontmatter = (
+        '---\nname: fixture-skill\ndescription: "Use when reviewing <PR>."\n---\n'
+    )
+    result = run_validate(write_skill(tmp_path / "brackets", frontmatter))
+    assert result.returncode == 1
+    assert "angle brackets" in result.stdout
 
 
 def test_missing_skill_md_fails(tmp_path: Path) -> None:

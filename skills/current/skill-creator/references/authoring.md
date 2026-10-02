@@ -34,7 +34,7 @@ Ask about edge cases, input/output formats, example files, success criteria, and
 Compose:
 
 - **name**: Skill identifier
-- **description**: Trigger contract + capability. This is the primary trigger. Put all "when to use" guidance here, not in the body. Skills tend to undertrigger, so write a pushy description with explicit contexts and nearby user phrasing
+- **description**: Trigger contract, not a synopsis. State when the agent loads the skill using concrete user situations and capability nouns. Start with `Use when`, `Use for`, or `Use before`. Follow `description-optimization.md` for wording and semantic review. Keep workflow details in the body.
 - **compatibility**: Required tools or dependencies. OPTIONAL; rarely needed
 - **body**: Imperative instructions, examples, references, workflows, and resource pointers
 

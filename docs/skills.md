@@ -114,8 +114,10 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 ## Metadata budget
 
 - `name` and `description` frontmatter load during skill discovery; treat them as scarce shared context across harnesses.
+- Treat `description` as the contract for when an agent loads the skill, not a synopsis of what the skill contains. State a concrete user situation with distinctive capability nouns. Start with `Use when`, `Use for`, or `Use before`.
 - Keep each `description` to one trigger-focused sentence of at most 120 characters. Preserve the capability and concrete trigger nouns; move workflow detail into `SKILL.md` or references.
-- Validate every changed skill with `quick-validate`; it enforces the 120-character description cap.
+- Validate every changed skill with `quick-validate`; it rejects empty descriptions, missing trigger openers, excess length, and angle brackets. This structural gate does not judge semantic quality.
+- Review every changed description for a concrete user situation, scope consistent with the body, and boundaries from neighboring capabilities where needed. Compare a positive request and a plausible near-miss. Follow [description optimization](../skills/current/skill-creator/references/description-optimization.md) for review and targeted model evaluation. Keep model routing scores separate from structural validation; ordinary metadata checks require no network or model judge.
 - Before adding a skill, prune or consolidate overlapping skills if the inventory would exceed this budget. Do not trade context capacity for keyword soup.
 
 ## Licensing
