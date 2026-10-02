@@ -8,13 +8,14 @@ ignore = ["A002", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["T201"]
-"tests/**/*.py" = ["S101"]
+"tests/**/*.py" = ["S101", "INP001", "CPY001"]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.basedpyright]
 typeCheckingMode = "all"
-include = ["scripts"]
+include = ["scripts", "tests"]
+extraPaths = ["scripts"]
 pythonVersion = "3.14"
 pythonPlatform = "All"
