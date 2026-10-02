@@ -3,6 +3,10 @@
     "hostname": "munich"
   },
   "listen": {
+    "host": "127.0.0.1",
+    "port": 18317
+  },
+  "gateway": {
     "host": "100.113.173.78",
     "port": 8317
   },
