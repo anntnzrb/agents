@@ -44,7 +44,7 @@ No verified hits use a warning label, not an error. Failures retain the query an
 The classifier is any Pi classifier model, named in Pi settings as `"<provider>/<model id>"`. Model IDs may contain `/`:
 
 ```json
-{ "find": { "classifier": "opencode/jev-1.13-free" } }
+{ "find": { "classifier": "cliproxy/typesafe/jev-1.13" } }
 ```
 
 The value lives in [`../../settings.json`](../../settings.json). To swap models, change that value and run `/reload`. The `codemode` script `models.getAvailableOfType("classifier")` lists the classifier models that have credentials. Project `.pi/settings.json` can override the value only in trusted projects.

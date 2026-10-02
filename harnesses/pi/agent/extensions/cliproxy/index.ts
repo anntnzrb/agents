@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
+import { typesafeSystemOneApi } from "@earendil-works/pi-ai/api/typesafe-system-one.lazy";
+import { getBuiltinClassifierModels, getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ExtensionContext, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import {
 	findBuiltinMetadata,
@@ -28,6 +29,11 @@ const FALLBACK_MAX_TOKENS = 16384;
 
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
+// The gateway's System One facade serves these ids at POST {baseUrl}/systemone through its OpenRouter pool.
+// Keep in sync with the allowlist in tools/cliproxyapi/gateway.json.
+const SYSTEM_ONE_UPSTREAM = "openrouter";
+const SYSTEM_ONE_MODELS: readonly string[] = ["typesafe/jev-1.13"];
+
 interface GatewayModelsResponse {
 	data?: Array<{ id?: unknown; owned_by?: unknown }>;
 }
@@ -45,8 +51,9 @@ let builtinIndex: Map<string, BuiltinMetadata[]> | undefined;
 let lastCatalogAttempt = -Infinity;
 let fallbackModels = new Set<string>();
 
-// Pi does not export the chat member of the ProviderModelConfig union; the gateway serves chat models only.
+// Pi does not export the chat or classifier members of the ProviderModelConfig union.
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
+type ClassifierModelConfig = Extract<ProviderModelConfig, { type: "classifier" }>;
 type ModelMetadata = Pick<ChatModelConfig, "compat" | "thinkingLevelMap">;
 
 interface BuiltinMetadata {
@@ -248,6 +255,28 @@ async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	return gateway.map((entry) => toModel(entry.id, entry.ownedBy, resolvedCatalog));
 }
 
+/**
+ * Classifiers the facade serves, described by pi's catalog entry for the upstream provider. The
+ * model inherits the gateway endpoint, and classifiers stay out of `/models` discovery because the
+ * gateway does not list them there.
+ */
+function classifierModels(): ClassifierModelConfig[] {
+	const upstream = getBuiltinClassifierModels(SYSTEM_ONE_UPSTREAM);
+	return SYSTEM_ONE_MODELS.flatMap((id) => {
+		const model = upstream.find((entry) => entry.id === id && entry.api === "typesafe-system-one");
+		if (!model) return [];
+		return [{
+			type: "classifier",
+			id,
+			name: `${model.name} (${SYSTEM_ONE_UPSTREAM})`,
+			api: model.api,
+			input: model.input,
+			cost: model.cost,
+			contextWindow: model.contextWindow,
+		}];
+	});
+}
+
 export default function cliproxy(pi: ExtensionAPI): void {
 	const warnedModels = new Set<string>();
 	const warnFallback = (model: ExtensionContext["model"], ctx: ExtensionContext): void => {
@@ -263,22 +292,26 @@ export default function cliproxy(pi: ExtensionAPI): void {
 	pi.on("before_agent_start", (_event, ctx) => warnFallback(ctx.model, ctx));
 
 	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel(id, undefined, undefined));
+	const classifiers = classifierModels();
 	pi.registerProvider("cliproxy", {
 		name: "CLIProxyAPI",
 		baseUrl: BASE_URL,
 		apiKey: "keyless",
 		api: "openai-completions",
-		models: staticModels,
+		models: [...staticModels, ...classifiers],
+		classifiers: { "typesafe-system-one": typesafeSystemOneApi() },
 		refreshModels: async (context) => {
 			// The gateway is a LAN endpoint; only explicit offline mode skips discovery.
-			if (process.env.PI_OFFLINE !== undefined || context.signal.aborted) return lastKnown;
-			try {
-				const models = await discover(context.signal);
-				if (models.length > 0) lastKnown = models;
-			} catch {
-				// Keep the previous catalog when the gateway is unreachable.
+			if (process.env.PI_OFFLINE === undefined && !context.signal.aborted) {
+				try {
+					const models = await discover(context.signal);
+					if (models.length > 0) lastKnown = models;
+				} catch {
+					// Keep the previous catalog when the gateway is unreachable.
+				}
 			}
-			return lastKnown;
+			// The returned list replaces every model, so classifiers ride along with chat discovery.
+			return [...lastKnown, ...classifiers];
 		},
 	});
 }

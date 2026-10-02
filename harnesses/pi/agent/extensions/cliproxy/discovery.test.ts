@@ -8,6 +8,7 @@ import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfi
 mock.module("@earendil-works/pi-ai/providers/all", () => ({
   getBuiltinProviders: () => [],
   getBuiltinModels: () => [],
+  getBuiltinClassifierModels: () => [],
 }));
 
 test("refreshes missing metadata in a fresh cache, throttles retries, and retains cached data on failure", async () => {
