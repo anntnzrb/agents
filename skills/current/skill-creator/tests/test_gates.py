@@ -64,7 +64,12 @@ def test_main_runs_static_gates_only_by_default(tmp_path: Path) -> None:
     skill = _skill_dir(tmp_path)
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
+    tools = [
+        step[1].split("==")[0]
+        if step[1].startswith("ruff==")
+        else step[-1].split("==")[0]
+        for step, _ in seen
+    ]
     assert tools == ["ruff", "ruff", "basedpyright"]
     assert all(cwd == skill for _, cwd in seen)
 
@@ -75,7 +80,12 @@ def test_main_appends_pytest_with_tests_flag(tmp_path: Path) -> None:
     (skill / "tests").mkdir()
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill), "--tests"], _fake_runner(seen)) == 0
-    tools = [step[1] if step[1] == "ruff" else step[-1] for step, _ in seen]
+    tools = [
+        step[1].split("==")[0]
+        if step[1].startswith("ruff==")
+        else step[-1].split("==")[0]
+        for step, _ in seen
+    ]
     assert tools == ["ruff", "ruff", "basedpyright", "tests"]
     pytest_step = list(seen[-1][0])
     assert "--with" in pytest_step
@@ -91,8 +101,8 @@ def test_basedpyright_step_includes_pytest_when_tests_exist(
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
     pyright_step = list(seen[2][0])
-    assert pyright_step[-1] == "basedpyright"
-    assert "pytest" in pyright_step
+    assert pyright_step[-1].startswith("basedpyright==")
+    assert any(arg.startswith("pytest==") for arg in pyright_step)
     assert "PyYAML>=6.0" in pyright_step
 
 
@@ -115,8 +125,8 @@ def test_basedpyright_step_omits_pytest_without_tests_dir(
     seen: list[tuple[Sequence[str], Path]] = []
     assert main([str(skill)], _fake_runner(seen)) == 0
     pyright_step = list(seen[2][0])
-    assert pyright_step[-1] == "basedpyright"
-    assert "pytest" not in pyright_step
+    assert pyright_step[-1].startswith("basedpyright==")
+    assert not any(arg.startswith("pytest==") for arg in pyright_step)
     assert "PyYAML>=6.0" in pyright_step
 
 

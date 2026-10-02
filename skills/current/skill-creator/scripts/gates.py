@@ -2,7 +2,8 @@
 """Python skill code gates: ruff, basedpyright, optionally pytest.
 
 Dispatched via ``scripts/cli.py gates <skill-dir> [--tests]``; never imported
-by other skills. Tools always resolve latest via ``uvx`` (unpinned by policy).
+by other skills. Tool versions are pinned here so local checks and CI use the
+same toolchain.
 Dependency truth is the PEP 723 block in the skill's ``scripts/cli.py``; the
 basedpyright and pytest steps derive their ``--with`` environments and their
 ``--python`` interpreter from it.
@@ -17,6 +18,10 @@ from typing import Final, TypeIs
 
 EXIT_OK: Final[int] = 0
 EXIT_USAGE: Final[int] = 2
+
+RUFF: Final[str] = "ruff==0.16.10"
+BASEDPYRIGHT: Final[str] = "basedpyright==1.40.1"
+PYTEST: Final[str] = "pytest==9.1.1"
 
 type GateRunner = Callable[[Sequence[str], Path], int]
 
@@ -125,17 +130,17 @@ def _static_steps(
     """Return the static gate steps; only basedpyright needs the skill env."""
     # Tests legitimately import pytest; it must be resolvable when the
     # basedpyright step type-checks a tests/ directory.
-    pyright_deps = ["pytest", *deps] if has_tests else list(deps)
+    pyright_deps = [PYTEST, *deps] if has_tests else list(deps)
     return [
-        ("uvx", "ruff", "format", "--check", "."),
-        ("uvx", "ruff", "check", "."),
-        (*_with_prefix(pyright_deps, python), "basedpyright"),
+        ("uvx", RUFF, "format", "--check", "."),
+        ("uvx", RUFF, "check", "."),
+        (*_with_prefix(pyright_deps, python), BASEDPYRIGHT),
     ]
 
 
 def _pytest_step(deps: Sequence[str], python: str | None) -> tuple[str, ...]:
     """Return the pytest step with pytest plus the skill env added."""
-    return (*_with_prefix(["pytest", *deps], python), "pytest", "tests")
+    return (*_with_prefix(deps, python), PYTEST, "tests")
 
 
 def main(argv: Sequence[str] | None = None, runner: GateRunner = _run_step) -> int:
