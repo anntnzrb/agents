@@ -141,4 +141,79 @@ const clinePassCard: QuotaCard = {
   },
 };
 
-export const QUOTA_CARDS: readonly QuotaCard[] = [openCodeGoCard, clinePassCard];
+const usd = (amount: number): string =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 6,
+  }).format(amount);
+
+const nonnegativeAmount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/** OpenRouter exposes the selected key's USD spending limit, not account credit. */
+const openRouterCard: QuotaCard = {
+  id: 'openrouter',
+  title: 'OpenRouter',
+  matchesBaseUrl: (baseUrl) => matchesBaseUrl(baseUrl, 'openrouter.ai', '/api/v1'),
+  matches: (file) => matchesBaseUrl(readBaseUrl(file), 'openrouter.ai', '/api/v1'),
+  request: () => ({
+    method: 'GET',
+    url: 'https://openrouter.ai/api/v1/key',
+    header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' },
+  }),
+  parse: (payload) => {
+    if (!isRecord(payload) || !isRecord(payload.data)) return null;
+    const data = payload.data;
+    const limit = data.limit;
+    const remaining = data.limit_remaining;
+    if ((limit !== null && !nonnegativeAmount(limit)) || !nonnegativeAmount(data.usage)) {
+      return null;
+    }
+    if (
+      (limit === null && remaining !== null) ||
+      (limit !== null && (typeof remaining !== 'number' || !Number.isFinite(remaining)))
+    ) {
+      return null;
+    }
+    const reset = data.limit_reset;
+    if (reset != null && !['daily', 'weekly', 'monthly'].includes(String(reset))) return null;
+    const windows: CustomQuotaWindow[] = [
+      {
+        id: 'budget',
+        label: 'Key budget (USD)',
+        remainingPercent:
+          limit === null ? null : limit === 0 ? 0 : clampPercent((Number(remaining) / limit) * 100),
+        displayValue: limit === null ? 'No key limit' : `${usd(Number(remaining))} left`,
+        displayDetail:
+          limit === null ? undefined : `Cap ${usd(limit)}${reset ? ` · Resets ${reset}` : ''}`,
+        resetAtMs: null,
+      },
+      {
+        id: 'spend',
+        label: 'Total spend',
+        remainingPercent: null,
+        displayValue: usd(data.usage),
+        resetAtMs: null,
+      },
+    ];
+    for (const [field, id, label] of [
+      ['usage_daily', 'daily-spend', 'Daily spend'],
+      ['usage_monthly', 'monthly-spend', 'Monthly spend'],
+    ] as const) {
+      if (data[field] === undefined) continue;
+      const amount = data[field];
+      if (!nonnegativeAmount(amount)) return null;
+      windows.push({
+        id,
+        label,
+        remainingPercent: null,
+        displayValue: usd(amount),
+        resetAtMs: null,
+      });
+    }
+    return windows;
+  },
+};
+
+export const QUOTA_CARDS: readonly QuotaCard[] = [openCodeGoCard, clinePassCard, openRouterCard];

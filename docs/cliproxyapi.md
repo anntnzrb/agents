@@ -1,10 +1,10 @@
 # CLIProxyAPI
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider, and the Anthropic Messages endpoint (`/v1/messages`) that Claude Code reaches through `ANTHROPIC_BASE_URL`. `tools/cliproxyapi/deployment.json` is the only deployment-specific resource. It selects the gateway host, listener, and client endpoint.
+CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider, and the Anthropic Messages endpoint (`/v1/messages`) that Claude Code reaches through `ANTHROPIC_BASE_URL`. `tools/cliproxyapi/deployment.json` selects the gateway host, listener, and client endpoint. An optional HTTP facade adds System One classification without changing the upstream CLIProxyAPI binary.
 
 T3 Code sessions on the gateway host also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
 
-Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. Use the reference sections for field definitions and routing settings.
+Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. See [System One classification](#system-one-classification) for the optional facade and its client contract.
 
 ## Set the deployment
 
@@ -131,6 +131,48 @@ journalctl --user -u cliproxyapi.service -n 50
 
 For a foreground debugging session, stop the unit first, then run `cli-proxy-api`.
 
+## System One classification
+
+The facade in `tools/cliproxyapi/gateway.py` sends `POST /v1/systemone` to the upstream configured in `tools/cliproxyapi/gateway.json`. It uses the native TypeSafe System One request and response format. The model must match an entry in the configured allowlist exactly. The facade selects a credential from the installed OpenRouter pool using thread-safe weighted round robin. Each valid request uses one key; classification does not add retries or failover.
+
+Chat requests and model discovery pass through to CLIProxyAPI. Classifiers do not appear in `/v1/models`: listing a classifier as a chat model would make clients invoke the wrong protocol. CLIProxyAPI retains its own routing, retries, and statistics for chat. Classification calls bypass that pipeline, so their budget and usage controls belong to the upstream provider. Set a spending limit on each OpenRouter key in the provider dashboard.
+
+The facade accepts client requests without authentication on its private listener. It exposes inference routes rather than management routes; access the control panel through the original CLIProxyAPI listener. The public Funnel path retains its separate bearer-token gate.
+
+The facade buffers request bodies, caps System One bodies at 16 MiB, and uses a 120-second I/O timeout while leaving forwarded CLIProxyAPI uploads uncapped.
+
+Any HTTP client or native System One SDK can use the facade. Configure its base URL with the facade's `/v1` endpoint and register the classifier explicitly. A chat-only agent still needs a client adapter for System One. The server has no dependency on a particular harness or orchestrator.
+
+### Enable the facade
+
+The facade is opt-in. Enabling it changes the endpoint clients use, so schedule that change separately from local development.
+
+1. Review the upstream and model allowlist in `tools/cliproxyapi/gateway.json`.
+2. Add your OpenRouter keys to the `openrouter` array in `CLIPROXY_CREDENTIAL_POOLS` in the ignored `secrets.local.json`, following `secrets.local.example.json`. Keep the file at mode `0600`. The classifier supports pool weights; `proxyUrl` is rejected while classification is enabled.
+3. Add a `gateway` listener to `tools/cliproxyapi/deployment.json`. Use a trusted private interface and a port distinct from `listen`; leave `listen` pointing at CLIProxyAPI.
+4. Point `client.baseUrl` at the facade's `/v1` endpoint.
+5. During the deployment window, run `uv run --project sync sync` on the gateway host, then on client hosts.
+
+Sync installs the facade and its private configuration on the gateway host. On Linux, it manages `cliproxy-gateway.service`. The existing Funnel auth gateway forwards to the facade when the optional listener is configured. Public clients still use the Funnel bearer token, not the OpenRouter key.
+
+### Verify changes in isolation
+
+Run the facade's adjacent tests from the repository root:
+
+```bash
+uv run --project sync pytest -n 0 tools/cliproxyapi/tests
+```
+
+These tests use local fake upstreams. They do not require provider credentials or a running production proxy. A temporary home alone does not isolate sync service operations; see [Develop the sync application](sync/development.md#run-the-full-checks) before running sync tests.
+
+On Linux, with dependencies already cached, run the tests in a network namespace:
+
+```bash
+unshare --user --map-root-user --net sh -c 'ip link set lo up && setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all uv run --project sync pytest -n 0 tools/cliproxyapi/tests'
+```
+
+Only loopback networking is available. Dropping capabilities also keeps filesystem permission tests meaningful despite the namespace's root mapping.
+
 ## Expose the gateway through Tailscale Funnel
 
 Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
@@ -186,7 +228,11 @@ The script clones upstream (ref `main`; export `PANEL_REF` to pin a tag, branch,
 }
 ```
 
-The gateway substitutes the selected credential for `$TOKEN$` and routes the call through `/v0/management/api-call`, so API keys never reach the browser. After editing cards:
+OpenRouter uses this same card framework: each configured key gets its own card, quota cache entry, and refresh action. Sync registers the keys with CLIProxyAPI for management queries but gives the provider an empty chat-model list. Adding keys does not publish classifiers as chat models. Quota inspection remains available with the classification listener disabled.
+
+The card reads the provider's [current-key endpoint](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key). It shows the key's remaining USD spending allowance and spend totals, not the account's prepaid balance. Keys without a cap show no-limit status and spend totals. Budget reset periods are labels, not invented reset timestamps. Account-wide credits need an OpenRouter management key and are outside this integration.
+
+Quota requests identify the selected credential by its `auth_index` and use `$TOKEN$` substitution through `/v8/management/requests/api-call`; the browser does not call OpenRouter directly. The authenticated management API retains its existing access to provider configuration. Quota discovery reads the native `/v0/management/openai-compatibility` metadata because the editable v8 configuration omits per-key auth indices; provider edits keep using the v8 configuration API. After editing cards:
 
 ```bash
 sh tools/cliproxyapi/panel.rebuild.sh
@@ -246,6 +292,8 @@ Back up `secrets.local.json` through an encrypted channel. Reauthenticate OAuth 
 | Managed command | `~/.local/bin/cli-proxy-api` |
 | Funnel auth gateway source | `tools/cliproxyapi/auth-gateway.py` |
 | Installed auth gateway and its env file | `~/.cli-proxy-api/auth-gateway.py`, `~/.cli-proxy-api/auth-gateway.env` |
+| System One facade source and upstream allowlist | `tools/cliproxyapi/gateway.py`, `tools/cliproxyapi/gateway.json` |
+| Installed facade and its private configuration | `~/.cli-proxy-api/gateway.py`, `~/.cli-proxy-api/gateway.json` |
 
 Sync verifies the selected release's SHA-256 checksum and extracts only the manifest's executable.
 
@@ -263,6 +311,8 @@ Sync prepares the managed binary and wrapper only on the gateway host. Client ho
 | `client.baseUrl` | HTTP or HTTPS `/v1` URL without credentials, query, or fragment | Endpoint used by harnesses and readiness checks |
 
 Sync rejects wildcard listeners, unspecified IPv6 addresses, unknown fields, malformed client URLs, raw query or fragment delimiters, and invalid ports. It renders the listener into `~/.cli-proxy-api/config.yaml` and replaces `${CLIPROXY_CLIENT_BASE_URL}` (the `/v1` URL) and `${CLIPROXY_CLIENT_ORIGIN}` (the same URL without `/v1`) in configured harness targets.
+
+The optional `gateway` listener uses the same validation rules as `listen`. Omitting it leaves CLIProxyAPI as the only managed inference listener. See [Enable the facade](#enable-the-facade) for the migration procedure.
 
 Sync compares the local OS hostname with `server.hostname` to choose the host role:
 
@@ -293,6 +343,8 @@ Each credential account accepts these fields:
 Pool names start with a lowercase letter and contain lowercase letters, digits, or hyphens. Every pool must contain at least one account. The template must reference every pool in the secrets file.
 
 The renderer rejects unknown account fields, duplicate keys within a pool, invalid weights, missing pools, and unreferenced pools.
+
+The optional OpenRouter pool uses the same credential shape as the other pools. It is required when the facade listener is configured; see [System One classification](#system-one-classification). The gateway host reads the ignored secrets file at `~/.config/agents/secrets.local.json`. Runtime credentials are rendered into installed private files rather than read by harnesses.
 
 ## Generated files and credentials
 

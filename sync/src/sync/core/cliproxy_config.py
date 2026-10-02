@@ -18,6 +18,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 if TYPE_CHECKING:
     from sync.core.cliproxy_deployment import CliProxyDeployment
+from sync.core.cliproxy_deployment import cliproxy_listen_origin
+from sync.core.cliproxy_gateway import (
+    GATEWAY_CONFIG,
+    SYSTEM_ONE_POOL,
+    SYSTEM_ONE_PROVIDER,
+    GatewayProfile,
+    read_gateway_profile,
+    render_gateway_config,
+)
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
@@ -633,11 +642,46 @@ def _expand_compatibility_section(
     return result
 
 
+def _register_system_one_quota(
+    config: dict[str, object],
+    pools: dict[str, list[Credential]],
+    referenced_pools: set[str],
+    gateway_profile: GatewayProfile | None,
+) -> None:
+    """Expose per-key management records without registering chat models."""
+    if gateway_profile is not None and SYSTEM_ONE_POOL in pools:
+        providers = config.setdefault("openai-compatibility", [])
+        if not is_obj_list(providers):
+            msg = "openai-compatibility must be a list"
+            raise TypeError(msg)
+        if any(
+            is_obj_dict(item) and item.get("name") == SYSTEM_ONE_PROVIDER
+            for item in providers
+        ):
+            msg = "openrouter quota provider conflicts with an existing profile"
+            raise ValueError(msg)
+        providers.append(
+            {
+                "name": SYSTEM_ONE_PROVIDER,
+                "base-url": gateway_profile.system_one.base_url,
+                # Empty models keeps these keys out of chat routing.
+                "models": [],
+                "api-key-entries": [
+                    credential_config(credential)
+                    for credential in pools[SYSTEM_ONE_POOL]
+                ],
+            }
+        )
+        referenced_pools.add(SYSTEM_ONE_POOL)
+
+
 def render_cliproxy_config(
     template: str,
     secrets: CliProxySecrets | Mapping[str, object],
     deployment: CliProxyDeployment,
     discovery: DiscoveryOptions | None = None,
+    *,
+    gateway_profile: GatewayProfile | None = None,
 ) -> str:
     """Render CLIProxyAPI configuration YAML from template, secrets, and deployment."""
     try:
@@ -681,6 +725,8 @@ def render_cliproxy_config(
             referenced_pools,
             discovery or DiscoveryOptions(),
         )
+
+    _register_system_one_quota(config, pools, referenced_pools, gateway_profile)
 
     unreferenced_pools = [name for name in pools if name not in referenced_pools]
     if unreferenced_pools:
@@ -734,6 +780,27 @@ def sync_cliproxy_config(
         raise RuntimeError(msg) from error
 
     secrets = read_cliproxy_secrets(secrets_p)
+    credentials = secrets.cliproxy_credential_pools.get(SYSTEM_ONE_POOL, [])
+    profile = (
+        read_gateway_profile(src_p.with_name(GATEWAY_CONFIG)) if credentials else None
+    )
+    for credential in credentials:
+        if not re.fullmatch(r"[!-~]+", credential.api_key):
+            msg = "openrouter API keys must be printable ASCII tokens"
+            raise ValueError(msg)
+        if deployment.gateway is not None and credential.proxy_url is not None:
+            msg = "openrouter classification does not support proxyUrl"
+            raise ValueError(msg)
+    gateway_content = render_gateway_config(
+        profile,
+        deployment,
+        [
+            credential.model_dump(
+                by_alias=True, exclude_none=True, exclude={"proxy_url"}
+            )
+            for credential in credentials
+        ],
+    )
     content = render_cliproxy_config(
         template,
         secrets,
@@ -743,12 +810,18 @@ def sync_cliproxy_config(
             previous=_read_previous_models(dst_p),
             catalog=models_dev_lookup(),
         ),
+        gateway_profile=profile,
     )
     try:
         sync_text_file(dst_p, content)
     except (OSError, ValueError, RuntimeError) as error:
         msg = f"render CLIProxyAPI config {src_p} -> {dst_p} ({panic_message(error)})"
         raise RuntimeError(msg) from error
+    gateway_dst = dst_p.parent / GATEWAY_CONFIG
+    if gateway_content is None:
+        gateway_dst.unlink(missing_ok=True)
+    else:
+        sync_text_file(gateway_dst, gateway_content)
     sync_auth_gateway_env(dst_p.parent / AUTH_GATEWAY_ENV, secrets, deployment)
 
 
@@ -761,7 +834,7 @@ def sync_auth_gateway_env(
     if secrets.funnel_token is None:
         dst.unlink(missing_ok=True)
         return
-    upstream = f"http://{deployment.listen.host}:{deployment.listen.port}"
+    upstream = cliproxy_listen_origin(deployment.gateway or deployment.listen)
     content = f"GATEWAY_SECRET={secrets.funnel_token}\nCLIPROXY_UPSTREAM={upstream}\n"
     try:
         sync_text_file(dst, content)

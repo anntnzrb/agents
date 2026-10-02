@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, cast
 
 from sync.core.cliproxy_config import AUTH_GATEWAY_ENV
 from sync.core.cliproxy_deployment import CLI_PROXY_SOURCE_DIR
+from sync.core.cliproxy_gateway import GATEWAY_CONFIG, GATEWAY_SCRIPT
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict, is_obj_list
@@ -170,6 +171,35 @@ PrivateTmp=true
 WantedBy=default.target
 """
     units = [UserUnit("cliproxyapi.service", gateway)]
+    facade_config = state / GATEWAY_CONFIG
+    if facade_config.is_file():
+        config_digest = hashlib.sha256(facade_config.read_bytes()).hexdigest()[:16]
+        facade_script = state / GATEWAY_SCRIPT
+        script_digest = (
+            hashlib.sha256(facade_script.read_bytes()).hexdigest()[:16]
+            if facade_script.is_file()
+            else "none"
+        )
+        facade = f"""\
+# config sha256 {config_digest}
+# script sha256 {script_digest}
+[Unit]
+Description=CLIProxyAPI System One facade
+After=cliproxyapi.service
+
+[Service]
+Type=simple
+ExecStart={_runtime_python(sync_env)} {facade_script} --config {facade_config}
+Restart=always
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+"""
+        units.append(UserUnit("cliproxy-gateway.service", facade))
     env_file = state / AUTH_GATEWAY_ENV
     if env_file.is_file():
         # The env file carries the token and the script is the gateway's code;
@@ -182,12 +212,13 @@ WantedBy=default.target
             if script.is_file()
             else "none"
         )
+        facade_after = " cliproxy-gateway.service" if facade_config.is_file() else ""
         auth = f"""\
 # env sha256 {env_digest}
 # script sha256 {script_digest}
 [Unit]
 Description=CLIProxyAPI public Funnel auth gateway
-After=cliproxyapi.service
+After=cliproxyapi.service{facade_after}
 
 [Service]
 Type=simple

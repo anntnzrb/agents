@@ -18,7 +18,14 @@ from pathlib import Path
 from typing import ClassVar, Final, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from sync.runtime.errors import is_errno, panic_message
 from sync.runtime.fs import sync_text_file
@@ -160,6 +167,20 @@ class CliProxyDeployment(BaseModel):
     server: ServerConfig
     listen: ListenConfig
     client: ClientConfig
+    gateway: ListenConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_gateway_listener(self) -> CliProxyDeployment:
+        if self.gateway == self.listen:
+            msg = "gateway listener conflicts with CLIProxyAPI listener"
+            raise ValueError(msg)
+        return self
+
+
+def cliproxy_listen_origin(listen: ListenConfig) -> str:
+    """Build an HTTP origin, including brackets for IPv6 listeners."""
+    host = f"[{listen.host}]" if ":" in listen.host else listen.host
+    return f"http://{host}:{listen.port}"
 
 
 def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:

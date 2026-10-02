@@ -493,3 +493,38 @@ def test_suite_cannot_reach_the_host_service_manager() -> None:
         check=False,
     )
     assert "Failed to connect" in result.stderr
+
+
+def test_facade_unit_uses_installed_state_and_restarts_on_configuration_changes(
+    home: Path,
+) -> None:
+    """The optional facade uses installed code and tracks private config changes."""
+    state = home / ".cli-proxy-api"
+    state.mkdir()
+    config = state / "gateway.json"
+    script = state / "gateway.py"
+    _ = config.write_text('{"key":"first"}\n', encoding="utf-8")
+    _ = script.write_text("first = 1\n", encoding="utf-8")
+
+    def facade_unit() -> str:
+        units = declared_user_units(_linux(home), gateway_host=True)
+        return next(
+            unit.content for unit in units if unit.name == "cliproxy-gateway.service"
+        )
+
+    first = facade_unit()
+    assert f"{script} --config {config}" in first
+    assert "After=cliproxyapi.service" in first
+    assert '"key"' not in first
+    _ = config.write_text('{"key":"second"}\n', encoding="utf-8")
+    second = facade_unit()
+    assert first != second
+    _ = script.write_text("second = 2\n", encoding="utf-8")
+    assert facade_unit() != second
+    assert "cliproxy-gateway.service" not in _names(
+        declared_user_units(_linux(home), gateway_host=False)
+    )
+    config.unlink()
+    assert "cliproxy-gateway.service" not in _names(
+        declared_user_units(_linux(home), gateway_host=True)
+    )
