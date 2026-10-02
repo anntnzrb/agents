@@ -43,32 +43,103 @@ def read_input(path: str | None) -> bytes:
     return Path(path).read_bytes()
 
 
-def get_output_channel() -> tuple[BinaryIO, bool]:
-    """Return the best output channel and whether it is the outer SSH TTY."""
-    if os.name == "nt":
+def native_command() -> list[str] | None:
+    """Select a local clipboard tool; never copy to an SSH server's clipboard."""
+    if any(os.environ.get(key) for key in ("SSH_TTY", "SSH_CONNECTION", "SSH_CLIENT")):
+        return None
+
+    candidates: list[list[str]] = []
+    if sys.platform == "darwin":
+        candidates = [["pbcopy"]]
+    elif os.name == "nt" or os.environ.get("WSL_DISTRO_NAME"):
+        script = (
+            "$ErrorActionPreference = 'Stop'; "
+            "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new(); "
+            "Set-Clipboard -Value ([Console]::In.ReadToEnd())"
+        )
+        candidates = [
+            [tool, "-NoProfile", "-NonInteractive", "-Command", script]
+            for tool in ("pwsh", "powershell", "powershell.exe")
+        ]
+    else:
+        if os.environ.get("WAYLAND_DISPLAY"):
+            candidates.append(["wl-copy"])
+        if os.environ.get("DISPLAY"):
+            candidates.extend(
+                [
+                    ["xclip", "-selection", "clipboard"],
+                    ["xsel", "--clipboard", "--input"],
+                ]
+            )
+
+    for command in candidates:
+        if executable := shutil.which(command[0]):
+            return [executable, *command[1:]]
+    return None
+
+
+def ancestor_terminals() -> list[str]:
+    """Find ancestor TTYs when the agent detached its command subprocess."""
+    terminals: list[str] = []
+    pid = os.getppid()
+    seen: set[int] = set()
+    while pid > 1 and pid not in seen:
+        seen.add(pid)
         try:
-            return Path("CONOUT$").open("wb", buffering=0), False
-        except OSError:
-            return sys.stdout.buffer, False
+            result = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "ppid=", "-o", "tty="],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=5,
+            )
+        except OSError, subprocess.SubprocessError:
+            break
+        fields = result.stdout.split()
+        if not fields or not fields[0].isdigit():
+            break
+        match fields:
+            case [parent, tty]:
+                pid = int(parent)
+            case _:
+                break
+        if tty not in ("?", "??", "-"):
+            terminals.append(tty if tty.startswith("/dev/") else f"/dev/{tty}")
+    return terminals
+
+
+def get_output_channel() -> tuple[BinaryIO, bool]:
+    """Open a terminal, never silently emit OSC 52 into captured output."""
+    if os.name == "nt":
+        return Path("CONOUT$").open("wb", buffering=0), False
 
     ssh_tty = os.environ.get("SSH_TTY")
-    if ssh_tty and Path(ssh_tty).exists():
+    candidates = [(ssh_tty, True)] if ssh_tty else []
+    candidates.append(("/dev/tty", False))
+    for candidate, is_outer in candidates:
         try:
-            fd = os.open(ssh_tty, os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK)
-            return os.fdopen(fd, "wb", buffering=0), True
-        except OSError:
-            pass
-
-    for candidate in ("/dev/tty",):
-        if not Path(candidate).exists():
-            continue
-        try:
-            fd = os.open(candidate, os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK)
-            return os.fdopen(fd, "wb", buffering=0), False
+            fd = os.open(candidate, os.O_WRONLY | os.O_NOCTTY)
+            if not os.isatty(fd):
+                os.close(fd)
+                continue
+            return os.fdopen(fd, "wb"), is_outer
         except OSError:
             continue
 
-    return sys.stdout.buffer, False
+    for candidate in ancestor_terminals():
+        try:
+            fd = os.open(candidate, os.O_WRONLY | os.O_NOCTTY)
+            if not os.isatty(fd):
+                os.close(fd)
+                continue
+            return os.fdopen(fd, "wb"), False
+        except OSError:
+            continue
+
+    if sys.stdout.isatty():
+        return sys.stdout.buffer, False
+    raise OSError("no accessible terminal or native clipboard backend")
 
 
 def build_osc52(payload: bytes, *, use_tmux_passthrough: bool) -> bytes:

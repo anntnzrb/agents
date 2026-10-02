@@ -23,13 +23,15 @@ uv run --script <skill-dir>/scripts/cli.py [FILE]
 ```
 
 - `FILE`: optional path to copy. Reads from stdin if omitted.
-- Emits the OSC 52 sequence to the active terminal output.
+- Read stderr for the selected transport and errors.
+- If stderr reports OSC 52 sent, report that the sequence was sent. Do not claim clipboard acceptance was verified.
+- If the command fails, report the error. Do not retry by printing escape sequences into captured output.
 
 ## Common calls
 
 ```text
 # copy a file
-uv run --script <skill-dir>/scripts/cli.py ./key.pem
+uv run --script <skill-dir>/scripts/cli.py ./notes.txt
 
 # copy command output
 some-command | uv run --script <skill-dir>/scripts/cli.py
