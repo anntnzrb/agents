@@ -36,6 +36,15 @@ def _loads_json(text: str) -> object:
     return fn(text)
 
 
+def mock_download(monkeypatch: pytest.MonkeyPatch, content: bytes) -> None:
+    """Mock the verification download with the uploaded bytes."""
+
+    def mock_get(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
+        return httpx2.Response(200, content=content, request=httpx2.Request("GET", url))
+
+    monkeypatch.setattr(httpx2.Client, "get", mock_get)
+
+
 def test_result_combinators() -> None:
     """Test map and and_then chaining on Ok results."""
     ok_res = Ok(10)
@@ -192,6 +201,7 @@ def test_upload_success_mock(
     """Test successful file upload with mocked server response."""
     sample_file = tmp_path / "test.py"
     _ = sample_file.write_text("print('hello world')\n")
+    mock_download(monkeypatch, sample_file.read_bytes())
 
     def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
         if "/post" not in url:
@@ -217,6 +227,7 @@ def test_upload_stdin_mock(
 ) -> None:
     """Test uploading content from piped stdin."""
     stdin_data = io.BytesIO(b"fn piped() {}\n")
+    mock_download(monkeypatch, stdin_data.getvalue())
     monkeypatch.setattr("sys.stdin", io.TextIOWrapper(stdin_data))
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
@@ -242,6 +253,7 @@ def test_upload_raw_url_output(
     """Test --raw-url outputs direct bytebin raw link."""
     sample_file = tmp_path / "test.txt"
     _ = sample_file.write_text("raw text")
+    mock_download(monkeypatch, sample_file.read_bytes())
 
     def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
         request = httpx2.Request("POST", url)
@@ -265,6 +277,7 @@ def test_upload_json_output(
     """Test JSON formatted output on successful upload."""
     sample_file = tmp_path / "test.json"
     _ = sample_file.write_text('{"a": 1}')
+    mock_download(monkeypatch, sample_file.read_bytes())
 
     def mock_post(_self: httpx2.Client, url: str, **_kwargs: object) -> httpx2.Response:
         request = httpx2.Request("POST", url)
