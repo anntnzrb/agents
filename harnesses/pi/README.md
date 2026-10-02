@@ -28,4 +28,4 @@ Run the test suite from the repository root:
 uv run --script .github/scripts/ci.py harness pi
 ```
 
-The CI runner copies active extension sources to a temporary directory, installs the committed Bun lockfile with `--frozen-lockfile`, and runs `bun test`. Host packages are development dependencies in `agent/extensions/package.json`; tests do not require a generated Pi home or provider credentials. Legacy extensions are excluded.
+The CI runner copies active extension sources to a temporary directory, installs the committed Bun lockfile with `--frozen-lockfile`, and runs module tests with HTTP transport blocked. Host modules and standalone ripgrep are development dependencies in `agent/extensions/package.json`; the runner exposes packaged ripgrep on `PATH`. CI does not invoke Pi, Codex, or provider APIs. Legacy extensions are excluded. Native apply-patch integration remains a [manual check](agent/extensions/apply-patch/README.md#load-and-validate).
