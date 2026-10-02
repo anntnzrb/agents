@@ -1,41 +1,37 @@
 /**
- * `find`: semantic code search for codemode scripts, judged by the classifier
+ * `find`: shared semantic evidence search for codemode scripts, judged by the classifier
  * model named in the `find.classifier` setting (`"<provider>/<model id>"`).
  *
  * 1. ripgrep lists files and ranks them by query keywords.
- * 2. The classifier judges the top candidates by path.
- * 3. The classifier verifies line windows of the best files; only verified ranges are reported.
+ * 2. Bounded workers classify every eligible file's line windows.
+ * 3. Full scores go to a temporary artifact; verified ranges are reported.
  *
  * Adapted from oh-my-pi's `find` (MIT, see LICENSE).
  */
-import { readFile, stat } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { mkdtemp, open, readFile, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, relative, resolve } from "node:path";
 import { Type, type ClassifierApi, type ClassifierContext, type ClassifierModel, type Usage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { eligible, fileScore, idf, keywords, selectWindows, windows } from "./search.ts";
+import { eligible, fileScore, idf, keywords, windows } from "./search.ts";
 import { renderFindCall, renderFindResult } from "./render.ts";
 
-const CANDIDATES = 96;
-const NAME_BATCH = 48;
-const FILES = 12;
-const WINDOWS_PER_FILE = 8;
 const WINDOW_BYTES = 2500;
 const VERIFY_BATCH = 6;
 const PARALLEL = 8;
 /** Verified probability a range needs to be reported. */
 const THRESHOLD = 0.5;
-const MAX_HITS = 8;
-const RANGES_PER_HIT = 2;
 
 type Classifier = ClassifierModel<ClassifierApi>;
 type Registry = ExtensionContext["modelRegistry"];
 
-export interface Hit {
+export type Hit = {
   path: string;
   start: number;
   end: number;
   p: number;
   snippet: string;
+  text?: string;
 }
 
 /**
@@ -158,51 +154,185 @@ export async function search(options: SearchOptions): Promise<{ hits: Hit[]; usa
       const line = lines.find((l) => words.some((w) => l.toLowerCase().includes(w))) ?? lines.find((l) => l.trim()) ?? "";
       hits.push({ path: relative(cwd, resolve(root, rel)), start: passage.start, end: passage.end, p: ps[i]!, snippet: line.trim().slice(0, 100) });
     });
+    }
   });
 
-  // Strongest files first, at most RANGES_PER_HIT ranges each.
+  // Ranking affects presentation, never coverage.
   const best = new Map<string, number>();
   for (const hit of hits) best.set(hit.path, Math.max(best.get(hit.path) ?? 0, hit.p));
-  const order = [...best].sort((a, b) => b[1] - a[1]).slice(0, MAX_HITS).map(([path]) => path);
+  const order = [...best].sort((a, b) => b[1] - a[1]).map(([path]) => path);
   return {
-    hits: order.flatMap((path) => hits.filter((h) => h.path === path).sort((a, b) => b.p - a.p || a.start - b.start).slice(0, RANGES_PER_HIT)),
+    hits: order.flatMap((path) => hits.filter((h) => h.path === path).sort((a, b) => b.p - a.p || a.start - b.start)),
     usage,
   };
 }
 
 export function report(query: string, hits: readonly Hit[]): string {
   if (hits.length === 0) return `No verified hits for "${query}". Rephrase, scope \`path\`, or use rg.`;
-  return hits.map((h) => `${h.path}:${h.start}-${h.end}  ${h.p.toFixed(2)}  ${h.snippet}`).join("\n");
+  return hits.slice(0, 16).map((h) => `${h.path}:${h.start}-${h.end}  ${h.p.toFixed(2)}  ${h.snippet}`).join("\n") + (hits.length > 16 ? `\n… ${hits.length - 16} more verified passages in the score artifact` : "");
 }
 
+export interface SearchRequest {
+  query: string;
+  path?: string;
+}
+
+/** Shared discovery and passage judgments for one invocation; no stale cross-run cache. */
+export async function searchBatch(options: Omit<SearchOptions, "query" | "path" | "read"> & { searches: SearchRequest[] }) {
+  const { searches, cwd, signal } = options;
+  if (!searches.length || searches.some((s) => !s.query.trim())) throw new Error("find: provide at least one nonempty query");
+  const commands = new Map<string, ReturnType<ExtensionAPI["exec"]>>();
+  const reads = new Map<string, Promise<Buffer>>();
+  const filesRead = new Set<string>();
+  const judgments = new Map<string, Promise<number[]>>();
+  const evidence = searches.map(() => new Map<string, Hit>());
+  const artifact = join(await mkdtemp(join(tmpdir(), "pi-find-")), "scores.jsonl");
+  const output = await open(artifact, "w");
+  let writes = Promise.resolve();
+  const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+  let classifierRequests = 0;
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  const classify: Registry["classify"] = async (model, context) => {
+    const state = context.state;
+    const root = state.root as string;
+    const related = searches.filter((s) => resolve(cwd, s.path ?? ".") === root);
+    const identity = JSON.stringify([root, state.file, state.files, state.ranges, state.passages]);
+    let promise = judgments.get(identity);
+    if (!promise) {
+      promise = (async () => {
+        if (active >= PARALLEL) await new Promise<void>((resolve) => waiting.push(resolve));
+        else active++;
+        try {
+          signal?.throwIfAborted();
+          const entries = Object.entries(context.questions);
+          const questions = Object.fromEntries(related.flatMap((s, q) => entries.map(([id, question]) => [
+            `${q}_${id}`,
+            { ...question, instructions: `For searches.${key(q)} only: ${question.instructions}` },
+          ])));
+          classifierRequests++;
+          const result = await options.registry.classify(model, {
+            state: { ...state, search: null, searches: Object.fromEntries(related.map((s, q) => [key(q), s.query.trim()])) },
+            questions,
+          }, { signal });
+          if (result.usage) {
+            for (const field of ["input", "output", "totalTokens"] as const) usage[field] += result.usage[field];
+            usage.cost.input += result.usage.cost.input;
+            usage.cost.output += result.usage.cost.output;
+            usage.cost.total += result.usage.cost.total;
+          }
+          if (result.stopReason !== "stop") throw new Error(`find: classifier ${model.provider}/${model.id} failed: ${result.errorMessage ?? result.stopReason}`);
+          return related.flatMap((_, q) => entries.map(([id]) => {
+            const answer = result.answers[`${q}_${id}`];
+            if (answer?.type !== "bool" || !Number.isFinite(answer.probability) || answer.probability < 0 || answer.probability > 1) throw new Error(`find: invalid classifier answer ${q}_${id}`);
+            if (state.passages) {
+              const passage = (state.passages as Record<string, string>)[id]!;
+              const range = (state.ranges as { start: number; end: number }[])[entries.findIndex(([entry]) => entry === id)]!;
+              const path = relative(cwd, resolve(root, state.file as string));
+              const words = keywords(related[q]!.query);
+              const line = passage.split("\n").find((line) => words.some((word) => line.toLowerCase().includes(word))) ?? passage.split("\n")[0] ?? "";
+              const matches = words.map((word) => line.toLowerCase().indexOf(word)).filter((offset) => offset >= 0);
+              const offset = matches.length ? Math.max(0, Math.min(...matches) - 30) : 0;
+              const hit = { path, ...range, p: answer.probability, snippet: `${offset ? "…" : ""}${line.slice(offset, offset + 100).trim()}`, text: passage };
+              const target = evidence[searches.indexOf(related[q]!)]!;
+              const identity = JSON.stringify([path, range.start, range.end, passage]);
+              writes = writes.then(async () => { await output.write(JSON.stringify({ search: searches.indexOf(related[q]!), query: related[q]!.query, ...hit }) + "\n"); });
+              if (answer.probability >= THRESHOLD) target.set(identity, hit);
+            }
+            return answer.probability;
+          }));
+        } finally {
+          const next = waiting.shift();
+          if (next) next();
+          else active--;
+        }
+      })();
+      judgments.set(identity, promise);
+    }
+    const probabilities = await promise;
+    judgments.delete(identity);
+    const q = related.findIndex((s) => s.query.trim() === state.search);
+    const ids = Object.keys(context.questions);
+    return { api: model.api, provider: model.provider, model: model.id, timestamp: Date.now(), stopReason: "stop", answers: Object.fromEntries(ids.map((id, i) => [id, { type: "bool", probability: probabilities[q * ids.length + i]! }])) };
+  };
+  const results: { query: string; path?: string; hits: Hit[] }[] = [];
+  let complete = false;
+  try {
+  // Each search visits all eligible files; shared evidence is judged for every query in its scope.
+  const scopes = [...new Map(searches.map((request) => [resolve(cwd, request.path ?? "."), request])).values()];
+  await pool(scopes, async (request) => {
+    const query = request.query.trim();
+    const result = await search({
+      ...options, query, path: request.path,
+      registry: { classify: (model, context) => classify(model, { ...context, state: { ...context.state, root: resolve(cwd, request.path ?? ".") } }) } as Registry,
+      exec: (command, args, execOptions) => {
+        const id = JSON.stringify([command, args, execOptions?.cwd]);
+        let pending = commands.get(id);
+        if (!pending) { pending = options.exec(command, args, execOptions); commands.set(id, pending); }
+        return pending;
+      },
+      read: (path) => {
+        let pending = reads.get(path);
+        if (!pending) { pending = readFile(path); reads.set(path, pending); filesRead.add(path); }
+        pending.finally(() => { reads.delete(path); }).catch(() => {});
+        return pending;
+      },
+    });
+    results[searches.indexOf(request)] = { query, ...(request.path === undefined ? {} : { path: request.path }), hits: result.hits };
+  });
+  complete = true;
+  } catch (error) {
+    throw new Error(`${error instanceof Error ? error.message : String(error)}; partial scores: ${artifact}`, { cause: error });
+  } finally {
+    await writes;
+    await output.write(JSON.stringify({ type: "coverage", exhaustive: complete }) + "\n");
+    await output.close();
+  }
+  searches.forEach((request, i) => { results[i] = { query: request.query.trim(), ...(request.path === undefined ? {} : { path: request.path }), hits: [...evidence[i]!.values()].sort((a, b) => b.p - a.p || a.path.localeCompare(b.path) || a.start - b.start) }; });
+  return { results, usage, artifact, coverage: { filesRead: filesRead.size, classifierRequests, searches: searches.length, exhaustive: true } };
+}
+
+const parameters = Type.Object({
+  query: Type.Optional(Type.String({ description: "Plain-language description for a single search. Use either query/path or searches, not both." })),
+  path: Type.Optional(Type.String({ description: "Directory to search (default: working directory)" })),
+  searches: Type.Optional(Type.Array(Type.Object({ query: Type.String(), path: Type.Optional(Type.String()) }), { minItems: 1 })),
+});
+
 export default function (pi: ExtensionAPI) {
-  pi.registerTool({
+  pi.registerTool<typeof parameters, Awaited<ReturnType<typeof searchBatch>> & { model: string; hits: Hit[] }>({
     name: "find",
     label: "Find",
     exposure: "direct",
     annotations: { readOnlyHint: true, openWorldHint: false },
     description:
-      "Semantic code search: describe a behavior in plain language, get `path:start-end probability snippet` lines for the code that implements it, strongest first, verified by a classifier. Call it first, before rg or grep, when you can describe a behavior but don't know the identifier or file, then read the returned ranges. Use rg only for known strings or symbols. No hits is weak evidence of absence: confirm with rg before concluding.",
-    parameters: Type.Object({
-      query: Type.String({ description: "Plain-language description of the behavior, e.g. 'retry backoff for failed uploads'. Quote exact phrases or identifiers." }),
-      path: Type.Optional(Type.String({ description: "Directory to search (default: working directory)" })),
+      "Semantic evidence search across all eligible code, docs, logs, and transcripts in the requested directories. Use query/path or searches:[{query,path?}] for shared multi-query scoring. Returns structured hits, coverage, and a JSONL artifact containing every score, including low probabilities. Text display is capped, retrieval is not. Ignored files, binaries, and secrets are excluded. Call first when meaning is known but wording or location is not.",
+    parameters,
+    outputSchema: Type.Object({
+      model: Type.String(),
+      artifact: Type.String(),
+      results: Type.Array(Type.Object({ query: Type.String(), path: Type.Optional(Type.String()), hits: Type.Array(Type.Object({ path: Type.String(), start: Type.Number(), end: Type.Number(), p: Type.Number(), snippet: Type.String(), text: Type.Optional(Type.String()) })) })),
+      coverage: Type.Object({ filesRead: Type.Number(), classifierRequests: Type.Number(), searches: Type.Number(), exhaustive: Type.Boolean() }),
     }),
     renderCall(args, theme, context) {
       return renderFindCall(args, context, theme);
     },
     renderResult(result, { expanded }, theme, context) {
       const output = result.content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+      if (result.details?.results?.length > 1) {
+        return renderFindResult(undefined, output, { expanded, isError: context.isError }, theme);
+      }
       return renderFindResult(result.details, output, {
-        expanded, isError: context.isError, scope: context.args.path, cwd: context.cwd,
+        expanded, isError: context.isError, scope: "path" in context.args ? context.args.path : undefined, cwd: context.cwd,
       }, theme);
     },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const query = params.query.trim();
-      if (!query) throw new Error("find: query must describe what to find");
+      if (params.searches ? params.query !== undefined || params.path !== undefined : !params.query?.trim()) throw new Error("find: use either query/path or searches");
       const settings = pi.getSettings() as { find?: { classifier?: unknown } };
       const model = await resolveClassifier(ctx.modelRegistry, settings.find?.classifier);
-      const { hits, usage } = await search({ exec: pi.exec.bind(pi), registry: ctx.modelRegistry, model, cwd: ctx.cwd, query, path: params.path, signal });
-      return { content: [{ type: "text", text: report(query, hits) }], details: { model: `${model.provider}/${model.id}`, hits }, usage };
+      const { results, usage, coverage, artifact } = await searchBatch({ exec: pi.exec.bind(pi), registry: ctx.modelRegistry, model, cwd: ctx.cwd, searches: params.searches ?? [{ query: params.query!, path: params.path }], signal });
+      const structuredContent = { model: `${model.provider}/${model.id}`, results, coverage, artifact };
+      const output = results.map((r, i) => `${results.length > 1 ? `[${i}] ${r.query} (${r.path ?? "."})\n` : ""}${report(r.query, r.hits)}`).join("\n\n");
+      return { content: [{ type: "text", text: `${output}\nScores: ${artifact}` }], structuredContent, details: { ...structuredContent, usage, hits: results.flatMap((r) => r.hits) }, usage };
     },
   });
 }

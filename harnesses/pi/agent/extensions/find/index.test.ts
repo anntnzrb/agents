@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import type { ClassifierApi, ClassifierContext, ClassifierModel, ClassifierResult } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { report, resolveClassifier, search } from "./index.ts";
+import { report, resolveClassifier, search, searchBatch } from "./index.ts";
 import { eligible, keywords, selectWindows, windows } from "./search.ts";
 
 const directories: string[] = [];
@@ -124,4 +124,96 @@ test("search scopes to path and reports paths relative to cwd", async () => {
   const { registry: fake } = registry(() => 0.8);
   const { hits } = await search({ exec, registry: fake, model: MODELS[0]!, cwd, query: "retry", path: "pkg/a", signal });
   expect(hits.map((h) => h.path)).toEqual(["pkg/a/retry.ts"]);
+});
+
+test("long lines preserve evidence after the old clipping boundary", () => {
+  const text = "x".repeat(4000) + " late evidence 🚀";
+  const passages = windows(text, 2500, ["evidence"], [1]);
+  expect(passages.map((p) => p.text.trimEnd()).join("")).toBe(text);
+  expect(passages.some((p) => p.text.includes("late evidence"))).toBe(true);
+  expect(passages.every((p) => p.start === 1 && p.end === 1)).toBe(true);
+});
+
+test("batch shares discovery and scores independent queries against shared passages", async () => {
+  const cwd = await workspace({ "a.ts": "retry backoff\n", "b.ts": "session cleanup\n" });
+  const commands: string[] = [];
+  const contexts: ClassifierContext[] = [];
+  const { registry: fake } = registry(() => 0.8);
+  const classify = fake.classify.bind(fake);
+  fake.classify = async (model, context, options) => {
+    contexts.push(context);
+    return classify(model, context, options);
+  };
+  const result = await searchBatch({
+    exec: async (command, args, options) => {
+      commands.push(JSON.stringify([command, args, options?.cwd]));
+      return exec(command, args, options);
+    },
+    registry: fake, model: MODELS[0]!, cwd, signal,
+    searches: [{ query: "retry backoff" }, { query: "session cleanup" }],
+  });
+  expect(commands.filter((command) => command.includes("--files"))).toHaveLength(1);
+  expect(new Set(commands).size).toBe(commands.length);
+  expect(result.results.map((r) => r.query)).toEqual(["retry backoff", "session cleanup"]);
+  expect(result.results.every((r) => r.hits.length === 2)).toBe(true);
+  expect(contexts.some((context) => context.state.searches && Object.keys(context.questions).length === 2)).toBe(true);
+  expect(result.coverage.filesRead).toBe(2);
+  expect(result.coverage.classifierRequests).toBe(contexts.length);
+  expect(result.usage.cost.total).toBeCloseTo(contexts.length * 0.01);
+});
+
+test("identical queries in different scopes stay isolated, including an empty scope", async () => {
+  const cwd = await workspace({ "a/retry.ts": "retry first", "b/retry.ts": "retry second" });
+  await mkdir(join(cwd, "empty"));
+  const { registry: fake } = registry(() => 0.8);
+  const result = await searchBatch({ exec, registry: fake, model: MODELS[0]!, cwd, signal,
+    searches: [{ query: "retry", path: "a" }, { query: "retry", path: "b" }, { query: "retry", path: "empty" }] });
+  expect(result.results.map((r) => r.hits.map((h) => h.path))).toEqual([["a/retry.ts"], ["b/retry.ts"], []]);
+  expect(result.results[0]!.hits[0]!.text).toContain("retry first");
+  expect(result.coverage.exhaustive).toBe(true);
+});
+
+test("batch cancellation stops before classification and classifier failures reject the batch", async () => {
+  const cwd = await workspace({ "a.ts": "retry" });
+  const { calls, registry: fake } = registry(() => 0.8);
+  const controller = new AbortController();
+  controller.abort();
+  await expect(searchBatch({ exec, registry: fake, model: MODELS[0]!, cwd, signal: controller.signal, searches: [{ query: "retry" }] })).rejects.toThrow();
+  expect(calls).toHaveLength(0);
+  await expect(searchBatch({ exec, registry: fake, model: MODELS[1]!, cwd, searches: [{ query: "retry" }, { query: "cleanup" }] })).rejects.toThrow("402 funds");
+});
+
+test("a shared classifier pool bounds concurrency and drains before returning", async () => {
+  const cwd = await workspace(Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`${i}/retry.ts`, "retry"])));
+  const { registry: fake } = registry(() => 0.8);
+  const classify = fake.classify.bind(fake);
+  let active = 0;
+  let peak = 0;
+  fake.classify = async (model, context, options) => {
+    peak = Math.max(peak, ++active);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return await classify(model, context, options);
+    } finally { active--; }
+  };
+  await searchBatch({ exec, registry: fake, model: MODELS[0]!, cwd,
+    searches: Array.from({ length: 12 }, (_, i) => ({ query: "retry", path: `${i}` })) });
+  expect(peak).toBeGreaterThan(1);
+  expect(peak).toBeLessThanOrEqual(8);
+  expect(active).toBe(0);
+});
+
+test("search covers files and passages beyond every former shortlist and retains low scores", async () => {
+  const cwd = await workspace(Object.fromEntries(Array.from({ length: 100 }, (_, i) => [
+    `${String(i).padStart(3, "0")}.ts`, i === 99 ? "padding\n".repeat(4000) + "needle evidence\n" : "unrelated\n",
+  ])));
+  const { registry: fake } = registry((state, id) => (state.passages as Record<string, string> | undefined)?.[id.replace(/^\d+_/, "")]?.includes("needle evidence") ? 0.95 : 0.1);
+  const result = await searchBatch({ exec, registry: fake, model: MODELS[0]!, cwd, searches: [{ query: "meaning without matching keywords" }] });
+  expect(result.coverage.filesRead).toBe(100);
+  expect(result.coverage.exhaustive).toBe(true);
+  expect(result.results[0]!.hits.some((hit) => hit.path === "099.ts" && hit.end === 4001)).toBe(true);
+  const records = (await import("node:fs/promises")).readFile;
+  const scores = (await records(result.artifact, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+  expect(scores.some((score) => score.p === 0.1)).toBe(true);
+  expect(scores.some((score) => score.path === "099.ts" && score.p === 0.95)).toBe(true);
 });

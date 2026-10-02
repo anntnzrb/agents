@@ -1,8 +1,27 @@
 # Pi semantic find
 
-`find` is a semantic code search tool. The model describes a behavior in plain language and gets back the file line ranges that implement it. A classifier model checks each range. For known strings or symbols, use `grep` or `rg`.
+`find` searches for semantic evidence in code, documentation, logs, and transcripts. A classifier checks each returned passage against the query. For known strings or symbols, use `grep` or `rg`.
 
-The tool registers with `direct` exposure: the model can call it directly, and active codemode scripts can also call `await tools.find({ query, path? })`. The registration replaces Pi's built-in glob `find`.
+The tool registers with `direct` exposure: the model can call it directly, and active codemode scripts can also call `await tools.find({ query, path? })`. The registration replaces Pi's built-in glob `find`. Codemode receives structured `{ model, results, coverage, artifact }`, not formatted text. Each result identifies its query and optional scope; its hits include path, line range, probability, snippet, and the classified passage text.
+
+## Search several questions
+
+Use either `query` with optional `path`, or a nonempty `searches` list. Do not mix them. Codemode can generate query-by-directory combinations:
+
+```js
+const queries = ["exponential retry backoff", "removal of expired sessions"];
+const paths = ["src", "docs"];
+const result = await tools.find({
+  searches: paths.flatMap(path => queries.map(query => ({ query, path }))),
+});
+return result.results.map(({ query, path, hits }) => ({ query, path, hits }));
+```
+
+Within an invocation, searches reuse directory listings, identical keyword scans, and file reads. Queries for the same resolved directory share classifier requests: each candidate passage is judged independently against every query in that scope. Verified evidence discovered by any of those queries is available to all of them. Different scopes remain separate. One classifier work pool serves the entire batch; no cache survives the invocation.
+
+Results preserve input order and retain all verified passages without a retrieval cap. `coverage.exhaustive` means every eligible passage in the requested scope was classified, not that ignored files, excluded formats, or secrets were inspected. Classification can still be wrong: probabilities are model judgments, not calibrated confidence.
+
+The temporary JSONL `artifact` retains every judgment, including scores below the display threshold, with query index, query text, path, line range, and passage text. Use `jq` through Bash to filter or page it without loading the entire score record into codemode. Its last record reports whether classification completed. Failed or cancelled searches reject instead of returning success; completed scores remain in the temporary artifact. No persistent index or service is created. Text reports show only the strongest passages and identify omissions; structured results are not capped.
 
 The design is a smaller port of [oh-my-pi's `find`](https://github.com/can1357/oh-my-pi/tree/main/packages/coding-agent/src/tools/jfind) (MIT, see [LICENSE](LICENSE)). It drops oh-my-pi's sketch-routing wave and internal URL scopes.
 
