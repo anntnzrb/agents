@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -430,3 +431,22 @@ def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
         c[:2] == ["launchctl", "bootout"] and AMP_RUNNER_LABEL in c[2] for c in calls
     )
     assert (agents_dir / "hand.made.plist").exists()
+
+
+def test_suite_cannot_reach_the_host_service_manager() -> None:
+    """Tests run real sync code; it must never touch the developer's units.
+
+    `systemctl --user` reaches the live manager through `XDG_RUNTIME_DIR`
+    even with D-Bus severed, so a reconcile in a temporary home would still
+    reload and restart the host's real services.
+    """
+    systemctl = shutil.which("systemctl")
+    if systemctl is None:
+        pytest.skip("systemctl is not installed")
+    result = subprocess.run(  # noqa: S603 - fixed probe of the test sandbox
+        [systemctl, "--user", "is-system-running"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "Failed to connect" in result.stderr

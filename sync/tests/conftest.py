@@ -44,6 +44,16 @@ shared_tool_cache_env: dict[str, str] = {
 
 PRISTINE_PATH: str = os.environ.get("PATH", "")
 
+# Tests run real sync reconciles, which call `systemctl --user`. That client
+# finds the live user manager through XDG_RUNTIME_DIR (or D-Bus), so a test home
+# alone would still reload and restart the developer's real services. Point the
+# whole session, and every subprocess it spawns, at a manager that does not exist.
+_TEST_RUNTIME_DIR = tempfile.mkdtemp(prefix="agents-test-runtime-")
+_ = atexit.register(shutil.rmtree, _TEST_RUNTIME_DIR, ignore_errors=True)
+os.environ["XDG_RUNTIME_DIR"] = _TEST_RUNTIME_DIR
+os.environ["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=/nonexistent-agents-test-bus"
+_ = os.environ.pop("DBUS_SYSTEM_BUS_ADDRESS", None)
+
 
 @dataclass(frozen=True, slots=True)
 class SharedRelease:
