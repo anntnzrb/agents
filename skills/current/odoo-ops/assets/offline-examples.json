@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "purpose": "Template for sanitized offline examples, not an Odoo import file",
+  "provenance": {
+    "snapshot_time": null,
+    "code_version": null,
+    "sampling_method": "Replace with domains, limits, ordering, and time windows",
+    "limitations": ["Example IDs are fictitious; replace placeholder content before handoff"]
+  },
+  "catalog": [
+    {"id": "program-example", "name": "Synthetic program", "active": true}
+  ],
+  "cases": [
+    {
+      "id": "case-example",
+      "input_kind": "partial_reconstruction_not_original_payload",
+      "input": {"program_interest": "Synthetic program"},
+      "catalog_refs": ["program-example"],
+      "observed": {},
+      "expected": {"resolved_program_ref": "program-example"},
+      "expectation_basis": "Replace with confirmed rule or verified behavior",
+      "business_verified": false,
+      "protected_invariants": ["Existing contact identity is unchanged"]
+    }
+  ],
+  "rpc_examples": {
+    "create_success": {"jsonrpc": "2.0", "id": 1, "result": 9001},
+    "assignment_no_error_not_proof_of_assignment": {"jsonrpc": "2.0", "id": 2, "result": null},
+    "validation_error": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "error": {"code": 200, "message": "Odoo Server Error", "data": {"name": "odoo.exceptions.ValidationError", "message": "Synthetic constraint rejection"}}
+    }
+  }
+}

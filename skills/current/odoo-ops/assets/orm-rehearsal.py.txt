@@ -1,0 +1,45 @@
+"""Adapt this local ORM rehearsal; it does not exercise the CSV importer."""
+
+# Copy to <temp-dir>/rehearse.py. Fill in model, fixtures, and assertions.
+# Execute only through the skill CLI shell --rollback --file <temp-dir>/rehearse.py.
+# The Odoo shell supplies env. Never commit from this template.
+
+MODEL = None  # Technical model name, resolved from installed source.
+CASES = []  # Each case: label, create_values, write_values, expected_read_values.
+PROTECTED_FIELDS = []  # Fields on this model that must survive the write unchanged.
+
+if not MODEL or not CASES:
+    raise ValueError("Configure a model and at least one rehearsal case first.")
+
+records = env[MODEL].with_context(tracking_disable=True, mail_create_nosubscribe=True)
+initial_count = records.search_count([])
+
+for case in CASES:
+    with env.cr.savepoint():
+        record = records.create(case["create_values"])
+        before = record.read(PROTECTED_FIELDS)[0] if PROTECTED_FIELDS else {}
+
+        # Add assertions for shared contacts or other related records here.
+        # Snapshot them before write; compare them afterward.
+        record.write(case.get("write_values", {}))
+
+        expected = case["expected_read_values"]
+        if not expected:
+            raise ValueError("Each case needs explicit expected values.")
+        actual = record.read(list(expected))[0]
+        for field, value in expected.items():
+            assert actual[field] == value, (case["label"], field, actual[field], value)
+
+        if PROTECTED_FIELDS:
+            after = record.read(PROTECTED_FIELDS)[0]
+            assert after == before, (case["label"], "protected fields changed")
+
+        print("REHEARSAL_CASE_OK", case["label"])
+
+assert records.search_count([]) == initial_count + len(CASES)
+print("REHEARSAL_OK", len(CASES), "synthetic cases; CLI must roll back on exit")
+
+# Many2one read values are normally (id, display_name), or False when empty.
+# Adapt assertions to installed field behavior. Add rejection cases using the
+# specific expected exception inside a savepoint; never swallow arbitrary errors.
+# In a fresh CLI read after exit, verify these synthetic records did not persist.

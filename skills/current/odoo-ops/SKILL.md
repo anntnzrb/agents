@@ -16,6 +16,7 @@ Follow these situational reading rules before taking action:
 - Before inspecting routes, you MUST read [references/route-safety.md](references/route-safety.md).
 - Before auditing or fixing XML views, you MUST read [references/xml-view-rules.md](references/xml-view-rules.md).
 - Before interpreting CLI inspection JSON, you MUST read [references/output-contracts.md](references/output-contracts.md).
+- Before preparing imports, classifying CRM batches, recovering partial writes, or exporting offline fixtures, read [references/import-and-audit-workflow.md](references/import-and-audit-workflow.md).
 - Before writing Server Action templates for user UI execution, you MUST read [references/server-action-capabilities.md](references/server-action-capabilities.md), [references/server-action-playbook.md](references/server-action-playbook.md), [references/server-action-safe-eval.md](references/server-action-safe-eval.md), [references/server-action-sql-safety.md](references/server-action-sql-safety.md), and [references/server-action-templates.md](references/server-action-templates.md).
 - Before analyzing CLI JSON outputs in an OMP Eval kernel, you MUST read [references/omp-eval.md](references/omp-eval.md).
 
@@ -34,7 +35,7 @@ Follow these situational reading rules before taking action:
   6. Revert: `rpc --allow-rpc revert <plan-id>` creates a restore plan from the backup.
   7. Plans and backups live in the state dir automatically (`ODOO_OPS_STATE_DIR` or XDG state `odoo-ops`).
 - Hard deny-list on production (CLI refuses; instruct user to use Odoo web UI): `unlink`/`delete`, module install/upgrade/uninstall, schema/field/ACL/rule changes, server action `run`, cron `method_direct_trigger`, sending email/WhatsApp/SMS, `message_post`, partner merge, accounting post/reconcile, budget sign/liquidate, payslip done, `set_param`, password changes. Server Action templates provide the user's manual UI path; keep `WRITE_APPROVED = False` by default.
-- Data discipline: no PII masking (exact values required); request only necessary fields (`--fields`). NEVER print tokens or read secrets from `ir_config_parameter` into output. NEVER upload data to public hosts.
+- Data discipline: preserve exact values in private operational inputs; minimize requested fields (`--fields`). Sanitize chat evidence and handoff fixtures. NEVER print tokens, expose secrets from `ir_config_parameter`, or upload production data to public hosts.
 - Long SQL or ORM scripts: write to `<temp-dir>` and pass `--file`.
 
 ## Public entrypoint
@@ -57,6 +58,7 @@ In examples below, `odoo-ops` represents this exact command.
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
 | XML view rules and AST linting | [XML view rules](references/xml-view-rules.md) | Auditing or fixing XML views and QWeb templates |
 | Command results | [Output contracts](references/output-contracts.md) | Interpreting inspection output |
+| Imports, classification, and offline examples | [Import and audit workflow](references/import-and-audit-workflow.md) | Preparing data imports, CRM corrections, partial-apply recovery, or sanitized handoffs |
 | Action selection | [Server Action capabilities](references/server-action-capabilities.md) | Choosing UI actions, automation, or addons |
 | Production action workflow | [Server Action playbook](references/server-action-playbook.md) | Preparing or executing production actions in the UI |
 | Sandbox restrictions | [safe_eval reference](references/server-action-safe-eval.md) | Writing Server Action Python |
