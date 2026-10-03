@@ -4,7 +4,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin
 
-from selectolax.parser import HTMLParser, Node
+from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from .models import SearchResult
 
@@ -38,7 +38,7 @@ def parse_search_results(
     base_url: str = "https://www.amazon.com",
 ) -> list[SearchResult]:
     """Parse search-result cards from a search page."""
-    tree = HTMLParser(html)
+    tree = LexborHTMLParser(html)
     return [
         result
         for node in tree.css(_CARD_SELECTOR)
@@ -46,7 +46,7 @@ def parse_search_results(
     ]
 
 
-def _parse_result_card(node: Node, *, base_url: str) -> SearchResult | None:
+def _parse_result_card(node: LexborNode, *, base_url: str) -> SearchResult | None:
     asin = _clean_text(node.attributes.get("data-asin", ""))
     if not asin:
         return None
@@ -71,7 +71,7 @@ def _parse_result_card(node: Node, *, base_url: str) -> SearchResult | None:
     )
 
 
-def _extract_price(node: Node) -> Decimal | None:
+def _extract_price(node: LexborNode) -> Decimal | None:
     for selector in _PRICE_SELECTORS:
         for price_node in node.css(selector):
             value = _parse_decimal(price_node.text(separator=" ", strip=True))
@@ -80,7 +80,7 @@ def _extract_price(node: Node) -> Decimal | None:
     return None
 
 
-def _extract_rating(node: Node) -> Decimal | None:
+def _extract_rating(node: LexborNode) -> Decimal | None:
     for selector in _RATING_SELECTORS:
         for rating_node in node.css(selector):
             raw = rating_node.attributes.get("aria-label") or rating_node.text(
@@ -93,7 +93,7 @@ def _extract_rating(node: Node) -> Decimal | None:
     return None
 
 
-def _extract_review_count(node: Node) -> int | None:
+def _extract_review_count(node: LexborNode) -> int | None:
     for selector in _REVIEW_COUNT_SELECTORS:
         for review_node in node.css(selector):
             raw = review_node.attributes.get("aria-label") or review_node.text(
@@ -106,7 +106,7 @@ def _extract_review_count(node: Node) -> int | None:
     return None
 
 
-def _extract_badges(node: Node) -> tuple[str, ...]:
+def _extract_badges(node: LexborNode) -> tuple[str, ...]:
     seen: set[str] = set()
     badges: list[str] = []
 
@@ -125,7 +125,7 @@ def _extract_badges(node: Node) -> tuple[str, ...]:
     return tuple(badges)
 
 
-def _first_text(node: Node, selectors: tuple[str, ...]) -> str | None:
+def _first_text(node: LexborNode, selectors: tuple[str, ...]) -> str | None:
     for selector in selectors:
         match = node.css_first(selector)
         if match is None:
@@ -136,7 +136,7 @@ def _first_text(node: Node, selectors: tuple[str, ...]) -> str | None:
     return None
 
 
-def _first_attr(node: Node, selectors: tuple[str, ...], attr: str) -> str | None:
+def _first_attr(node: LexborNode, selectors: tuple[str, ...], attr: str) -> str | None:
     for selector in selectors:
         for match in node.css(selector):
             value = _clean_text(match.attributes.get(attr, ""))

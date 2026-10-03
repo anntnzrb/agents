@@ -2,7 +2,7 @@
 
 import re
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser
 
 from .models import ProductDetail
 
@@ -11,7 +11,7 @@ _MIN_TABLE_CELLS = 2
 
 def parse_product_detail(html: str) -> ProductDetail:
     """Parse a product-detail page into normalized data."""
-    tree = HTMLParser(html)
+    tree = LexborHTMLParser(html)
     merchant_fields = _extract_merchant_fields(tree)
     return ProductDetail(
         brand=_extract_brand(tree),
@@ -29,7 +29,7 @@ def parse_product_detail(html: str) -> ProductDetail:
     )
 
 
-def _extract_brand(tree: HTMLParser) -> str | None:
+def _extract_brand(tree: LexborHTMLParser) -> str | None:
     for row in tree.css("#productOverview_feature_div tr"):
         cells = [_clean_text(cell.text(separator=" ", strip=True)) for cell in row.css("td")]
         if len(cells) >= _MIN_TABLE_CELLS and cells[0].casefold() == "brand":
@@ -41,14 +41,14 @@ def _extract_brand(tree: HTMLParser) -> str | None:
     return re.sub(r"^Visit the\s+|\s+Store$", "", byline).strip() or None
 
 
-def _extract_availability_text(tree: HTMLParser) -> str | None:
+def _extract_availability_text(tree: LexborHTMLParser) -> str | None:
     availability = _extract_text(tree, ("#availability",))
     if availability is None:
         return None
     return availability.split(" {", 1)[0]
 
 
-def _extract_bullet_points(tree: HTMLParser, *, limit: int = 5) -> tuple[str, ...]:
+def _extract_bullet_points(tree: LexborHTMLParser, *, limit: int = 5) -> tuple[str, ...]:
     seen: set[str] = set()
     items: list[str] = []
     for node in tree.css("#feature-bullets ul li span.a-list-item"):
@@ -62,7 +62,7 @@ def _extract_bullet_points(tree: HTMLParser, *, limit: int = 5) -> tuple[str, ..
     return tuple(items)
 
 
-def _extract_merchant_fields(tree: HTMLParser) -> dict[str, str]:
+def _extract_merchant_fields(tree: LexborHTMLParser) -> dict[str, str]:
     fields: dict[str, str] = {}
     for row in tree.css("#tabular-buybox .tabular-buybox-container"):
         texts = [
@@ -78,7 +78,7 @@ def _extract_merchant_fields(tree: HTMLParser) -> dict[str, str]:
     return fields
 
 
-def _extract_text(tree: HTMLParser, selectors: tuple[str, ...]) -> str | None:
+def _extract_text(tree: LexborHTMLParser, selectors: tuple[str, ...]) -> str | None:
     for selector in selectors:
         node = tree.css_first(selector)
         if node is None:
