@@ -8,7 +8,7 @@ Sync's launchers resolve the newest release on every launch. The versioned cache
 | --- | --- | --- |
 | npm | `npm cache clean --force` | Runs only while holding every `npm-tools/<tool>/lock`; a launcher mid-install makes it skip npm for that run |
 | uv | `uv cache prune` | uv keeps entries in use and waits on its own cache lock |
-| bun | `bun pm cache rm` | Runs from an empty temporary package, which `bun pm` requires |
+| bun | Empties `~/.bun/install/cache` and `<cache-home>/.bun/install/cache` | Both hold only re-downloadable tarballs; `bun pm cache rm` would clear only the location bun currently resolves, leaving the legacy one growing |
 | scratch | Deletes top-level `/tmp` entries this user owns whose newest modification is older than 7 days | Never touches sockets, `*.lock` files, other users' entries, or names starting with `.`, `tmux-`, `zellij-`, `systemd-private-`, `ssh-`, `com.apple.`, `launchd-`, `nix-` |
 
 Harness homes stay out of scope: sessions, browser downloads, runtimes, and anything under `~/.omp`, `~/.pi`, `~/.codex`, `~/.claude`, `~/.hermes`, or `~/.t3`. Every step is best-effort; a failing step is logged and the rest still run.
