@@ -102,8 +102,8 @@ DEPLOYMENT = load_deployment()
 
 def declared_hosts() -> list[str]:
     hosts = field("hosts")
-    if not isinstance(hosts, list) or not hosts:
-        die("deployment.json needs a non-empty hosts list")
+    if not isinstance(hosts, list):
+        die("deployment.json needs a hosts list")
     return [h for h in hosts if isinstance(h, str)]
 
 
