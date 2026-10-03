@@ -22,7 +22,7 @@ A manual sync runs these stages in order:
 1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. Adapter-declared bootstraps run only when their adapter is enabled.
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, managed JSON configuration, shared assets, skills, and generated configuration.
-4. On the gateway host, prepare managed tools from the committed release manifest.
+4. Prepare kestractl on every supported host and CLIProxyAPI only on the gateway host, using their committed release manifests.
 5. Reconcile harness, tool, and managed-tool wrappers. Remove stale owned CLIProxyAPI wrappers on client hosts. Reconcile this host's [user services](#user-services).
 6. Record managed harness entries.
 7. Run package-bootstrap and extension-dependency hooks.
@@ -44,7 +44,7 @@ Recorded ownership limits cleanup to safe top-level names. Sync preserves unmana
 
 ## Missing sources and errors
 
-Most missing source files and directories produce diagnostics but do not fail the run. Invalid committed configuration, malformed local secrets, hook failures, and a first managed-tool installation failure on the gateway host are fatal.
+Most missing source files and directories produce diagnostics but do not fail the run. Invalid committed configuration, malformed local secrets, hook failures, and a declared managed-tool installation failure are fatal.
 
 A client host can operate without `secrets.local.json`. A launch-time sync treats reconciliation failures as warnings so a cached harness package can still start. A first launch without a valid package cache fails.
 
@@ -105,6 +105,14 @@ The cache path has this form, where `<cache-home>` is `XDG_CACHE_HOME` or `~/.ca
 Sync verifies the release's SHA-256 checksum, extracts only the named executable, writes a receipt, and generates a stable wrapper.
 
 Sync prepares the managed CLIProxyAPI binary and wrapper only on the gateway host. Client hosts remove a previously owned `cli-proxy-api` wrapper on the next sync.
+
+## Managed kestractl release
+
+`tools/kestractl/release.json` pins official release assets and checksums. Sync prepares the CLI independently of gateway placement and does not provision a Kestra server. Update the manifest deliberately after checking upstream compatibility and verifying each asset's checksum.
+
+The cache follows the CLIProxyAPI layout under `<cache-home>/github-tools/kestractl/versions/`. The generated `~/.local/bin/kestractl` wrapper forwards arguments without injecting gateway configuration. It executes the cached binary without reading repository sources. Direct invocation inherits the caller's environment and Kestra CLI context; agent-launched commands also inherit the harness environment. Sync does not embed Kestra credentials in the wrapper.
+
+Sync publishes the docs MCP registry through the existing MCPorter configuration job. Shared skill usage and instance setup live in the installed `kestra` skill, not in sync configuration. An unsupported release asset or checksum mismatch fails preparation. Unmanaged wrapper conflicts remain preserved and reported.
 
 ## Launch behavior
 

@@ -1,0 +1,23 @@
+{
+  "repository": "kestra-io/kestractl",
+  "version": "3.6.0",
+  "binary": "kestractl",
+  "assets": {
+    "darwin-x64": {
+      "name": "kestractl_3.6.0_darwin_amd64.tar.gz",
+      "sha256": "8e27b90c56c9897d031c3a2dd667d5e47cd8a66d64e72f85af7010336dbed52e"
+    },
+    "darwin-arm64": {
+      "name": "kestractl_3.6.0_darwin_arm64.tar.gz",
+      "sha256": "0111e249150d7fd13bff92ac9242816fe6edf480f78805aca885068cd30dbbcf"
+    },
+    "linux-x64": {
+      "name": "kestractl_3.6.0_linux_amd64.tar.gz",
+      "sha256": "2c4d3b322b94a0e0dcd4adbdcc15790fc5e45c3229421308a1891a4ee395e93f"
+    },
+    "linux-arm64": {
+      "name": "kestractl_3.6.0_linux_arm64.tar.gz",
+      "sha256": "0fb4387884e7562ccd2c2315e4e7a218d1c21c07cb30720f85c53a3614754280"
+    }
+  }
+}

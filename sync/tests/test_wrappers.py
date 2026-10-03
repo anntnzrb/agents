@@ -289,6 +289,24 @@ def test_managed_tool_wrappers_use_the_cached_binary_and_generated_config(
         assert unix.content == expected_content
 
 
+def test_managed_tool_wrapper_only_passes_config_when_configured(
+    tmp_path: Path,
+) -> None:
+    """CLIProxyAPI keeps --config; Go CLI wrappers pass arguments through."""
+    home = str(tmp_path)
+    env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
+    tool = PreparedManagedTool(
+        name="kestractl",
+        command="kestractl",
+        executable=str(tmp_path / "kestractl"),
+        version="3.6.0",
+        config_path="",
+    )
+    wrapper = managed_tool_wrapper_destination(env, tool)
+    assert "--config" not in wrapper.content
+    assert f"exec '{tool.executable}' \"$@\"" in wrapper.content
+
+
 def test_wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries(
     tmp_path: Path,
 ) -> None:

@@ -10,7 +10,7 @@ import tarfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final, cast
 
 import httpx
 import pytest
@@ -30,7 +30,12 @@ from sync.core.managed_tools import (
     installed_tool_matches,
     is_cli_proxy_running,
     prepare_managed_tools,
+    prepare_release_tool,
+    read_manifest,
 )
+
+if TYPE_CHECKING:
+    from sync.core.harness_adapters import HostPlatform
 
 ARCHIVE_CONTENT = b"fixture archive"
 EXPECTED_CHECKSUM = hashlib.sha256(ARCHIVE_CONTENT).hexdigest()
@@ -158,6 +163,168 @@ def test_managed_tool_rejects_platform_without_pinned_asset(
 
     with pytest.raises(RuntimeError, match=r"no release asset for linux-arm64"):
         _ = prepare_managed_tools(sync_env, runtime)
+
+
+@pytest.mark.parametrize(
+    ("platform_name", "arch", "asset_arch"),
+    [
+        ("linux", "x64", "amd64"),
+        ("linux", "arm64", "arm64"),
+        ("darwin", "x64", "amd64"),
+        ("darwin", "arm64", "arm64"),
+    ],
+)
+def test_kestractl_installs_independently_on_pinned_platforms(
+    tmp_path: Path, platform_name: HostPlatform, arch: str, asset_arch: str
+) -> None:
+    """Install kestractl without a gateway and reuse its verified archive."""
+    sync_env = SyncEnv.from_home(
+        str(tmp_path), INSTALL_TIMEOUT_MS, platform=platform_name
+    )
+    cache = tmp_path / "cache"
+    downloads: list[str] = []
+    archive = b"kestractl pinned release fixture"
+    checksum = hashlib.sha256(archive).hexdigest()
+    manifest = Path(__file__).parents[2] / "tools/kestractl/release.json"
+    payload = cast(
+        "dict[str, object]", json.loads(manifest.read_text(encoding="utf-8"))
+    )
+    assets = cast("dict[str, dict[str, object]]", payload["assets"])
+    assets[f"{platform_name}-{arch}"]["sha256"] = checksum
+    manifest = tmp_path / "release.json"
+    _ = manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    def download(url: str, destination: str, _timeout_ms: int) -> None:
+        downloads.append(url)
+        _ = Path(destination).write_bytes(archive)
+
+    def extract(
+        _archive: str, destination: str, entry_name: str, _timeout_ms: int
+    ) -> None:
+        executable = Path(destination) / entry_name
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(EXECUTABLE_MODE)
+
+    runtime = ManagedToolRuntime(
+        arch=arch, cache_home=str(cache), download=download, extract=extract
+    )
+
+    first = prepare_release_tool(
+        sync_env,
+        "kestractl",
+        manifest,
+        runtime,
+    )
+    second = prepare_release_tool(
+        sync_env,
+        "kestractl",
+        manifest,
+        runtime,
+    )
+    assert first.command == "kestractl"
+    assert first.config_path == ""
+    assert first.executable == second.executable
+    assert len(downloads) == 1
+    assert downloads == [
+        (
+            "https://github.com/kestra-io/kestractl/releases/download/v3.6.0/"
+            f"kestractl_3.6.0_{platform_name}_{asset_arch}.tar.gz"
+        )
+    ]
+
+
+def test_kestractl_platform_assets_are_fully_pinned() -> None:
+    """The release manifest supports all declared macOS/Linux architectures."""
+    manifest = read_manifest(Path(__file__).parents[2] / "tools/kestractl/release.json")
+    assert set(manifest.assets) == {
+        "darwin-x64",
+        "darwin-arm64",
+        "linux-x64",
+        "linux-arm64",
+    }
+    assert all(asset.sha256 is not None for asset in manifest.assets.values())
+
+
+@pytest.mark.parametrize("gateway_host", [False, True])
+def test_managed_tools_respects_gateway_placement(
+    tmp_path: Path, *, gateway_host: bool
+) -> None:
+    """Kestractl installs everywhere; CLIProxyAPI only on the gateway."""
+    write_manifest(tmp_path)
+    source = Path(__file__).parents[2] / "tools/kestractl/release.json"
+    destination = tmp_path / ".config/agents/tools/kestractl/release.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    _ = destination.write_bytes(source.read_bytes())
+    env = SyncEnv.from_home(str(tmp_path), INSTALL_TIMEOUT_MS, platform="darwin")
+    archive = ARCHIVE_CONTENT
+    checksum = hashlib.sha256(archive).hexdigest()
+    payload = cast("dict[str, object]", json.loads(source.read_text(encoding="utf-8")))
+    assets = cast("dict[str, dict[str, object]]", payload["assets"])
+    assets["darwin-arm64"]["sha256"] = checksum
+    _ = destination.write_text(json.dumps(payload), encoding="utf-8")
+
+    def download(_url: str, path: str, _timeout: int) -> None:
+        _ = Path(path).write_bytes(archive)
+
+    def extract(
+        _archive: str, destination_path: str, entry: str, _timeout: int
+    ) -> None:
+        executable = Path(destination_path) / entry
+        _ = executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(EXECUTABLE_MODE)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        download=download,
+        extract=extract,
+    )
+
+    prepared = prepare_managed_tools(env, runtime, gateway_host=gateway_host)
+
+    expected_names = ["kestractl", "cliproxyapi"] if gateway_host else ["kestractl"]
+    assert [tool.name for tool in prepared] == expected_names
+    assert len({tool.executable for tool in prepared}) == len(prepared)
+
+
+def test_kestractl_rejects_checksum_failure_and_unsupported_asset(
+    tmp_path: Path,
+) -> None:
+    """Kestractl uses normal pinned verification and platform rejection."""
+    env = SyncEnv.from_home(str(tmp_path), INSTALL_TIMEOUT_MS, platform="darwin")
+    source = Path(__file__).parents[2] / "tools/kestractl/release.json"
+    checksum_manifest = tmp_path / "checksummed.json"
+    payload = cast("dict[str, object]", json.loads(source.read_text(encoding="utf-8")))
+    assets = cast("dict[str, dict[str, object]]", payload["assets"])
+    assets["darwin-arm64"]["sha256"] = INVALID_CHECKSUM
+    _ = checksum_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    def download(_url: str, path: str, _timeout: int) -> None:
+        _ = Path(path).write_bytes(ARCHIVE_CONTENT)
+
+    runtime = ManagedToolRuntime(
+        arch="arm64",
+        cache_home=str(tmp_path / "cache"),
+        download=download,
+    )
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        _ = prepare_release_tool(env, "kestractl", checksum_manifest, runtime)
+
+    unsupported_env = SyncEnv.from_home(
+        str(tmp_path), INSTALL_TIMEOUT_MS, platform="linux"
+    )
+    del assets["linux-x64"]
+    unsupported_manifest = tmp_path / "unsupported.json"
+    _ = unsupported_manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(
+        RuntimeError, match="kestractl has no release asset for linux-x64"
+    ):
+        _ = prepare_release_tool(
+            unsupported_env,
+            "kestractl",
+            unsupported_manifest,
+            ManagedToolRuntime(arch="x64", cache_home=str(tmp_path / "cache")),
+        )
 
 
 def test_managed_tool_health_check_targets_deployment_client() -> None:
