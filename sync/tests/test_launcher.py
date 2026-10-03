@@ -986,6 +986,27 @@ def test_npm_prune_keeps_a_version_whose_executable_is_still_running(
     assert _version_names(versions) == {"3.0.0", "4.0.0"}
 
 
+def test_npm_prune_removes_stages_left_by_dead_installers(tmp_path: Path) -> None:
+    """A killed installer's stage is reclaimed; a live installer's stage is kept."""
+
+    async def running() -> set[Path] | None:
+        return set()
+
+    versions_dir = _prepare_versions(tmp_path, ["1.0.0"], running)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    _ = dead.wait()
+    orphan = versions_dir / f".stage-{dead.pid}-deadbeef"
+    live = versions_dir / f".stage-{os.getpid()}-cafef00d"
+    for stage in (orphan, live):
+        (stage / "node_modules").mkdir(parents=True)
+
+    versions = _prepare_versions(tmp_path, ["2.0.0"], running)
+
+    assert not orphan.exists()
+    assert live.is_dir()
+    assert _version_names(versions) == {"1.0.0", "2.0.0"}
+
+
 def test_npm_prune_keeps_every_version_when_running_processes_are_unknown(
     tmp_path: Path,
 ) -> None:
