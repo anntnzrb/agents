@@ -726,6 +726,34 @@ def _version_in_use(version_dir: Path, running: set[Path]) -> bool:
     return any(path.is_relative_to(version_dir) for path in running)
 
 
+def _stage_owner_alive(name: str) -> bool:
+    """Return False only when the PID in a ``.stage-<pid>-<token>`` name is gone.
+
+    Stages are removed by their installer; one survives only when the installer
+    was killed. An unparsable name or an unprobeable PID counts as alive.
+    """
+    pid = name.removeprefix(RELEASE_STAGE_PREFIX).split("-", 1)[0]
+    if not pid.isdigit():
+        return True
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _prunable(entry_path: Path, keep: set[str], running: set[Path]) -> bool:
+    name = entry_path.name
+    if name.startswith((".stage-", ".stage.")):
+        # A stage belongs to its installer until that process is gone.
+        return name.startswith(RELEASE_STAGE_PREFIX) and not _stage_owner_alive(name)
+    if name in keep:
+        return False
+    return not _version_in_use(Path(os.path.realpath(entry_path)), running)
+
+
 def prune_versions(layout: NpmCacheLayout, running: set[Path] | None) -> None:
     """Remove versions not referenced by current, previous, or a running process.
 
@@ -743,12 +771,7 @@ def prune_versions(layout: NpmCacheLayout, running: set[Path] | None) -> None:
         return
     with contextlib.suppress(OSError):
         for entry_path in versions_path.iterdir():
-            name = entry_path.name
-            if name.startswith((".stage-", ".stage.")):
-                continue
-            if name in keep:
-                continue
-            if _version_in_use(Path(os.path.realpath(entry_path)), running):
+            if not _prunable(entry_path, keep, running):
                 continue
             if entry_path.is_dir() and not entry_path.is_symlink():
                 shutil.rmtree(entry_path, ignore_errors=True)
