@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AMP_RUNNER_LABEL",
     "AUTH_GATEWAY_ENV",
+    "CACHE_GC_LABEL",
     "LAUNCHD_LABEL",
     "UserUnit",
     "declared_launch_agents",
@@ -55,6 +56,9 @@ AMP_RUNNER_UPDATE_LABEL = "dev.agents.amp-runner-update"
 AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
 CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
+CACHE_GC_DEPLOYMENT = ("tools", "cache-gc", "deployment.json")
+CACHE_GC_UNIT = "cache-gc"
+CACHE_GC_LABEL = "dev.agents.cache-gc"
 T3_REFRESH_UNIT = "t3-refresh-models"
 T3_REFRESH_INTERVAL_SECONDS = 900
 T3_REFRESH_LABEL = "dev.agents.t3-refresh-models"
@@ -332,6 +336,42 @@ WantedBy=timers.target
     return [UserUnit(f"{name}.service", service), UserUnit(f"{name}.timer", timer)]
 
 
+def _cache_gc_script(sync_env: SyncEnv) -> str:
+    return str(Path(sync_env.ssot_home) / "tools" / "cache-gc" / "cache_gc.py")
+
+
+def _cache_gc_units(sync_env: SyncEnv) -> list[UserUnit]:
+    """Sweep package-manager caches and stale scratch nightly, at idle priority."""
+    service = f"""\
+[Unit]
+Description=Reclaim package caches and stale agent scratch
+
+[Service]
+Type=oneshot
+Environment=PATH={_service_path(sync_env.home)}
+ExecStart={_runtime_python(sync_env)} {_cache_gc_script(sync_env)}
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=30min
+"""
+    timer = f"""\
+[Unit]
+Description=Nightly package cache sweep
+
+[Timer]
+OnCalendar={NIGHTLY_UPDATE_CALENDAR}
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
+    return [
+        UserUnit(f"{CACHE_GC_UNIT}.service", service),
+        UserUnit(f"{CACHE_GC_UNIT}.timer", timer),
+    ]
+
+
 def _codex_server_units(sync_env: SyncEnv) -> list[UserUnit]:
     # Native Codex owns the detached daemon and its updater. The timer repairs
     # missing processes; starting an already-running daemon is idempotent.
@@ -417,6 +457,8 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
         )
     if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
         units.extend(_codex_server_units(sync_env))
+    if _is_deployment_host(sync_env, CACHE_GC_DEPLOYMENT):
+        units.extend(_cache_gc_units(sync_env))
     if _is_deployment_host(sync_env, T3_DEPLOYMENT):
         units.extend(_t3_refresh_units(sync_env))
         t3ctl = Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py"
@@ -609,6 +651,12 @@ def declared_launch_agents(sync_env: SyncEnv) -> list[UserUnit]:
         )
     if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
         agents.append(_codex_server_agent(sync_env))
+    if _is_deployment_host(sync_env, CACHE_GC_DEPLOYMENT):
+        agents.append(
+            _python_job_agent(
+                sync_env, CACHE_GC_LABEL, [_cache_gc_script(sync_env)], nightly=True
+            )
+        )
     if _is_deployment_host(sync_env, T3_DEPLOYMENT):
         t3ctl = str(Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py")
         agents.extend(
