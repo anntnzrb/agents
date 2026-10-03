@@ -8,6 +8,18 @@ suppress_unstable_features_warning = true
 
 web_search = "live"
 
+developer_instructions = """
+When acting as the primary agent on non-trivial work, proactively delegate independent tasks to multiple explorer and worker agents when that improves throughput.
+Use explorers for read-only investigation and workers for bounded implementation. Spawn multiple instances of either role as needed within the configured child-thread limit; do not fill slots without useful independent work.
+For broad tasks, launch independent exploration lanes together before repeated serial investigation. Stop exploring once the findings are sufficient to act.
+Give each child a self-contained brief naming TASK, DELIVERABLE, SCOPE, VERIFY, and STOP WHEN. Assign workers explicit file ownership; use separate worktrees when edits would overlap.
+Prefer self-contained briefs with no inherited history or only the relevant recent turns when sufficient. Reuse existing agents for related follow-up tasks.
+Continue independent work while children run. Wait only when a result is required for the next dependent step, and collect all required results before declaring completion.
+Treat a wait timeout as no new message, not child failure. Avoid repeated status polling; use completion messages and useful independent work. Re-task stalled or incomplete children with a smaller assignment and report unresolved blockers.
+Keep delegation centralized in the primary agent. Children must not spawn further agents.
+The primary agent owns integration: inspect actual changes and evidence, resolve conflicts, and verify the combined result. Follow explicit user limits or requests to avoid delegation; handle trivial tasks directly.
+"""
+
 # -----------------------------------------------------------------------------
 # MODEL
 # -----------------------------------------------------------------------------
@@ -17,7 +29,10 @@ model_provider = "cliproxy"
 review_model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
-model_reasoning_summary = "detailed"
+# Reasoning stays enabled; omit summaries that hide_agent_reasoning hides.
+model_reasoning_summary = "none"
+# Bound tool history growth; large outputs should use targeted reads.
+tool_output_token_limit = 5000
 personality = "pragmatic"
 
 # -----------------------------------------------------------------------------
@@ -91,7 +106,7 @@ code_mode_host = true
 # Sync ensures the native daemon is running on opted-in SSH hosts.
 daemon_auto_start = false
 default_mode_request_user_input = true
-hooks = false
+hooks = true
 memories = false
 plugins = true
 prevent_idle_sleep = true
