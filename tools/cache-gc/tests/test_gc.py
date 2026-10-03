@@ -99,6 +99,24 @@ def test_scratch_skips_entries_owned_by_another_user(tmp_path: Path) -> None:
     assert gc.stale_scratch(tmp_path, os.getuid() + 1, time.time()) == []
 
 
+def test_bun_empties_every_install_cache_location(tmp_path: Path) -> None:
+    """Both the legacy and the XDG bun caches are emptied; the roots survive."""
+    home = tmp_path / "home"
+    caches = [
+        home / ".bun" / "install" / "cache",
+        tmp_path / "xdg" / ".bun" / "install" / "cache",
+    ]
+    for cache in caches:
+        (cache / "pkg@1.0.0").mkdir(parents=True)
+        _ = (cache / "0123.npm").write_text("x")
+
+    gc.clean_bun(home, tmp_path / "xdg", dry_run=False)
+
+    for cache in caches:
+        assert cache.is_dir()
+        assert list(cache.iterdir()) == []
+
+
 def test_npm_is_skipped_while_a_launcher_holds_an_npm_tools_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

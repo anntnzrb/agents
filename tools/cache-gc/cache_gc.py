@@ -10,7 +10,7 @@ directories in /tmp. This script trims those, and nothing else:
 - npm: `npm cache clean --force`, only while holding every npm-tools cache lock,
   so a launcher install never loses its cache mid-flight. A held lock skips npm.
 - uv: `uv cache prune`, which keeps entries in use and skips a locked cache.
-- bun: `bun pm cache rm`.
+- bun: empty the legacy ~/.bun and XDG install caches (tarballs only).
 - /tmp: top-level entries this user owns whose newest modification is older than
   SCRATCH_DAYS. Sockets, multiplexer and service-private directories are kept.
 
@@ -27,7 +27,6 @@ import os
 import shutil
 import stat
 import subprocess
-import tempfile
 import time
 from pathlib import Path
 
@@ -141,17 +140,29 @@ def clean_uv(home: Path, cache_home: Path, *, dry_run: bool) -> None:
     say(f"uv cache {before}M -> {size_mb(cache)}M")
 
 
-def clean_bun(home: Path, *, dry_run: bool) -> None:
-    """Empty bun's global install cache."""
-    cache = home / ".bun" / "install" / "cache"
-    if not cache.is_dir():
-        return
-    before = size_mb(cache)
-    # `bun pm` refuses to run outside a package; give it an empty one.
-    with tempfile.TemporaryDirectory(prefix="cache-gc-bun-") as scratch:
-        _ = (Path(scratch) / "package.json").write_text("{}\n")
-        _ = run(["bun", "pm", "cache", "rm"], dry_run=dry_run, cwd=Path(scratch))
-    say(f"bun cache {before}M -> {size_mb(cache) if cache.exists() else 0}M")
+def clean_bun(home: Path, cache_home: Path, *, dry_run: bool) -> None:
+    """Empty every bun install cache.
+
+    Bun moved its default cache from ~/.bun to the XDG cache home, and
+    `bun pm cache rm` clears only the one it currently resolves, so the legacy
+    cache would grow forever. Both hold re-downloadable tarballs only.
+    """
+    for cache in (
+        home / ".bun" / "install" / "cache",
+        cache_home / ".bun" / "install" / "cache",
+    ):
+        if not cache.is_dir():
+            continue
+        before = size_mb(cache)
+        for entry in list(cache.iterdir()):
+            if dry_run:
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                with contextlib.suppress(OSError):
+                    entry.unlink()
+        say(f"bun cache {cache}: {before}M -> {size_mb(cache)}M")
 
 
 def newest_mtime(path: Path) -> float:
@@ -221,7 +232,7 @@ def main() -> int:
     cache_home = Path(os.environ.get("XDG_CACHE_HOME") or home / ".cache")
     clean_npm(home, cache_home, dry_run=dry_run)
     clean_uv(home, cache_home, dry_run=dry_run)
-    clean_bun(home, dry_run=dry_run)
+    clean_bun(home, cache_home, dry_run=dry_run)
     clean_scratch(SCRATCH_ROOT, days=days, dry_run=dry_run)
     return 0
 
