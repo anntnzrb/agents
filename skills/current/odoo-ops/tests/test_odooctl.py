@@ -473,6 +473,33 @@ class TestStopAndDevLifecycle:
             assert payload.get("status") == "stopped"
             assert mock_run.call_count == 3
 
+    def test_cmd_stop_waits_for_op_lock_and_stops_db_gracefully(self) -> None:
+        """Verify full stop holds the op lock and gives postgres a shutdown window."""
+        args = argparse.Namespace(json=True)
+        lock_depths: list[int] = []
+
+        def record(*_a: object, **_k: object) -> MagicMock:
+            lock_depths.append(odooctl._LOCK_STATE.depth)
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run", side_effect=record) as mock_run,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            code = odooctl.cmd_stop(args)
+
+        assert code == 0
+        assert lock_depths
+        assert all(depth >= 1 for depth in lock_depths)
+        run_cmds = [
+            to_str_list(mock_call_args(call)[0])
+            for call in mock_run.call_args_list
+            if mock_call_args(call) and is_obj_list(mock_call_args(call)[0])
+        ]
+        db_rm = next(c for c in run_cmds if "rm" in c and "odoo-db" in c)
+        assert db_rm[db_rm.index("-t") + 1] == str(odooctl.DB_STOP_TIMEOUT)
+
 
 class TestDatabaseAndSafetyValidation:
     """Tests for database identifier safety, query write checks, and local endpoint validation."""

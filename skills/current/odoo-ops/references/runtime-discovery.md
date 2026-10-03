@@ -45,6 +45,12 @@ Use the CLI subcommands to inspect and manage container state:
 - `prune`: removes orphaned test containers (`odoo-test-*`) left behind after aborted test runs.
 - `stop [--web]`: stops the pod or gracefully stops only the web container.
 
+## Session Lifecycle
+
+`dev` removes `odoo-web` on exit, and `test` removes its `odoo-test-*` container. Both leave `odoo-db` and `odoo-pod` running so repeated tests and other agents reuse the warm database.
+
+When a development session ends, run `stop` to release the database. It waits on `odoo-ops.lock`, so it never interrupts a running test or pod creation; it does not detect a `dev` server or `shell` run by another agent, so check with them first. PostgreSQL receives a fast shutdown and writes a clean checkpoint before its container is removed. Container removal never deletes the bind-mounted data directory (`<runtime>/data/db`) or filestores; the next `dev` or `test` recreates the pod against the same data.
+
 ## Isolation and Multi-Agent Concurrency
 
 The CLI manages container creation and unit test execution through an internal file lock (`odoo-ops.lock`). When multiple agents or tasks run tests concurrently, the CLI serializes execution automatically; external `flock` wrappers are unnecessary.

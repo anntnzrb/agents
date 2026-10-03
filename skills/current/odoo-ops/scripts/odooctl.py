@@ -104,6 +104,8 @@ DEFAULT_DB_CONTAINER = "odoo-db"
 DEFAULT_WEB_CONTAINER = "odoo-web"
 DEFAULT_POSTGRES_IMAGE = "docker.io/library/postgres:15"
 DEFAULT_ODOO_IMAGE = "localhost/odoo17-local:17.0-e-20260527"
+# Seconds postgres gets to finish its shutdown checkpoint before SIGKILL.
+DB_STOP_TIMEOUT = 60
 
 # Standard Base Addons required by Odoo web/enterprise engine
 BASE_ODOO_ADDONS = (
@@ -1121,11 +1123,19 @@ def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> Non
 
 
 def _stop_all() -> None:
-    """Stop and remove all Odoo stack containers and the pod."""
-    _ensure_podman()
-    for name in (DEFAULT_WEB_CONTAINER, DEFAULT_DB_CONTAINER):
-        _ = _run(["podman", "rm", "-f", name], check=False)
-    _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
+    """Stop and remove all Odoo stack containers and the pod.
+
+    Holds the op lock so teardown never interrupts a test run or pod creation.
+    Removing containers keeps the bind-mounted PostgreSQL data directory.
+    """
+    with _op_lock():
+        _ensure_podman()
+        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+        _ = _run(
+            ["podman", "rm", "-f", "-t", str(DB_STOP_TIMEOUT), DEFAULT_DB_CONTAINER],
+            check=False,
+        )
+        _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
