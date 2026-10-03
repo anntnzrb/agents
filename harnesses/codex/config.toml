@@ -29,7 +29,10 @@ model_provider = "cliproxy"
 review_model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
-model_reasoning_summary = "detailed"
+# Reasoning stays enabled; omit summaries that hide_agent_reasoning hides.
+model_reasoning_summary = "none"
+# Bound tool history growth; large outputs should use targeted reads.
+tool_output_token_limit = 5000
 personality = "pragmatic"
 
 # -----------------------------------------------------------------------------
