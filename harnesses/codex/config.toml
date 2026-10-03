@@ -106,7 +106,7 @@ code_mode_host = true
 # Sync ensures the native daemon is running on opted-in SSH hosts.
 daemon_auto_start = false
 default_mode_request_user_input = true
-hooks = false
+hooks = true
 memories = false
 plugins = true
 prevent_idle_sleep = true
