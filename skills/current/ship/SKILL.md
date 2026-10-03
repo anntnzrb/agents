@@ -22,9 +22,10 @@ Read the user's request and relevant conversation before any mutation. Explicit 
 | Implement without a request to publish | Implement | The scoped local change is verified |
 | Open a PR, get it green, or make it merge-ready without a request to ship or merge | Prepare | The scoped PR is verified and merge-ready |
 | Ship, land, or merge when ready, with a clear target | Deliver | The merge is confirmed and linked issues reflect the actual resolution |
+| Clean up merged local branches | Cleanup | Eligible local branches are deleted or reported as skipped |
 | Check status, consider filing, or discuss a possible change | Inspect | Findings only, with no writes |
 
-An explicit request to deliver authorizes the necessary scoped implementation, commits, pushes, PR writes, and merge, subject to project rules and required approvals. Capture authorizes only the scoped issue write. Implement authorizes local edits and verification, not commits or remote writes unless separately requested or allowed by project rules. Prepare authorizes scoped implementation, commits, pushes, and PR writes, but not merge. Skill discovery alone grants no authorization.
+An explicit request to deliver authorizes the necessary scoped implementation, commits, pushes, PR writes, merge, and verified merged local branch cleanup, subject to project rules and required approvals. Cleanup authorizes only the local branch cleanup phase, subject to the same approval requirements. Capture authorizes only the scoped issue write. Implement authorizes local edits and verification, not commits or remote writes unless separately requested or allowed by project rules. Prepare authorizes scoped implementation, commits, pushes, and PR writes, but not merge. Skill discovery alone grants no authorization.
 
 Keep scope bound to the requested target. Shipping an issue covers its acceptance criteria. Shipping a PR covers that PR's intended change, not every unfinished requirement in a linked issue. Report remaining issue scope without implementing it unless authorized.
 
@@ -32,7 +33,7 @@ For a bare invocation, infer the target from the active task only when unambiguo
 
 When the target, repository, or destination remains ambiguous after read-only inspection, present a short lettered menu of plausible choices. Name the target and stopping point for each choice, including whether it publishes or merges. Mark a recommendation when the evidence supports one, but wait for the user's selection before the ambiguous action. Accept a letter or a natural-language choice. Offer only relevant options, not every destination. Ask one focused question instead when missing information cannot be resolved by choosing among known options. Do not show a menu when the request is already clear or use a recommendation as authorization.
 
-State the target and destination briefly, then proceed. Ask only for missing information or permission that changes correctness, safety, cost, or scope. Do authorized work before an approval stop. Do not expand the task into deployment, releases, repository settings, unrelated cleanup, or branch deletion.
+State the target and destination briefly, then proceed. Ask only for missing information or permission that changes correctness, safety, cost, or scope. Do authorized work before an approval stop. Keep branch cleanup within the rules below. Do not expand the task into deployment, releases, repository settings, or unrelated cleanup.
 
 ## Reconstruct and reconcile
 
@@ -79,10 +80,23 @@ Merge-ready means the current patch satisfies acceptance criteria, relevant veri
 3. If merge is queued or automatic, monitor until the PR actually merges or a real blocker appears. A queued request is not completed delivery. Do not claim unattended monitoring after the session ends.
 4. Confirm the remote PR is merged and its change reached the intended branch. Inspect applicable post-merge checks. Report a post-merge failure as a delivery problem rather than concealing it behind a successful merge.
 5. Verify automatic issue closure. Close the linked issue only when its acceptance criteria are fully resolved and closure is authorized by the request. Keep partially resolved issues open with an accurate note. Never claim a closed PR without a merge solved the issue.
+6. Clean up merged local branches using the rules below, including branches merged before this invocation. Resume cleanup when the requested change was already delivered.
+
+## Clean up merged local branches
+
+Run this phase only for Deliver or Cleanup. Honor user and project approval requirements before deletion. Restrict cleanup to the resolved repository. Do not delete remote branches or remove worktrees.
+
+1. Fetch the verified remote's default branch before evaluating candidates. Use its remote-tracking ref, not a stale local `main`. If the fetch fails, report cleanup as blocked.
+2. Inspect local branch tips, upstreams, and `git worktree list --porcelain`. Exclude the default branch, protected branches, and branches checked out in another worktree. Report worktree-bound skips with their checkout paths.
+3. Prove each candidate's current tip is merged. For history-preserving merges, require `git merge-base --is-ancestor <local-tip> <remote-default-ref>` to succeed. A deleted upstream or matching branch name is not merge evidence.
+4. For squash or rebase merges, verify a merged PR in the same repository whose base is the default branch and whose recorded head SHA equals the current local tip. Require its merge commit to be an ancestor of the fetched default branch. If that evidence is unavailable or the branch has later commits, preserve the branch and report why.
+5. Before deleting the current branch, require a clean checkout, including untracked files. Switch to the local default branch and update it only with a fast-forward from the fetched default branch. If switching or fast-forwarding fails, preserve the branch. Never stash, reset, or discard work to enable cleanup.
+6. Recheck the candidate tip and worktree occupancy immediately before deletion. Prefer `git branch -d -- <branch>`. Git checks the upstream or current HEAD, which can differ from the fetched default branch. If Git rejects deletion as not fully merged, use `git branch -D -- <branch>` only after repeating the ancestry proof from step 3 or the exact-tip merged PR proof from step 4, with required approvals. Preserve branches when deletion fails for another reason.
+7. Verify deleted refs are absent. Report deleted branches and skipped candidates with their reasons. Repeated cleanup must leave surviving work intact.
 
 ## Report the result
 
-Report the destination reached, issue and PR links when present, observed verification, and any blocker or remaining scope. For delivery, include the merged commit and target branch. Distinguish captured, locally verified, merge-ready, queued, merged, and blocked. Keep the report concise and cite actual artifacts rather than intention or worker summaries.
+Report the destination reached, issue and PR links when present, observed verification, and any blocker or remaining scope. For delivery, include the merged commit, target branch, and local branch cleanup result. Distinguish captured, locally verified, merge-ready, queued, merged, and blocked. Keep the report concise and cite actual artifacts rather than intention or worker summaries.
 
 ## Common calls
 
