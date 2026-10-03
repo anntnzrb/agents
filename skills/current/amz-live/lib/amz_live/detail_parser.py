@@ -80,7 +80,7 @@ def _extract_merchant_fields(tree: LexborHTMLParser) -> dict[str, str]:
 
 def _extract_text(tree: LexborHTMLParser, selectors: tuple[str, ...]) -> str | None:
     for selector in selectors:
-        node = tree.css_first(selector)
+        node = tree.css_first(selector, strict=False)
         if node is None:
             continue
         text = _clean_text(node.text(separator=" ", strip=True))

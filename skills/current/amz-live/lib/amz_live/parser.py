@@ -127,7 +127,7 @@ def _extract_badges(node: LexborNode) -> tuple[str, ...]:
 
 def _first_text(node: LexborNode, selectors: tuple[str, ...]) -> str | None:
     for selector in selectors:
-        match = node.css_first(selector)
+        match = node.css_first(selector, strict=False)
         if match is None:
             continue
         text = _clean_text(match.text(separator=" ", strip=True))
