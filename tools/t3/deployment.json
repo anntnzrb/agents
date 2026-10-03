@@ -1,5 +1,5 @@
 {
-	"hosts": ["munich", "oulu"],
+	"hosts": [],
 	"channel": "nightly",
 	"exposure": {
 		"tailscaleServe": true,
