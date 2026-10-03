@@ -141,6 +141,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 - `write-batch`: takes positional `model` and `file` mapping record ID to values dict.
 - RPC flag placement: `--allow-rpc` can appear before or after the subcommand. Placing RPC flags before `rpc` exits 2 with a hint.
 - On production: passing `--write` on direct mutations is blocked; `--write` is valid exclusively with `apply <plan-id>`.
+- `stop`: run when the development session ends; `dev` and `test` leave `odoo-db` running for reuse. It waits for running tests and keeps database data and filestores. `stop --web` leaves the database up.
 - Container logs: use `logs -c web|db|test`. Container names are `odoo-db` and `odoo-web`.
 - Use `127.0.0.1` rather than `localhost` to avoid IPv6 binding failures.
 - Do not run `git stash` while `dev` is running; filesystem changes trigger autoreload crashes.

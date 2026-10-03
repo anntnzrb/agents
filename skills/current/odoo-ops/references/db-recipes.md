@@ -63,7 +63,7 @@ uv run --script <skill-dir>/scripts/cli.py logs -c web -f
 uv run --script <skill-dir>/scripts/cli.py logs -c db -n 100
 uv run --script <skill-dir>/scripts/cli.py logs -c test
 
-# Stop the pod or stop only the web container
+# End a session (keeps data) or stop only the web container
 uv run --script <skill-dir>/scripts/cli.py stop
 uv run --script <skill-dir>/scripts/cli.py stop --web
 
