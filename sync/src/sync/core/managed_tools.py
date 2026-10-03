@@ -24,6 +24,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sync.core.cliproxy_deployment import (
+    CLI_PROXY_SOURCE_DIR,
     CliProxyDeployment,
     cliproxy_models_url,
 )
@@ -91,7 +92,7 @@ class PreparedManagedTool:
     command: str
     executable: str
     version: str
-    config_path: str = ""
+    config_path: str
 
 
 type DownloadFn = Callable[[str, str, int], None]
@@ -124,7 +125,6 @@ class ManagedToolInstallContext:
     config_path: str
     timeout_ms: int
     runtime: ManagedToolRuntime | None
-    tool_name: str = TOOL_NAME
 
 
 @dataclass(frozen=True)
@@ -360,10 +360,9 @@ def _newest_cached_install(
     cache_home: str,
     platform_key: str,
     repository: str,
-    tool_name: str = TOOL_NAME,
 ) -> tuple[str, Path, dict[str, object]] | None:
     """Return the newest cached install for a repository and platform, if any."""
-    versions_root = Path(cache_home) / "github-tools" / tool_name / "versions"
+    versions_root = Path(cache_home) / "github-tools" / TOOL_NAME / "versions"
     if not versions_root.is_dir():
         return None
     best: tuple[tuple[int, ...], str, Path, dict[str, object]] | None = None
@@ -408,7 +407,7 @@ def _resolve_cache_home(
 def _ensure_staged_executable(stage_path: Path, executable_name: str) -> None:
     staged_executable = stage_path / executable_name
     if not staged_executable.is_file():
-        message = f"release archive is missing {executable_name}"
+        message = f"CLIProxyAPI archive is missing {executable_name}"
         raise RuntimeError(message)
     staged_executable.chmod(EXECUTABLE_MODE)
 
@@ -438,7 +437,6 @@ def _cached_tool(
         context.cache_home,
         context.platform_key,
         context.manifest.repository,
-        context.tool_name,
     )
     if cached is None:
         return None
@@ -447,13 +445,9 @@ def _cached_tool(
     if not is_executable(executable):
         return None
     detail = panic_message(error)
-    message = (
-        f"{context.tool_name} latest lookup failed; "
-        f"using cached {cached_version} ({detail})"
-    )
-    warn(message)
+    warn(f"CLIProxyAPI latest lookup failed; using cached {cached_version} ({detail})")
     return PreparedManagedTool(
-        name=context.tool_name,
+        name=TOOL_NAME,
         command=context.executable_name,
         executable=str(executable),
         version=cached_version,
@@ -479,15 +473,12 @@ def _resolve_checksum(
     try:
         entries = fetch_fn(checksums_url, context.timeout_ms)
     except Exception as exc:
-        message = (
-            f"install {context.tool_name} {resolved_version} ({panic_message(exc)})"
-        )
+        message = f"install CLIProxyAPI {resolved_version} ({panic_message(exc)})"
         raise RuntimeError(message) from exc
     sha256 = entries.get(asset_name)
     if sha256 is None:
         message = (
-            f"install {context.tool_name} {resolved_version} "
-            f"(checksums missing {asset_name})"
+            f"install CLIProxyAPI {resolved_version} (checksums missing {asset_name})"
         )
         raise RuntimeError(message)
     return sha256
@@ -550,19 +541,16 @@ def _install_verified_archive(
         _ = stage_path.replace(install_dir)
     except Exception as exc:
         shutil.rmtree(stage_dir, ignore_errors=True)
-        message = (
-            f"install {context.tool_name} {release.version} ({panic_message(exc)})"
-        )
+        message = f"install CLIProxyAPI {release.version} ({panic_message(exc)})"
         raise RuntimeError(message) from exc
 
 
-def prepare_release_tool(
+def prepare_cli_proxy(
     sync_env: SyncEnv,
-    tool_name: str,
     manifest_path: str | Path,
     runtime: ManagedToolRuntime | None = None,
 ) -> PreparedManagedTool:
-    """Download, verify, extract, and stage a pinned managed tool binary.
+    """Download, verify, extract, and stage the CLIProxyAPI tool binary.
 
     Manifests with ``version: "latest"`` resolve the newest GitHub release at
     install time; a cached install is reused when the lookup fails so offline
@@ -575,17 +563,13 @@ def prepare_release_tool(
     platform_key = f"{platform_name}-{arch}"
     asset = manifest.assets.get(platform_key)
     if asset is None:
-        message = f"{tool_name} has no release asset for {platform_key}"
+        message = f"CLIProxyAPI has no release asset for {platform_key}"
         raise RuntimeError(message)
 
     executable_name = manifest.binary
     cache_home = _resolve_cache_home(sync_env, runtime)
     home = sync_env.home
-    config_path = (
-        str(Path(home) / ".cli-proxy-api" / "config.yaml")
-        if tool_name == TOOL_NAME
-        else ""
-    )
+    config_path = str(Path(home) / ".cli-proxy-api" / "config.yaml")
     timeout_ms = sync_env.install_timeout_ms
 
     context = ManagedToolInstallContext(
@@ -596,7 +580,6 @@ def prepare_release_tool(
         config_path=config_path,
         timeout_ms=timeout_ms,
         runtime=runtime,
-        tool_name=tool_name,
     )
 
     try:
@@ -611,7 +594,7 @@ def prepare_release_tool(
     install_dir = (
         Path(cache_home)
         / "github-tools"
-        / tool_name
+        / TOOL_NAME
         / "versions"
         / resolved_version
         / platform_key
@@ -641,21 +624,12 @@ def prepare_release_tool(
         _install_verified_archive(context, release)
 
     return PreparedManagedTool(
-        name=tool_name,
+        name=TOOL_NAME,
         command=executable_name,
         executable=str(executable),
         version=resolved_version,
         config_path=config_path,
     )
-
-
-def prepare_cli_proxy(
-    sync_env: SyncEnv,
-    manifest_path: str | Path,
-    runtime: ManagedToolRuntime | None = None,
-) -> PreparedManagedTool:
-    """Prepare CLIProxyAPI with its configuration-aware wrapper metadata."""
-    return prepare_release_tool(sync_env, TOOL_NAME, manifest_path, runtime)
 
 
 def sys_platform() -> str:
@@ -668,19 +642,13 @@ def sys_platform() -> str:
 def prepare_managed_tools(
     sync_env: SyncEnv,
     runtime: ManagedToolRuntime | None = None,
-    *,
-    gateway_host: bool = True,
 ) -> list[PreparedManagedTool]:
     """Prepare all managed tools defined in SSOT environment."""
-    prepared: list[PreparedManagedTool] = []
-    names = ("kestractl", TOOL_NAME) if gateway_host else ("kestractl",)
-    for name in names:
-        tool_manifest_path = Path(sync_env.ssot_home) / "tools" / name / RELEASE_FILE
-        if tool_manifest_path.exists():
-            prepared.append(
-                prepare_release_tool(sync_env, name, tool_manifest_path, runtime)
-            )
-    return prepared
+    ssot_home = sync_env.ssot_home
+    manifest_path = Path(ssot_home) / CLI_PROXY_SOURCE_DIR / RELEASE_FILE
+    if not manifest_path.exists():
+        return []
+    return [prepare_cli_proxy(sync_env, manifest_path, runtime)]
 
 
 def is_cli_proxy_running(

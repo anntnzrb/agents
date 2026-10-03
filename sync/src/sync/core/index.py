@@ -202,11 +202,9 @@ async def run_sync(
 
     managed_tools: list[PreparedManagedTool] = []
     managed_tool_success = base_success
-    if base_success:
+    if base_success and sync_plan.gateway_host:
         try:
-            managed_tools = list(
-                prepare_managed_tools(sync_env, gateway_host=sync_plan.gateway_host)
-            )
+            managed_tools = list(prepare_managed_tools(sync_env))
         except (OSError, RuntimeError, ValueError, TypeError) as error:
             err(panic_message(error))
             managed_tool_success = False

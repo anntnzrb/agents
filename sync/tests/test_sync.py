@@ -2148,8 +2148,7 @@ def test_run_sync_bootstraps_python_env_from_adapter_declaration(
     def _empty_managed_plan(_env: object, _plan: object) -> ManagedSyncPlan:
         return ManagedSyncPlan(harnesses=[])
 
-    def _no_managed_tools(_env: object, *, gateway_host: bool = True) -> list[object]:
-        _ = gateway_host
+    def _no_managed_tools(_env: object) -> list[object]:
         return []
 
     async def _skip_hooks(_hooks: object, _states: object) -> bool:

@@ -158,14 +158,12 @@ def managed_tool_wrapper_destination(
 def render_managed_tool_wrapper(tool: PreparedManagedTool) -> str:
     """Render a POSIX shell script wrapper for a managed tool binary."""
     quoted_exec = shell_quote(tool.executable)
-    config_arg = (
-        f" --config {shell_quote(tool.config_path)}" if tool.config_path else ""
-    )
+    quoted_cfg = shell_quote(tool.config_path)
     lines = [
         "#!/bin/sh",
         f"# {WRAPPER_MARKER}",
         "set -eu",
-        f'exec {quoted_exec}{config_arg} "$@"',
+        f'exec {quoted_exec} --config {quoted_cfg} "$@"',
         "",
     ]
     return "\n".join(lines)
