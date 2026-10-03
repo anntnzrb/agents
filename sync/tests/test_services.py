@@ -22,6 +22,7 @@ from sync.core.services import (
     AMP_RUNNER_LABEL,
     AMP_RUNNER_UPDATE_LABEL,
     AUTH_GATEWAY_ENV,
+    CACHE_GC_LABEL,
     LAUNCHD_LABEL,
     T3_REFRESH_LABEL,
     T3_UPDATE_LABEL,
@@ -398,6 +399,50 @@ def test_t3_model_refresh_timer_only_on_declared_t3_hosts(
     assert f"{home}/.config/agents/tools/t3/t3ctl.py refresh-models" in service
     assert "[Install]" not in service
     assert "OnUnitActiveSec=" in units["t3-refresh-models.timer"].content
+
+
+def _declare_cache_gc_hosts(home: Path, hosts: list[str]) -> None:
+    deployment = home / ".config" / "agents" / "tools" / "cache-gc"
+    deployment.mkdir(parents=True, exist_ok=True)
+    _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": hosts}))
+
+
+def test_cache_gc_runs_nightly_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declared host sweeps package caches nightly at idle priority."""
+    monkeypatch.setattr("socket.gethostname", lambda: "oulu")
+    _declare_cache_gc_hosts(home, ["munich"])
+    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+
+    _declare_cache_gc_hosts(home, ["munich", "Oulu"])
+    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    assert set(units) == {"cache-gc.service", "cache-gc.timer"}
+    service = units["cache-gc.service"].content
+    assert f"{home}/.config/agents/tools/cache-gc/cache_gc.py" in service
+    assert "Type=oneshot" in service
+    assert "Nice=19" in service
+    assert "IOSchedulingClass=idle" in service
+    assert "[Install]" not in service
+    assert "OnCalendar=" in units["cache-gc.timer"].content
+
+
+def test_darwin_declares_cache_gc_agent_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Mac host gets the same nightly sweep as a launch agent."""
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut.local")
+    darwin = SyncEnv.from_home(str(home), platform="darwin")
+    _declare_cache_gc_hosts(home, ["munich"])
+    assert declared_launch_agents(darwin) == []
+
+    _declare_cache_gc_hosts(home, ["beirut"])
+    agents = {a.name: a.content for a in declared_launch_agents(darwin)}
+    assert set(agents) == {CACHE_GC_LABEL}
+    sweep = agents[CACHE_GC_LABEL]
+    assert f"<string>{home}/.config/agents/tools/cache-gc/cache_gc.py</string>" in sweep
+    assert "<key>StartCalendarInterval</key>" in sweep
+    assert "KeepAlive" not in sweep
 
 
 def test_darwin_declares_updater_and_runner_launch_agents(
