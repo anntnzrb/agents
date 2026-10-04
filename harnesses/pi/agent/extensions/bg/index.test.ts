@@ -4,6 +4,11 @@ import { access } from "node:fs/promises";
 import bg, { middle } from "./index.ts";
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Waits for an asynchronous effect with a generous deadline, so slow runners do not flake.
+async function until(ready: () => boolean, ms = 10000) {
+  const deadline = Date.now() + ms;
+  while (!ready() && Date.now() < deadline) await pause(20);
+}
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 function load(settings = {}, mode = "rpc", hasUI = true) {
@@ -29,10 +34,11 @@ function load(settings = {}, mode = "rpc", hasUI = true) {
 test("threshold backgrounds, streams to disk, and delivers automatically", async () => {
   const h = load(); const start = Date.now();
   const r = await h.bash("printf start; sleep 0.2; printf end");
-  expect(Date.now() - start).toBeLessThan(180);
+  expect(Date.now() - start).toBeLessThan(5000);
+  expect(h.text(r)).not.toContain("end");
   expect(h.text(r)).toContain("polling is unnecessary");
   expect(h.text(r)).toContain("start");
-  await pause(1300);
+  await until(() => h.messages.length > 0);
   expect(h.messages).toHaveLength(1);
   expect(h.messages[0].content).toContain("startend");
   expect(h.messages[0].options).toEqual({ deliverAs: "followUp", triggerTurn: true });
@@ -45,7 +51,7 @@ test("fast command preserves built-in shape and output", async () => {
 });
 test("coalesces exits", async () => {
   const h = load(); await h.bash("sleep 0.1; echo one", true); await h.bash("sleep 0.2; echo two", true);
-  await pause(1400); expect(h.messages).toHaveLength(1);
+  await until(() => h.messages.length > 0); await pause(1200); expect(h.messages).toHaveLength(1);
   expect(h.messages[0].content).toContain("one"); expect(h.messages[0].content).toContain("two");
 });
 test("SIGKILL is 137, not success", async () => {
@@ -54,19 +60,23 @@ test("SIGKILL is 137, not success", async () => {
 });
 test("offset reads return only new bytes", async () => {
   const h = load(); const r = await h.bash("printf abc; sleep 0.3; printf def", true); const id = h.id(r);
-  await pause(80); const first = await h.jobs("output", id);
+  let first = await h.jobs("output", id);
+  for (const end = Date.now() + 10000; !h.text(first).includes("abc") && Date.now() < end; first = await h.jobs("output", id)) await pause(20);
   expect(first.details).toMatchObject({ offset: 3 }); expect(h.text(first)).toContain("abc");
   await h.jobs("wait", id); const second = await h.jobs("output", id, { offset: 3 });
   expect(second.details).toMatchObject({ offset: 6 }); expect(h.text(second)).toContain("def"); expect(h.text(second)).not.toContain("abc");
 });
 const tree = `bash -c 'sleep 20 & echo $!; wait' & echo $!; wait`;
 async function pids(h: ReturnType<typeof load>, id: string) {
-  await pause(100); return h.text(await h.jobs("output", id)).match(/^\d+$/gm)!.map(Number);
+  let found: number[] = [];
+  for (const end = Date.now() + 10000; found.length < 2 && Date.now() < end; await pause(20)) found = (h.text(await h.jobs("output", id)).match(/^\d+$/gm) ?? []).map(Number);
+  return found;
 }
-function gone(pid: number) { expect(() => process.kill(pid, 0)).toThrow(); }
+function alive(pid: number) { try { process.kill(pid, 0); return true; } catch { return false; } }
+async function gone(pids: number[]) { await until(() => pids.every(pid => !alive(pid))); pids.forEach(pid => expect(alive(pid)).toBe(false)); }
 test("kill terminates child and grandchild process group", async () => {
   const h = load(); const id = h.id(await h.bash(tree, true)); const children = await pids(h, id);
-  expect(children).toHaveLength(2); await h.jobs("kill", id); await pause(100); children.forEach(gone);
+  expect(children).toHaveLength(2); await h.jobs("kill", id); await gone(children);
 });
 test("wait consumes without duplicate follow-up", async () => {
   const h = load(); const id = h.id(await h.bash("sleep 0.1; echo consumed", true));
@@ -76,17 +86,17 @@ test("aborted wait preserves undelivered result", async () => {
   const h = load(); const id = h.id(await h.bash("echo retained", true)); await pause(100);
   const abort = new AbortController(); abort.abort();
   await expect(h.jobs("wait", id, {}, abort.signal)).rejects.toThrow();
-  await pause(1200); expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("retained");
+  await until(() => h.messages.length > 0); expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("retained");
 });
 test("shutdown is idempotent, kills everything and removes logs", async () => {
   const h = load(); const r = await h.bash(tree, true); const children = await pids(h, h.id(r));
   const path = h.text(r).match(/Log: (\S+)/)![1]; await access(path);
-  await h.shutdown(); await h.shutdown(); await pause(100); children.forEach(gone); await expect(access(path)).rejects.toThrow();
+  await h.shutdown(); await h.shutdown(); await gone(children); await expect(access(path)).rejects.toThrow();
 });
 test("hard maximum kills the job", async () => {
   const h = load({ maxJobMs: 100 }); const id = h.id(await h.bash("echo $$; exec sleep 20", true));
   const r = await h.jobs("wait", id); expect(h.text(r)).toContain("exit 137");
-  gone(Number(h.text(r).match(/^\d+$/m)![0]));
+  await gone([Number(h.text(r).match(/^\d+$/m)![0])]);
 });
 test("print mode passes through and rejects explicit background", async () => {
   const h = load({}, "print", false); const start = Date.now();
