@@ -24,7 +24,7 @@ Generated homes are overwritten on every sync, so an edit there is lost and the 
 
 ## Skills
 
-Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`
+Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`. New skills follow its "Create a skill" procedure.
 
 ## Documentation Gate
 

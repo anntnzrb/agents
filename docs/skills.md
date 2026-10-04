@@ -6,10 +6,38 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 
 1. Read the policy sections below.
 2. Edit `skills/current/<name>/`.
-3. Run the skill's focused tests.
-4. Run the validation that matches the changed files.
-5. Run `uv run --project sync sync` from the repository root.
-6. Inspect the generated skill in one harness home.
+3. For a skill with Python code, run its gates and tests as described in [Validate Python skills](#validate-python-skills-standard).
+4. Run the checks that match the changed files: [Validate an executable skill](#validate-an-executable-skill) and [Validate skill metadata](#validate-skill-metadata).
+5. Complete the [Final authoring review](#final-authoring-review).
+6. Commit with the `autommit` skill; the subject starts with `skills(<name>):`. Open a pull request as described in [Verify a change in CI](ci.md#merge-a-pull-request).
+7. Run `uv run --project sync sync` from `~/.config/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/.config/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
+
+## Create a skill
+
+Sync publishes every skill to every enabled harness, so each new skill spends discovery context everywhere.
+
+1. Read the `name` and `description` of the existing skills near the new capability in `skills/current/*/SKILL.md`. If an existing skill fits, extend it instead. Follow the [Metadata budget](#metadata-budget).
+2. For a port, check the upstream license under [Licensing](#licensing) before copying anything. Add `NOTICE.md` with the upstream notices. If the upstream keeps evolving, add `UPSTREAM.json` as described in [Track upstream ports](#track-upstream-ports).
+3. Load the `skill-creator` skill for drafting, evaluation, and trigger review. No scaffold command exists; start from a similar skill's layout.
+4. Create `skills/current/<name>/SKILL.md`. The directory name and the frontmatter `name` match and use lowercase letters, digits, and single hyphens. Replace every placeholder; `quick-validate` rejects angle brackets in `description`:
+
+   ```yaml
+   ---
+   name: <name>
+   description: "Use when <user situation with distinctive capability nouns>."
+   license: AGPL-3.0-or-later
+   ---
+   ```
+
+   Write `description` as a trigger under the [Metadata budget](#metadata-budget). Structure the body by [Documentation structure](#documentation-structure) and [Model-facing text](#model-facing-text).
+5. For an executable skill, add `scripts/cli.py` with PEP 723 metadata, the `pyproject.toml` from [Validate Python skills](#validate-python-skills-standard), and tests under `tests/`. Follow the [Skill package policy](#skill-package-policy) and [Portability constraints](#portability-constraints).
+6. Run the checks in steps 3 to 5 of [Change a skill](#change-a-skill), then validate every active skill:
+
+   ```bash
+   uv run --script .github/scripts/ci.py metadata
+   ```
+
+7. Commit and open a pull request as in [Change a skill](#change-a-skill). Check which CI jobs the branch gets with `uv run --script .github/scripts/ci.py plan --base origin/main`; [Verify a change in CI](ci.md#maintain-merge-protection) explains the selection.
 
 Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
 
@@ -122,8 +150,9 @@ To resolve an issue:
 1. Read the upstream diff. Port changes that improve the skill and fit this setup; skip vendor-specific ones such as model slugs, vendor tool parameters, and vendor paths.
 2. Apply the skill gate to the ported text, including the final authoring review. Never copy an upstream `description`. Upstream descriptions are usually summaries; here the description is the trigger, so keep the local one or rewrite it under the [Metadata budget](#metadata-budget).
 3. Update the pin: `commit`, `release` for release pins, every tree hash, and `watch` entries for each new directory reviewed, ported or not.
+4. Put `Closes #<issue>` in the pull request body. The workflow creates and refreshes drift issues but never closes them.
 
-Check locally; the command exits `1` while any pin is behind:
+Check locally with an authenticated `gh`; the command exits `1` while any pin is behind:
 
 ```bash
 uv run --script .github/scripts/upstream.py
@@ -145,7 +174,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 ## Skill package policy
 
 - Public entrypoint: `scripts/cli.py`, invoked as `uv run --script <skill-dir>/scripts/cli.py ...`.
-- Standalone `pyproject.toml` per skill with pinned dev tools; see Validate Python files.
+- Standalone `pyproject.toml` per Python skill with tool configuration only; `skill-creator` pins the gate tools. See [Validate Python skills](#validate-python-skills-standard).
 - Put reusable code in `lib/<module>/`; make `scripts/cli.py` add `lib/` to `sys.path`.
 - Declare inline dependencies in `scripts/cli.py` using PyPA inline script metadata (PEP 723 `# /// script` block).
 - Skills this gate requires (`skill-creator`, `technical-writing`, `pstack-principles`, `unslop`) MUST stay model-invocable; do not set `disable-model-invocation: true` on them, because harnesses that honor it hide the skill from the agent.
