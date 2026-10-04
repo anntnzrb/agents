@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import override
 
@@ -148,6 +149,41 @@ class _RewriteSandbox(unittest.TestCase):
 
 class RewriteTests(_RewriteSandbox):
     """Cover the frozen tree, dependency order, refusals, and dry runs."""
+
+    def test_frozen_tree_whitespace_refuses_before_model(self) -> None:
+        _ = (self.repo / "alpha.txt").write_text("alpha \n", encoding="utf-8")
+        # Commit the defect: an index-only check would miss it.
+        _ = self.git("add", "alpha.txt")
+        _ = self.git("commit", "-m", "bad whitespace")
+        before = self.git("rev-parse", "HEAD")
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            raise AssertionError("gate must refuse before inference")
+
+        self.assertEqual(run_rewrite(self.options(post=post)), 4)
+        self.assertEqual(self.git("rev-parse", "HEAD"), before)
+        self.assertEqual(run_rewrite(self.options(dry_run=True)), 4)
+        self.assertEqual(
+            run_rewrite(replace(self.options(dry_run=True), no_verify=True)), 0
+        )
+
+    def test_gate_judges_worktree_not_index_and_skips_hook(self) -> None:
+        _ = (self.repo / "alpha.txt").write_text("alpha \n", encoding="utf-8")
+        _ = self.git("add", "alpha.txt")
+        _ = (self.repo / "alpha.txt").write_text("alpha\n", encoding="utf-8")
+        hook = self.repo / ".git" / "hooks" / "pre-commit"
+        _ = hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        hook.chmod(0o755)
+        self.assertEqual(run_rewrite(self.options(dry_run=True)), 0)
+
+    def test_unchanged_base_whitespace_is_not_introduced(self) -> None:
+        _ = (self.repo / "README.md").write_text("readme \n", encoding="utf-8")
+        _ = self.git("add", "README.md")
+        _ = self.git("commit", "-m", "legacy whitespace")
+        base = self.git("rev-parse", "HEAD").strip()
+        _ = (self.repo / "alpha.txt").write_text("alpha changed\n", encoding="utf-8")
+        self.assertEqual(run_rewrite(self.options(base=base, dry_run=True)), 0)
 
     def test_rewrite_rebuilds_commits_and_preserves_the_frozen_tree(self) -> None:
         target = self.frozen_tree()

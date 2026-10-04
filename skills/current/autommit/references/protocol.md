@@ -52,11 +52,12 @@ uv run --script <skill-dir>/scripts/cli.py rewrite --base <rev> [options]
 
 1. Resolves `--base` (default order: `origin/HEAD`, `origin/main`, `main`) and refuses a revision that is not an ancestor of `HEAD`.
 2. Freezes the current worktree, including uncommitted work, into a target tree through a temporary index, so the real index is never touched.
+   Before any model call, checks introduced whitespace with `git diff --check <base> <frozen-tree> --`. A failure refuses with `hook_failed` (exit 4) and includes the gate output. `--dry-run` runs this check too; `--no-verify` skips it.
 3. Builds the planner evidence from the range diff between `--base` and that target tree.
 4. Rebuilds the commits in dependency order inside a detached temporary worktree placed at `--base`.
 5. Requires the rebuilt tip tree to equal the frozen target tree, then moves the branch with one compare-and-swap and refreshes the index. Worktree files never change.
 
-The previous tip is reported as the recovery point and stays reachable through the reflog. `rewrite` never pushes. It does not run the pre-commit gate: its target is the frozen worktree, not the index that `git diff --cached --check` and a pre-commit hook judge. Use `--dry-run` to print the frozen scope without a model call.
+The previous tip is reported as the recovery point and stays reachable through the reflog. `rewrite` never pushes. The whitespace gate checks exactly the final tree rewrite publishes against `--base`, including committed and uncommitted changes. Existing whitespace unchanged from the base is not an introduced defect. Rewrite does not run the repository pre-commit hook or `git diff --cached --check`: they inspect the real index, not the frozen target tree. Use `--dry-run` to print the frozen scope without a model call.
 
 ### `models`
 
@@ -193,7 +194,7 @@ Valves: concern <=512 characters; rationale <=2,048 characters; concern count is
 |1|Provider or network failure|Wait for the provider, or configure another endpoint|
 |2|Usage, JSON, plan, coverage, config, or critic error|Correct bounded model/input data; retry only within workflow limits|
 |3|Lock, snapshot, branch, index, in-progress Git state, or receipt refusal|Preserve state; report exact blocker|
-|4|Git, filesystem, cleanup, or smoke failure; `hook_failed` when the pre-commit gate rejects the staged state|Preserve state and inspect evidence; for `hook_failed`, fix the staged changes and rerun|
+|4|Git, filesystem, cleanup, or smoke failure; `hook_failed` when the staged pre-commit gate or frozen-tree whitespace gate fails|Preserve state and inspect evidence; for `hook_failed`, fix the rejected changes and rerun|
 |127|Git executable unavailable|Install/fix Git before retrying|
 |130|Cancelled by a signal|Lock released, temporary worktree removed; no commits were created|
 
@@ -205,6 +206,6 @@ Autommit never restores a recovery point automatically. Read it, inspect the rep
 
 ## Environment Invariants
 
-Every Git invocation pins diff shape so hunk indices stay portable across machines: `core.quotepath=false`, `diff.mnemonicprefix=false`, `diff.noprefix=false`, `diff.algorithm=myers`, `diff.renames=true`, `diff.interHunkContext=0`, and the diff flags `--no-color --no-ext-diff --no-textconv`. `GIT_DIFF_OPTS` and `GIT_EXTERNAL_DIFF` are dropped from the environment, and `GIT_PAGER` is `cat`. Commits are created with `core.hooksPath=` and `--no-verify` inside the temporary worktree. Each commit there holds a partial state that the branch never receives on its own, so a hook would judge the wrong tree, and a hook that rewrites files would break tree equality. Repository hooks run once instead, as the pre-commit gate on the full staged snapshot before planning; tree equality then guarantees that the published tip has the tree of that snapshot. Pass `--smoke` to run validation on each commit deliberately.
+Every Git invocation pins diff shape so hunk indices stay portable across machines: `core.quotepath=false`, `diff.mnemonicprefix=false`, `diff.noprefix=false`, `diff.algorithm=myers`, `diff.renames=true`, `diff.interHunkContext=0`, and the diff flags `--no-color --no-ext-diff --no-textconv`. `GIT_DIFF_OPTS` and `GIT_EXTERNAL_DIFF` are dropped from the environment, and `GIT_PAGER` is `cat`. Commits are created with `core.hooksPath=` and `--no-verify` inside the temporary worktree. Each commit there holds a partial state that the branch never receives on its own, so a hook would judge the wrong tree, and a hook that rewrites files would break tree equality. In `run`, repository hooks run once instead, as the pre-commit gate on the full staged snapshot before planning; tree equality then guarantees that the published tip has the tree of that snapshot. Rewrite runs only the frozen-tree whitespace gate described above. Pass `--smoke` to run validation on each commit deliberately.
 
 Locks are never broken automatically. A prepared receipt is durable recovery evidence. Re-run `prepare` to recover it under the same branch and index state.
