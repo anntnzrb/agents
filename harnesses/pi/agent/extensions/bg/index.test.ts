@@ -1,8 +1,10 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { access } from "node:fs/promises";
 import bg, { middle } from "./index.ts";
 
+// Above the 10 s `until` deadline plus fixed pauses, so slow runners fail on assertions, not the runner clock.
+setDefaultTimeout(30000);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Waits for an asynchronous effect with a generous deadline, so slow runners do not flake.
 async function until(ready: () => boolean, ms = 10000) {
