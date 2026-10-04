@@ -1,4 +1,7 @@
 {
+  "bg": {
+    "thresholdMs": 5000
+  },
   "cacheWarming": "idle",
   "collapseChangelog": true,
   "codemode": {
