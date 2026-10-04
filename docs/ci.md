@@ -83,6 +83,10 @@ Clean up only after the merge is confirmed. Deleting a branch whose PR is still 
 
 Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one grouped weekly PR per ecosystem: GitHub Actions, uv lock files under `sync/` and `skills/current/*/`, and the bun harness packages. The `auto-merge` workflow queues each Dependabot PR to merge once `CI required` passes. Workflows reference actions by version tag, not commit SHA, so these PRs stay readable; tool versions that are pinned in commands, such as the `uvx` gate tools and the skill-creator gate pins, are updated by hand.
 
+## Repository settings
+
+The Settings app (https://github.com/apps/settings) syncs [`.github/settings.yml`](../.github/settings.yml) to GitHub whenever it changes on `main`. The file extends the shared baseline in the `anntnzrb/.github` repository; change a value for every repository there, or override it here for this one. The app does not manage rulesets, so merge protection below stays a separate setting.
+
 ## Maintain merge protection
 
 The default branch's ruleset requires `CI required` from GitHub Actions. Keep the final check name stable when changing job selection. Preserve existing protection rules, and do not add bypass actors to make a failing change mergeable.
