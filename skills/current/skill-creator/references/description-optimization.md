@@ -56,6 +56,8 @@ Tune on about 60% of the queries and score the final description on the held-out
 
 Keep tuning and held-out cases in separate files. Run `trigger-eval` against the tuning file while comparing overrides, then against the held-out file once the wording is fixed.
 
+A passing score shows the description picks the right skill when the model is asked to choose. To check what the agent does during real work, run real tasks and count reads of the skill's `SKILL.md`; some harnesses read skills through a URL scheme such as `skill://<name>` instead of a file path, so count both. Add a routing line to global instructions only when that count shows a miss: a routing line can also make the skill load where it does not apply.
+
 Use repeated model evaluation when investigating trigger failures or comparing candidate wording. Do not require network access or a model judge for ordinary metadata validation. Report model routing scores separately from structural validation results.
 
 ## Apply the result

@@ -30,7 +30,7 @@ Sync publishes every skill to every enabled harness, so each new skill spends di
    ```
 
    Write `description` as a trigger under the [Metadata budget](#metadata-budget). Structure the body by [Documentation structure](#documentation-structure) and [Model-facing text](#model-facing-text).
-5. For an executable skill, add `scripts/cli.py` with PEP 723 metadata, the `pyproject.toml` from [Validate Python skills](#validate-python-skills-standard), and tests under `tests/`. Follow the [Skill package policy](#skill-package-policy) and [Portability constraints](#portability-constraints).
+5. For an executable skill, add `scripts/cli.py` with PEP 723 metadata, the `pyproject.toml` from [Validate Python skills](#validate-python-skills-standard), and tests under `tests/`. Tests drive `scripts/cli.py` as a subprocess with real files in a temporary directory; replace only external services, with a loopback fixture. Unit-test pure logic. Follow the [Skill package policy](#skill-package-policy) and [Portability constraints](#portability-constraints).
 6. Run the checks in steps 3 to 5 of [Change a skill](#change-a-skill), then validate every active skill:
 
    ```bash
