@@ -26,6 +26,8 @@ def git(*args):
         ["git", "--git-dir", str(root / "origin.git"), *args], text=True).strip()
 if args[:2] == ["repo", "view"]:
     print(json.dumps({{"nameWithOwner": "owner/repo"}}))
+elif args[:2] == ["pr", "checks"] and config["scenario"] == "unreported":
+    sys.exit("no required checks reported on the 'topic' branch")
 elif args[:2] == ["pr", "checks"]:
     failed = config["scenario"] == "failed"
     print(json.dumps([{{"name": "CI required",
@@ -193,7 +195,9 @@ def test_stops_without_cleanup(repository: Repository, scenario: str) -> None:
         assert not any(c[:2] == ["pr", "merge"] for c in repository.commands())
 
 
-@pytest.mark.parametrize("scenario", ["clean", "behind", "uncertain", "remote_deleted"])
+@pytest.mark.parametrize(
+    "scenario", ["clean", "behind", "uncertain", "remote_deleted", "unreported"]
+)
 def test_merge_then_cleanup(repository: Repository, scenario: str) -> None:
     """Only merged PRs remove the worktree and both branch refs."""
     result = repository.land(scenario)

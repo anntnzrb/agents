@@ -250,9 +250,9 @@ def land(args: argparse.Namespace, steps: list[str]) -> str:  # noqa: C901, PLR0
         if runner.run("git", "rev-parse", f"refs/heads/{branch}") != head:
             raise RuntimeError("Local branch changed; landing stopped")
         check_args = ("gh", "pr", "checks", number, "--repo", repo, "--required")
-        checks = runner.data(
-            *check_args, "--json", "name,bucket,link", allowed=(0, 1, 8)
-        )
+        # gh exits 1 with empty stdout until a required check has reported.
+        raw = runner.run(*check_args, "--json", "name,bucket,link", allowed=(0, 1, 8))
+        checks = cast("Json", json.loads(raw)) if raw else []
         if not isinstance(checks, list):
             raise TypeError("Expected required check list")
         failures = [
