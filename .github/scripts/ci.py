@@ -166,6 +166,16 @@ def harness(root: Path, name: str) -> None:
         )
 
 
+def local(root: Path, base: str) -> None:
+    """Run the checks CI would plan for this branch, cheapest first."""
+    selected = plan(root, base)
+    metadata(root)
+    if selected["skills"]:
+        skills(root, json.dumps(selected["skills"]))
+    for name in selected["harnesses"]:
+        harness(root, name)
+
+
 def is_str_dict(value: object) -> TypeIs[dict[str, object]]:
     """Narrow JSON objects at the workflow boundary."""
     return isinstance(value, dict)
@@ -215,6 +225,8 @@ def main() -> int:
     commands.add_parser("metadata")
     commands.add_parser("skills")
     commands.add_parser("required")
+    branch = commands.add_parser("local")
+    branch.add_argument("--base", default="origin/main")
     extension = commands.add_parser("harness")
     extension.add_argument("name", choices=sorted(HARNESS_ROOTS))
     args = parser.parse_args()
@@ -250,6 +262,8 @@ def main() -> int:
             skills(root, os.environ["SKILLS"])
         elif args.command == "required":
             required(os.environ["CI_NEEDS"])
+        elif args.command == "local":
+            local(root, args.base)
         else:
             harness(root, args.name)
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:

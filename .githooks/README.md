@@ -1,7 +1,7 @@
 # Git hooks
 
-These hooks enforce the sync application's local quality gates without an
-external hook manager.
+These hooks enforce sync quality gates and selected repository checks without
+an external hook manager.
 
 Requirements:
 - Python >=3.12
@@ -35,5 +35,5 @@ Branch guard (`reference-transaction`):
 
 Quality gates (`sync-gates` console script, defined in `sync/src/sync/gates.py`):
 - `pre-commit`: runs `git diff --cached --check`, followed by `sync-gates` (ruff check, ruff format check, basedpyright).
-- `pre-push`: runs the static gates with `sync-gates`, then the full test suite serially with `pytest -n 0 -o addopts="" -q`. Clearing configured pytest options prevents parallel workers on production hosts.
+- `pre-push`: runs the static gates with `sync-gates`, then the full test suite serially with `pytest -n 0 -o addopts="" -q`. Clearing configured pytest options prevents parallel workers on production hosts. It then runs `ci.py local` from the repository root against `origin/main`; see [Run checks locally](../docs/ci.md#run-checks-locally).
 - The `autommit` skill runs `pre-commit` once on the full staged snapshot before planning, then creates each commit in a temporary worktree with hooks disabled. The branch guard and `pre-push` still run.

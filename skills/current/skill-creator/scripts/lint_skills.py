@@ -6,6 +6,7 @@ checks the skills under ``skills/current`` that differ from ``origin/main``,
 including untracked files. Exit codes: 0 clean, 1 findings, 2 usage.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -14,6 +15,14 @@ from pathlib import Path
 from typing import Final, TypeIs
 
 from scripts.frontmatter import read_frontmatter
+
+# Git hooks export GIT_DIR without GIT_WORK_TREE, which makes Git treat the
+# subprocess cwd as the work tree root and skip the root .gitattributes.
+GIT_ENV: Final = {
+    key: value
+    for key, value in os.environ.items()
+    if key not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"}
+}
 
 EXIT_OK: Final[int] = 0
 EXIT_FINDINGS: Final[int] = 1
@@ -81,6 +90,7 @@ def _skill_files(skill_dir: Path) -> list[tuple[Path, frozenset[str]]]:
     listed = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=skill_dir,
+        env=GIT_ENV,
         capture_output=True,
         check=False,
     )
@@ -102,6 +112,7 @@ def _skill_files(skill_dir: Path) -> list[tuple[Path, frozenset[str]]]:
     attrs = subprocess.run(
         ["git", "check-attr", "-z", "--stdin", "whitespace"],
         cwd=skill_dir,
+        env=GIT_ENV,
         input="".join(f"{name}\0" for name in names).encode("utf-8", "surrogateescape"),
         capture_output=True,
         check=True,
@@ -282,7 +293,7 @@ class _UsageError(Exception):
 
 def _git(cwd: Path, *args: str) -> str:
     completed = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, check=False
+        ["git", *args], cwd=cwd, env=GIT_ENV, capture_output=True, check=False
     )
     if completed.returncode != 0:
         detail = completed.stderr.decode("utf-8", "replace").strip()

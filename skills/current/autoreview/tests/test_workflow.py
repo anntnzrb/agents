@@ -239,6 +239,20 @@ def test_verify_locations(repo: Path, location: dict[str, object]) -> None:
         assert "Zero divisor" in result.stdout
 
 
+def test_verify_keeps_p2_by_default(repo: Path) -> None:
+    _ = (repo / "app.py").write_text(
+        "def divide(n):\n    return n / 0\n", encoding="utf-8"
+    )
+    path = report(repo)
+    data = cast("Report", json.loads(path.read_text(encoding="utf-8")))
+    data["findings"][0]["priority"] = "P2"
+    _ = path.write_text(json.dumps(data), encoding="utf-8")
+    result = cli(repo, "verify", "--mode", "local", "--findings", str(path))
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["findings"] == data["findings"]
+    assert "Verified: 1; Filtered: 0" in result.stderr
+
+
 def test_verify_snapshot_and_filter(repo: Path) -> None:
     _ = (repo / "app.py").write_text(
         "def divide(n):\n    return n / 0\n", encoding="utf-8"
@@ -262,7 +276,16 @@ def test_verify_snapshot_and_filter(repo: Path) -> None:
     assert valid.returncode == 0
     assert "Zero divisor" in valid.stdout
     filtered = cli(
-        repo, "verify", "--mode", "commit", "--commit", sha, "--findings", str(path)
+        repo,
+        "verify",
+        "--mode",
+        "commit",
+        "--commit",
+        sha,
+        "--findings",
+        str(path),
+        "--max-priority",
+        "P0",
     )
     assert filtered.returncode == 0
     assert json.loads(filtered.stdout)["findings"] == []

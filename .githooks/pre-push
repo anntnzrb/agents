@@ -1,8 +1,16 @@
 #!/bin/sh
 set -eu
 
+# Git exports these to hooks. Tests that create temporary repositories would
+# otherwise inherit them and run git init, config, and commit against this one.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
+cd "$(git rev-parse --show-toplevel)"
+
 cd sync
 uv sync --frozen
 uv run --no-sync sync-gates
 # Keep local validation serial, including on production hosts.
 uv run --no-sync pytest -n 0 -o addopts="" -q
+
+cd ..
+uv run --script .github/scripts/ci.py local

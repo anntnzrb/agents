@@ -20,7 +20,7 @@ class CliArgs(argparse.Namespace):
     mode: str = "auto"
     base: str | None = None
     commit: str = "HEAD"
-    max_priority: str = "P0"
+    max_priority: str = "P3"
     findings: str | None = None
     output: str | None = None
 
@@ -45,8 +45,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _ = parser.add_argument(
         "--max-priority",
         choices=PRIORITIES,
-        default="P0",
-        help="Verify reporting threshold (default: P0).",
+        default="P3",
+        help="Verify reporting threshold (default: P3).",
     )
     return parser
 

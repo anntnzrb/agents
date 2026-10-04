@@ -3,7 +3,7 @@ name: autoreview
 description: "Use when reviewing git diffs, commits, or pull requests for bugs, invariant violations, regressions, or security flaws."
 license: AGPL-3.0-or-later
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   author: anntnzrb
   upstream: https://github.com/openclaw/openclaw/tree/41cdd02909b9a8749b91dc6eccfb310a90cddce1/.agents/skills/autoreview
 ---
@@ -59,7 +59,7 @@ bundle --mode commit --commit HEAD
 verify --mode local --findings <temp-dir>/findings.json --max-priority P1
 ```
 
-`verify` defaults to P0 only. Use P3 when the caller requests all actionable priorities.
+`verify` defaults to P3, keeping all actionable priorities. Set `--max-priority` to narrow the requested scope.
 It exits 0 for valid reports, including reports with findings, and 1 for invalid reports with per-finding reasons on stderr.
 Successful stdout is the report with lower-priority findings removed. Filtering is not a clean verdict.
 Verification proves source locations, not the truth of the diagnosis.
