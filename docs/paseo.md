@@ -35,7 +35,8 @@ Control the daemon through systemd, not `paseo daemon start` or `paseo daemon st
    ```
 
    Providers are dynamic keys, so `config set` must replace the whole `agents` object. Merge any existing providers into the JSON first: `paseo daemon config get agents`.
-3. Check the daemon and its providers:
+3. Choose a metadata model the gateway serves. Paseo matches its built-in candidates for workspace titles, branch names, and commit messages (a `haiku` model, then other small models) against enabled providers and can select models the gateway rejects. Select a small `cliproxy/...` model under **Settings → Host → Metadata → Manual**; the daemon stores it in `agents.metadataGeneration`.
+4. Check the daemon and its providers:
 
    ```sh
    systemctl --user status paseo.service
