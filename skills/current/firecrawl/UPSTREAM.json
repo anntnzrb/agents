@@ -1,0 +1,35 @@
+{
+  "repo": "firecrawl/cli",
+  "release": "v1.23.1",
+  "commit": "026c820bebd7040720079a05d4d428c193e23a7b",
+  "trees": {
+    "skills/firecrawl-agent": "fc43770b7a35766c88dc1c8bb960b75e2a5bc7d8",
+    "skills/firecrawl-crawl": "4683f3aa2b31bade3230fe6073aff3caa5af91ae",
+    "skills/firecrawl-developer-index": "2e4f6d3f44d85f4b037935b239c923c75621802c",
+    "skills/firecrawl-download": "eb93eb0fe691e508bfbc8e2fc83a9a05de7201bc",
+    "skills/firecrawl-interact": "6ffb9a9ce5fbb78e86edfc7c71cdb8e0c3a72636",
+    "skills/firecrawl-map": "edca48527098cf9a79ef015213434c3f5f8aad5c",
+    "skills/firecrawl-monitor": "f61531759ba601d2c1553649f17e639764241a51",
+    "skills/firecrawl-parse": "a799c1938611c499b44f1b4bbbfbe2eeb044f785",
+    "skills/firecrawl-research-index": "54a3a6a61f8b940b996c2bcc8e554c068139e3c3",
+    "skills/firecrawl-scrape": "eef5cb0b0625fbf02cafc375a4a88402e23490ab",
+    "skills/firecrawl-search": "006b5aa701ced4595537d364b0744c79e53ac5fb",
+    "skills/firecrawl": "477b97d5cffd6d0767b59cafaab19d1259a0e21e"
+  },
+  "watch": {
+    "skills": [
+      "firecrawl",
+      "firecrawl-agent",
+      "firecrawl-crawl",
+      "firecrawl-developer-index",
+      "firecrawl-download",
+      "firecrawl-interact",
+      "firecrawl-map",
+      "firecrawl-monitor",
+      "firecrawl-parse",
+      "firecrawl-research-index",
+      "firecrawl-scrape",
+      "firecrawl-search"
+    ]
+  }
+}
