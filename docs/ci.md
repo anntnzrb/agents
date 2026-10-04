@@ -12,7 +12,7 @@ uv run --script .github/scripts/ci.py plan --base origin/main
 
 Omit `--base` to select all active code suites. Selection compares the merge base with `HEAD`; uncommitted changes are not included.
 
-Validate every active skill's metadata:
+Validate every active skill's metadata, and check repository Markdown outside `skills/` and `legacy/` for en and em dashes:
 
 ```bash
 uv run --script .github/scripts/ci.py metadata

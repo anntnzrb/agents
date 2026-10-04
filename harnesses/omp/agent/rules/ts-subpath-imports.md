@@ -27,12 +27,12 @@ Prohibit upward relative directory traversal (`../` or `../../`) in TypeScript i
 ## Example
 
 ```typescript
-// BAD — Brittle relative directory traversal
+// BAD: Brittle relative directory traversal
 import type { RawMarketListing } from "../models.ts";
 import { registerAdapter } from "../../registry.ts";
 import { scoreListing } from "../scoring.ts";
 
-// GOOD — Encapsulated package subpath imports
+// GOOD: Encapsulated package subpath imports
 import type { RawMarketListing } from "#models";
 import { registerAdapter } from "#registry";
 import { scoreListing } from "#scoring";

@@ -31,7 +31,7 @@ Effort values come from the catalog row's `reasoning_options` effort list when p
 resolves to `minimal/low/medium/high`); otherwise the Responses default ladder
 (`none/minimal/low/medium/high/xhigh`) applies. Each variant sets Responses-style settings
 (`reasoningEffort`, `reasoningSummary: auto`, `include: reasoning.encrypted_content`), matching what
-upstream generates for `@opencode/ai/providers/openai` — the rewrite target of this provider's
+upstream generates for `@opencode/ai/providers/openai`, the rewrite target of this provider's
 `aisdk:@ai-sdk/openai` package. The gateway translates `reasoningEffort` to each upstream's native
 thinking control.
 
