@@ -84,6 +84,11 @@ def _run_parser() -> Parser:
     _ = parser.add_argument("--base", type=str, default=None)
     _ = parser.add_argument("--filter", type=str, default=None)
     _ = parser.add_argument("--dry-run", action="store_true")
+    _ = parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="skip the pre-commit gate on the staged state (run only)",
+    )
     _ = parser.add_argument("--json", action="store_true", dest="json_output")
     _ = parser.add_argument("positional_context", nargs="*", default=[])
     return parser
@@ -173,6 +178,7 @@ def _run_options(arguments: argparse.Namespace) -> RunOptions:
         base=_arg_optional_str(arguments, "base"),
         dry_run=_arg_bool(arguments, "dry_run"),
         json_output=_arg_bool(arguments, "json_output"),
+        no_verify=_arg_bool(arguments, "no_verify"),
     )
 
 
@@ -254,6 +260,7 @@ def _schema() -> dict[str, object]:
                     "timeout": "number (optional)",
                     "smoke": "shell command run per commit (optional)",
                     "dry_run": "boolean (optional)",
+                    "no_verify": "boolean (optional): skip the pre-commit gate",
                     "context": "array of strings (optional)",
                 },
                 "returns": "Publication evidence with created commit objects",

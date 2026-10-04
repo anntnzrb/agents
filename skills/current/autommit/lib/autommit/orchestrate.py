@@ -16,6 +16,7 @@ from autommit.client import HttpResponse, ModelRequest, call_critic, call_planne
 from autommit.config import ConfigOverrides, load_config
 from autommit.errors import AutommitError, CancelledError
 from autommit.git import try_git
+from autommit.hooks import run_pre_commit_gate
 from autommit.inventory import (
     CRITIC_SYSTEM,
     PLAN_SYSTEM,
@@ -96,6 +97,7 @@ class RunOptions:
     base: str | None = None
     dry_run: bool = False
     json_output: bool = False
+    no_verify: bool = False
     post: Callable[[dict[str, object]], HttpResponse] | None = None
 
 
@@ -595,6 +597,8 @@ def run_orchestrated(options: RunOptions) -> int:
             options,
             f"Prepared {len(staged_files)} file(s), {hunk_count} hunk(s) (snapshot {snapshot[:8]}).",
         )
+        if not options.no_verify:
+            run_pre_commit_gate(options.repo)
 
         if options.dry_run:
             payload = _dry_run_payload(prepared, inventory, staged_files)

@@ -240,6 +240,7 @@ class AutommitCliTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("--dry-run", completed.stdout)
         self.assertIn("--smoke", completed.stdout)
+        self.assertIn("--no-verify", completed.stdout)
 
     def test_prepare_stages_all_only_when_the_index_is_empty(self) -> None:
         _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
