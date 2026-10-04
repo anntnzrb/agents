@@ -1,7 +1,7 @@
 name: upstream
 
-# Opens one issue per ported skill when its upstream release changes the
-# directories pinned in skills/current/<skill>/UPSTREAM.json.
+# Opens one issue per ported skill when its upstream release or branch head changes
+# the directories pinned in skills/current/<skill>/UPSTREAM.json.
 on:
   schedule:
     - cron: '41 7 * * *'
