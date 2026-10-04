@@ -14,12 +14,14 @@ The repository separates committed sources, local inputs, generated targets, and
 | `tools/` | Managed-tool sources |
 | `sync/` | The Python (uv) sync application |
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
+| `.github/` | CI workflows, their orchestration scripts, and adjacent tests; see [Verify a change in CI](ci.md) |
+| `.githooks/` | Local Git hooks; see [Git hooks](../.githooks/README.md) |
 | `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 | `.env.example` | Template and guidance for shared harness environment variables |
 
 ### Harness sources
 
-Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtimeSubdir`, sync appends that subdirectory to the source root.
+Each harness source starts under `harnesses/<id>/`. When an adapter defines `runtime_subdir`, sync appends that subdirectory to the source root.
 
 `sync/src/sync/core/harness_adapters.py` defines the supported harness IDs, package launchers, generated homes, platforms, runtime subdirectories, and hooks. A matching directory under `harnesses/` enables that adapter on a supported platform.
 
@@ -42,7 +44,7 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 
 ## Generated targets
 
-For each harness, `homeSegments` defines the generated harness home. When the adapter defines `runtimeSubdir`, sync appends that subdirectory to the generated root.
+For each harness, `home_segments` defines the generated harness home. When the adapter defines `runtime_subdir`, sync appends that subdirectory to the generated root.
 
 Other jobs use fixed generated targets:
 
@@ -52,7 +54,9 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and managed-tool wrappers |
-| `~/.config/systemd/user/` units that sync owns (Linux), `~/Library/LaunchAgents/dev.agents.update.plist` (macOS) | Declared user services; see [User services](sync/sync.md#user-services) |
+| `~/.cli-proxy-api/` (gateway host) | Rendered CLIProxyAPI configuration; see [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs) |
+| `~/.mcporter/mcporter.json`, `~/.summarize/config.json` | Tool configuration copied from `tools/`; see [Tool launchers](sync/sync.md#tool-launchers) |
+| `~/.config/systemd/user/` units (Linux) and `~/Library/LaunchAgents/` launch agents (macOS) that sync owns | Declared user services; see [User services](sync/sync.md#user-services) |
 
 Sync replaces managed content in these targets. Make durable changes in the matching committed source.
 
