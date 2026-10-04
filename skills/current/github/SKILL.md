@@ -31,17 +31,19 @@ Use when a task names `gh`, GitHub CLI, a GitHub remote surface, or stacked pull
 
 Read the listed reference whenever its trigger applies. Use `references/core.md` before any command family when router rules are insufficient.
 
-- Shared invocation, hosts, auth, aliases, config, completion, output, prompts, exits → `references/core.md`.
-- Repository discovery, cloning, browsing, search, gists, organizations, or Codespaces → `references/repositories.md`; keep local Git/worktree actions local.
-- Issues, pull requests, discussions, projects, reviews, or labels → `references/collaboration.md`.
-- Actions, workflows, caches, secrets, or variables → `references/automation.md`; keep account and repository writes gated.
-- Releases, artifact attestations, rulesets, keys, or licenses → `references/release-security.md`; preserve key and permission boundaries.
-- REST, GraphQL, pagination, previews, or custom endpoints; any `gh api` surface → `references/api.md`; use `gh api` only with explicit target and method.
-- Extensions, agent tasks, skills, Copilot, or preview-only tooling → `references/agent-platform.md`; check installed capability before invoking.
-- Planning a dependent-PR chain or deciding whether work belongs in one stack → `references/stack-design.md` for invariants, layer design, and ownership.
-- Publishing a branch, creating a PR, or linking a PR to a stack → `references/stacked-pr-workflow.md` for the branch/PR-to-stack handoff.
-- Executing or planning `gh stack`, or stack-aware integration → `references/stack-commands.md` for commands, capability gates, merge/API semantics, and CI state.
-- Stack failure, partial landing, divergence, lock, interop, or recovery → `references/stack-troubleshooting.md`; preserve state and NEVER auto-repair.
+| Need | Read | When |
+| --- | --- | --- |
+| Shared invocation, hosts, auth, aliases, config, completion, output, prompts, exits | `references/core.md` | Any command family the router does not cover |
+| Repository discovery, cloning, browsing, search, gists, organizations, or Codespaces | `references/repositories.md` | Remote repository work; keep local Git/worktree actions local |
+| Issues, pull requests, discussions, projects, reviews, or labels | `references/collaboration.md` | Collaboration commands |
+| Actions, workflows, caches, secrets, or variables | `references/automation.md` | Automation commands; keep account and repository writes gated |
+| Releases, artifact attestations, rulesets, keys, or licenses | `references/release-security.md` | Release or security commands; preserve key and permission boundaries |
+| REST, GraphQL, pagination, previews, or custom endpoints | `references/api.md` | Any `gh api` surface; use `gh api` only with explicit target and method |
+| Extensions, agent tasks, skills, Copilot, or preview-only tooling | `references/agent-platform.md` | Before invoking; check installed capability first |
+| Invariants, layer design, and ownership of a dependent-PR chain | `references/stack-design.md` | Planning a chain or deciding whether work belongs in one stack |
+| Branch/PR-to-stack handoff | `references/stacked-pr-workflow.md` | Publishing a branch, creating a PR, or linking a PR to a stack |
+| Commands, capability gates, merge/API semantics, and CI state | `references/stack-commands.md` | Executing or planning `gh stack`, or stack-aware integration |
+| Stack failure, partial landing, divergence, lock, interop, or recovery | `references/stack-troubleshooting.md` | A stack fails; preserve state and NEVER auto-repair |
 
 ## Stacked PR boundary
 

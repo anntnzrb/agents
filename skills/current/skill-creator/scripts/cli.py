@@ -18,6 +18,7 @@ COMMANDS: Final[dict[str, Path]] = {
     "aggregate-benchmark": SCRIPTS_DIR / "aggregate_benchmark.py",
     "gates": SCRIPTS_DIR / "gates.py",
     "generate-review": SKILL_DIR / "eval-viewer" / "generate_review.py",
+    "lint": SCRIPTS_DIR / "lint_skills.py",
     "package": SCRIPTS_DIR / "package_skill.py",
     "quick-validate": SCRIPTS_DIR / "quick_validate.py",
 }
@@ -27,6 +28,7 @@ _HELP_EXAMPLES: Final[tuple[str, ...]] = (
     "aggregate-benchmark <workspace>/iteration-N --skill-name <name>",
     "gates <path-to-skill-folder> [--tests]",
     "generate-review <workspace> --skill-name <name>",
+    "lint [<skill-dir> ...]",
     "package <path-to-skill-folder>",
 )
 

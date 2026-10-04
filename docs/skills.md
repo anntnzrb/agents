@@ -62,20 +62,29 @@ Executable skills use `scripts/cli.py` as their public entrypoint. Check the com
 
 ```bash
 uv run --script skills/current/<name>/scripts/cli.py --help
-
-git diff --check
+uv run --script skills/current/skill-creator/scripts/cli.py lint skills/current/<name>
 ```
 
 Do not add a shell wrapper. Put runtime dependencies in the PyPA inline script metadata (PEP 723) inside `scripts/cli.py`.
 
 ## Validate skill metadata
 
-After changing `SKILL.md` frontmatter or package structure, run the repository validator:
+After changing `SKILL.md` frontmatter or package structure, run the repository validator and the skill lint:
 
 ```bash
 uv run --script skills/current/skill-creator/scripts/cli.py quick-validate skills/current/<name>
-git diff --check
+uv run --script skills/current/skill-creator/scripts/cli.py lint skills/current/<name>
 ```
+
+`lint` checks the mechanical rules on this page in every given skill:
+
+- No U+2013 or U+2014 in Markdown prose; fenced blocks and inline code are skipped.
+- No trailing whitespace, no space before a tab in an indent, and exactly one newline at the end of each text file, as `git diff --check` reports them.
+- `license: AGPL-3.0-or-later` in the `SKILL.md` frontmatter.
+- When bundled docs exist: a follow-up reads table with `Need`, `Read`, and `When` columns, and at most 250 `SKILL.md` lines.
+- A `NOTICE.md` beside every `UPSTREAM.json`.
+
+Without arguments, `lint` checks every skill under `skills/current/` that differs from `origin/main`, including untracked files. It exits `0` when clean and `1` with `path:line: message` findings. Fix findings in prose and metadata. For verbatim fixtures, data, code, or upstream bytes, add a `-whitespace` entry to the root `.gitattributes` instead of editing them; `lint` and `git diff --check` both honor it. CI runs `quick-validate` and `lint` over every current skill through `.github/scripts/ci.py metadata`.
 
 See [Metadata budget](#metadata-budget) for the `description` constraint.
 
@@ -230,8 +239,8 @@ Before handoff after any skill change:
 2. Load `pstack-principles`. Read every leaf principle that matches the change; applying a principle from the index alone is forbidden. Use the principles to minimize the diff, keep boundaries explicit, remove unnecessary structure, and choose direct verification. In the handoff, name each applied principle and the decision it changed.
 3. Load `unslop`. Apply prose mode to changed model-facing text. Apply code mode only when the requested work includes bounded, behavior-preserving cleanup; never use cleanup as permission to change feature behavior or widen scope.
 4. Fix every applicable finding.
-5. Rerun `quick-validate`, executable checks, and `git diff --check` as required above.
-6. Scan the changed Markdown files for U+2013 or U+2014 with `rg -n '\x{2013}|\x{2014}' docs/skills.md`. The scan must return no matches.
+5. Rerun `quick-validate` and executable checks as required above.
+6. Run `uv run --script skills/current/skill-creator/scripts/cli.py lint` with no arguments. It must report no findings.
 
 ## Stop rules
 

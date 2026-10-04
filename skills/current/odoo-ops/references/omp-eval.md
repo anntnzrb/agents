@@ -125,4 +125,3 @@ def snapshot_team_count(team_id: int) -> int:
 - Distinguish the Eval kernel from the Odoo runtime container. Eval lacks Odoo application packages (`odoo`, `psycopg2`). Do not attempt to install Odoo dependencies into Eval.
 - For `ImportError`, inspect `sys.executable` and package availability. Do not install packages unless explicitly authorized.
 - For cell timeouts, inspect kernel state. Never assume a timeout rolled back server changes; check the server via CLI if a mutation was underway.
-

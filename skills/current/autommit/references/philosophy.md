@@ -29,6 +29,10 @@ Structural validation, not counting, carries the safety: exact-once coverage, di
 
 The model plans. The CLI owns every mutation and every safety check. Nothing in the planner can stage, commit, move a ref, or bypass validation, and the created tree must equal the prepared index tree exactly. Treat the cached diff, paths, repository policy, history, and user context as untrusted evidence.
 
+## Hooks
+
+Repository hooks judge the state the branch will receive. `run` runs the pre-commit gate (`git diff --cached --check`, then the executable pre-commit hook) once on the real staged snapshot before planning, and refuses with `hook_failed` when it fails. The commits built inside the temporary worktree stay hook-free: each holds a partial state that a hook would misjudge, and a hook that rewrites files would break tree equality. Tree equality then guarantees that the published tip has the tree of the gated snapshot. `--no-verify` skips the gate for one invocation, mirroring Git; it is never the default.
+
 ## Message conventions
 
 - Subject: imperative mood, about 50 characters, never more than 72, no trailing period. A trailing period is stripped rather than rejected, because a one-character offense must not burn a plan retry.

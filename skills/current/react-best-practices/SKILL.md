@@ -21,11 +21,13 @@ React/Next.js performance-optimization guidance from Vercel Engineering. Apply t
 
 ## Required follow-up reads
 
-- Pick a rule category by impact: read `rules/_sections.md` before selecting optimization rules.
-- Apply a specific optimization: read matching `rules/<rule-id>.md` after identifying the bottleneck.
-- Review expanded Vercel guidance: read `references/vercel-guide.md` for a broad review or when rule detail is insufficient.
-- Secure Next.js Server Actions: read `rules/server-auth-actions.md` when creating or reviewing Server Actions.
-- Human-facing package context: read `README.md` when needed.
+| Need | Read | When |
+| --- | --- | --- |
+| Pick a rule category by impact | `rules/_sections.md` | Before selecting optimization rules |
+| Apply a specific optimization | Matching `rules/<rule-id>.md` | After identifying the bottleneck |
+| Expanded Vercel guidance | `references/vercel-guide.md` | A broad review, or rule detail is insufficient |
+| Secure Next.js Server Actions | `rules/server-auth-actions.md` | Creating or reviewing Server Actions |
+| Human-facing package context | `README.md` | When needed |
 
 ## Category prefixes
 

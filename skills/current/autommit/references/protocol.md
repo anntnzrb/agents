@@ -23,17 +23,18 @@ Settings come from CLI flags, then environment variables, then the owner default
 ### `run` (default)
 
 ```text
-uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--reasoning-effort LEVEL] [--smoke CMD] [--dry-run] [--json] [context ...]
+uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--reasoning-effort LEVEL] [--smoke CMD] [--dry-run] [--no-verify] [--json] [context ...]
 ```
 
 `run` is the default command when no subcommand is given, and the only one that mutates anything. It owns the whole loop:
 
 1. Recover a prepared receipt, then re-prepare in the same invocation.
-2. Hold back pure renames: renamed files with identical content. They never reach the planner; autommit adds one move-only commit for them, applied before every model commit, (`refactor: move files without content changes` when most recent subjects are conventional, otherwise `Move files without content changes`). A snapshot of only pure renames needs no model call.
-3. Send the remaining inventory, repository policy, and the regular cached diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation. Only a reply that is not JSON moves to the next format; a JSON reply that fails the plan shape goes straight to the correction loop. The inventory hunk ids count the hunks of that same diff, a renamed file shows its source as `new <- old`, and a renamed file, a deleted file, or a file without hunks is marked `whole file only`; autommit selects such a file with `"all"` whatever selector the model returns, and validation rejects any other selector for a rename. When a plan selects a file whole in one commit and again elsewhere, autommit keeps it only in the first whole-file commit and drops commits left empty. A deleted file shows only its first 40 lines and the count of omitted lines.
-4. Validate each returned plan, with the move-only commit appended, against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context; a retry adds the rejection under any standing correction, such as the critic's concerns, and never replaces it. When every attempt fails, the error ends with the last validation message.
-5. When the model's plan needs atomicity review, ask an independent critic, at most twice. The move-only commit never counts toward the review or the split requirement. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two model commits.
-6. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
+2. Run the pre-commit gate in the real repository, against the staged snapshot: `git diff --cached --check`, then the hook at `git rev-parse --git-path hooks/pre-commit` (which honors `core.hooksPath`) from the repository root when that file is executable. A failure refuses with `hook_failed` (exit 4), includes the gate output, and calls no model. `--dry-run` runs the gate too; `--no-verify` skips it, mirroring `git commit --no-verify`.
+3. Hold back pure renames: renamed files with identical content. They never reach the planner; autommit adds one move-only commit for them, applied before every model commit, (`refactor: move files without content changes` when most recent subjects are conventional, otherwise `Move files without content changes`). A snapshot of only pure renames needs no model call.
+4. Send the remaining inventory, repository policy, and the regular cached diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation. Only a reply that is not JSON moves to the next format; a JSON reply that fails the plan shape goes straight to the correction loop. The inventory hunk ids count the hunks of that same diff, a renamed file shows its source as `new <- old`, and a renamed file, a deleted file, or a file without hunks is marked `whole file only`; autommit selects such a file with `"all"` whatever selector the model returns, and validation rejects any other selector for a rename. When a plan selects a file whole in one commit and again elsewhere, autommit keeps it only in the first whole-file commit and drops commits left empty. A deleted file shows only its first 40 lines and the count of omitted lines.
+5. Validate each returned plan, with the move-only commit appended, against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context; a retry adds the rejection under any standing correction, such as the critic's concerns, and never replaces it. When every attempt fails, the error ends with the last validation message.
+6. When the model's plan needs atomicity review, ask an independent critic, at most twice. The move-only commit never counts toward the review or the split requirement. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two model commits.
+7. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
 
 Provider failures are terminal and never count as plan rejections. A request that exceeds `--timeout` fails at once instead of resending the same prompt; raise `--timeout` or lower `--reasoning-effort`. `--dry-run` prints the inventory and snapshot without a model call and without an API key. `--smoke CMD` runs one validation command inside the temporary worktree after each commit and creates nothing when it fails; it applies to that invocation only and is never persisted in config or environment.
 
@@ -55,7 +56,7 @@ uv run --script <skill-dir>/scripts/cli.py rewrite --base <rev> [options]
 4. Rebuilds the commits in dependency order inside a detached temporary worktree placed at `--base`.
 5. Requires the rebuilt tip tree to equal the frozen target tree, then moves the branch with one compare-and-swap and refreshes the index. Worktree files never change.
 
-The previous tip is reported as the recovery point and stays reachable through the reflog. `rewrite` never pushes. Use `--dry-run` to print the frozen scope without a model call.
+The previous tip is reported as the recovery point and stays reachable through the reflog. `rewrite` never pushes. It does not run the pre-commit gate: its target is the frozen worktree, not the index that `git diff --cached --check` and a pre-commit hook judge. Use `--dry-run` to print the frozen scope without a model call.
 
 ### `models`
 
@@ -192,7 +193,7 @@ Valves: concern <=512 characters; rationale <=2,048 characters; concern count is
 |1|Provider or network failure|Wait for the provider, or configure another endpoint|
 |2|Usage, JSON, plan, coverage, config, or critic error|Correct bounded model/input data; retry only within workflow limits|
 |3|Lock, snapshot, branch, index, in-progress Git state, or receipt refusal|Preserve state; report exact blocker|
-|4|Git, filesystem, cleanup, or smoke failure|Preserve state and inspect evidence|
+|4|Git, filesystem, cleanup, or smoke failure; `hook_failed` when the pre-commit gate rejects the staged state|Preserve state and inspect evidence; for `hook_failed`, fix the staged changes and rerun|
 |127|Git executable unavailable|Install/fix Git before retrying|
 |130|Cancelled by a signal|Lock released, temporary worktree removed; no commits were created|
 
@@ -204,6 +205,6 @@ Autommit never restores a recovery point automatically. Read it, inspect the rep
 
 ## Environment Invariants
 
-Every Git invocation pins diff shape so hunk indices stay portable across machines: `core.quotepath=false`, `diff.mnemonicprefix=false`, `diff.noprefix=false`, `diff.algorithm=myers`, `diff.renames=true`, `diff.interHunkContext=0`, and the diff flags `--no-color --no-ext-diff --no-textconv`. `GIT_DIFF_OPTS` and `GIT_EXTERNAL_DIFF` are dropped from the environment, and `GIT_PAGER` is `cat`. Commits are created with `core.hooksPath=` and `--no-verify` inside the temporary worktree, so repository hooks never observe the temporary state. Pass `--smoke` to run repository validation deliberately.
+Every Git invocation pins diff shape so hunk indices stay portable across machines: `core.quotepath=false`, `diff.mnemonicprefix=false`, `diff.noprefix=false`, `diff.algorithm=myers`, `diff.renames=true`, `diff.interHunkContext=0`, and the diff flags `--no-color --no-ext-diff --no-textconv`. `GIT_DIFF_OPTS` and `GIT_EXTERNAL_DIFF` are dropped from the environment, and `GIT_PAGER` is `cat`. Commits are created with `core.hooksPath=` and `--no-verify` inside the temporary worktree. Each commit there holds a partial state that the branch never receives on its own, so a hook would judge the wrong tree, and a hook that rewrites files would break tree equality. Repository hooks run once instead, as the pre-commit gate on the full staged snapshot before planning; tree equality then guarantees that the published tip has the tree of that snapshot. Pass `--smoke` to run validation on each commit deliberately.
 
 Locks are never broken automatically. A prepared receipt is durable recovery evidence. Re-run `prepare` to recover it under the same branch and index state.
