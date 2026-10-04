@@ -438,6 +438,51 @@ class LargeRefactorTests(_Sandbox):
             "Move files without content changes",
         )
 
+    def test_moving_several_files_needs_no_model_or_critic(self) -> None:
+        names = ("a", "b", "c")
+        for name in names:
+            self.commit_file(
+                f"old/{name}.txt", "".join(f"{name} line {i}\n" for i in range(20))
+            )
+        for name in names:
+            self.move(f"old/{name}.txt", f"new/{name}.txt")
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            raise AssertionError("a moves-only snapshot must not call a model")
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(),
+            "Move files without content changes",
+        )
+        moved = self.git("show", "--name-status", "-M", "--format=", "HEAD").split()
+        self.assertEqual(moved.count("R100"), 3)
+        self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
+
+    def test_several_moves_beside_a_narrow_change_skip_the_critic(self) -> None:
+        names = ("a", "b")
+        for name in names:
+            self.commit_file(
+                f"old/{name}.txt", "".join(f"{name} line {i}\n" for i in range(20))
+            )
+        for name in names:
+            self.move(f"old/{name}.txt", f"new/{name}.txt")
+        self.stage()
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            if "Independent atomicity critic" in _system_of(payload):
+                raise AssertionError("the move-only commit must not trigger the critic")
+            return _model_reply(PLAN)
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        subjects = self.git("log", "-2", "--format=%s").splitlines()
+        self.assertEqual(
+            subjects, ["Update tracked value", "Move files without content changes"]
+        )
+
     def test_critic_still_judges_the_model_commit_next_to_moves(self) -> None:
         self.commit_file("old/moved.txt", "same\n")
         self.move("old/moved.txt", "new/moved.txt")
