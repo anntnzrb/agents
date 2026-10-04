@@ -1,7 +1,7 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "adf3218ca2f5b9971eedc07a76bef22df7701539",
+  "commit": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
   "trees": {
     "pstack/skills/create-verification-skill": "38a3e016bb42ba7ba6f66315e04ef64242937660",
     "pstack/skills/maintain-verification-skill": "b6ce4dcdc378492f9acd55a4e56ae111204b4f11"
