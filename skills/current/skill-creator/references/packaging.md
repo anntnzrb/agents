@@ -16,7 +16,6 @@ Set `<skill-dir>` to this skill directory. NEVER rely on shell sourcing, executa
 
 ```bash
 uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
-uv run --script <skill-creator-path>/scripts/cli.py package <path/to/skill-folder>
 uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 ```
 
@@ -29,7 +28,7 @@ When packaging an update, preserve the original skill identity: keep the directo
 If the `present_files` tool is unavailable, skip presentation. If it is available, package the skill and present the `.skill` file:
 
 ```bash
-uv run --script <skill-creator-path>/scripts/cli.py package <path/to/skill-folder>
+uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 ```
 
 Tell the user the resulting `.skill` file path so they can install it.

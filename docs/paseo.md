@@ -62,3 +62,16 @@ Push notifications to the mobile app go through Expo's push service. Only the no
 ## Remove a host
 
 Remove the host from `tools/paseo/deployment.json`. Sync stops and disables `paseo.service`, and `ExecStopPost` removes the Tailscale Serve entry. `~/.paseo/` stays in place; delete it by hand to discard sessions and worktrees.
+
+## Validate a change
+
+Run these from the repository root after changing `tools/paseo/`:
+
+```sh
+uvx ruff==0.16.10 check --config sync/pyproject.toml tools/paseo
+uvx ruff==0.16.10 format --check --config sync/pyproject.toml tools/paseo
+uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p tools/paseo
+uvx --python 3.14 pytest==9.1.1 tools/paseo/tests -q
+```
+
+CI runs the same checks in `repository-checks`.

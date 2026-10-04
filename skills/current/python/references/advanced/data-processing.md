@@ -131,4 +131,3 @@ basedpyright understands `polars-stubs`, which ship with polars itself. No extra
 - Polars docs: <https://docs.pola.rs>
 - DuckDB Python API: <https://duckdb.org/docs/api/python/overview>
 - Cross-reference - this skill set's `data-scientist` skill (load it for the deep version)
-

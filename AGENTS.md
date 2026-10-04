@@ -2,7 +2,7 @@
 
 ## Scope
 
-- `HARNESS.md`: SSOT for global, harness-agnostic agent instructions; sync publishes it to every harness as its instruction file. After editing it, run the final version against the "Model-facing text" rules in `docs/skills.md` and the prompting guidelines, then `git diff --check`
+- `HARNESS.md`: SSOT for global, harness-agnostic agent instructions; sync publishes it to every harness as its instruction file. After editing it, review the final version against `docs/skills.md` section "Model-facing text", then `git diff --check`
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - `tools/`: repo-only managed-tool sources
@@ -20,11 +20,13 @@
 Generated homes are overwritten on every sync, so an edit there is lost and the SSOT stays wrong:
 
 - NEVER edit generated synced homes unless the user asks and the SSOT impact is clear
-- Only sync may read the SSOT directly; wrappers, harnesses, and runtime adapters must use installed state
+- Sync reads the SSOT to reconcile installed state. Generated wrappers, harness configuration, skills, and runtime adapters must consume installed state, not load their configuration or code from the checkout.
+- Sync-declared maintenance services may run repository-owned tool scripts from the checkout with the installed runtime's Python: cache-gc, Paseo and Amp runner updates, and T3 refresh and updates. These jobs maintain machine state or refresh long-lived processes outside harness launches; `sync/src/sync/core/services.py` owns their command paths.
+- The Amp runner may serve the checkout as a work directory through `--dir`; it still launches through the installed wrapper. Sync reads the auth-gateway checkout source to hash it for restart detection, but the service executes the installed copy.
 
 ## Skills
 
-Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`
+Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`. New skills follow its "Create a skill" procedure.
 
 ## Documentation Gate
 
@@ -66,4 +68,7 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 Commits:
 - For harness-specific changes use `<harness>: ...`; for example `pi: configure fallback model`
-- For generic changes: `docs:`, `sync:`, `ci:`, `skills(<skill>):`, `tools(<tool>):`
+- For generic changes: `docs:`, `sync:`, `ci:`, `deps:`, `skills(<skill>):`, `tools(<tool>):`
+
+Pull requests:
+- `main` changes only through pull requests; push a `work/<8-lowercase-hex>` branch and follow "Merge a pull request" in `docs/ci.md`

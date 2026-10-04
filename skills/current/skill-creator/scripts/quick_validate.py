@@ -67,7 +67,7 @@ def _validate_name(name: object) -> tuple[bool, str]:
         return False, f"Name must be a string, got {type(name).__name__}"
     name = name.strip()
     if not name:
-        return True, ""
+        return False, "Name must not be empty"
     if not re.match(r"^[a-z0-9-]+$", name):
         return (
             False,
@@ -172,6 +172,10 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     for ok, message in checks:
         if not ok:
             return False, message
+
+    directory_name = skill_md.parent.resolve().name
+    if frontmatter["name"] != directory_name:
+        return False, f"Name must match skill directory '{directory_name}'"
 
     return True, "Skill is valid!"
 

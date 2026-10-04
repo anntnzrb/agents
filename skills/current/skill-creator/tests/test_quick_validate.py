@@ -41,9 +41,25 @@ def run_validate(target: Path) -> subprocess.CompletedProcess[str]:
 
 def test_valid_skill_passes(tmp_path: Path) -> None:
     """Valid fixture skill passes quick validation."""
-    result = run_validate(write_skill(tmp_path / "ok", _VALID_FRONTMATTER))
+    result = run_validate(write_skill(tmp_path / "fixture-skill", _VALID_FRONTMATTER))
     assert result.returncode == 0
     assert "Skill is valid!" in result.stdout
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_empty_name_fails(tmp_path: Path, name: str) -> None:
+    """Empty and whitespace-only names fail the public validator."""
+    frontmatter = _VALID_FRONTMATTER.replace("fixture-skill", f'"{name}"')
+    result = run_validate(write_skill(tmp_path / "fixture-skill", frontmatter))
+    assert result.returncode == 1
+    assert "Name must not be empty" in result.stdout
+
+
+def test_name_must_match_directory(tmp_path: Path) -> None:
+    """A valid name in the wrong directory is rejected."""
+    result = run_validate(write_skill(tmp_path / "different-skill", _VALID_FRONTMATTER))
+    assert result.returncode == 1
+    assert "must match skill directory 'different-skill'" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -76,7 +92,7 @@ def test_description_without_trigger_fails(tmp_path: Path, description: str) -> 
 def test_trigger_openers_pass(tmp_path: Path, description: str) -> None:
     """Trigger grammar passes without claiming to judge semantic quality."""
     frontmatter = f'---\nname: fixture-skill\ndescription: "{description}"\n---\n'
-    result = run_validate(write_skill(tmp_path / "trigger", frontmatter))
+    result = run_validate(write_skill(tmp_path / "fixture-skill", frontmatter))
     assert result.returncode == 0
 
 

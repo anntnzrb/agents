@@ -37,6 +37,12 @@ cd ~/.config/agents
 
 The shell is now in `~/.config/agents`.
 
+Enable the repository's [Git hooks](../.githooks/README.md), which run the sync quality gates and keep commits off `main`:
+
+```bash
+git config --local core.hooksPath .githooks
+```
+
 ## Configure shared environment variables
 
 Copy the shared environment template if `.env` does not exist yet, restrict access, and edit the file:

@@ -76,7 +76,7 @@ def plan(root: Path, base: str | None) -> dict[str, list[str]]:
 
 
 def metadata(root: Path) -> None:
-    """Validate every published skill with its owning validator."""
+    """Validate and lint every published skill with its owning validators."""
     skills = sorted(
         path for path in (root / "skills/current").iterdir() if path.is_dir()
     )
@@ -88,6 +88,8 @@ def metadata(root: Path) -> None:
             ["uv", "run", "--script", validator, "quick-validate", str(skill)],
             cwd=root,
         )
+    relative = [str(skill.relative_to(root)) for skill in skills]
+    run(["uv", "run", "--script", validator, "lint", *relative], cwd=root)
     print(f"Validated {len(skills)} active skills", flush=True)
 
 

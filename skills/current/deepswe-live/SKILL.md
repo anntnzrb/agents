@@ -44,11 +44,13 @@ CLI output: `ok`, `schema_version`, `command`, and `data` or `error`. Check `ok`
 
 ## Required reads
 
-- Command choice and version/cache behavior → `references/command-routing.md`, before selecting a command or handling fetch/cache results.
-- JSON envelope and metric fields → `references/output-contract.md`, before consuming output or writing a report.
-- URLs, freshness, validators, and labels → `references/provenance.md`, before citing data or describing published/raw/derived values.
-- Provenance, same-version refreshes, or new releases → `references/release-maintenance.md` when upstream reruns models, publishes `v1.12`/`v2.0`, or the default release must move.
-- Complete flags/examples → `README.md` when fast routing does not answer the invocation question.
+| Need | Read | When |
+| --- | --- | --- |
+| Command choice and version/cache behavior | `references/command-routing.md` | Before selecting a command or handling fetch/cache results |
+| JSON envelope and metric fields | `references/output-contract.md` | Before consuming output or writing a report |
+| URLs, freshness, validators, and labels | `references/provenance.md` | Before citing data or describing published/raw/derived values |
+| Provenance, same-version refreshes, or new releases | `references/release-maintenance.md` | Upstream reruns models, publishes `v1.12`/`v2.0`, or the default release must move |
+| Complete flags/examples | `README.md` | Fast routing does not answer the invocation question |
 
 ## Evidence and comparison controls
 

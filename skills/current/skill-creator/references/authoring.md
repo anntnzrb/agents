@@ -33,8 +33,9 @@ Ask about edge cases, input/output formats, example files, success criteria, and
 
 Compose:
 
-- **name**: Skill identifier
+- **name**: Nonempty kebab-case identifier matching the skill directory name
 - **description**: Trigger contract, not a synopsis. State when the agent loads the skill using concrete user situations and capability nouns. Start with `Use when`, `Use for`, or `Use before`. Follow `description-optimization.md` for wording and semantic review. Keep workflow details in the body.
+- **license**: Required. Set `AGPL-3.0-or-later`; preserve upstream notices in `NOTICE.md` at the skill root or in `references/` for ports
 - **compatibility**: Required tools or dependencies. OPTIONAL; rarely needed
 - **body**: Imperative instructions, examples, references, workflows, and resource pointers
 
@@ -43,7 +44,7 @@ Skill anatomy:
 ```text
 skill-name/
 ├── SKILL.md (required)
-│   ├── YAML frontmatter (name, description required)
+│   ├── YAML frontmatter (name, description, license required)
 │   └── Markdown instructions
 └── Bundled Resources (optional)
     ├── scripts/    - Executable code for deterministic/repetitive tasks

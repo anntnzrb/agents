@@ -83,7 +83,7 @@ The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. A failed or aborted installation job cleans up its private staging directory in a `finally` block, leaving active and previous releases intact. During post-sync pruning, sync prunes completed, unreferenced releases and safely cleans up stale `.stage-<pid>-<nonce>` directories whose creating PID is no longer alive or is older than the install timeout, without deleting unrecognized user directories or active releases. Package operations similarly use unique per-operation staging (`staging-<pid>-<timestamp>`) and backup (`backup-<pid>-<timestamp>`) paths, rolling back to previous directory content on failure and cleaning up temporary backups only upon successful completion. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
 ## Extension hook state
 
-Extension dependency hooks compute a content fingerprint (`fingerprintTree`) of their source directory to skip redundant installation steps when dependencies and sources have not changed:
+Extension dependency hooks compute a content fingerprint (`fingerprint_tree` in `sync/src/sync/core/hook_state.py`) of their source directory to skip redundant installation steps when dependencies and sources have not changed:
 
 - Produces a SHA-256 digest over the directory tree (or `"missing"` if the target path does not exist).
 - Traverses directory entries in deterministic Unicode code-point (code-unit) order.
@@ -146,7 +146,7 @@ The facade unit is `cliproxy-gateway.service`. Its installed script and private 
 
 Every machine converges on `origin/main`: commit and push from any machine, and the others pick the change up on their own. Pushing stays manual; pulling and reconciling are automatic. The git hooks stay pure quality gates, so only commits that passed the `pre-push` tests reach `origin/main`.
 
-Sync installs a per-user schedule — a systemd timer on Linux, a launch agent on macOS (see [User services](#user-services)) — that runs `sync update` every few minutes at idle CPU and I/O priority. Each run:
+Sync installs a per-user schedule (a systemd timer on Linux, a launch agent on macOS; see [User services](#user-services)) that runs `sync update` every few minutes at idle CPU and I/O priority. Each run:
 
 1. Skips the round if another sync holds the process lock; it never waits.
 2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout. Each of these cases logs a `sync: warning: update: …` line naming the blocker (the changed files, the branch, or the local and upstream commit counts), so a host that stops converging shows why in its updater log; an up-to-date run logs nothing.
@@ -170,3 +170,5 @@ A host stuck behind `origin/main` repeats the same warning on every run. Commit 
 ## Tool launchers
 
 `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills.
+
+Sync copies `tools/mcporter/mcporter.jsonc` to `~/.mcporter/mcporter.json` and `tools/summarize/config.json` to `~/.summarize/config.json`, replacing the endpoint placeholders in the second file. `_config_jobs` in `sync/src/sync/core/plan.py` declares these jobs.

@@ -11,6 +11,7 @@ import tempfile
 import time
 import unittest
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import TypeIs, override
 from unittest import mock
@@ -879,6 +880,111 @@ class ProgressFeedbackTests(_Sandbox):
 
         self.assertEqual(code, 0)
         self.assertEqual(err.getvalue(), "")
+
+
+def _no_model(payload: dict[str, object]) -> HttpResponse:
+    del payload
+    raise AssertionError("a refused pre-commit gate must not call the model")
+
+
+def _plan_reply(payload: dict[str, object]) -> HttpResponse:
+    del payload
+    return _model_reply(PLAN)
+
+
+class PreCommitGateTests(_Sandbox):
+    """Run the repository pre-commit gate on the staged state before planning."""
+
+    def hook(self, body: str, *, directory: Path | None = None) -> Path:
+        hooks = directory or self.repo / ".git" / "hooks"
+        hooks.mkdir(parents=True, exist_ok=True)
+        path = hooks / "pre-commit"
+        _ = path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+        path.chmod(0o755)
+        return path
+
+    def run_gate(
+        self, *, dry_run: bool = False, no_verify: bool = False
+    ) -> tuple[int, str]:
+        options = replace(
+            self.options(
+                dry_run=dry_run,
+                json_output=True,
+                post=_plan_reply if no_verify else _no_model,
+            ),
+            no_verify=no_verify,
+        )
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = run_orchestrated(options)
+        return code, out.getvalue() + err.getvalue()
+
+    def assert_refused(self, code: int, output: str, evidence: str) -> None:
+        self.assertEqual(code, 4, output)
+        error = _as_dict(_as_dict(_json_loads(output))["error"])
+        self.assertEqual(error["code"], "hook_failed")
+        self.assertIn(evidence, str(error["message"]))
+        self.assertEqual(self.git("log", "--format=%s").strip(), "initial")
+        self.assertEqual(
+            self.git("diff", "--cached", "--name-only").strip(), "tracked.txt"
+        )
+
+    def test_staged_trailing_whitespace_refuses_without_commits(self) -> None:
+        self.stage("changed \n")
+        code, output = self.run_gate()
+        self.assert_refused(code, output, "trailing whitespace")
+
+    def test_dry_run_runs_the_gate_too(self) -> None:
+        self.stage("changed \n")
+        code, output = self.run_gate(dry_run=True)
+        self.assert_refused(code, output, "trailing whitespace")
+
+    def test_failing_pre_commit_hook_refuses_with_its_output(self) -> None:
+        _ = self.hook("echo 'blocked by repository policy' >&2\nexit 1")
+        self.stage()
+        code, output = self.run_gate()
+        self.assert_refused(code, output, "blocked by repository policy")
+
+    def test_hook_under_core_hooks_path_is_honored(self) -> None:
+        _ = self.hook(
+            "echo 'custom hooks path' >&2\nexit 1", directory=self.repo / ".hooks"
+        )
+        _ = self.git("config", "core.hooksPath", ".hooks")
+        self.stage()
+        code, output = self.run_gate()
+        self.assert_refused(code, output, "custom hooks path")
+
+    def test_passing_hook_runs_once_in_the_repository_root(self) -> None:
+        marker = Path(self.temporary_directory.name) / "hook-runs.txt"
+        _ = self.hook(f'pwd >> "{marker}"')
+        self.stage()
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = run_orchestrated(self.options(json_output=True, post=_plan_reply))
+
+        self.assertEqual(code, 0, out.getvalue())
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(), "Update tracked value"
+        )
+        runs = marker.read_text(encoding="utf-8").splitlines()
+        # once on the real staged state; temporary-worktree commits stay hook-free
+        self.assertEqual([Path(run).resolve() for run in runs], [self.repo.resolve()])
+
+    def test_non_executable_hook_is_ignored(self) -> None:
+        self.hook("exit 1").chmod(0o644)
+        self.stage()
+        code, output = self.run_gate(no_verify=False, dry_run=True)
+        self.assertEqual(code, 0, output)
+
+    def test_no_verify_skips_the_gate(self) -> None:
+        _ = self.hook("exit 1")
+        self.stage("changed \n")
+        code, output = self.run_gate(no_verify=True)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(), "Update tracked value"
+        )
 
 
 class ModelContractTests(unittest.TestCase):

@@ -262,28 +262,52 @@ def test_required_rejects_failed_cancelled_and_unexpectedly_skipped_checks(
     assert "skills" in completed.stderr
 
 
-def test_metadata_rejects_a_skill_directory_without_its_entrypoint(
-    tmp_path: Path,
-) -> None:
-    checker = tmp_path / "skills/current/skill-creator"
-    scripts = checker / "scripts"
+def metadata_checker(root: Path) -> None:
+    """Install the real skill validators and a valid skill-creator fixture."""
+    scripts = root / "skills/current/skill-creator/scripts"
     scripts.mkdir(parents=True)
     original = SCRIPT.parents[2] / "skills/current/skill-creator/scripts"
-    for name in ("cli.py", "quick_validate.py"):
+    for name in ("cli.py", "quick_validate.py", "lint_skills.py"):
         (original / name).copy(scripts / name)
     write(
-        tmp_path,
+        root,
         "skills/current/skill-creator/SKILL.md",
         "---\nname: skill-creator\n"
         'description: "Use when validating skills."\n'
         "license: AGPL-3.0-or-later\n---\n",
     )
-    write(tmp_path, "skills/current/broken/scripts/cli.py")
-    result = subprocess.run(
+
+
+def metadata(root: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [sys.executable, str(SCRIPT), "metadata"],
-        cwd=tmp_path,
+        cwd=root,
         capture_output=True,
         text=True,
     )
+
+
+def test_metadata_rejects_a_skill_directory_without_its_entrypoint(
+    tmp_path: Path,
+) -> None:
+    metadata_checker(tmp_path)
+    write(tmp_path, "skills/current/broken/scripts/cli.py")
+    result = metadata(tmp_path)
     assert result.returncode == 1
     assert "SKILL.md not found" in result.stdout
+
+
+def test_metadata_runs_the_skill_lint_over_every_current_skill(
+    tmp_path: Path,
+) -> None:
+    metadata_checker(tmp_path)
+    write(
+        tmp_path,
+        "skills/current/prose/SKILL.md",
+        "---\nname: prose\n"
+        'description: "Use when testing lint."\n'
+        "license: AGPL-3.0-or-later\n---\nTrailing \n",
+    )
+    result = metadata(tmp_path)
+    assert result.returncode == 1
+    assert "skills/current/prose/SKILL.md:6: trailing whitespace" in result.stdout

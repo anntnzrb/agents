@@ -67,8 +67,10 @@ mcporter call n8n.<DISCOVERED_TOOL> --args '<JSON_MATCHING_DISCOVERED_SCHEMA>'
 
 ## Required follow-up reads
 
-- REST auth, endpoints, environment lookup → `reference.md`; before REST work.
-- MCP prerequisites, safe status, discovery, failures → `references/mcporter.md`; MUST read before MCPorter work.
-- MCP transport definition → `~/.mcporter/mcporter.json`; diagnose transport; MUST NOT print resolved secrets.
-- Workflow authoring recipes → `cookbook/basics.md`; when a REST or MCP task matches.
-- End-to-end authoring sequence → `cookbook/blueprints.md`; when creating or iterating a workflow.
+| Need | Read | When |
+| --- | --- | --- |
+| REST auth, endpoints, environment lookup | `reference.md` | Before REST work |
+| MCP prerequisites, safe status, discovery, failures | `references/mcporter.md` | MUST read before MCPorter work |
+| MCP transport definition | `~/.mcporter/mcporter.json` | Diagnosing transport; MUST NOT print resolved secrets |
+| Workflow authoring recipes | `cookbook/basics.md` | A REST or MCP task matches |
+| End-to-end authoring sequence | `cookbook/blueprints.md` | Creating or iterating a workflow |

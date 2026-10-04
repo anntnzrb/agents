@@ -25,7 +25,8 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 | `--model`, `--base-url`, `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment variables and the built-in defaults |
 | `--base REV` | Rewrite mode only: rebuild the commits since this ancestor revision |
 | `--smoke CMD` | Run one validation command in the temporary worktree after each commit (default: off) |
-| `--dry-run` | Print the inventory and snapshot, call no model, create nothing |
+| `--dry-run` | Print the inventory and snapshot, call no model, create nothing; the pre-commit gate still runs |
+| `--no-verify` | Skip the pre-commit gate. By default `run` refuses with `hook_failed` (exit 4) before planning when `git diff --cached --check` or the repository's executable pre-commit hook fails on the staged state |
 | `--json` | Emit one `autommit/v1` object on stdout; exit codes are unchanged |
 
 Positional arguments and repeated `--context` values pass user intent to the planner unchanged.
@@ -64,6 +65,7 @@ Rewrite freezes the current worktree, including uncommitted work, into a target 
 
 ## Invariants
 
+- Never pass `--no-verify` unless the user asks for it. On `hook_failed`, report the gate output; do not repair the staged changes unasked.
 - Never bypass `validate-plan`, critic gating, snapshot binding, the operation lock, receipt recovery, the temporary worktree, tree equality, or compare-and-swap creation.
 - Never remove a stale lock automatically. Preserve evidence and state on every refusal or failure.
 - Never replace this loop with direct `git add`, `git commit`, or `git update-ref` commands.
