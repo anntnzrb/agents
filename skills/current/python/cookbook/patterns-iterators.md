@@ -174,4 +174,3 @@ def unique[T, K](iterable: Iterable[T], key: Callable[[T], K] | None = None) -> 
         if k not in seen:
             seen.add(k)
             yield item
-

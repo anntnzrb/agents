@@ -128,4 +128,3 @@ Use plain CLI when:
 - working manually in the skill root
 - one-shot commands are enough
 - you are debugging by hand
-

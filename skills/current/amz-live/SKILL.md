@@ -57,4 +57,3 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 ## Reference routing
 
 Use the Required follow-up reads table near the top of this file; do not preload references for routine searches.
-

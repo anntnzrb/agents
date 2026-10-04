@@ -47,10 +47,12 @@ Comparisons require exact source benchmark/version or snapshot, release, metric 
 
 ## Required follow-up reads
 
-- Runtime source routing: `references/source-discovery.md`; before selecting a seed or selector.
-- Extraction precedence: `references/extraction.md`; when HTML/island/RSC/table data differs.
-- Values and semantic gates: `references/normalization.md`; before reporting or ranking a metric.
-- Cache and field lineage: `references/provenance.md`; when using refresh, stale, or snapshots.
-- Drift and catalog diff: `references/drift-handling.md`; when a catalog/page changes.
-- Dependencies and overlap: `references/overlap-model.md`; when comparing composites or coding benchmarks.
-- Fixture/eval expectations: `references/eval-notes.md`; when extending tests or source fixtures.
+| Need | Read | When |
+| --- | --- | --- |
+| Runtime source routing | `references/source-discovery.md` | Before selecting a seed or selector |
+| Extraction precedence | `references/extraction.md` | HTML/island/RSC/table data differs |
+| Values and semantic gates | `references/normalization.md` | Before reporting or ranking a metric |
+| Cache and field lineage | `references/provenance.md` | Using refresh, stale, or snapshots |
+| Drift and catalog diff | `references/drift-handling.md` | A catalog/page changes |
+| Dependencies and overlap | `references/overlap-model.md` | Comparing composites or coding benchmarks |
+| Fixture/eval expectations | `references/eval-notes.md` | Extending tests or source fixtures |

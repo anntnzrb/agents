@@ -28,11 +28,13 @@ Bundled snapshot: Clan `clan-core`, branch `26.05`, commit `1ec96dde9a8e3244b32a
 
 ## Required follow-up reads
 
-- Every Clan request: `references/INDEX.md`; topic routing and snapshot rules; first read.
-- Creating or installing a Clan: `references/docs/getting-started/`; installation or first deployment.
-- Prescribing inventory, services, vars, backups, or networking: matching `references/docs/guides/<topic>/`.
-- Upgrading or migrating: `references/docs/guides/migrations/` and `references/docs/releases/26-05.md`; migration or 26.05 release behavior.
-- Configuring encrypted disks: `references/docs/guides/disk-encryption.md` and `references/embeds/`; disk encryption and initrd SSH.
-- Generated CLI, options, `clan.core`, or official-service reference: pinned rendered URL in `references/INDEX.md`.
-- Refreshing to another release: `references/update-workflow.md`; snapshot updater.
-- Copying or redistributing text: `references/NOTICE.md`; copyright and redistribution terms.
+| Need | Read | When |
+| --- | --- | --- |
+| Topic routing and snapshot rules | `references/INDEX.md` | Every Clan request; first read |
+| Installation or first deployment | `references/docs/getting-started/` | Creating or installing a Clan |
+| Inventory, services, vars, backups, or networking | Matching `references/docs/guides/<topic>/` | Prescribing that topic |
+| Migration or 26.05 release behavior | `references/docs/guides/migrations/` and `references/docs/releases/26-05.md` | Upgrading or migrating |
+| Disk encryption and initrd SSH | `references/docs/guides/disk-encryption.md` and `references/embeds/` | Configuring encrypted disks |
+| Generated CLI, options, `clan.core`, or official-service reference | Pinned rendered URL in `references/INDEX.md` | Looking up generated reference |
+| Snapshot updater | `references/update-workflow.md` | Refreshing to another release |
+| Copyright and redistribution terms | `references/NOTICE.md` | Copying or redistributing text |
