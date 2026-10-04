@@ -61,6 +61,7 @@ uv run --script <skill-dir>/scripts/cli.py generate-review <workspace>/iteration
 uv run --script <skill-dir>/scripts/cli.py lint [<path-to-skill-folder> ...]
 uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
+uv run --script <skill-dir>/scripts/cli.py trigger-eval --cases <cases.json> --base-url <api-base-url> --model <model-id> --api-key <api-key>
 ```
 
 Run `lint` after every skill change. It checks the mechanical rules of the repository skill gate: dashes in Markdown prose, whitespace, the license, the follow-up reads table, the line cap, and `NOTICE.md`. Without paths, it checks the skills that differ from `origin/main`.
@@ -120,7 +121,7 @@ Detailed workflow: `references/eval-workflow.md`.
 
 ## Description Optimization
 
-Offer description optimization only after core behavior is in good shape. Read `references/description-optimization.md` for trigger writing rules, eval-set design, and harness-agnostic checking.
+Offer description optimization only after core behavior is in good shape. Read `references/description-optimization.md` for trigger writing rules, case JSON, held-out splits, and `trigger-eval` usage. The command is OPTIONAL and manual: it costs inference, so CI MUST NOT run it.
 
 ## Packaging
 
