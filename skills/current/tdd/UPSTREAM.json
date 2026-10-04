@@ -1,0 +1,8 @@
+{
+  "repo": "cursor/plugins",
+  "branch": "main",
+  "commit": "2a8044425c7bddf429c3bdedf3ab61e791d34d65",
+  "trees": {
+    "pstack/skills/tdd": "3a761ae539f19c61c7ae73eddbec54951d44e752"
+  }
+}

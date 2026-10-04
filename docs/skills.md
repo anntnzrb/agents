@@ -89,14 +89,30 @@ A skill ported from a repository that keeps evolving records its source in `skil
 {
   "repo": "<owner>/<repo>",
   "release": "<tag>",
-  "commit": "<full commit hash of the tag>",
-  "trees": {"<upstream directory>": "<git tree hash at that tag>"}
+  "commit": "<full commit hash>",
+  "trees": {"<upstream directory>": "<git tree hash at commit>"},
+  "watch": {"<upstream parent directory>": ["<every entry reviewed at commit>"]}
 }
 ```
 
-Get each tree hash from a clone with `git rev-parse <tag>:<upstream directory>`.
+- Set `release` to follow the latest release, or `"branch": "<name>"` for upstreams without releases. Set exactly one.
+- `commit` is the upstream commit the port was last synchronized with; for release pins, the tag's commit.
+- `trees` lists every upstream directory the port derives from. Get a hash with `git rev-parse <commit>:<directory>` in a clone, or from `gh api repos/<owner>/<repo>/contents/<parent>?ref=<commit>`.
+- `watch` is optional. It reports upstream directories that appear under a parent and are not in its list, such as a new skill or principle.
 
-The daily `upstream` workflow (`.github/workflows/upstream.yml`) compares the pinned hashes with the repository's latest release. It opens one issue per skill and release when a pinned directory changed or disappeared. To act on an issue, port relevant changes, then update the release, commit, and every tree hash. Update the pin even when nothing applies; otherwise the next release raises the same changes.
+The daily `upstream` workflow (`.github/workflows/upstream.yml`) compares each pin with the upstream target. It keeps one open issue per drifted skill and refreshes its body while the pin stays behind.
+
+Review drift against upstream itself, not against the local port. Local adaptations (renamed tools, removed vendor-specific steps, merged skills) always differ from upstream, so a local comparison is noise. The issue gives the upstream-only command:
+
+```bash
+git diff <pinned commit> <target> -- <changed directories>
+```
+
+To resolve an issue:
+
+1. Read the upstream diff. Port changes that improve the skill and fit this setup; skip vendor-specific ones.
+2. Apply the skill gate to the ported text.
+3. Update the pin: `commit`, `release` for release pins, every tree hash, and `watch` entries for each new directory reviewed, ported or not.
 
 Check locally; the command exits `1` while any pin is behind:
 

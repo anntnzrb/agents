@@ -8,3 +8,6 @@ This skill references and ports command patterns, documentation, and agent workf
 - Copyright: (c) Firecrawl / Mendable AI
 
 Licensed under the Apache License 2.0 / ISC License upstream, ported and packaged under AGPL-3.0-or-later for the agent harness skill library.
+
+`UPSTREAM.json` records the upstream commit and directory hashes this port
+tracks.

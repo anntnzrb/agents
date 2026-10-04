@@ -1,0 +1,8 @@
+{
+  "repo": "anthropics/skills",
+  "branch": "main",
+  "commit": "69c0b1a0674149f27b61b2635f935524b6add202",
+  "trees": {
+    "skills/skill-creator": "7bd8fc459f09f0e14dcc2adbb4a5a58e60ea755c"
+  }
+}
