@@ -27,7 +27,8 @@ __all__ = [
 _MISSING: Final = object()
 
 
-def _read_json_object(path: Path) -> dict[str, object] | None:
+def read_json_object(path: Path) -> dict[str, object] | None:
+    """Read a managed JSONC object, returning None for an absent source."""
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -89,11 +90,11 @@ def sync_json_config(src: str, dst: str, preserve_paths: Sequence[str] = ()) -> 
     """Copy managed JSON config, re-injecting declared destination-only keys."""
     src_path = Path(src)
     dst_path = Path(dst)
-    source = _read_json_object(src_path)
+    source = read_json_object(src_path)
     if source is None:
         message = f"missing source: {src}"
         raise RuntimeError(message)
-    previous = _read_json_object(dst_path) or {}
+    previous = read_json_object(dst_path) or {}
     result = copy.deepcopy(source)
     for path in preserve_paths:
         _inject_preserved(result, source, previous, path)
@@ -102,3 +103,9 @@ def sync_json_config(src: str, dst: str, preserve_paths: Sequence[str] = ()) -> 
         return
     content = f"{json.dumps(result, indent=2)}\n"
     sync_text_file(dst_path, content, existing_file_mode(dst_path))
+
+
+def sync_rendered_json(dst: str, content: dict[str, object]) -> None:
+    """Replace a managed rendered JSON file without retaining obsolete keys."""
+    path = Path(dst)
+    sync_text_file(path, f"{json.dumps(content, indent=2)}\n", existing_file_mode(path))

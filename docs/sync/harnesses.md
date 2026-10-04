@@ -31,6 +31,8 @@ Without `runtime_subdir`, the source root is `harnesses/<id>/` and the generated
 
 Sync publishes the repository's `HARNESS.md` as the harness instruction file (`AGENTS.md` unless the adapter sets `instruction_file`) and `skills/current/` as `skills/` to every enabled harness. Sync never publishes `tools/` into a harness home; it copies or renders selected tool files into each tool's own home, as the [Sync reference](sync.md#tool-launchers) describes.
 
+The Pi adapter also renders native MCP configuration from `tools/mcporter/mcporter.jsonc` through `sync/src/sync/core/pi_mcp.py`. A server's `piSkill` names the shared skill replaced by that native entry. Sync appends exact skill-path exclusions to the tracked Pi settings and records the generated files as managed entries. Each reconciliation replaces the server map and derives exclusions from the current registry, so removed servers and their exclusions disappear. Other adapters retain the shared skills and mcporter configuration unchanged. See the [Pi harness source](../../harnesses/pi/README.md#native-mcp) for runtime behavior and credential handling.
+
 ## Launchers
 
 Sync supports two launcher kinds, discriminated by the adapter's `launcher` value.
