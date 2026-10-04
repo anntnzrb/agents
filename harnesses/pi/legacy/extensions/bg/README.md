@@ -1,5 +1,7 @@
 # Background Bash
 
+> **Archived.** Not loaded: Pi does not auto-discover `legacy/`, sync does not publish it, and CI does not test it. Kept as a reference for nonblocking Bash on Pi (threshold backgrounding, turn-boundary delivery, `jobs wait` that yields to queued user messages). Relative links and validation paths refer to its former location, `harnesses/pi/agent/extensions/bg/`.
+
 Overrides `bash` using Pi's own definition and result formatter. Long commands return a job notice
 while their process group continues running; fast commands return the ordinary Bash result.
 Completions arrive as coalesced `bg-result` follow-ups, never steering messages.
