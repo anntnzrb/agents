@@ -20,6 +20,8 @@ uv run --script .github/scripts/ci.py metadata
 
 Run a selected skill's gates using [Manage shared skills](skills.md#validate-python-skills-standard). Run sync checks using [Develop the sync application](sync/development.md#run-the-full-checks). Harness validation stays beside its source.
 
+The `repository-checks` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) also lints, formats, type-checks, and tests `.github/` and the Python tools under `tools/` with pinned `uvx` commands. Run the same commands locally after changing those paths.
+
 Reproduce a skill shard by copying its `SKILLS` JSON array from the job's environment:
 
 ```bash
@@ -79,4 +81,4 @@ Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one gro
 
 The default branch's ruleset requires `CI required` from GitHub Actions. Keep the final check name stable when changing job selection. Preserve existing protection rules, and do not add bypass actors to make a failing change mergeable.
 
-Workflow changes select all code suites. Changes to the shared skill gate select all Python skills. Deleted or archived skills no longer produce code jobs; metadata validation still covers every published skill.
+The `repository-checks` and `sync-gates` jobs run on every pull request. The plan selects a skill only when a changed path is under `skills/current/<name>/` and that directory contains Python files; other skills get metadata validation only. Changes under `.github/` select every skill and harness suite. Changes under `skills/current/skill-creator/`, `docs/skills.md`, or `HARNESS.md` select every Python skill. Deleted or archived skills no longer produce code jobs; metadata validation still covers every published skill.

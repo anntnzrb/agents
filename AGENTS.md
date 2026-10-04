@@ -24,7 +24,7 @@ Generated homes are overwritten on every sync, so an edit there is lost and the 
 
 ## Skills
 
-Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`
+Skills are modified here, in the SSOT. Always run against the skill gate: `./docs/skills.md`. New skills follow its "Create a skill" procedure.
 
 ## Documentation Gate
 
@@ -66,4 +66,7 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 Commits:
 - For harness-specific changes use `<harness>: ...`; for example `pi: configure fallback model`
-- For generic changes: `docs:`, `sync:`, `ci:`, `skills(<skill>):`, `tools(<tool>):`
+- For generic changes: `docs:`, `sync:`, `ci:`, `deps:`, `skills(<skill>):`, `tools(<tool>):`
+
+Pull requests:
+- `main` changes only through pull requests; push a `work/<8-lowercase-hex>` branch and follow "Merge a pull request" in `docs/ci.md`

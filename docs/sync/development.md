@@ -10,6 +10,8 @@ From the repository root, use the public entrypoint:
 uv run --project sync sync
 ```
 
+Sync always reads its sources from `~/.config/agents`, not from the current directory. From another checkout or a worktree, this command runs that checkout's sync code against the sources in `~/.config/agents`, so the checkout's skill, harness, and tool changes are not published. They reach harness homes after the change merges and each host's [background updater](sync.md#background-updates) fast-forwards `~/.config/agents`.
+
 Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline. Contributor gates live behind the dev-only `sync-gates` console script (`sync/src/sync/gates.py`), not the public CLI.
 
 ## Run the full checks
@@ -109,9 +111,11 @@ Keep these contracts intact:
 ## Change harness configuration
 
 1. Edit the matching source under `harnesses/`.
-2. Run `uv run --project sync sync` from the repository root.
-3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
-4. Run the wrapper with `--version`.
+2. Run the harness's own validation from its README. Harnesses with bun test suites run them with `uv run --script .github/scripts/ci.py harness <name>`; `uv run --script .github/scripts/ci.py harness --help` lists them.
+3. Run `uv run --project sync sync` from `~/.config/agents`; see [Run sync from source](#run-sync-from-source).
+4. Inspect the generated root derived from the adapter's `home_segments` and `runtime_subdir` fields.
+5. Run the wrapper with `--version`.
+6. Commit as `<harness>: ...` (see the Git Contract in `AGENTS.md`).
 
 Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/tests/` or `docs/`.
 
@@ -126,11 +130,21 @@ Do not edit a generated harness home. Sync replaces managed files on the next ru
 5. Run the full checks.
 6. Update the [Harness adapter reference](harnesses.md) only when the adapter changes the shared workflow or requires a harness-specific user action.
 
-`tests/test_harness_adapters.py` enforces the registry invariants: `HarnessId` matches the adapter ids, ids and `homeSegments` are safe path components, wrapper names are unique across harnesses and tools, every adapter declares supported platforms, and registration order stays stable. Append new adapters instead of reordering the table; order fixes discovery, plan, and wrapper reconciliation order.
+`tests/test_harness_adapters.py` enforces the registry invariants: `HarnessId` matches the adapter ids, ids and `home_segments` are safe path components, wrapper names are unique across harnesses and tools, every adapter declares supported platforms, and registration order stays stable. Append new adapters instead of reordering the table; order fixes discovery, plan, and wrapper reconciliation order.
 
 Store launcher metadata in the adapter. Do not repeat package names, target homes, or hook rules in user configuration.
 
 Do not add a supported-harness roster to the documentation. `HARNESS_ADAPTERS` owns that list.
+
+## Add a managed tool
+
+Tool sources live under `tools/<tool>/`. Sync reads them from `~/.config/agents` and never publishes the directory itself. Wire a tool through the declaration that matches its need, following [Change sync behavior](#change-sync-behavior) for each:
+
+- To give an npm CLI a wrapper and a versioned cache, append it to `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py`.
+- To copy a configuration file into the tool's home, add a `FileJob` to `_config_jobs` in `sync/src/sync/core/plan.py`.
+- To run a per-host user service, declare it in `declared_user_units` and `declared_launch_agents` in `sync/src/sync/core/services.py`, read its hosts from `tools/<tool>/deployment.json`, and update [User services](sync.md#user-services).
+
+To check Python code under `tools/<tool>/` in CI, add its commands to the `repository-checks` job in `.github/workflows/ci.yml`, as `tools/cache-gc` and `tools/paseo` do. Document how to operate the tool on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
 
 ## Parsing and format contracts
 

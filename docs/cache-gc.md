@@ -36,6 +36,7 @@ tail ~/Library/Logs/cache-gc.log
 
 ```sh
 uvx ruff==0.16.10 check --config sync/pyproject.toml tools/cache-gc
+uvx ruff==0.16.10 format --check --config sync/pyproject.toml tools/cache-gc
 uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p tools/cache-gc
 uvx --python 3.14 pytest==9.1.1 tools/cache-gc/tests -q
 ```
