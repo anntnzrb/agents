@@ -398,6 +398,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def forward(self) -> None:
         parsed = urlsplit(self.path)
         classifier = self.command == "POST" and self.path == "/v1/systemone"
+        discovery = self.command == "GET" and self.path == "/v1/systemone/models"
         decoded_path = unquote(parsed.path)
         safe_path = (
             not any(part in {".", ".."} for part in decoded_path.split("/"))
@@ -429,7 +430,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             parsed.scheme
             or parsed.netloc
             or parsed.fragment
-            or not (classifier or ordinary)
+            or not (classifier or discovery or ordinary)
         ):
             self.error(404, "Unknown inference route")
             return
@@ -443,6 +444,19 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if not isinstance(server, GatewayServer):
             raise TypeError("Expected GatewayServer")
         config = server.config
+        if discovery:
+            payload = json.dumps(
+                {
+                    "object": "list",
+                    "data": [{"id": model} for model in sorted(config.models)],
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            _ = self.wfile.write(payload)
+            return
         if classifier:
             try:
                 payload = decode_json(body)

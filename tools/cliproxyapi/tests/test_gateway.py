@@ -186,6 +186,19 @@ def request(port, method, path, body=None, headers=None):
         return response.status, dict(response.headers), response.read()
 
 
+def test_classifier_discovery_is_local_nonsecret_and_separate(gateway):
+    port, cpa, router, _ = gateway
+    status, headers, body = request(port, "GET", "/v1/systemone/models")
+    assert status == 200
+    assert headers["Content-Type"] == "application/json"
+    assert json.loads(body) == {"object": "list", "data": [{"id": MODEL}]}
+    assert b"server-secret" not in body
+    assert cpa.empty() and router.empty()
+    status, _, body = request(port, "GET", "/v1/models")
+    assert status == 200
+    assert MODEL not in {entry["id"] for entry in json.loads(body)["data"]}
+
+
 def test_native_protocol_and_credentials(gateway):
     port, _, router, _ = gateway
     body = b'{ "model": "typesafe/jev-1.13", "state": "ok", "questions": {"spam":{"type":"noul","description":"Is this spam?"}} }'
