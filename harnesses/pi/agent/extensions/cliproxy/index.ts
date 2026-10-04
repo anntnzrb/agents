@@ -304,6 +304,10 @@ function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogMod
 	);
 }
 
+function positiveLimit(value: number | undefined): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 function toModel(
 	{ id, ownedBy, contextLength, anthropic }: GatewayModel,
 	catalog: CatalogCache | undefined,
@@ -329,8 +333,8 @@ function toModel(
 			cacheRead: entry?.cost?.cache_read ?? 0,
 			cacheWrite: entry?.cost?.cache_write ?? 0,
 		},
-		contextWindow: entry?.limit?.context ?? contextLength ?? FALLBACK_CONTEXT_WINDOW,
-		maxTokens: entry?.limit?.output ?? FALLBACK_MAX_TOKENS,
+		contextWindow: positiveLimit(entry?.limit?.context) ?? contextLength ?? FALLBACK_CONTEXT_WINDOW,
+		maxTokens: positiveLimit(entry?.limit?.output) ?? FALLBACK_MAX_TOKENS,
 		// Claude through Chat Completions loses its thinking text and signatures, which multi-turn
 		// reasoning replay needs. The gateway marks the Claude models /v1/messages serves natively;
 		// Pi's Anthropic transport appends /v1/messages to the origin itself.
@@ -365,13 +369,13 @@ async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	const gateway = gatewayModels(payload);
 	let resolvedCatalog = catalog;
 	if (
-		gateway.some((entry) => catalogModel(catalog, entry.id)?.limit?.context === undefined) &&
+		gateway.some((entry) => positiveLimit(catalogModel(catalog, entry.id)?.limit?.context) === undefined) &&
 		Date.now() - lastCatalogAttempt >= MISSING_MODEL_RETRY_MS
 	) {
 		resolvedCatalog = await loadCatalog(signal, true);
 	}
 	for (const entry of gateway) {
-		if (catalogModel(resolvedCatalog, entry.id)?.limit?.context === undefined && entry.contextLength === undefined) {
+		if (positiveLimit(catalogModel(resolvedCatalog, entry.id)?.limit?.context) === undefined && entry.contextLength === undefined) {
 			fallbackModels.add(entry.id);
 		} else {
 			fallbackModels.delete(entry.id);

@@ -1,7 +1,7 @@
 import { expect, mock, spyOn, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
 // Gateway catalog handling does not need Pi's bundled request-dialect metadata.
@@ -35,21 +35,21 @@ async function loadProvider(
 }
 
 async function withGateway(
-  run: (gateway: { models: unknown[]; up: boolean; status: number; requests: number }, cacheFile: string) => Promise<void>,
+  run: (gateway: { models: unknown[]; catalog: unknown; up: boolean; status: number; requests: number }, cacheFile: string) => Promise<void>,
 ): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "cliproxy-catalog-"));
   const previousCacheHome = process.env.XDG_CACHE_HOME;
   const previousOffline = process.env.PI_OFFLINE;
   process.env.XDG_CACHE_HOME = directory;
   delete process.env.PI_OFFLINE;
-  const gateway = { models: [] as unknown[], up: true, status: 200, requests: 0 };
+  const gateway = { models: [] as unknown[], catalog: {} as unknown, up: true, status: 200, requests: 0 };
   const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
     if (String(url).endsWith("/models")) {
       gateway.requests++;
       if (!gateway.up) throw new Error("gateway unreachable");
       return Response.json({ data: gateway.models }, { status: gateway.status });
     }
-    return Response.json({});
+    return Response.json(gateway.catalog);
   });
   try {
     await run(gateway, join(directory, "agents", "cliproxy-models.json"));
@@ -190,6 +190,26 @@ test("the gateway's context_length fills limits the metadata catalog lacks", asy
     const byId = new Map(models.map((model) => [model.id, model]));
     expect(byId.get("pool/vendor/unknown")?.contextWindow).toBe(262144);
     expect(byId.get("pool/vendor/bare")?.contextWindow).toBe(128000);
+  });
+});
+
+test("zero catalog limits cannot poison the startup cache for every gateway model", async () => {
+  await withGateway(async (gateway, cacheFile) => {
+    const image = { limit: { context: 0, output: 0 }, reasoning: false };
+    gateway.catalog = { images: { models: { "image-model": image } } };
+    await mkdir(dirname(cacheFile), { recursive: true });
+    await writeFile(join(dirname(cacheFile), "models-dev.json"), JSON.stringify({
+      version: 2, fetchedAt: Date.now(),
+      models: { "image-model": image }, suffixes: { "image-model": image }, stripped: { "image-model": image },
+    }));
+    gateway.models = [{ id: "image-model", context_length: 65536 }, { id: "pool/vendor/alpha" }];
+    const first = await loadProvider("zero-limits-first");
+    const models = await first.refreshModels!(context(true)) as ChatModel[];
+    expect(models.find((model) => model.id === "image-model")).toMatchObject({
+      contextWindow: 65536, maxTokens: 16384,
+    });
+    const second = await loadProvider("zero-limits-second");
+    expect(ids(second.models ?? [])).toEqual(expect.arrayContaining(["image-model", "pool/vendor/alpha"]));
   });
 });
 
