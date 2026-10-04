@@ -31,7 +31,7 @@ test("registers the facade's System One classifiers and keeps them across catalo
   try {
     const { default: cliproxy } = await import("./index.ts");
     let config!: ProviderConfig;
-    cliproxy({
+    await cliproxy({
       registerProvider: (_name: string, value: ProviderConfig) => { config = value; },
       on: () => () => {},
     } as unknown as ExtensionAPI);
@@ -48,7 +48,7 @@ test("registers the facade's System One classifiers and keeps them across catalo
     expect(registered?.baseUrl).toBeUndefined();
     expect(typeof config.classifiers?.["typesafe-system-one"]?.classify).toBe("function");
 
-    const refreshed = await config.refreshModels!({ signal: new AbortController().signal } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0]);
+    const refreshed = await config.refreshModels!({ signal: new AbortController().signal, allowNetwork: true, publish: async () => true } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0]);
     expect(classifiers(refreshed).map((model) => model.id)).toEqual(["typesafe/jev-1.13"]);
   } finally {
     if (previousOffline === undefined) delete process.env.PI_OFFLINE;

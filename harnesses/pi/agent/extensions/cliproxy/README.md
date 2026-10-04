@@ -6,7 +6,11 @@ Types come from the installed `@earendil-works/pi-coding-agent` package (`Extens
 `ProviderModelConfig`); the runtime catalog reads come from `@earendil-works/pi-ai/providers/all`, which
 Pi resolves for hosted extensions. The file has no local type declarations and passes `tsc --strict`.
 
-Discovery order per refresh:
+The asynchronous extension factory reads the last discovered catalog before registering the provider.
+Pi waits for the factory, so RPC clients see cached models on their first catalog request. A first run
+without a cache still needs a network refresh before the full catalog is available.
+
+Discovery order during a network-enabled refresh:
 
 1. `GET {baseUrl}/models` lists the gateway's current model ids.
 2. `https://models.dev/api.json` supplies limits, pricing, modalities, and reasoning flags for ids it
@@ -16,8 +20,8 @@ Discovery order per refresh:
    share a key, the row with the widest context window wins.
 3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
    overrides before falling back to metadata-free defaults.
-4. Unknown ids fall back to `FALLBACK_CONTEXT_WINDOW` (128K) and `FALLBACK_MAX_TOKENS` (16.4K), which
-   are pi defaults for metadata-free models.
+4. Gateway `context_length` fills a context limit absent from the metadata catalogs. Other unknown
+   limits fall back to the defaults in `index.ts`.
 
 ## System One classifiers
 
@@ -49,8 +53,9 @@ shipped catalog, which already authors them per model:
   reaches the catalog's `meta/muse-spark-1.3-contributor`.
 - When several shipped providers publish the same suffix, the provider named as a segment of the
   gateway id wins, so `opencode-go/deepseek-v4-pro` keeps the `opencode-go` dialect.
-- Only `openai-completions` models are indexed. This provider speaks that protocol to the gateway, so
-  metadata authored for another protocol describes a request shape it never sends.
+- Only `openai-completions` models contribute compatibility metadata for Chat Completions requests.
+  Models advertised with an Anthropic endpoint use `anthropic-messages` at the gateway origin instead,
+  without Chat Completions compatibility flags. This preserves Claude thinking blocks and signatures.
 - Models newer than the shipped catalog keep the generic dialect, and their thinking levels come from
   the models.dev `reasoning_options` effort list, which is also why `:max` reaches the wire for them
   instead of clamping to a supported level.
@@ -59,11 +64,19 @@ Without this resolution a reasoning request carries `reasoning_effort` only. Mod
 dialect requires a `thinking` field never enable extended thinking, and levels the model does support
 are absent from `thinkingLevelMap`, so pi clamps the selected level to the highest mapped one.
 
-The models.dev snapshot is cached for 24 hours at `$XDG_CACHE_HOME/agents/models-dev.json`
+The models.dev snapshot is cached at `$XDG_CACHE_HOME/agents/models-dev.json`
 (`~/.cache/agents/models-dev.json` by default) and is shared with the OpenCode plugin; the cache carries
 its own format version and is ignored when that version changes. A failed fetch reuses the cached
-snapshot, and a failed gateway request keeps the last catalog discovered in the running process.
-`PI_OFFLINE=1` disables discovery.
+snapshot. The discovered model catalog is stored separately at
+`$XDG_CACHE_HOME/agents/cliproxy-models.json`. It is endpoint-bound, validated and expires according to
+the constants in `index.ts`; writes use atomic replacement so simultaneous Pi sessions cannot expose
+a partially written file. A failed gateway request retains the cached catalog. Models briefly absent
+from successful nonempty listings remain available until the missing-listing threshold is reached,
+including across process restarts. Empty listings do not count as removals.
+
+Cache-only refreshes never contact the network. `PI_OFFLINE=1` also disables network discovery.
+For the first launch without a cache, use RPC or interactive mode to populate it; print/list modes
+may only expose the static fallback catalog until a network refresh has completed.
 
 If a discovered gateway model has no catalog context limit, discovery bypasses the cache TTL and
 fetches models.dev again before assigning fallback metadata. Missing-model retries are limited to
@@ -75,6 +88,13 @@ If the selected model still needs a fallback context limit, the extension warns 
 extension load in UI sessions, on startup, model selection, or before the next agent run. `/reload`
 loads changed extension code; a fresh Pi process also picks it up.
 
+## Transient stream failures
+
+The `message_end` handler normalizes the specific gateway stream-drop errors in `retry.ts` to wording
+Pi recognizes as retryable. It only changes failed `cliproxy` assistant messages and leaves already
+retryable errors, authentication failures, other providers and successful turns unchanged. Pi owns
+retry scheduling and attempt limits; the extension does not start a separate retry loop.
+
 ## Validate
 
 Pi's host packages are installed only in the synced home. Run the tests from a copy that links them:
@@ -85,3 +105,7 @@ ln -s ~/.pi/agent/extensions/node_modules "$T/node_modules"
 (cd "$T" && bun test cliproxy/)
 git diff --check
 ```
+
+For runtime checks, invoke the installed Pi binary directly with a separate `PI_CODING_AGENT_DIR`,
+not the sync-managed `pi` wrapper. Never pass a temporary `XDG_CACHE_HOME` to a sync-managed launcher:
+reconciliation can rewrite shared tool launchers to paths inside that temporary cache.
