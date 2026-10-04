@@ -65,6 +65,8 @@ export default function bg(pi: ExtensionAPI) {
   let delivery: ReturnType<typeof setTimeout> | undefined;
   let shutdown: Promise<void> | undefined;
   let starting = 0;
+  // Deliver only between runs: a queued follow-up cannot be withdrawn if wait later reads the result.
+  let busy = false;
   const settings = () => {
     const all = pi.getSettings();
     const config = (all as typeof all & { bg?: { thresholdMs?: number; maxJobMs?: number } }).bg;
@@ -77,6 +79,7 @@ export default function bg(pi: ExtensionAPI) {
     if (closing || delivery) return;
     delivery = setTimeout(async () => {
       delivery = undefined;
+      if (busy) return;
       const ready = [...jobs.values()].filter(j => j.background && j.ended !== undefined && !j.consumed && !j.watchers).slice(0, 8);
       const reports = await Promise.all(ready.map(j => report(j, ready.length)));
       // Wait/shutdown may have won while reading the logs.
@@ -185,6 +188,8 @@ export default function bg(pi: ExtensionAPI) {
       }
       if (args.action === "kill") {
         if (!job) throw new Error("jobs kill requires id");
+        // The caller asked for this stop; it must not come back as a follow-up.
+        job.consumed = true;
         if (job.ended === undefined) {
           job.terminating = true;
           signalGroup(job, "SIGTERM");
@@ -206,6 +211,8 @@ export default function bg(pi: ExtensionAPI) {
       } finally { watched.forEach(j => { j.watchers--; }); schedule(); }
     },
   });
+  pi.on("agent_start", () => { busy = true; });
+  pi.on("agent_settled", () => { busy = false; schedule(); });
   pi.on("session_shutdown", () => {
     shutdown ??= (async () => {
       closing = true; clearTimeout(delivery);
