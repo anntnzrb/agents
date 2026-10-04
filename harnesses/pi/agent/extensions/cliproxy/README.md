@@ -20,8 +20,9 @@ Discovery order during a network-enabled refresh:
    share a key, the row with the widest context window wins.
 3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
    overrides before falling back to metadata-free defaults.
-4. Gateway `context_length` fills a context limit absent from the metadata catalogs. Other unknown
-   limits fall back to the defaults in `index.ts`.
+4. Gateway `context_length` fills a context limit absent from the metadata catalogs or reported as
+   nonpositive. Nonpositive output limits also use the defaults in `index.ts`. Image-model catalog
+   entries often carry zero token limits; those values must not invalidate the entire startup cache.
 
 ## System One classifiers
 
