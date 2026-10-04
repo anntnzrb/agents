@@ -47,9 +47,10 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 - Subtract before you add: prefer deletion and the smallest diff that solves the problem
 - Fix root causes: trace each symptom to its cause before changing code
 - Prove it works: check the real thing (diff, file, output, runtime behavior), not a proxy, a self-report, or a subagent's summary. A syntax-only check or a command that failed to start isn't a check; if no real check can run, say which one and why instead of calling the work done. Match checks to the change and stop verifying once the relevant ones pass
-- Test through the real entry point (CLI, RPC, HTTP) with real files and processes in a temporary home. Fake only nondeterministic or paid edges (model, network, clock) at their boundary, never the system under test. Unit-test pure logic and cheap reproductions of a known bug. Live model calls are a manual smoke check, never a merge gate
+- Test through the real entry point (CLI, RPC, HTTP) with real files and processes in a temporary home. Fake only nondeterministic or paid edges (model, network, clock) at their boundary, never the system under test; reproduce the real boundary's captured output, including error and empty responses. Unit-test pure logic and cheap reproductions of a known bug. Live model calls are a manual smoke check, never a merge gate
 - Never delete, weaken, or special-case tests, or hardcode expected values, to get green. If a test looks wrong or the task is infeasible, say so instead of working around it
 - For versions, prices, limits, and APIs that may have changed since training, check the current source even when confident
+- For research that needs live or current information, use Parallel for search and Firecrawl for page content
 - Use the shared cache for reusable dependency source. For a one-off look at a remote repo, shallow-clone into a temporary directory
 
 # Where things live
@@ -61,5 +62,5 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 # Machines (Tailscale)
 - `beirut`: my MacBook, where I work interactively
 - `munich`: Debian server, moving to NixOS later. Runs the CLIProxyAPI gateway and Hermes
-- `oulu`: work server and Nix builder
+- `oulu`: my work machine and Nix builder; never install, experiment, or deploy there without explicit approval
 - `iphone17`: my phone
