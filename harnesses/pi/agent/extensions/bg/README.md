@@ -28,9 +28,12 @@ when blocked, or do other work while automatic delivery is pending.
 
 ## Settings and lifetime
 
-Pi's merged settings supply optional `bg.thresholdMs` and `bg.maxJobMs`; the defaults live in
-[`index.ts`](index.ts). Set only values that differ from the defaults. This extension never writes
-settings. Pi's shell path and command prefix remain respected.
+Pi's merged settings supply optional `bg.thresholdMs` (how long a command runs in the foreground
+before it moves to the background) and `bg.maxJobMs` (hard limit per job). The defaults live in
+[`index.ts`](index.ts); this repository overrides the threshold in
+[`../../settings.json`](../../settings.json). Set only values that differ from the defaults; a
+project `.pi/settings.json` can override them in trusted projects. Each call reads the merged
+settings, so a change applies after sync and `/reload`. This extension never writes settings. Pi's shell path and command prefix remain respected.
 
 Commands are captured from launch into private temporary logs. Eight live managed commands fill
 capacity; further calls use Pi's ordinary foreground executor. Print/JSON/no-UI sessions also

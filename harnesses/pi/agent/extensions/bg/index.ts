@@ -69,7 +69,7 @@ export default function bg(pi: ExtensionAPI) {
     const all = pi.getSettings();
     const config = (all as typeof all & { bg?: { thresholdMs?: number; maxJobMs?: number } }).bg;
     const number = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 2147483647 ? value : fallback;
-    return { all, threshold: number(config?.thresholdMs, 5000), maximum: number(config?.maxJobMs, 1800000) };
+    return { all, threshold: number(config?.thresholdMs, 60000), maximum: number(config?.maxJobMs, 1800000) };
   };
   const output = async (job: Job) => { await job.writes; return readFile(job.path, "utf8"); };
   const report = async (job: Job, count = 1) => `${job.id}: ${JSON.stringify(job.command.slice(0, 160))}, exit ${job.code}, duration ${((job.ended! - job.started) / 1000).toFixed(1)}s\nLog: ${job.path}\n${fenced(middle(await output(job), Math.floor(DEFAULT_MAX_BYTES / count / 3) - 1024, Math.floor(DEFAULT_MAX_LINES / count) - 20))}`;

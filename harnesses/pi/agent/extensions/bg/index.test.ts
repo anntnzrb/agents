@@ -11,12 +11,12 @@ async function until(ready: () => boolean, ms = 10000) {
 }
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
-function load(settings = {}, mode = "rpc", hasUI = true) {
+function load(settings: Record<string, unknown> | null = {}, mode = "rpc", hasUI = true) {
   const tools = new Map<string, ToolDefinition>();
   const messages: Array<{ content: string; options: unknown }> = [];
   let shutdown = async () => {};
   bg({
-    getSettings: () => ({ bg: { thresholdMs: 40, maxJobMs: 5000, ...settings } }),
+    getSettings: () => (settings === null ? {} : { bg: { thresholdMs: 40, maxJobMs: 5000, ...settings } }),
     registerTool: (tool: ToolDefinition) => tools.set(tool.name, tool),
     on: (name: string, callback: () => Promise<void>) => { if (name === "session_shutdown") shutdown = callback; },
     sendMessage: (message: { content: string }, options: unknown) => messages.push({ content: message.content, options }),
@@ -42,6 +42,19 @@ test("threshold backgrounds, streams to disk, and delivers automatically", async
   expect(h.messages).toHaveLength(1);
   expect(h.messages[0].content).toContain("startend");
   expect(h.messages[0].options).toEqual({ deliverAs: "followUp", triggerTurn: true });
+});
+test("defaults to a 60 second threshold when settings omit bg", async () => {
+  const h = load(null); const start = Date.now();
+  // Longer than the old 5 second default, far shorter than 60 seconds.
+  const r = await h.bash("printf a; sleep 5.5; printf b");
+  expect(h.text(r)).toBe("ab");
+  expect(Date.now() - start).toBeGreaterThan(5400);
+}, 20000);
+test("user threshold setting overrides the default", async () => {
+  const h = load({ thresholdMs: 100 }); const start = Date.now();
+  const r = await h.bash("sleep 1; printf late");
+  expect(h.text(r)).toContain("polling is unnecessary");
+  expect(Date.now() - start).toBeLessThan(900);
 });
 test("fast command preserves built-in shape and output", async () => {
   const h = load(); const r = await h.bash("printf fast");
