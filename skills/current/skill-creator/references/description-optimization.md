@@ -14,6 +14,8 @@ The frontmatter `description` is the skill's trigger, not a summary. Harnesses l
 - When a sibling skill could claim the same prompt, add a short `not for <capability>` clause. Name the other capability, never the other skill, so archiving a skill never breaks another trigger.
 - Stay truthful to the body. Do not claim scope the skill lacks.
 - Models skip skills for tasks they handle unaided; triggers matter most for multi-step or specialized work.
+- When porting a skill, write a new trigger. Upstream descriptions usually summarize the skill or name a slash command, and neither tells the model when to load it.
+- When a skill gains a capability, add its trigger noun. A capability missing from the trigger loses to a sibling whose trigger names the artifact: a perf-claim request routes to a writing skill when the principles trigger never mentions measured numbers.
 
 ## Trigger eval set
 
@@ -26,7 +28,7 @@ Write about 20 queries as JSON, a mix of should-trigger and should-not-trigger:
 ]
 ```
 
-Queries must be realistic: concrete, specific, with file paths, context, casual phrasing, or typos. Avoid abstract one-liners such as `"Format this data"`.
+Include requests at each boundary the change moves: an added capability, a dropped `not for` clause, and a new sibling. Queries must be realistic: concrete, specific, with file paths, context, casual phrasing, or typos. Avoid abstract one-liners such as `"Format this data"`.
 
 - Should-trigger (8 to 10): varied phrasings of the same intent, including cases where the user never names the skill or tool, and cases where this skill competes with a sibling and should win.
 - Should-not-trigger (8 to 10): near-misses that share keywords but need a different capability. Obviously unrelated queries test nothing.
