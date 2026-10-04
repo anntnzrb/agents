@@ -21,17 +21,6 @@ One skill, two modes. Both remove AI-generated slop; the artifact decides the mo
 
 1. Scan for the patterns in `references/slop-patterns.md`.
 2. Rewrite. Preserve meaning, match intended tone.
-3. Add soul (below).
-4. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
-
-### Adding soul
-
-- Have opinions. React to facts instead of neutrally listing pros and cons.
-- Vary rhythm. Short sentences. Then longer ones that take their time.
-- Acknowledge complexity. "Impressive but also kind of unsettling" beats "impressive."
-- Use "I" when it fits. First person isn't unprofessional.
-- Let some mess in. Perfect structure looks machine-made.
-- Be specific. Not "this is concerning" but "there's something unsettling about agents churning away at 3am."
 
 ## Code mode
 
@@ -61,7 +50,7 @@ Report scope, baseline/behavior lock, cleanup plan, per-file results and deliber
 
 | Need | Read | When |
 | --- | --- | --- |
-| The 31-pattern slop catalog | `references/slop-patterns.md` | Prose mode, before rewriting |
+| The slop pattern catalog | `references/slop-patterns.md` | Prose mode, before rewriting |
 | Category definitions, keep/refactor rules, deletion ladder, validation | `references/cleanup-playbook.md` | Code mode, before planning, modifying, or reviewing a cleanup |
 
 Merged from remove-ai-slops (GPL-3.0-or-later, anntnzrb) and pstack unslop (MIT, Lauren Tan).
