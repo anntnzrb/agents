@@ -51,6 +51,12 @@ The value lives in [`../../settings.json`](../../settings.json). To swap models,
 
 There is no fallback model. The call fails with the reason when the setting is missing, the model is unknown or has no credentials, or any classifier request fails. A partial result would hide lost coverage.
 
+## Disable or re-enable
+
+The `extensions` entry `-extensions/find/index.ts` in [`../../settings.json`](../../settings.json) keeps the extension from loading, for example while the classifier's provider has no credit. Auto-discovered extensions match by file path, so the entry names `index.ts`, not the directory. `find` must also be absent from `defaultTools`, because Pi has a built-in tool with the same name.
+
+To re-enable it, remove that entry, add `find` back to `defaultTools`, sync, and run `/reload`. The `find.classifier` value stays in place while the extension is disabled.
+
 ## How a search runs
 
 1. `rg` lists the files that are not ignored. It skips lockfiles, build output, binaries, and credential files. It also counts query keywords per file to build an IDF-weighted lexical rank.

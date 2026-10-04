@@ -5,9 +5,10 @@
     "mode": "on",
     "inlineBudget": 6000
   },
-  "defaultTools": ["bash", "read", "write", "edit", "apply_patch", "find", "codemode"],
+  "defaultTools": ["bash", "read", "write", "edit", "apply_patch", "codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
+  "extensions": ["-extensions/find/index.ts"],
   "find": {
     "classifier": "cliproxy/typesafe/jev-1.13"
   },
