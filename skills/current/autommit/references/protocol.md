@@ -26,12 +26,12 @@ Settings come from CLI flags, then environment variables, then the owner default
 uv run --script <skill-dir>/scripts/cli.py [--repo PATH] [--scope auto|staged|all] [--model M] [--base-url URL] [--api-key KEY] [--timeout S] [--reasoning-effort LEVEL] [--smoke CMD] [--dry-run] [--no-verify] [--json] [context ...]
 ```
 
-`run` is the default command when no subcommand is given, and the only one that mutates anything. It owns the whole loop:
+`run` is the default command when no subcommand is given. It owns the whole loop:
 
 1. Recover a prepared receipt, then re-prepare in the same invocation.
 2. Run the pre-commit gate in the real repository, against the staged snapshot: `git diff --cached --check`, then the hook at `git rev-parse --git-path hooks/pre-commit` (which honors `core.hooksPath`) from the repository root when that file is executable. A failure refuses with `hook_failed` (exit 4), includes the gate output, and calls no model. `--dry-run` runs the gate too; `--no-verify` skips it, mirroring `git commit --no-verify`.
-3. Hold back pure renames: renamed files with identical content. They never reach the planner; autommit adds one move-only commit for them, applied before every model commit, (`refactor: move files without content changes` when most recent subjects are conventional, otherwise `Move files without content changes`). A snapshot of only pure renames needs no model call.
-4. Send the remaining inventory, repository policy, and the regular cached diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation. Only a reply that is not JSON moves to the next format; a JSON reply that fails the plan shape goes straight to the correction loop. The inventory hunk ids count the hunks of that same diff, a renamed file shows its source as `new <- old`, and a renamed file, a deleted file, or a file without hunks is marked `whole file only`; autommit selects such a file with `"all"` whatever selector the model returns, and validation rejects any other selector for a rename. When a plan selects a file whole in one commit and again elsewhere, autommit keeps it only in the first whole-file commit and drops commits left empty. A deleted file shows only its first 40 lines and the count of omitted lines.
+3. Hold back pure renames: renamed files with identical content. They never reach the planner; autommit adds one move-only commit for them, applied before every model commit. Its subject reuses the prefix that recent commits touching the moved sources use most (`<prefix>: move files without content changes`); without one, it is `refactor: move files without content changes` when most recent subjects are conventional, otherwise `Move files without content changes`. A snapshot of only pure renames needs no model call.
+4. Send the remaining inventory, repository policy, and the regular cached diff to the planner through the transport ladder: strict `json_schema`, then one forced tool call, then `json_object` plus local validation. Only a reply that is not JSON moves to the next format; a JSON reply that fails the plan shape goes straight to the correction loop. The inventory hunk ids count the hunks of that same diff. A renamed file shows its source as `new <- old`; its text edits accept partial selections after an automatic original-content move. Binary files, deleted files, and files without hunks are marked `whole file only`; autommit selects them with `"all"` whatever selector the model returns. Validation also requires mode changes to be whole-file. When a plan selects a file whole in one commit and again elsewhere, autommit keeps it only in the first whole-file commit and drops commits left empty. A deleted file shows only its first 40 lines and the count of omitted lines.
 5. Validate each returned plan, with the move-only commit appended, against the prepared snapshot. A rejected plan is retried at most three times, with the exact validation message as correction context; a retry adds the rejection under any standing correction, such as the critic's concerns, and never replaces it. When every attempt fails, the error ends with the last validation message.
 6. When the model's plan needs atomicity review, ask an independent critic, at most twice. The move-only commit never counts toward the review or the split requirement. An `accept` verdict writes a decision file. A `split` verdict forces at most three replans that must produce at least two model commits.
 7. Apply commits in dependency order inside a detached temporary worktree, then create the commits by compare-and-swap.
@@ -131,8 +131,8 @@ Apply behavior:
 
 1. Acquire the worktree-local operation lock and recover any receipt.
 2. Recheck the snapshot and complete plan coverage.
-3. Build selected patches from the original staged diff.
-4. Apply commits in exact plan order in a detached temporary worktree.
+3. Move detected renamed-and-edited text files first, preserving their original blobs and modes. Their plan selections then describe content edits at the new path. Pure renames retain the run workflow's move-only commit.
+4. Apply commits in dependency order in a detached temporary worktree. Partial line and hunk selections render cumulative edits from the original blob and zero-context diff, then stage exact blobs with `hash-object` and `update-index`. Whole-file selections retain patch application with plumbing fallback.
 5. Commit from a temporary UTF-8 message file. Details become `- ` body bullets, and one trailing period on the subject is stripped before the commit.
 6. Require the final commit tree to equal the prepared index tree exactly.
 7. Recheck the cached diff and snapshot.
@@ -160,7 +160,7 @@ The original worktree index becomes clean relative to the new `HEAD`. In `auto` 
 }
 ```
 
-`dependencies` is optional per commit. It holds 0-based indices into `commits` for commits that must be applied first. Autommit rejects self-references, duplicates, out-of-range indices, and cycles, then applies commits in dependency order. Dependency order matters because every commit is applied as a patch into one temporary worktree.
+`dependencies` is optional per commit. It holds 0-based indices into `commits` for commits that must be applied first. Autommit rejects self-references, duplicates, out-of-range indices, and cycles, then applies commits in dependency order. Partial selections include every earlier applied edit to the same file, regardless of line order.
 
 Valves, not product limits: there is no ceiling on commits, changes per commit, details, or dependencies. `summary` is capped at 72 characters and each detail and path at 2,048 and 4,096 characters. A plan or decision file is capped at 1 MiB and rejected as `invalid_file` above that.
 
@@ -171,6 +171,10 @@ Selectors:
 - `{"type":"lines","start":1,"end":8}`: inclusive positive new-file line range, selected from the zero-context diff
 
 Use line selectors when hunk selectors cannot separate the concerns and separate commits must own disjoint changed lines inside one file, including a modified file. Ranges must be disjoint and cover every changed new-file line exactly once.
+
+A replacement's removed lines belong to its first added line. A pure deletion belongs to the zero-context hunk's new-file anchor (the preceding surviving line); anchor zero at the beginning of a file maps to line 1. A range may span several hunks; unchanged lines are never edits. Binary files, deleted files, and mode changes require `all`.
+
+Git detects renames at its default 50% similarity threshold. Its exhaustive search defaults to a rename limit of 1000, overridable by `diff.renameLimit`; `diff.renames=true` does not force detection. An undetected move remains an ordinary deletion plus addition, both covered by the plan.
 
 ## Atomicity Shape
 

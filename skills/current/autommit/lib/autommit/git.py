@@ -49,15 +49,18 @@ def try_git(
         _ = merged_env.pop(dropped, None)
     cmd = ["git", *GIT_SAFE_ARGS, *args]
     try:
-        return subprocess.run(
+        completed = subprocess.run(
             cmd,
             cwd=cwd,
             check=False,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="surrogateescape",
             env=merged_env,
+        )
+        return subprocess.CompletedProcess(
+            cmd,
+            completed.returncode,
+            completed.stdout.decode("utf-8", "surrogateescape"),
+            completed.stderr.decode("utf-8", "surrogateescape"),
         )
     except FileNotFoundError as err:
         raise GitMissingError from err

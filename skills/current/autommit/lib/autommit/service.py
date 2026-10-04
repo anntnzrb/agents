@@ -13,11 +13,12 @@ from pathlib import Path
 from typing import Final, Literal
 
 from autommit.errors import AutommitError, RefusalError
-from autommit.fallback import CommitWork, apply_with_fallback
+from autommit.fallback import CommitWork, apply_with_fallback, stage_edited_moves
 from autommit.git import GIT_DIFF_FLAGS, run_git, try_git
 from autommit.inventory import build_inventory, inventory_payload
 from autommit.proposal import (
     AtomicityDecision,
+    CommitChange,
     CommitGroup,
     CommitProposal,
     changed_hunk_count,
@@ -344,7 +345,12 @@ def _load_validated_plan(
     proposal = normalize_proposal(raw_plan)
     staged = _staged_files(cwd)
     diff = _staged_diff(cwd)
-    errors = validate_proposal_coverage(proposal, staged, parse_file_diffs(diff))
+    errors = validate_proposal_coverage(
+        proposal,
+        staged,
+        parse_file_diffs(diff),
+        parse_file_diffs(_staged_diff(cwd, zero_context=True)),
+    )
     if errors:
         raise AutommitError("invalid_plan", "Invalid split plan: " + "; ".join(errors))
     review = requires_atomicity_review(proposal, diff)
@@ -469,6 +475,33 @@ def apply(
                 cwd, "worktree", "add", "--detach", str(worktree), expected.before
             )
             try:
+                applied: tuple[CommitChange, ...] = ()
+                move_work = CommitWork(
+                    cwd,
+                    worktree,
+                    Path(patch_name),
+                    expected.index_tree,
+                    expected.ref,
+                    expected.before,
+                    staged_diff,
+                    zero_context_diff,
+                )
+                if stage_edited_moves(move_work):
+                    _ = run_git(
+                        worktree,
+                        "-c",
+                        "core.hooksPath=",
+                        "commit",
+                        "--no-verify",
+                        "-m",
+                        "Move files without content changes",
+                    )
+                    created.append(
+                        {
+                            "sha": run_git(worktree, "rev-parse", "HEAD").strip(),
+                            "summary": "Move files without content changes",
+                        }
+                    )
                 for commit_index in compute_apply_order(proposal.commits):
                     group = proposal.commits[commit_index]
                     work = CommitWork(
@@ -480,8 +513,10 @@ def apply(
                         before=expected.before,
                         staged_diff=staged_diff,
                         zero_diff=zero_context_diff,
+                        applied=applied,
                     )
                     _ = apply_with_fallback(work, group)
+                    applied += group.changes
                     if smoke is not None:
                         _run_smoke(worktree, smoke, expected.ref, expected.before)
                     _ = message.write_text(_commit_message(group), encoding="utf-8")

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Final, TypeIs
 from autommit.client import ModelRequest, call_critic, call_planner
 from autommit.config import ConfigOverrides, load_config
 from autommit.errors import AutommitError, RefusalError
-from autommit.fallback import CommitWork, apply_with_fallback
+from autommit.fallback import CommitWork, apply_with_fallback, stage_edited_moves
 from autommit.git import GIT_DIFF_FLAGS, run_git, try_git
 from autommit.inventory import (
     CRITIC_SYSTEM,
@@ -30,6 +30,7 @@ from autommit.inventory import (
     stack_correction,
 )
 from autommit.proposal import (
+    CommitChange,
     changed_hunk_count,
     compute_apply_order,
     normalize_atomicity_decision,
@@ -317,7 +318,10 @@ def _validate_rewrite_plan(
     _assert_snapshot(cwd, evidence)
     proposal = normalize_proposal(read_json_file(plan_file, "plan"))
     errors = validate_proposal_coverage(
-        proposal, evidence.staged_files, parse_file_diffs(evidence.diff)
+        proposal,
+        evidence.staged_files,
+        parse_file_diffs(evidence.diff),
+        parse_file_diffs(evidence.zero_diff),
     )
     if errors:
         raise AutommitError("invalid_plan", "Invalid split plan: " + "; ".join(errors))
@@ -366,6 +370,33 @@ def publish_rewrite(
                 cwd, "worktree", "add", "--detach", str(worktree), evidence.base
             )
             try:
+                applied: tuple[CommitChange, ...] = ()
+                move_work = CommitWork(
+                    cwd,
+                    worktree,
+                    Path(patch_name),
+                    evidence.target_tree,
+                    evidence.ref,
+                    evidence.base,
+                    evidence.diff,
+                    evidence.zero_diff,
+                )
+                if stage_edited_moves(move_work):
+                    _ = run_git(
+                        worktree,
+                        "-c",
+                        "core.hooksPath=",
+                        "commit",
+                        "--no-verify",
+                        "-m",
+                        "Move files without content changes",
+                    )
+                    created.append(
+                        {
+                            "sha": run_git(worktree, "rev-parse", "HEAD").strip(),
+                            "summary": "Move files without content changes",
+                        }
+                    )
                 for commit_index in compute_apply_order(proposal.commits):
                     group = proposal.commits[commit_index]
                     work = CommitWork(
@@ -374,11 +405,13 @@ def publish_rewrite(
                         patch_dir=Path(patch_name),
                         index_tree=evidence.target_tree,
                         ref=evidence.ref,
-                        before=evidence.before,
+                        before=evidence.base,
                         staged_diff=evidence.diff,
                         zero_diff=evidence.zero_diff,
+                        applied=applied,
                     )
                     _ = apply_with_fallback(work, group)
+                    applied += group.changes
                     if smoke is not None:
                         run_smoke(worktree, smoke, evidence.ref, evidence.before)
                     _ = message.write_text(commit_message(group), encoding="utf-8")

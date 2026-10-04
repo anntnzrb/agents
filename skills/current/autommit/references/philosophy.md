@@ -49,7 +49,9 @@ The independent atomicity critic runs only for a broad single-commit plan, becau
 
 - `all` selects one whole file section.
 - `indices` selects 1-based hunks of the regular diff.
-- `lines` selects an inclusive new-file line range from the zero-context diff, for disjoint changed lines inside one file, including a modified file. Coverage and disjointness are validated, and the final tree equality check backstops every partial patch.
+- `lines` selects an inclusive new-file line range from the zero-context diff, for disjoint changed lines inside one file, including a modified file. Replacement deletions belong to the first added line; pure deletions belong to the preceding surviving line, with anchor zero mapped to line 1.
+- Both partial selectors stage exact cumulative blobs derived from original offsets. They never ask Git to search for matching lines. Final tree equality remains a backstop, not a substitute for correct intermediate trees.
+- Detected edited text renames move original content first, then select edits at the destination. Undetected renames remain delete-plus-add changes. Binary and mode changes stay whole-file.
 
 ## Inference policy
 
