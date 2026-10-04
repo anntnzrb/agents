@@ -4,6 +4,7 @@ Pharos nudges the agent toward focused Bash commands without blocking or rewriti
 The preferences live in [`index.ts`](index.ts).
 
 The extension assigns a named prompt section before each agent run when `bash` is active.
+The section routes meaning searches to the semantic `find` tool only while `find` is active; otherwise it routes them to `rg`.
 It removes that section when `bash` is inactive and leaves other prompt sections and tool guidance unchanged.
 Repeated runs do not accumulate copies. It has no commands, settings, subprocesses, or session state.
 
