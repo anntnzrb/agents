@@ -10,11 +10,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import upstream  # noqa: E402
 
-PIN = {
+COMMIT = "a" * 40
+RELEASE_PIN = {
     "repo": "owner/repo",
     "release": "v1.0.0",
-    "commit": "a" * 40,
+    "commit": COMMIT,
     "trees": {"skills/x": "1" * 40, "skills/y": "2" * 40},
+}
+BRANCH_PIN = {
+    "repo": "owner/repo",
+    "branch": "main",
+    "commit": COMMIT,
+    "trees": {"pack/skills/x": "1" * 40},
+    "watch": {"pack/skills": ["x", "skipped"]},
 }
 
 
@@ -25,39 +33,76 @@ def write_pin(root: Path, name: str, pin: object) -> None:
 
 
 def test_pins_reads_only_skills_with_upstream_files(tmp_path: Path) -> None:
-    write_pin(tmp_path, "ported", PIN)
+    write_pin(tmp_path, "ported", RELEASE_PIN)
     (tmp_path / "skills/current/native").mkdir(parents=True)
     pins = upstream.pins(tmp_path)
     assert [pin.skill for pin in pins] == ["ported"]
     assert pins[0].repo == "owner/repo"
-    assert pins[0].trees == PIN["trees"]
+    assert pins[0].trees == RELEASE_PIN["trees"]
 
 
-def test_pins_rejects_malformed_files(tmp_path: Path) -> None:
-    write_pin(tmp_path, "broken", {"repo": "owner/repo", "trees": {}})
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"repo": "owner/repo", "commit": COMMIT, "trees": {}},
+        {"repo": "owner/repo", "trees": {"a": "1"}, "release": "v1"},
+        {"repo": "owner/repo", "commit": COMMIT, "trees": {"a": "1"}},
+        {
+            "repo": "owner/repo",
+            "commit": COMMIT,
+            "release": "v1",
+            "branch": "main",
+            "trees": {"a": "1"},
+        },
+        {**BRANCH_PIN, "watch": {"pack/skills": "x"}},
+    ],
+)
+def test_pins_rejects_malformed_files(tmp_path: Path, raw: object) -> None:
+    write_pin(tmp_path, "broken", raw)
     with pytest.raises(ValueError, match="broken"):
         _ = upstream.pins(tmp_path)
 
 
-def test_changed_lists_modified_and_removed_paths() -> None:
-    pin = upstream.Pin.parse("x", PIN)
-    assert upstream.changed(pin, {"skills/x": "1" * 40, "skills/y": "2" * 40}) == []
-    assert upstream.changed(pin, {"skills/x": "9" * 40, "skills/y": "2" * 40}) == [
-        "skills/x"
-    ]
-    assert upstream.changed(pin, {"skills/x": "1" * 40}) == ["skills/y"]
+def test_baseline_is_the_release_or_the_commit() -> None:
+    assert upstream.Pin.parse("x", RELEASE_PIN).baseline == "v1.0.0"
+    assert upstream.Pin.parse("x", BRANCH_PIN).baseline == COMMIT
 
 
-def test_issue_title_names_the_skill_and_release() -> None:
-    pin = upstream.Pin.parse("paseo", PIN)
-    assert upstream.issue_title(pin, "v1.1.0") == (
-        "skills(paseo): upstream owner/repo v1.1.0 changed ported skills"
+def test_drift_lists_modified_removed_and_new_paths() -> None:
+    pin = upstream.Pin.parse("x", BRANCH_PIN)
+    same = {"pack/skills/x": "1" * 40, "pack/skills/skipped": "3" * 40}
+    assert upstream.drift(pin, same) == upstream.Drift([], [])
+    edited = {**same, "pack/skills/x": "9" * 40}
+    assert upstream.drift(pin, edited).changed == ["pack/skills/x"]
+    assert upstream.drift(pin, {}).changed == ["pack/skills/x"]
+    added = {**same, "pack/skills/new": "4" * 40}
+    assert upstream.drift(pin, added) == upstream.Drift([], ["pack/skills/new"])
+
+
+def test_drift_ignores_unwatched_new_paths() -> None:
+    pin = upstream.Pin.parse("x", RELEASE_PIN)
+    current = {"skills/x": "1" * 40, "skills/y": "2" * 40, "skills/z": "3" * 40}
+    assert not upstream.drift(pin, current)
+
+
+def test_lookup_parents_cover_pinned_and_watched_directories() -> None:
+    pin = upstream.Pin.parse("x", BRANCH_PIN)
+    assert upstream.lookup_parents(pin) == ["pack/skills"]
+
+
+def test_issue_title_names_the_skill_and_repository() -> None:
+    pin = upstream.Pin.parse("paseo", RELEASE_PIN)
+    assert upstream.issue_title(pin) == (
+        "skills(paseo): upstream owner/repo changed ported sources"
     )
 
 
-def test_issue_body_links_the_comparison() -> None:
-    pin = upstream.Pin.parse("paseo", PIN)
-    body = upstream.issue_body(pin, "v1.1.0", ["skills/x"])
-    assert "https://github.com/owner/repo/compare/v1.0.0...v1.1.0" in body
-    assert "`skills/x`" in body
-    assert "skills/current/paseo/UPSTREAM.json" in body
+def test_issue_body_diffs_upstream_against_itself() -> None:
+    pin = upstream.Pin.parse("pstack", BRANCH_PIN)
+    found = upstream.Drift(["pack/skills/x"], ["pack/skills/new"])
+    body = upstream.issue_body(pin, "b" * 40, found)
+    assert f"https://github.com/owner/repo/compare/{COMMIT}...{'b' * 40}" in body
+    assert "`pack/skills/x`" in body
+    assert "`pack/skills/new`" in body
+    assert f"git diff {COMMIT} {'b' * 40} -- pack/skills/x" in body
+    assert "skills/current/pstack/UPSTREAM.json" in body
