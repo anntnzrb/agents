@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -212,7 +213,7 @@ def fetch_upstream_models(
 
 def _models_dev_cache_path() -> Path:
     cache_home = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
-    return Path(cache_home) / "agents" / "models-dev.json"
+    return Path(cache_home) / "agents" / "models-dev-sync.json"
 
 
 def _widest_record(
@@ -329,7 +330,7 @@ def _read_models_dev_cache(
         cached: object = json.loads(path.read_text(encoding="utf-8"))  # pyright: ignore[reportAny]
     except (OSError, ValueError):
         return None, False
-    if not is_obj_dict(cached):
+    if not is_obj_dict(cached) or cached.get("version") != MODELS_DEV_CACHE_VERSION:
         return None, False
     maps: dict[str, dict[str, dict[str, object]]] = {}
     for key in ("models", "suffixes", "stripped"):
@@ -348,7 +349,7 @@ def _read_models_dev_cache(
 
 
 def _load_models_dev_maps() -> dict[str, dict[str, dict[str, object]]]:
-    """Load models.dev lookup maps, refreshing the shared cache when stale."""
+    """Load models.dev lookup maps, refreshing sync's cache when stale."""
     path = _models_dev_cache_path()
     cached, fresh = _read_models_dev_cache(path)
     if cached is not None and fresh:
@@ -363,9 +364,9 @@ def _load_models_dev_maps() -> dict[str, dict[str, dict[str, object]]]:
     maps = _normalize_models_dev(payload)
     if not maps["models"]:
         return cached or maps
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _ = path.write_text(
+    with contextlib.suppress(OSError):
+        sync_text_file(
+            path,
             json.dumps(
                 {
                     "version": MODELS_DEV_CACHE_VERSION,
@@ -373,15 +374,12 @@ def _load_models_dev_maps() -> dict[str, dict[str, dict[str, object]]]:
                     **maps,
                 }
             ),
-            encoding="utf-8",
         )
-    except OSError:
-        pass
     return maps
 
 
 def models_dev_lookup() -> CatalogLookup:
-    """Return a lazy lookup over the shared models.dev metadata cache."""
+    """Return a lazy lookup over sync's models.dev metadata cache."""
     loaded: list[dict[str, dict[str, dict[str, object]]]] = []
 
     def lookup(model_id: str) -> CatalogModelEntry | None:
