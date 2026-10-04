@@ -423,6 +423,30 @@ class LargeRefactorTests(_Sandbox):
         )
         self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
 
+    def test_move_commit_reuses_the_prefix_of_the_moved_files_history(self) -> None:
+        _ = (self.repo / "old").mkdir()
+        for subject, content in (
+            ("pi: add moved file", "1\n"),
+            ("pi: tune moved file", "2\n"),
+        ):
+            _ = (self.repo / "old/moved.txt").write_text(content, encoding="utf-8")
+            _ = self.git("add", "old/moved.txt")
+            _ = self.git("commit", "-m", subject)
+        for subject in ("docs: other", "ci: other", "docs: more"):
+            _ = self.git("commit", "--allow-empty", "-m", subject)
+        self.move("old/moved.txt", "new/moved.txt")
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            raise AssertionError("a moves-only snapshot must not call the model")
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(),
+            "pi: move files without content changes",
+        )
+
     def test_moves_only_snapshot_needs_no_model(self) -> None:
         self.commit_file("old/moved.txt", "same\n")
         self.move("old/moved.txt", "new/moved.txt")

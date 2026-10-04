@@ -6,6 +6,7 @@ import re
 import signal
 import sys
 import tempfile
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -79,6 +80,7 @@ MIN_SPLIT_COMMITS: Final[int] = 2
 MAX_ERROR_CHARS: Final[int] = 2000
 _SUBJECT: Final[re.Pattern[str]] = re.compile(r"^### \S+ (.+)$", re.MULTILINE)
 _CONVENTIONAL: Final[re.Pattern[str]] = re.compile(r"[a-z]+(\([^)]*\))?!?: ")
+_PREFIX: Final[re.Pattern[str]] = re.compile(r"[a-z][a-z0-9-]*(\([^)]*\))?!?: ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,19 +450,43 @@ def _with_move_commit(
     }
 
 
+def _path_prefix(repo: Path, sources: tuple[str, ...]) -> str | None:
+    """Return the subject prefix most used by recent commits on the moved sources."""
+    result = try_git(repo, "log", "-20", "--format=%s", "--", *sources)
+    if result.returncode != 0:
+        return None
+    prefixes = [
+        match.group(0)[:-2]
+        for line in result.stdout.splitlines()
+        if (match := _PREFIX.match(line))
+    ]
+    if not prefixes:
+        return None
+    counts = Counter(prefixes)
+    best = max(counts.values())
+    return next(prefix for prefix in prefixes if counts[prefix] == best)
+
+
 def _move_commit(
-    moves: tuple[str, ...], repository_context: str
+    moves: tuple[str, ...],
+    repository_context: str,
+    prefix: str | None = None,
 ) -> dict[str, object] | None:
-    """One deterministic move-only commit for renames with identical content."""
+    """One deterministic move-only commit for renames with identical content.
+
+    The subject reuses the prefix that the moved files' own history uses; without
+    one, it follows whether recent repository subjects are conventional.
+    """
     if not moves:
         return None
     subjects = [m.group(1) for m in _SUBJECT.finditer(repository_context)]
     conventional = sum(1 for subject in subjects if _CONVENTIONAL.match(subject))
-    summary = (
-        "refactor: move files without content changes"
-        if subjects and conventional * 2 > len(subjects)
-        else "Move files without content changes"
-    )
+    if prefix is not None:
+        summary = f"{prefix}: move files without content changes"
+    elif subjects and conventional * 2 > len(subjects):
+        summary = "refactor: move files without content changes"
+    else:
+        summary = "Move files without content changes"
     return {
         "summary": summary,
         "details": [f"Rename {len(moves)} file(s); content is unchanged."],
@@ -633,7 +659,18 @@ def run_orchestrated(options: RunOptions) -> int:
                 staged_count=len(evidence.staged_files),
                 hunk_count=hunk_count,
                 diff=planned_diff,
-                move_commit=_move_commit(moves, repository_context),
+                move_commit=_move_commit(
+                    moves,
+                    repository_context,
+                    _path_prefix(
+                        options.repo,
+                        tuple(
+                            file.renamed_from or file.path
+                            for file in inventory
+                            if file.is_pure_rename
+                        ),
+                    ),
+                ),
                 whole_files=frozenset(
                     file.path for file in evidence.inventory if file.whole_file_only
                 ),
