@@ -25,8 +25,8 @@ uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 | `--model`, `--base-url`, `--api-key`, `--timeout`, `--reasoning-effort` | Endpoint overrides that beat environment variables and the built-in defaults |
 | `--base REV` | Rewrite mode only: rebuild the commits since this ancestor revision |
 | `--smoke CMD` | Run one validation command in the temporary worktree after each commit (default: off) |
-| `--dry-run` | Print the inventory and snapshot, call no model, create nothing; the pre-commit gate still runs |
-| `--no-verify` | Skip the pre-commit gate. By default `run` refuses with `hook_failed` (exit 4) before planning when `git diff --cached --check` or the repository's executable pre-commit hook fails on the staged state |
+| `--dry-run` | Print the inventory and snapshot, call no model, create nothing; the mode's gate still runs |
+| `--no-verify` | Skip the mode's gate. `run` checks staged whitespace and the repository pre-commit hook; `rewrite` checks introduced whitespace between the base and frozen tree, without running the hook. Both refuse with `hook_failed` (exit 4) before planning |
 | `--json` | Emit one `autommit/v1` object on stdout; exit codes are unchanged |
 
 Positional arguments and repeated `--context` values pass user intent to the planner unchanged.

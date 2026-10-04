@@ -23,8 +23,9 @@ Write about 20 queries as JSON, a mix of should-trigger and should-not-trigger:
 
 ```json
 [
-  { "query": "the user prompt", "should_trigger": true },
-  { "query": "another prompt", "should_trigger": false }
+  { "query": "the user prompt", "expect": "skill-name" },
+  { "query": "a near-miss prompt", "expect": "sibling-skill" },
+  { "query": "a prompt needing no skill", "expect": "none" }
 ]
 ```
 
@@ -41,7 +42,19 @@ During authoring review, require a concrete user situation, scope consistent wit
 
 Checking is harness-agnostic: present the full enabled skill listing (every `name: description` line) and one query to a model, ask which skill it would load or none, and compare against the expected label. Run each query at least 3 times and treat the majority as the result. Use any model the environment provides; prefer the model the user works with, since trigger behavior varies by model.
 
+Run the bundled `trigger-eval` command manually. It costs inference and is OPTIONAL. CI MUST NOT run it. Save the JSON array above as a cases file, replacing the placeholder queries and labels:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py trigger-eval --cases <cases.json> --base-url <api-base-url> --model <model-id> --api-key <api-key> --runs 3 --jobs 2 --json
+```
+
+The command defaults to the repository's `skills/current` listing. Use `--skills-dir <skills-dir>` for another inventory. It excludes `disable-model-invocation: true` skills. Repeat `--override 'name=description'` to test candidate wording without editing files. `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` supply settings when flags are absent. No endpoint or credential is built in.
+
+Each call contains the full enabled listing and one query. Replies are normalized for case, whitespace, and surrounding quotes or backticks. A strict majority wins; no majority is a miss. The report includes each expected label, majority answer, vote counts, and total score. Exit codes are `0` for all passing cases, `1` for a miss or provider failure, and `2` for invalid input or missing configuration. Transient failures receive at most two retries per call.
+
 Tune on about 60% of the queries and score the final description on the held-out 40% to avoid overfitting. When a description loses to a sibling, fix both triggers, not only one.
+
+Keep tuning and held-out cases in separate files. Run `trigger-eval` against the tuning file while comparing overrides, then against the held-out file once the wording is fixed.
 
 Use repeated model evaluation when investigating trigger failures or comparing candidate wording. Do not require network access or a model judge for ordinary metadata validation. Report model routing scores separately from structural validation results.
 

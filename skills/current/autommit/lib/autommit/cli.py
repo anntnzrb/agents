@@ -87,7 +87,7 @@ def _run_parser() -> Parser:
     _ = parser.add_argument(
         "--no-verify",
         action="store_true",
-        help="skip the pre-commit gate on the staged state (run only)",
+        help="skip the staged pre-commit gate or rewrite frozen-tree whitespace gate",
     )
     _ = parser.add_argument("--json", action="store_true", dest="json_output")
     _ = parser.add_argument("positional_context", nargs="*", default=[])

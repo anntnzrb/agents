@@ -553,6 +553,24 @@ def run_rewrite(options: RunOptions) -> int:
     try:
         prepared = prepare_rewrite(options.repo, options.context, base_rev=options.base)
         evidence = _evidence(options.repo, prepared)
+        if not options.no_verify:
+            check = try_git(
+                options.repo,
+                "diff",
+                "--check",
+                *GIT_DIFF_FLAGS,
+                evidence.base,
+                evidence.target_tree,
+                "--",
+            )
+            if check.returncode != 0:
+                raise AutommitError(
+                    "hook_failed",
+                    "Frozen-tree whitespace gate failed; fix changes since the base.\n"
+                    + check.stdout
+                    + check.stderr,
+                    4,
+                )
         _note(
             options,
             f"Frozen {len(evidence.staged_files)} file(s) since {evidence.base[:7]} (snapshot {evidence.snapshot[:8]}).",

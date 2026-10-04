@@ -21,6 +21,7 @@ COMMANDS: Final[dict[str, Path]] = {
     "lint": SCRIPTS_DIR / "lint_skills.py",
     "package": SCRIPTS_DIR / "package_skill.py",
     "quick-validate": SCRIPTS_DIR / "quick_validate.py",
+    "trigger-eval": SCRIPTS_DIR / "trigger_eval.py",
 }
 
 # Example invocations shown by --help; the dispatcher prefix is added there.
@@ -30,6 +31,7 @@ _HELP_EXAMPLES: Final[tuple[str, ...]] = (
     "generate-review <workspace> --skill-name <name>",
     "lint [<skill-dir> ...]",
     "package <path-to-skill-folder>",
+    "trigger-eval --cases <cases.json> --model <model>",
 )
 
 
