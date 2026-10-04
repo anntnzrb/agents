@@ -21,7 +21,7 @@ Discovery order per plugin load:
 2. `https://models.dev/api.json` supplies limits, pricing, modalities, capability flags, and
    reasoning effort options for ids it knows. Lookups try the exact id, the segment after the last `/`,
    then the same keys with a trailing thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`,
-   `-max`, `-thinking`) removed, so `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash`
+   `-xhigh`, `-max`, `-thinking`) removed, so `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash`
    row. When several catalog rows share a key, the row with the widest context window wins.
 3. Unknown ids fall back to `FALLBACK_LIMIT` (200K context, 32K output). The fallback exists because
    OpenCode disables context compaction for models without a context limit.
@@ -39,7 +39,7 @@ Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>
 use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
 field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
 
-The models.dev snapshot is cached for 24 hours at `$XDG_CACHE_HOME/agents/models-dev.json`
-(`~/.cache/agents/models-dev.json` by default) and is shared with the pi extension; the cache carries its
+The OpenCode-owned models.dev snapshot is cached for 24 hours at `$XDG_CACHE_HOME/agents/models-dev-opencode.json`
+(`~/.cache/agents/models-dev-opencode.json` by default) and published by atomic replacement; the cache carries its
 own format version and is ignored when that version changes. A failed fetch reuses the cached snapshot;
 a failed gateway request leaves the provider's model map unchanged.

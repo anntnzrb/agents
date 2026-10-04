@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { Model, Plugin, Provider } from "@opencode/plugin";
@@ -17,7 +18,7 @@ const CATALOG_VERSION = 2;
 const FALLBACK_LIMIT = { context: 200000, output: 32000 };
 
 // Gateway ids may carry a thinking-level qualifier the catalog does not use.
-const QUALIFIER_PATTERN = /-(minimal|low|medium|high|max|thinking)$/i;
+const QUALIFIER_PATTERN = /-(minimal|low|medium|high|xhigh|max|thinking)$/i;
 
 const INPUT_MODALITIES = ["text", "audio", "image", "video", "pdf"] as const;
 type InputModality = (typeof INPUT_MODALITIES)[number];
@@ -57,7 +58,7 @@ let memoryCatalog: CatalogCache | undefined;
 
 function catalogPath(): string {
 	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
-	return join(cacheHome, "agents", "models-dev.json");
+	return join(cacheHome, "agents", "models-dev-opencode.json");
 }
 
 function widest(current: CatalogModel | undefined, candidate: CatalogModel): CatalogModel {
@@ -110,11 +111,16 @@ async function loadCatalog(): Promise<CatalogCache | undefined> {
 			}
 		}
 		memoryCatalog = next;
+		const path = catalogPath();
+		const temporary = `${path}.${randomUUID()}.tmp`;
 		try {
-			await mkdir(dirname(catalogPath()), { recursive: true });
-			await writeFile(catalogPath(), JSON.stringify(next));
+			await mkdir(dirname(path), { recursive: true });
+			await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
+			await rename(temporary, path);
 		} catch {
 			// Cache writes are best effort.
+		} finally {
+			await rm(temporary, { force: true }).catch(() => {});
 		}
 		return next;
 	} catch {

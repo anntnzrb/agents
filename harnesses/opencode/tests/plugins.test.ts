@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Model } from "@opencode/plugin";
@@ -14,6 +14,40 @@ afterAll(async () => {
   if (originalCache === undefined) delete process.env.XDG_CACHE_HOME;
   else process.env.XDG_CACHE_HOME = originalCache;
   await rm(cache, { recursive: true, force: true });
+});
+
+test("OpenCode owns an atomic catalog cache and example-xhigh maps to example", async () => {
+  const directory = join(cache, "agents");
+  await mkdir(directory, { recursive: true });
+  const shared = join(directory, "models-dev.json");
+  const owned = join(directory, "models-dev-opencode.json");
+  await writeFile(shared, "untouched");
+  await writeFile(owned, "{}");
+  const inode = (await stat(owned)).ino;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => Response.json(url.endsWith("/models")
+    ? { data: [{ id: "example" }] }
+    : { vendor: { models: { "example-xhigh": { limit: { context: 123456 } } } } })) as typeof fetch;
+  try {
+    const { default: plugin } = await import("../plugins/cliproxy/index.ts?private-cache");
+    let models: readonly Model.Info[] = [];
+    await plugin.setup({ options: { baseURL: "http://gateway/v1" }, provider: {
+      transform: async (callback: (editor: unknown) => void) => callback({
+        add: (value: { models: readonly Model.Info[] }) => { models = value.models; },
+      }),
+    } } as never);
+    expect(models[0]?.limit.context).toBe(123456);
+    expect(await readFile(shared, "utf8")).toBe("untouched");
+    expect((await stat(owned)).ino).not.toBe(inode);
+    expect(JSON.parse(await readFile(owned, "utf8")).stripped.example.limit.context).toBe(123456);
+    expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    // Leave the next independent plugin load without a fresh snapshot.
+    await writeFile(owned, "{}");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await writeFile(owned, "{}");
+    await writeFile(shared, "untouched");
+  }
 });
 
 test("discovery publishes v2 models and preserves inventory on gateway failure", async () => {
