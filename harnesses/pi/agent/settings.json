@@ -11,7 +11,7 @@
   "defaultTools": ["bash", "read", "write", "edit", "apply_patch", "codemode"],
   "doubleEscapeAction": "none",
   "editorPaddingX": 1,
-  "extensions": ["-extensions/find/index.ts"],
+  "extensions": ["-builtin:llama.cpp", "-extensions/find/index.ts"],
   "find": {
     "classifier": "cliproxy/typesafe/jev-1.13"
   },
