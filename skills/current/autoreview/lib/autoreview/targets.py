@@ -1,25 +1,23 @@
-"""Target selection, Git diff extraction, multi-state capture, and bundle preparation."""
+"""Resolve Git targets and collect redacted patches and source snapshots."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
 from autoreview.git_ops import git_run, is_dirty, validate_git_ref
 from autoreview.models import SAFE_DIFF_FLAGS
-from autoreview.redaction import (
-    filter_diff_paths,
-    is_sensitive_path,
-    redact_sensitive_text,
-)
+from autoreview.redaction import filter_diff_paths, redact_sensitive_text
 
 
 @dataclass(frozen=True, slots=True)
 class ReviewBundle:
     mode: str
-    base_ref: str | None
-    commit_sha: str | None
+    base_ref: str
+    commit_sha: str
     changed_files: list[str]
     redacted_files: list[str]
     diff_text: str
+    file_stats: list[str]
+    snapshots: dict[str, dict[str, str]]
 
 
 def choose_review_target(
@@ -28,29 +26,37 @@ def choose_review_target(
     base_ref: str | None,
     commit_ref: str | None,
 ) -> tuple[str, str | None, str | None]:
-    """Resolve review mode and exact commit references."""
-    resolved_mode = "local" if mode == "uncommitted" else mode
-
-    if resolved_mode == "auto":
-        resolved_mode = "local" if is_dirty(repo) else "branch"
-
-    if resolved_mode == "local":
-        pinned_base = (
-            validate_git_ref(repo, base_ref, "base") if base_ref is not None else None
+    """Pin requested refs; auto uses dirty local work or origin/main."""
+    mode = "local" if mode == "uncommitted" else mode
+    if mode == "auto":
+        mode = "local" if is_dirty(repo) else "branch"
+    if mode == "local":
+        return (
+            mode,
+            validate_git_ref(repo, base_ref, "base") if base_ref else None,
+            None,
         )
-        return "local", pinned_base, None
+    if mode == "branch":
+        return mode, validate_git_ref(repo, base_ref or "origin/main", "base"), None
+    if mode == "commit":
+        return mode, None, validate_git_ref(repo, commit_ref or "HEAD", "commit")
+    raise ValueError(f"unsupported review mode: {mode}")
 
-    if resolved_mode == "commit":
-        target_commit = commit_ref or "HEAD"
-        resolved_commit = validate_git_ref(repo, target_commit, "commit")
-        return "commit", None, resolved_commit
 
-    if resolved_mode == "branch":
-        target_base = base_ref or "origin/main"
-        pinned_base = validate_git_ref(repo, target_base, "base")
-        return "branch", pinned_base, None
-
-    raise SystemExit(f"unsupported review mode: {mode}")
+def read_snapshot(repo: Path, path: str, state: str) -> str | None:
+    """Read a Git blob or a contained, regular working file."""
+    if state == "WORKTREE":
+        target = repo / path
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or not target.resolve().is_relative_to(repo)
+        ):
+            return None
+        return target.read_text(encoding="utf-8", errors="surrogateescape")
+    spec = f":{path}" if state == "INDEX" else f"{state}:{path}"
+    proc = git_run(repo, ["show", spec], check=False)
+    return proc.stdout if proc.returncode == 0 else None
 
 
 def capture_diff_bundle(
@@ -59,126 +65,77 @@ def capture_diff_bundle(
     base_ref: str | None = None,
     commit_sha: str | None = None,
 ) -> ReviewBundle:
-    """Extract and sanitize unified diffs for the selected review target with path exclusion."""
-    diff_cmd_base = ["diff", *SAFE_DIFF_FLAGS]
-
-    # First discover changed paths across the scope
-    if mode == "local":
-        stat_args = (
-            ["diff", "--name-only", *SAFE_DIFF_FLAGS, base_ref]
-            if base_ref
-            else ["diff", "--name-only", *SAFE_DIFF_FLAGS, "HEAD"]
+    """Capture each selected state without executing external diff commands."""
+    head = commit_sha or validate_git_ref(repo, "HEAD")
+    base = base_ref or head
+    if mode == "branch":
+        base = git_run(repo, ["merge-base", base, head]).stdout.strip()
+    if mode == "commit":
+        parents = git_run(
+            repo, ["rev-list", "--parents", "-n", "1", head]
+        ).stdout.split()
+        base = (
+            parents[1]
+            if len(parents) > 1
+            else git_run(repo, ["hash-object", "-t", "tree", "--stdin"]).stdout.strip()
         )
-    elif mode == "branch":
-        base = base_ref or "origin/main"
-        stat_args = ["diff", "--name-only", *SAFE_DIFF_FLAGS, f"{base}...HEAD"]
-    elif mode == "commit":
-        sha = commit_sha or "HEAD"
-        stat_args = ["diff-tree", "--name-only", "--no-commit-id", "-r", sha]
-    else:
-        stat_args = ["diff", "--name-only", *SAFE_DIFF_FLAGS, "HEAD"]
-    stat_proc = git_run(repo, stat_args, check=False)
-    raw_paths = [line.strip() for line in stat_proc.stdout.splitlines() if line.strip()]
-
-    # Include untracked text files in local mode
+    comparisons: list[tuple[str, list[str]]] = (
+        [("INDEX", ["--cached", base]), ("WORKTREE", [])]
+        if mode == "local" and base_ref is None
+        else [("INDEX", ["--cached", base]), ("WORKTREE", [base])]
+        if mode == "local"
+        else [(head, [base, head])]
+    )
+    patches: list[str] = []
+    stats: list[str] = []
+    paths: set[str] = set()
+    redacted: set[str] = set()
+    snapshots: dict[str, dict[str, str]] = {}
+    for state, refs in comparisons:
+        names = git_run(
+            repo, ["diff", *SAFE_DIFF_FLAGS, "--name-only", "-z", *refs]
+        ).stdout
+        kept, hidden = filter_diff_paths([p for p in names.split("\0") if p])
+        paths.update(kept)
+        redacted.update(hidden)
+        if not kept:
+            continue
+        patch = git_run(repo, ["diff", *SAFE_DIFF_FLAGS, *refs, "--", *kept]).stdout
+        patches.append(f"=== {state} ===\n{patch}")
+        numstat = git_run(
+            repo, ["diff", *SAFE_DIFF_FLAGS, "--numstat", *refs, "--", *kept]
+        ).stdout
+        for row in numstat.splitlines():
+            added, removed, path = row.split("\t", 2)
+            stats.append(f"{state}: {path} +{added} -{removed}")
+        for path in kept:
+            if (content := read_snapshot(repo, path, state)) is not None:
+                snapshots.setdefault(path, {})[state] = content
     if mode == "local":
-        untracked_proc = git_run(
-            repo,
-            ["ls-files", "--others", "--exclude-standard"],
-            check=False,
-        )
-        raw_paths.extend(
-            [
-                line.strip()
-                for line in untracked_proc.stdout.splitlines()
-                if line.strip()
-            ]
-        )
-
-    # De-duplicate
-    raw_paths = sorted(set(raw_paths))
-    kept_paths, redacted_paths = filter_diff_paths(raw_paths)
-
-    # Build the path-filtered diff
-    diff_text_parts: list[str] = []
-
-    if mode == "local":
-        if base_ref:
-            # Base to Index + Working Tree
-            if kept_paths:
-                proc = git_run(
-                    repo,
-                    [*diff_cmd_base, base_ref, "--", *kept_paths],
-                    check=False,
-                )
-                if proc.stdout:
-                    diff_text_parts.append(proc.stdout)
-        # Staged (Index) + Unstaged (Working Tree)
-        elif kept_paths:
-            staged_proc = git_run(
-                repo,
-                [*diff_cmd_base, "--cached", "HEAD", "--", *kept_paths],
-                check=False,
+        names = git_run(
+            repo, ["ls-files", "--others", "--exclude-standard", "-z"]
+        ).stdout
+        kept, hidden = filter_diff_paths([p for p in names.split("\0") if p])
+        redacted.update(hidden)
+        for path in kept:
+            content = read_snapshot(repo, path, "WORKTREE")
+            if content is None:
+                continue
+            paths.add(path)
+            snapshots.setdefault(path, {})["WORKTREE"] = content
+            lines = content.splitlines()
+            patch = "".join(f"+{line}\n" for line in lines)
+            patches.append(
+                f"=== WORKTREE (untracked) ===\ndiff --git a/{path} b/{path}\n--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{len(lines)} @@\n{patch}"
             )
-            if staged_proc.stdout:
-                diff_text_parts.append(staged_proc.stdout)
-
-            unstaged_proc = git_run(
-                repo,
-                [*diff_cmd_base, "--", *kept_paths],
-                check=False,
-            )
-            if unstaged_proc.stdout:
-                diff_text_parts.append(unstaged_proc.stdout)
-
-        # Include untracked files as synthetic diffs
-        for untracked in kept_paths:
-            p = repo / untracked
-            if p.is_file() and not is_sensitive_path(untracked):
-                try:
-                    content = p.read_text(encoding="utf-8", errors="replace")
-                    lines = content.splitlines()
-                    joined_lines = "".join(f"+{line}\n" for line in lines)
-                    synthetic_diff = (
-                        f"diff --git a/{untracked} b/{untracked}\n"
-                        f"new file mode 100644\n"
-                        f"--- /dev/null\n"
-                        f"+++ b/{untracked}\n"
-                        f"@@ -0,0 +1,{len(lines)} @@\n"
-                        f"{joined_lines}"
-                    )
-                    diff_text_parts.append(synthetic_diff)
-                except OSError:
-                    pass
-        base = base_ref or "origin/main"
-        if kept_paths:
-            proc = git_run(
-                repo,
-                [*diff_cmd_base, f"{base}...HEAD", "--", *kept_paths],
-                check=False,
-            )
-            if proc.stdout:
-                diff_text_parts.append(proc.stdout)
-
-    elif mode == "commit":
-        sha = commit_sha or "HEAD"
-        if kept_paths:
-            proc = git_run(
-                repo,
-                [*diff_cmd_base, f"{sha}~1..{sha}", "--", *kept_paths],
-                check=False,
-            )
-            if proc.stdout:
-                diff_text_parts.append(proc.stdout)
-
-    combined_diff = "\n".join(diff_text_parts)
-    sanitized_diff = redact_sensitive_text(combined_diff)
-
+            stats.append(f"WORKTREE: {path} +{len(lines)} -0")
     return ReviewBundle(
-        mode=mode,
-        base_ref=base_ref,
-        commit_sha=commit_sha,
-        changed_files=kept_paths,
-        redacted_files=redacted_paths,
-        diff_text=sanitized_diff,
+        mode,
+        base,
+        head,
+        sorted(paths),
+        sorted(redacted),
+        redact_sensitive_text("\n".join(patches)),
+        stats,
+        snapshots,
     )

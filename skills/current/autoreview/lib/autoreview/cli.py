@@ -1,190 +1,128 @@
-"""Main command-line interface logic and coordinator for AutoReview."""
+"""Deterministic review preparation and findings verification."""
 
 import argparse
 import json
 import sys
-from collections.abc import Mapping
+import tempfile
 from pathlib import Path
-from typing import TypeIs
+from typing import cast
 
-from autoreview.engines import invoke_engine_review
-from autoreview.models import ENGINES, PRIORITIES
-from autoreview.targets import capture_diff_bundle, choose_review_target
-from autoreview.verification import (
-    filter_findings_by_priority,
-    validate_finding_structure,
-    verify_physical_line_exists,
-)
+from autoreview.git_ops import git_run
+from autoreview.models import PRIORITIES
+from autoreview.targets import ReviewBundle, capture_diff_bundle, choose_review_target
+from autoreview.verification import filter_findings_by_priority, validate_report
+
+STDOUT_LIMIT = 10000
 
 
 class CliArgs(argparse.Namespace):
-    """Parsed CLI arguments for AutoReview."""
-
+    command: str = "bundle"
     mode: str = "auto"
     base: str | None = None
     commit: str = "HEAD"
-    engine: str = "codex"
     max_priority: str = "P0"
-    json_output: str | None = None
+    findings: str | None = None
     output: str | None = None
-    dry_run: bool = False
-
-
-def _is_dict(obj: object) -> TypeIs[dict[str, object]]:
-    return isinstance(obj, dict)
-
-
-def _is_list(obj: object) -> TypeIs[list[object]]:
-    return isinstance(obj, list)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Construct the standard CLI argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Bundle-driven AI code review harness."
+    """Construct the public command parser."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    _ = parser.add_argument(
+        "command", nargs="?", choices=["bundle", "verify"], default="bundle"
     )
     _ = parser.add_argument(
         "--mode",
         choices=["auto", "local", "uncommitted", "branch", "commit"],
         default="auto",
-        help="Git review target scope.",
     )
+    _ = parser.add_argument("--base", help="Branch base or pinned local base ref.")
+    _ = parser.add_argument("--commit", default="HEAD", help="Commit target ref.")
     _ = parser.add_argument(
-        "--base",
-        help="Branch base ref, or explicit commit to compare against in local mode.",
+        "--output", help="Write the full review bundle to this file."
     )
-    _ = parser.add_argument(
-        "--commit",
-        default="HEAD",
-        help="Target commit SHA when reviewing a single commit.",
-    )
-    _ = parser.add_argument(
-        "--engine",
-        choices=ENGINES,
-        default="codex",
-        help="Underlying review model engine.",
-    )
+    _ = parser.add_argument("--findings", help="JSON findings file for verify.")
     _ = parser.add_argument(
         "--max-priority",
         choices=PRIORITIES,
         default="P0",
-        help="Widest finding priority to accept (P0, P1, P2, P3).",
-    )
-    _ = parser.add_argument(
-        "--json-output",
-        help="File path to write structured JSON report.",
-    )
-    _ = parser.add_argument(
-        "--output",
-        help="File path to write human-readable review transcript.",
-    )
-    _ = parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Capture and display bundle metadata without triggering LLM inference.",
+        help="Verify reporting threshold (default: P0).",
     )
     return parser
 
 
-def format_human_report(report: Mapping[str, object]) -> str:
-    """Render findings into a clean, human-readable terminal report."""
-    lines: list[str] = []
-    lines.append("=== AutoReview Summary ===")
-    lines.append(f"Verdict: {report.get('overall_correctness', 'Unknown')}")
-    lines.append(f"Explanation: {report.get('overall_explanation', '')}\n")
-
-    raw_findings = report.get("findings")
-    findings = (
-        [f for f in raw_findings if _is_dict(f)] if _is_list(raw_findings) else []
+def render_bundle(bundle: ReviewBundle) -> str:
+    """Describe the resolved target and include the complete sanitized patch."""
+    files = "\n".join(bundle.file_stats)
+    return (
+        f"Target: {bundle.mode}\nBase: {bundle.base_ref}\nHead: {bundle.commit_sha}\n"
+        f"Changed files ({len(bundle.changed_files)}), additions/deletions by state:\n{files}\n"
+        f"Redacted files: {', '.join(bundle.redacted_files) or 'None'}\n\n"
+        f"{bundle.diff_text or 'Empty diff. No reviewable changes.'}\n"
     )
-    if not findings:
-        lines.append("No findings matching the requested priority threshold.")
-        return "\n".join(lines)
 
-    lines.append(f"Findings ({len(findings)}):")
-    for idx, f in enumerate(findings, 1):
-        raw_loc = f.get("code_location")
-        loc = raw_loc if _is_dict(raw_loc) else {}
-        lines.append(
-            f"[{idx}] [{f.get('priority')}] {f.get('title')} ({f.get('category')})"
+
+def publish_bundle(bundle: ReviewBundle, output: str | None) -> None:
+    """Keep stdout bounded without truncating the saved bundle."""
+    text = render_bundle(bundle)
+    path = Path(output).resolve() if output else None
+    if len(text) > STDOUT_LIMIT and path is None:
+        with tempfile.NamedTemporaryFile(
+            prefix="autoreview-", suffix=".txt", delete=False
+        ) as handle:
+            path = Path(handle.name)
+    if path is not None:
+        _ = path.write_text(text, encoding="utf-8", errors="surrogateescape")
+    if len(text) > STDOUT_LIMIT:
+        print(
+            f"Target: {bundle.mode}\nBase: {bundle.base_ref}\nHead: {bundle.commit_sha}"
         )
-        lines.append(f"    Location: {loc.get('file_path')}:{loc.get('line')}")
-        lines.append(f"    Confidence: {f.get('confidence')}")
-        lines.append(f"    Details: {f.get('body')}\n")
-
-    return "\n".join(lines)
+        print(
+            f"Changed files: {len(bundle.changed_files)}; redacted: {len(bundle.redacted_files)}"
+        )
+        print(f"Bundle size: {len(text)} characters. Read the full file in chunks.")
+    else:
+        print(text, end="")
+    if path is not None:
+        print(f"Full bundle: {path}")
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Execute the AutoReview workflow."""
+    """Run only Git collection and local validation, never a reviewer process."""
     parser = build_arg_parser()
     args = parser.parse_args(argv, namespace=CliArgs())
-    repo_root = Path.cwd()
-
-    mode, base_ref, commit_sha = choose_review_target(
-        repo_root,
-        args.mode,
-        args.base,
-        args.commit,
-    )
-
-    bundle = capture_diff_bundle(repo_root, mode, base_ref, commit_sha)
-
-    if args.dry_run:
-        print(f"AutoReview [Dry Run] Mode: {bundle.mode}")
-        print(f"Changed Files ({len(bundle.changed_files)}): {bundle.changed_files}")
-        if bundle.redacted_files:
-            print(
-                f"Redacted Files ({len(bundle.redacted_files)}): {bundle.redacted_files}"
-            )
-        print(f"Diff Size: {len(bundle.diff_text)} bytes")
-        return 0
-
-    # Dispatch to review engine
-    report = invoke_engine_review(bundle, _engine=args.engine)
-
-    # Filter and verify findings against real physical disk files
-    raw_findings_val = report.get("findings")
-    raw_findings = (
-        [f for f in raw_findings_val if _is_dict(f)]
-        if _is_list(raw_findings_val)
-        else []
-    )
-    verified_findings: list[dict[str, object]] = []
-
-    for idx, f in enumerate(raw_findings):
-        try:
-            validate_finding_structure(f, idx)
-            loc = f.get("code_location")
-            if _is_dict(loc):
-                file_path = loc.get("file_path")
-                line_no = loc.get("line")
-                if (
-                    isinstance(file_path, str)
-                    and isinstance(line_no, int)
-                    and verify_physical_line_exists(repo_root, file_path, line_no)
-                ):
-                    verified_findings.append(f)
-        except ValueError as err:
-            _ = sys.stderr.write(f"Warning: discarding malformed finding: {err}\n")
-
-    kept, _ = filter_findings_by_priority(verified_findings, args.max_priority)
-    report["findings"] = kept
-
-    if kept:
-        report["overall_correctness"] = "patch is incorrect"
-
-    # Human-readable output
-    human_text = format_human_report(report)
-    print(human_text)
-
-    if args.output:
-        _ = Path(args.output).write_text(human_text, encoding="utf-8")
-
-    if args.json_output:
-        _ = Path(args.json_output).write_text(
-            json.dumps(report, indent=2) + "\n",
-            encoding="utf-8",
+    if args.command == "verify" and not args.findings:
+        parser.error("verify requires --findings")
+    if args.command == "bundle" and args.findings:
+        parser.error("--findings is only valid for verify")
+    if args.command == "verify" and args.output:
+        parser.error("--output is only valid for bundle")
+    try:
+        repo = Path(git_root())
+        mode, base, head = choose_review_target(repo, args.mode, args.base, args.commit)
+        bundle = capture_diff_bundle(repo, mode, base, head)
+        if args.command == "bundle":
+            publish_bundle(bundle, args.output)
+            return 0
+        payload = cast(
+            "object", json.loads(Path(args.findings or "").read_text(encoding="utf-8"))
         )
+        report, reasons = validate_report(payload, bundle)
+        if reasons:
+            for reason in reasons:
+                print(reason, file=sys.stderr)
+            return 1
+        kept, filtered = filter_findings_by_priority(
+            report["findings"], args.max_priority
+        )
+        print(json.dumps({**report, "findings": kept}, indent=2))
+        print(f"Verified: {len(kept)}; Filtered: {len(filtered)}", file=sys.stderr)
+    except (OSError, ValueError) as err:
+        print(str(err), file=sys.stderr)
+        return 1
+    return 0
 
-    return 1 if any(f.get("priority") == "P0" for f in kept) else 0
+
+def git_root() -> str:
+    """Resolve the repository root, including invocation from a subdirectory."""
+    return git_run(Path.cwd(), ["rev-parse", "--show-toplevel"]).stdout.strip()

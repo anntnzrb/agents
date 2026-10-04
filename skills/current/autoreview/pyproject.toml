@@ -6,7 +6,7 @@ line-length = 88
 select = ["ALL"]
 ignore = [
     "A002",
-    "C901",  # complex git bundle capture and review dispatch
+    "C901",  # multi-state Git collection and report validation
     "COM812",
     "CPY001",  # repo policy: no license or copyright headers in code files
     "D100",  # docstrings optional on internal modules
@@ -16,7 +16,7 @@ ignore = [
     "D104",  # docstrings optional on internal packages
     "D203",
     "D213",
-    "E501",  # long prompt and regex strings
+    "E501",  # long patch headers and regex strings
     "EM101",
     "EM102",
     "ERA001",
@@ -26,7 +26,6 @@ ignore = [
     "PLR0911",
     "PLR0912",
     "PLR0915",  # multi-step bundle and CLI functions
-    "RUF012",  # schema dictionary constant
     "S101",
     "S603",
     "S607",
