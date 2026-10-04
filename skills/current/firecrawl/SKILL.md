@@ -42,6 +42,7 @@ Match the intent to a command listed by live `--help`:
 - Parse local documents (PDF, Office, HTML).
 - Drive a live browser session: click, fill forms, paginate.
 - Track page changes on a schedule.
+- Find structured records or listings through a ready-made Alexandria workflow, data API, or index, then execute it.
 - Look up error strings, GitHub issues and PRs, READMEs, or library docs in the developer index.
 - Search and read scientific papers in the research index.
 - Check credit balance; diagnose failed runs.
@@ -50,7 +51,7 @@ Match the intent to a command listed by live `--help`:
 
 | Need | Read | When |
 | --- | --- | --- |
-| Multi-step workflows | `references/recipes.md` | Debugging errors, mirroring doc trees, interactive scraping, or recurring monitors |
+| Multi-step workflows | `references/recipes.md` | Debugging errors, mirroring doc trees, interactive scraping, structured data through Alexandria, or recurring monitors |
 
 ## Durable Rules
 
@@ -58,4 +59,5 @@ Match the intent to a command listed by live `--help`:
 - Check credit usage before large crawls or site downloads.
 - Let the CLI wait on async jobs with its own wait options; do not write polling loops.
 - When live page state matters, disable cached snapshots with the CLI's max-age option.
+- Cap PDF parsing with the scrape page-limit option; each parsed page costs a credit.
 - The developer command takes a free-form query. For strict filters (repositories, artifact types, doc sources, language, stars), call the REST developer search endpoint; read its current fields in the Firecrawl API reference before building the request.

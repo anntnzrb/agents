@@ -122,3 +122,23 @@ bun x firecrawl-cli@latest monitor create \
   --page "<url>" \
   -o .firecrawl/<name>-monitor.json
 ```
+
+## 8. Get Structured Records Through Alexandria
+
+For structured records, listings, transcripts, or datasets, check Alexandria for a ready-made workflow, data API, or index before scraping pages or running `agent`. Discovery is free of side effects; only Scrape executes a tool.
+
+### Steps
+1. Run `bun x firecrawl-cli@latest search --help`, `list --help`, and `scrape --help` to confirm discovery and execution flags.
+2. Search with the user's actual question. `search alexandria` returns tools only; `find-tools <url>` matches tools to a known website.
+3. Inspect the selected tool's contract with `list <provider> <capability> --pretty`. Honor `required` inputs and `requiresOneOf` groups, read the example request and response, and use `response.key` to locate records.
+4. Execute with `scrape <provider>/<capability> --options '<JSON matching the contract>'`, saving output under `.firecrawl/`. Check each result for errors, not just the exit status.
+5. If no tool covers the market or required inputs, fall back to web results. Do not probe adjacent paid tools for coverage.
+
+### Illustrative command
+```sh
+bun x firecrawl-cli@latest search alexandria "<data you need>" -o .firecrawl/<name>-tools.json
+bun x firecrawl-cli@latest list "<provider>" "<capability>" --pretty
+bun x firecrawl-cli@latest scrape "<provider>/<capability>" \
+  --options '<input JSON>' \
+  -o .firecrawl/<name>.json
+```
