@@ -135,7 +135,7 @@ For a foreground debugging session, stop the unit first, then run `cli-proxy-api
 
 The facade in `tools/cliproxyapi/gateway.py` sends `POST /v1/systemone` to the upstream configured in `tools/cliproxyapi/gateway.json`. It uses the native TypeSafe System One request and response format. The model must match an entry in the configured allowlist exactly. The facade selects a credential from the installed OpenRouter pool using thread-safe weighted round robin. Each valid request uses one key; classification does not add retries or failover.
 
-Chat requests and model discovery pass through to CLIProxyAPI. Classifiers do not appear in `/v1/models`: listing a classifier as a chat model would make clients invoke the wrong protocol. CLIProxyAPI retains its own routing, retries, and statistics for chat. Classification calls bypass that pipeline, so their budget and usage controls belong to the upstream provider. Set a spending limit on each OpenRouter key in the provider dashboard.
+Chat requests pass through to CLIProxyAPI. The facade enriches the model list as described in [Discovery metadata](#discovery-metadata). Classifiers do not appear in `/v1/models`: listing a classifier as a chat model would make clients invoke the wrong protocol. CLIProxyAPI retains its own routing, retries, and statistics for chat. Classification calls bypass that pipeline, so their budget and usage controls belong to the upstream provider. Set a spending limit on each OpenRouter key in the provider dashboard.
 
 The facade accepts client requests without authentication on its private listener. It forwards inference routes and CLIProxyAPI's management surface (`/management.html`, `/v0/management/`, `/v8/management/`, and `/v0/resource/plugins/`), so the control panel stays on the client endpoint. Management requests keep their `Authorization` and `X-Management-Key` headers because CLIProxyAPI checks the panel's own key; inference requests have client credentials replaced. The public Funnel path keeps its separate bearer-token gate and refuses the management surface; see [Expose the gateway through Tailscale Funnel](#expose-the-gateway-through-tailscale-funnel).
 
@@ -250,6 +250,19 @@ The template exposes upstream model names as-is. Aliases, forked model variants,
 With `force-model-prefix`, a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential. A `prefix` belongs to the credential's generated auth file, so reauthentication removes it.
 
 Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role — same model through two pools are distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
+
+### Discovery metadata
+
+For an exact `GET /v1/models`, the facade combines CLIProxyAPI's OpenAI list with its Codex catalog.
+It adds positive context windows as `context_length` without inventing limits for omitted models.
+It also adds `supported_endpoint_types`, identifying Claude models served by native Anthropic credentials.
+Other pools remain on the OpenAI-compatible endpoint, even when their model name contains `claude`.
+The ownership rule lives beside the implementation in `tools/cliproxyapi/gateway.py`.
+
+A failed metadata fetch leaves context limits absent but preserves the model list.
+A failed listing fetch falls back to the normal relay and preserves upstream error status.
+Catalog requests with query parameters pass through unchanged.
+Clients can retain their own trusted metadata and use gateway limits only as a fallback.
 
 ### Codex model catalog
 

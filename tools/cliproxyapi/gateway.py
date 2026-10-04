@@ -8,6 +8,7 @@ rejects the management routes this facade forwards to the private network.
 from __future__ import annotations
 
 import argparse
+import http
 import http.client
 import io
 import json
@@ -41,6 +42,13 @@ HOP_HEADERS = frozenset(
 MANAGEMENT_PREFIXES = ("/v0/management/", "/v8/management/", "/v0/resource/plugins/")
 MANAGEMENT_PATHS = frozenset({"/management.html", "/v0/management", "/v8/management"})
 MANAGEMENT_CREDENTIALS = frozenset({"authorization", "x-management-key"})
+MODEL_LIST_PATH = "/v1/models"
+# CLIProxyAPI's Codex-shaped catalog carries per-model context windows that its
+# OpenAI model list omits.
+CODEX_CATALOG_PATH = "/v1/models?client_version=pi"
+# Owners whose Claude models CLIProxyAPI serves natively at /v1/messages. Other
+# pools translate Claude through their own protocol and may reject it there.
+ANTHROPIC_NATIVE_OWNERS = frozenset({"anthropic", "claude"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +173,78 @@ def read_config(path: Path) -> Config:
         key_entries,
         frozenset(models),
     )
+
+
+def fetch_json(url: str, headers: dict[str, str]) -> object | None:
+    """GET a JSON document from CLIProxyAPI; None on any transport or HTTP failure."""
+    parts = urlsplit(url)
+    connection_type = (
+        http.client.HTTPSConnection
+        if parts.scheme == "https"
+        else http.client.HTTPConnection
+    )
+    connection = connection_type(parts.hostname or "", parts.port, timeout=IO_TIMEOUT)
+    try:
+        target = parts.path + ("?" + parts.query if parts.query else "")
+        # http.client does not decompress; internal JSON reads require identity encoding.
+        json_headers = {
+            key: value
+            for key, value in headers.items()
+            if key.lower() != "accept-encoding"
+        }
+        connection.request(
+            "GET", target, headers=json_headers | {"Accept-Encoding": "identity"}
+        )
+        with connection.getresponse() as response:
+            if response.status != http.HTTPStatus.OK:
+                return None
+            return decode_json(response.read())
+    except (OSError, http.client.HTTPException, ValueError, UnicodeError):
+        return None
+    finally:
+        connection.close()
+
+
+def context_windows(catalog: object) -> dict[str, int]:
+    """Map model ids to positive context windows from the Codex catalog."""
+    models = catalog.get("models") if is_object(catalog) else None
+    windows: dict[str, int] = {}
+    for model in models if is_list(models) else []:
+        if not is_object(model):
+            continue
+        slug = model.get("slug")
+        window = model.get("context_window")
+        if isinstance(slug, str) and type(window) is int and window > 0:
+            windows[slug] = window
+    return windows
+
+
+def enrich_model_list(listing: object, catalog: object) -> object:
+    """Add `context_length` and `supported_endpoint_types` to each listed model."""
+    data = listing.get("data") if is_object(listing) else None
+    if not is_object(listing) or not is_list(data):
+        return listing
+    windows = context_windows(catalog)
+    enriched: list[object] = []
+    for model in data:
+        if not is_object(model) or not isinstance(model.get("id"), str):
+            enriched.append(model)
+            continue
+        model_id = str(model["id"])
+        entry = dict(model)
+        if model_id in windows:
+            entry["context_length"] = windows[model_id]
+        owner = model.get("owned_by")
+        native = (
+            model_id.startswith("claude-")
+            and isinstance(owner, str)
+            and owner in ANTHROPIC_NATIVE_OWNERS
+        )
+        entry["supported_endpoint_types"] = (
+            ["anthropic", "openai"] if native else ["openai"]
+        )
+        enriched.append(entry)
+    return {**listing, "data": enriched}
 
 
 def excluded_headers(headers: Message) -> frozenset[str]:
@@ -401,7 +481,30 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if websocket:
                 headers["Connection"] = "Upgrade"
                 headers["Upgrade"] = "websocket"
-        self.relay(urlsplit(url), body, headers, websocket=websocket)
+        if self.command == "GET" and self.path == MODEL_LIST_PATH:
+            self.model_list(config.upstream, headers)
+        else:
+            self.relay(urlsplit(url), body, headers, websocket=websocket)
+
+    def model_list(self, upstream: str, headers: dict[str, str]) -> None:
+        """Serve the OpenAI model list with the fields omp and Pi read per model.
+
+        `context_length` comes from the Codex catalog, and
+        `supported_endpoint_types` marks Claude models that /v1/messages serves
+        natively. A failed metadata fetch leaves context limits absent; a failed
+        listing fetch falls back to the normal relay.
+        """
+        listing = fetch_json(upstream + MODEL_LIST_PATH, headers)
+        if listing is None:
+            self.relay(urlsplit(upstream + self.path), b"", headers, websocket=False)
+            return
+        catalog = fetch_json(upstream + CODEX_CATALOG_PATH, headers)
+        payload = json.dumps(enrich_model_list(listing, catalog)).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        _ = self.wfile.write(payload)
 
     def relay(
         self, url: SplitResult, body: bytes, headers: dict[str, str], *, websocket: bool
