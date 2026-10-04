@@ -66,4 +66,7 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 Commits:
 - For harness-specific changes use `<harness>: ...`; for example `pi: configure fallback model`
-- For generic changes: `docs:`, `sync:`, `ci:`, `skills(<skill>):`, `tools(<tool>):`
+- For generic changes: `docs:`, `sync:`, `ci:`, `deps:`, `skills(<skill>):`, `tools(<tool>):`
+
+Pull requests:
+- `main` changes only through pull requests; push a `work/<8-lowercase-hex>` branch and follow "Merge a pull request" in `docs/ci.md`
