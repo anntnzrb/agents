@@ -1,6 +1,6 @@
 # Verify a change in CI
 
-CI checks repository structure and runs the suites owned by the changed code. The workflows under [`.github/workflows/`](../.github/workflows/) own triggers, runners, schedules, and tool versions. Local sync hooks remain focused on sync; see [Git hooks](../.githooks/README.md).
+CI checks repository structure and runs the suites owned by the changed code. The workflows under [`.github/workflows/`](../.github/workflows/) own triggers, runners, schedules, and tool versions. Local hooks run sync gates and selected owner checks; see [Git hooks](../.githooks/README.md).
 
 ## Run checks locally
 
@@ -11,6 +11,14 @@ uv run --script .github/scripts/ci.py plan --base origin/main
 ```
 
 Omit `--base` to select all active code suites. Selection compares the merge base with `HEAD`; uncommitted changes are not included.
+
+Run metadata validation, then the selected skill and harness suites:
+
+```bash
+uv run --script .github/scripts/ci.py local
+```
+
+`local` defaults to `--base origin/main` and stops at the first failure. Each selected harness runs `bun install --frozen-lockfile` then `bun test` in a temporary copy. The `pre-push` hook runs this command from the repository root after the sync static gates and serial test suite.
 
 Validate every active skill's metadata, and check repository Markdown outside `skills/` and `legacy/` for en and em dashes:
 

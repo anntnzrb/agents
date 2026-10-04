@@ -327,3 +327,38 @@ def test_metadata_rejects_dashes_in_repository_prose(tmp_path: Path) -> None:
     assert "docs/page.md:1: U+2013 en dash" in result.stdout
     assert "legacy" not in result.stdout
     assert "node_modules" not in result.stdout
+
+
+def test_local_runs_only_the_planned_owners_then_metadata(repo: Path) -> None:
+    calls = repo.parent / "calls.jsonl"
+    bin_dir = repo.parent / "bin"
+    for tool in ("uv", "bun"):
+        write(
+            bin_dir,
+            tool,
+            f"#!{sys.executable}\n"
+            "import json, os, sys\n"
+            "with open(os.environ['CALLS'], 'a') as log:\n"
+            f"    log.write(json.dumps(['{tool}', *sys.argv[1:]]) + '\\n')\n",
+        )
+        (bin_dir / tool).chmod(0o755)
+    write(repo, "skills/current/alpha/scripts/cli.py", "changed")
+    write(repo, "harnesses/opencode/index.ts", "changed")
+    base = commit_change(repo)
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "local", "--base", base],
+        cwd=repo,
+        env=os.environ
+        | {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "CALLS": str(calls)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    commands = [json.loads(line) for line in calls.read_text().splitlines()]
+    gates = [c[5] for c in commands if c[:2] == ["uv", "run"] and "gates" in c]
+    assert gates == ["skills/current/alpha"]
+    assert [c[1] for c in commands if c[0] == "bun"] == ["install", "test"]
+    assert any("lint" in c for c in commands)
+    assert next(i for i, c in enumerate(commands) if "lint" in c) < next(
+        i for i, c in enumerate(commands) if "gates" in c
+    )
