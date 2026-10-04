@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: uv
+    directories:
+      - /sync
+      - /skills/current/*
+    schedule:
+      interval: weekly
+    groups:
+      uv:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: bun
+    directories:
+      - /harnesses/opencode
+      - /harnesses/pi/agent/extensions
+    schedule:
+      interval: weekly
+    groups:
+      bun:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps

@@ -47,7 +47,7 @@ The final `CI required` check succeeds only when every selected suite succeeds. 
 
 CI uses recorded fixtures and local test servers without provider credentials. Live tests are disabled. Python skill gates reject sockets outside loopback; Unix sockets remain available for local process coordination. Extension tests preload an HTTP guard, so calls using the default fetch transport fail instead of contacting a provider.
 
-Run or inspect the workflow from GitHub's **Actions** tab. Manual dispatch and scheduled CI select all active code suites. The workflow does not invoke harness CLIs, inference providers, automatic agent reviews, or model evaluations.
+Run or inspect the workflow from GitHub's **Actions** tab. CI runs on pull requests, manual dispatch, and a weekly schedule. Manual dispatch and scheduled CI select all active code suites. A merge to `main` does not rerun CI; see [Merge a pull request](#merge-a-pull-request). The workflow does not invoke harness CLIs, inference providers, automatic agent reviews, or model evaluations.
 
 Live smoke tests, native harness integration tests, and model-based skill evaluations remain explicit manual operations owned by their source. They do not run in CI. Structural skill validation does not establish instruction quality or activation accuracy.
 
@@ -58,6 +58,22 @@ Skill shards share uv's dependency and tool environments within a runner. Cache 
 Caches store dependencies and interpreters, never successful check results. Every selected owner runs its gates on both supported platforms. Keep the platform matrix and shard count in the workflow and planner, respectively; do not tune them by omitting owners or weakening the required check.
 
 For a local comparison, use fresh `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, and `UV_TOOL_DIR` directories for each group. Run the same owners with the same concurrency, first with empty caches and then again with those caches retained. Compare total elapsed time and the sum of group durations separately. Keep source, interpreter requirements, and gate commands unchanged. Local timings exclude GitHub runner provisioning, checkout, and cache transfer; Darwin measurements require a Darwin runner.
+
+## Merge a pull request
+
+The ruleset requires the branch to be up to date with `main` before merging, so the tree that merges is the tree CI tested. A second run on `main` would retest the same tree, so CI has no push trigger. The weekly scheduled run catches drift from dependencies that move without a commit, such as `latest` tool versions.
+
+Queue the merge as soon as the PR is open, instead of waiting for green:
+
+```bash
+gh pr merge <number> --auto --merge --match-head-commit "$(git rev-parse HEAD)"
+```
+
+GitHub merges when `CI required` passes and deletes the branch. A failed check leaves the PR open. If `main` moves first, update the branch; CI runs again and the queued merge still applies.
+
+## Update dependencies
+
+Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one grouped weekly PR per ecosystem: GitHub Actions, uv lock files under `sync/` and `skills/current/*/`, and the bun harness packages. The `auto-merge` workflow queues each Dependabot PR to merge once `CI required` passes. Workflows reference actions by version tag, not commit SHA, so these PRs stay readable; tool versions that are pinned in commands, such as the `uvx` gate tools and the skill-creator gate pins, are updated by hand.
 
 ## Maintain merge protection
 
