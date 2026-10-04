@@ -1,15 +1,8 @@
-import { expect, mock, spyOn, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-
-// Catalog discovery does not need Pi's bundled request-dialect metadata.
-mock.module("@earendil-works/pi-ai/providers/all", () => ({
-  getBuiltinProviders: () => [],
-  getBuiltinModels: () => [],
-  getBuiltinClassifierModels: () => [],
-}));
 
 test("refreshes missing metadata in a fresh cache, throttles retries, and retains cached data on failure", async () => {
   const directory = await mkdtemp(join(tmpdir(), "cliproxy-discovery-"));
@@ -19,7 +12,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
   delete process.env.PI_OFFLINE;
   let now = Date.now();
   const clock = spyOn(Date, "now").mockImplementation(() => now);
-  const path = join(directory, "agents/models-dev.json");
+  const path = join(directory, "agents/models-dev-pi.json");
   await mkdir(join(directory, "agents"));
   const known = { limit: { context: 200000, output: 32000 } };
   await writeFile(path, JSON.stringify({
@@ -30,6 +23,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
   let failure = false;
   // Bun's fetch type adds preconnect, which the mock does not need.
   const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
+    if (String(url).endsWith("/systemone/models")) return Response.json({ data: [] });
     if (String(url).endsWith("/models")) {
       return Response.json({ data: ids.map((id) => ({ id, owned_by: "openai" })) });
     }

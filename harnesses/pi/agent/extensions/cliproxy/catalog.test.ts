@@ -1,15 +1,8 @@
-import { expect, mock, spyOn, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { expect, spyOn, test } from "bun:test";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-
-// Gateway catalog handling does not need Pi's bundled request-dialect metadata.
-mock.module("@earendil-works/pi-ai/providers/all", () => ({
-  getBuiltinProviders: () => [],
-  getBuiltinModels: () => [],
-  getBuiltinClassifierModels: () => [],
-}));
 
 type RefreshContext = Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0];
 type ChatModel = Extract<ProviderModelConfig, { type?: "chat" }>;
@@ -44,6 +37,7 @@ async function withGateway(
   delete process.env.PI_OFFLINE;
   const gateway = { models: [] as unknown[], catalog: {} as unknown, up: true, status: 200, requests: 0 };
   const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
+    if (String(url).endsWith("/systemone/models")) return Response.json({ data: [] });
     if (String(url).endsWith("/models")) {
       gateway.requests++;
       if (!gateway.up) throw new Error("gateway unreachable");
@@ -64,6 +58,26 @@ async function withGateway(
 }
 
 const ids = (models: readonly ProviderModelConfig[]): string[] => models.map((model) => model.id);
+
+test("Pi owns an atomic catalog cache and example-xhigh maps to example", async () => {
+  await withGateway(async (gateway, cacheFile) => {
+    const directory = dirname(cacheFile);
+    await mkdir(directory, { recursive: true });
+    const shared = join(directory, "models-dev.json");
+    const owned = join(directory, "models-dev-pi.json");
+    await writeFile(shared, "untouched");
+    await writeFile(owned, "{}");
+    const inode = (await stat(owned)).ino;
+    gateway.models = [{ id: "example" }];
+    gateway.catalog = { vendor: { models: { "example-xhigh": { limit: { context: 123456 } } } } };
+    const models = await (await loadProvider("private-cache")).refreshModels!(context(true)) as ChatModel[];
+    expect(models.find((model) => model.id === "example")?.contextWindow).toBe(123456);
+    expect(await readFile(shared, "utf8")).toBe("untouched");
+    expect((await stat(owned)).ino).not.toBe(inode);
+    expect(JSON.parse(await readFile(owned, "utf8")).stripped.example.limit.context).toBe(123456);
+    expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+  });
+});
 
 test("a new process lists the cached catalog in Pi's cache-only phase, before any request", async () => {
   await withGateway(async (gateway, cacheFile) => {
@@ -198,7 +212,7 @@ test("zero catalog limits cannot poison the startup cache for every gateway mode
     const image = { limit: { context: 0, output: 0 }, reasoning: false };
     gateway.catalog = { images: { models: { "image-model": image } } };
     await mkdir(dirname(cacheFile), { recursive: true });
-    await writeFile(join(dirname(cacheFile), "models-dev.json"), JSON.stringify({
+    await writeFile(join(dirname(cacheFile), "models-dev-pi.json"), JSON.stringify({
       version: 2, fetchedAt: Date.now(),
       models: { "image-model": image }, suffixes: { "image-model": image }, stripped: { "image-model": image },
     }));

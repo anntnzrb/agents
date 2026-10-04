@@ -15,7 +15,7 @@ Discovery order during a network-enabled refresh:
 1. `GET {baseUrl}/models` lists the gateway's current model ids.
 2. `https://models.dev/api.json` supplies limits, pricing, modalities, and reasoning flags for ids it
    knows. Lookups try the exact id, the segment after the last `/`, then the same keys with a trailing
-   thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-max`, `-thinking`) removed, so
+   thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-xhigh`, `-max`, `-thinking`) removed, so
    `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash` row. When several catalog rows
    share a key, the row with the widest context window wins.
 3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
@@ -27,15 +27,22 @@ Discovery order during a network-enabled refresh:
 ## System One classifiers
 
 The gateway's optional System One facade serves classification at `POST {baseUrl}/systemone`; see
-`docs/cliproxyapi.md` in the repository root. The extension registers the facade's allowlisted models
-(`SYSTEM_ONE_MODELS`, mirroring `tools/cliproxyapi/gateway.json`) as `cliproxy` classifier models with
-the `typesafe-system-one` API and Pi's shipped TypeSafe transport. Price, context window, and display
+[CLIProxyAPI](../../../../../docs/cliproxyapi.md#system-one-classification).
+During a network-enabled refresh, the extension reads `GET {baseUrl}/systemone/models` and registers
+the returned allowlisted models as `cliproxy` classifiers with the `typesafe-system-one` API and
+Pi's shipped TypeSafe transport. The gateway owns availability in
+[gateway.json](../../../../../tools/cliproxyapi/gateway.json). Price, context window, and display
 name come from Pi's catalog entry for the facade's upstream provider, OpenRouter, so classifier usage
 counts toward session cost.
 
-Classifiers are not discovered: the facade keeps them out of `/models`, so the extension registers them
-statically and returns them with every catalog refresh. A model the installed Pi catalog does not know
-is skipped. Select one for the `find` tool with `"find": { "classifier": "cliproxy/typesafe/jev-1.13" }`.
+Classifiers stay out of the chat `/models` list. Discovery runs independently of chat discovery and
+honors the same timeout, cancellation, and offline controls. Successful listings, including empty
+ones, replace classifier availability. Failed requests retain the last listing. The endpoint-bound,
+versioned listing is cached atomically at `$XDG_CACHE_HOME/agents/cliproxy-classifiers-pi.json` and
+expires according to `MODELS_CACHE_TTL_MS` in `index.ts`. Startup and cache-only refreshes use that
+cache without network access. A first run needs a network refresh to discover classifiers.
+A model the installed Pi catalog does not know is skipped. Configure `find.classifier` with the
+`cliproxy/` prefix followed by a discovered classifier id.
 
 A request reaches the facade only when the gateway host deploys it; otherwise the gateway answers `404`.
 
@@ -65,8 +72,8 @@ Without this resolution a reasoning request carries `reasoning_effort` only. Mod
 dialect requires a `thinking` field never enable extended thinking, and levels the model does support
 are absent from `thinkingLevelMap`, so pi clamps the selected level to the highest mapped one.
 
-The models.dev snapshot is cached at `$XDG_CACHE_HOME/agents/models-dev.json`
-(`~/.cache/agents/models-dev.json` by default) and is shared with the OpenCode plugin; the cache carries
+The Pi-owned models.dev snapshot is cached at `$XDG_CACHE_HOME/agents/models-dev-pi.json`
+(`~/.cache/agents/models-dev-pi.json` by default) and published by atomic replacement. The cache carries
 its own format version and is ignored when that version changes. A failed fetch reuses the cached
 snapshot. The discovered model catalog is stored separately at
 `$XDG_CACHE_HOME/agents/cliproxy-models.json`. It is endpoint-bound, validated and expires according to
