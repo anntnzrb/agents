@@ -73,6 +73,12 @@ gh pr merge <number> --auto --merge --match-head-commit "$(git rev-parse HEAD)"
 
 GitHub merges when `CI required` passes and deletes the branch. A failed check leaves the PR open. If `main` moves first, update the branch; CI runs again and the queued merge still applies.
 
+Clean up only after the merge is confirmed. Deleting a branch whose PR is still open closes the PR, so gate local branch and worktree removal on the PR state:
+
+```bash
+[ "$(gh pr view <number> --json state -q .state)" = MERGED ] && git worktree remove <path> && git branch -d <branch>
+```
+
 ## Update dependencies
 
 Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one grouped weekly PR per ecosystem: GitHub Actions, uv lock files under `sync/` and `skills/current/*/`, and the bun harness packages. The `auto-merge` workflow queues each Dependabot PR to merge once `CI required` passes. Workflows reference actions by version tag, not commit SHA, so these PRs stay readable; tool versions that are pinned in commands, such as the `uvx` gate tools and the skill-creator gate pins, are updated by hand.
