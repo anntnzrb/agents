@@ -22,7 +22,7 @@ The adapter also passes `--remote-control-terminal` as a launcher default argume
 
 ## Runner services
 
-A runner serves its own working directory plus every `--dir` and every checkout `--discover-dirs` finds. Only the working directory is exclusive, so start a long-lived runner from a neutral directory — one no interactive instance occupies — and add the wanted directories explicitly. A runner whose working directory is already served exits immediately, and a supervisor that restarts it on failure turns that into a crash loop; an occupied `--dir` costs nothing.
+A runner serves its own working directory plus every `--dir` and every checkout `--discover-dirs` finds. Only the working directory is exclusive, so start a long-lived runner from a neutral directory, one that no interactive instance occupies, and add the wanted directories explicitly. A runner whose working directory is already served exits immediately, and a supervisor that restarts it on failure turns that into a crash loop; an occupied `--dir` costs nothing.
 
 `--discover-dirs` serves Git checkouts beneath a directory and skips hidden directories, so the SSOT checkout at `~/.config/agents` needs an explicit `--dir`.
 
