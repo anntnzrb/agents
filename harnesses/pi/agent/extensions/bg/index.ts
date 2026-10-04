@@ -165,9 +165,9 @@ export default function bg(pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "jobs", label: "jobs", description: "List, read new output, kill, or wait for session background bash jobs.",
-    promptGuidelines: ["jobs wait blocks without inference when no other work remains; completions otherwise arrive automatically."],
+    promptGuidelines: ["Use jobs wait only when the next step needs a job result and no other work remains; completions otherwise arrive automatically after the run, and jobs wait returns early when the user sends a message."],
     parameters: Type.Object({ action: Type.Union([Type.Literal("list"), Type.Literal("output"), Type.Literal("kill"), Type.Literal("wait")]), id: Type.Optional(Type.String()), offset: Type.Optional(Type.Integer({ minimum: 0 })), timeout: Type.Optional(Type.Number({ minimum: 0, maximum: 600 })) }),
-    async execute(_id, args, signal) {
+    async execute(_id, args, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("aborted");
       const visible = [...jobs.values()].filter(j => j.background);
       if (args.action === "list") return textResult(visible.map(j => `${j.id}: ${j.ended === undefined ? "running" : `exit ${j.code}`} Log: ${j.path}`).join("\n") || "No jobs.");
@@ -203,7 +203,10 @@ export default function bg(pi: ExtensionAPI) {
       if (!watched.length) return textResult("No jobs to wait for.");
       watched.forEach(j => { j.watchers++; });
       try {
-        const settled = await race(Promise.race(watched.map(j => j.done.then(() => j))), (args.timeout ?? 600) * 1000, signal);
+        let poll: ReturnType<typeof setInterval> | undefined;
+        const message = new Promise<"message">(resolve => { poll = setInterval(() => { if (ctx.hasPendingMessages?.()) resolve("message"); }, 200); });
+        const settled = await race(Promise.race([...watched.map(j => j.done.then(() => j)), message]), (args.timeout ?? 600) * 1000, signal).finally(() => clearInterval(poll));
+        if (settled === "message") return textResult("Stopped waiting: a new user message is queued. Jobs continue running; results are delivered automatically.");
         if (!settled) return textResult("Wait timed out; jobs continue running.");
         const result = await report(settled);
         if (signal?.aborted) throw new Error("aborted");
