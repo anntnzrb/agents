@@ -63,7 +63,7 @@ export const STATIC_CATALOG_MODELS: Record<string, CatalogModel> = {
 	},
 };
 
-const QUALIFIER_PATTERN = /-(minimal|low|medium|high|max|thinking)$/i;
+const QUALIFIER_PATTERN = /-(minimal|low|medium|high|xhigh|max|thinking)$/i;
 
 export function stripQualifier(id: string): string {
 	return id.replace(QUALIFIER_PATTERN, "");

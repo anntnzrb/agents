@@ -15,7 +15,7 @@ Discovery order during a network-enabled refresh:
 1. `GET {baseUrl}/models` lists the gateway's current model ids.
 2. `https://models.dev/api.json` supplies limits, pricing, modalities, and reasoning flags for ids it
    knows. Lookups try the exact id, the segment after the last `/`, then the same keys with a trailing
-   thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-max`, `-thinking`) removed, so
+   thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-xhigh`, `-max`, `-thinking`) removed, so
    `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash` row. When several catalog rows
    share a key, the row with the widest context window wins.
 3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
@@ -72,8 +72,8 @@ Without this resolution a reasoning request carries `reasoning_effort` only. Mod
 dialect requires a `thinking` field never enable extended thinking, and levels the model does support
 are absent from `thinkingLevelMap`, so pi clamps the selected level to the highest mapped one.
 
-The models.dev snapshot is cached at `$XDG_CACHE_HOME/agents/models-dev.json`
-(`~/.cache/agents/models-dev.json` by default) and is shared with the OpenCode plugin; the cache carries
+The Pi-owned models.dev snapshot is cached at `$XDG_CACHE_HOME/agents/models-dev-pi.json`
+(`~/.cache/agents/models-dev-pi.json` by default) and published by atomic replacement. The cache carries
 its own format version and is ignored when that version changes. A failed fetch reuses the cached
 snapshot. The discovered model catalog is stored separately at
 `$XDG_CACHE_HOME/agents/cliproxy-models.json`. It is endpoint-bound, validated and expires according to

@@ -146,7 +146,7 @@ function effortLevelMap(options: ReasoningOption[] | undefined): ModelMetadata["
 
 function catalogPath(): string {
 	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
-	return join(cacheHome, "agents", "models-dev.json");
+	return join(cacheHome, "agents", "models-dev-pi.json");
 }
 
 function modelsCachePath(): string {
@@ -284,11 +284,16 @@ async function loadCatalog(signal: AbortSignal, force = false): Promise<CatalogC
 			}
 		}
 		memoryCatalog = next;
+		const path = catalogPath();
+		const temporary = `${path}.${randomUUID()}.tmp`;
 		try {
-			await mkdir(dirname(catalogPath()), { recursive: true });
-			await writeFile(catalogPath(), JSON.stringify(next));
+			await mkdir(dirname(path), { recursive: true });
+			await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
+			await rename(temporary, path);
 		} catch {
 			// Cache writes are best effort.
+		} finally {
+			await rm(temporary, { force: true }).catch(() => {});
 		}
 		return next;
 	} catch {

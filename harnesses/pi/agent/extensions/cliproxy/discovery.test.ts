@@ -19,7 +19,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
   delete process.env.PI_OFFLINE;
   let now = Date.now();
   const clock = spyOn(Date, "now").mockImplementation(() => now);
-  const path = join(directory, "agents/models-dev.json");
+  const path = join(directory, "agents/models-dev-pi.json");
   await mkdir(join(directory, "agents"));
   const known = { limit: { context: 200000, output: 32000 } };
   await writeFile(path, JSON.stringify({
