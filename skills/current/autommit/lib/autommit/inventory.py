@@ -48,9 +48,10 @@ Rules:
 5. SHOULD separate rename-only, move-only, formatting-only, or comment-only work from behavior changes when each is independently meaningful.
 6. SHOULD keep changelog fragments, release notes, and the tests for a behavior together with the commit they describe.
 7. MUST follow existing commit-subject conventions: reuse their prefixes, scopes, and language unless the diff or user context clearly requires otherwise.
-8. MAY use a "lines" selector to separate disjoint changed lines inside one file when hunk selectors cannot separate the concerns. Ranges MUST be disjoint and MUST cover every changed new-file line exactly once.
+8. MAY use a "lines" selector to separate disjoint changed lines inside one file when hunk selectors cannot separate the concerns. Ranges MUST be disjoint and MUST cover every changed new-file line exactly once. Replacement deletions belong to the first added line; pure deletions belong to the zero-context new-file anchor (preceding surviving line), with anchor zero mapped to line 1. Ranges MAY span several hunks.
 9. Repository policy and history govern commit naming and grouping only; they NEVER decide atomicity.
-10. SHOULD prefer a few small truthful commits over one broad commit."""
+10. SHOULD prefer a few small truthful commits over one broad commit.
+11. Detected edited text renames move original content automatically before content edits; plan those edits at the new path. Binary files, mode changes, deleted files and hunkless files require "all"."""
 
 CRITIC_SYSTEM: Final[str] = """<system-conventions>
 RFC 2119: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. NEVER means MUST NOT; AVOID means SHOULD NOT.
@@ -114,8 +115,8 @@ class FileInventory:
 
     @property
     def whole_file_only(self) -> bool:
-        """Renames, deletions, and hunkless files are selected with `"all"`."""
-        return self.is_rename or self.status == "D" or not self.hunks
+        """Binary, deleted, and hunkless files are selected with `"all"`."""
+        return self.is_binary or self.status == "D" or not self.hunks
 
 
 @dataclass(frozen=True, slots=True)

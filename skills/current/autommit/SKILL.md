@@ -65,6 +65,7 @@ Rewrite freezes the current worktree, including uncommitted work, into a target 
 
 ## Invariants
 
+- Partial hunk and line selections stage exact cumulative content. Detected edited text renames move original content first, then apply selectable edits at the new path; see the protocol for deletion anchors and whole-file limits.
 - Never pass `--no-verify` unless the user asks for it. On `hook_failed`, report the gate output; do not repair the staged changes unasked.
 - Never bypass `validate-plan`, critic gating, snapshot binding, the operation lock, receipt recovery, the temporary worktree, tree equality, or compare-and-swap creation.
 - Never remove a stale lock automatically. Preserve evidence and state on every refusal or failure.

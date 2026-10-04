@@ -15,6 +15,7 @@ from typing import TypedDict, TypeIs, final, override
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 _ = sys.path.insert(0, str(SKILL_ROOT / "lib"))
 from autommit.errors import AutommitError
+from autommit.fallback import CommitWork, _partial_blob
 from autommit.git import run_git
 from autommit.proposal import (
     MAX_ATOMICITY_DIFF_CHARS,
@@ -22,7 +23,6 @@ from autommit.proposal import (
     IndicesSelector,
     LinesSelector,
     _changed_new_lines,
-    build_commit_patch,
     compute_apply_order,
     normalize_atomicity_decision,
     normalize_proposal,
@@ -242,6 +242,123 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("--smoke", completed.stdout)
         self.assertIn("--no-verify", completed.stdout)
 
+    def exact_slices(
+        self,
+        base: str,
+        final: str,
+        ranges: tuple[tuple[int, int], ...],
+        images: tuple[str, ...],
+    ) -> None:
+        """Exercise debug CLI selection and inspect every created tree."""
+        path = self.repo / "f.txt"
+        _ = path.write_text(base, encoding="utf-8")
+        _ = self.git("add", "f.txt")
+        _ = self.git("commit", "-m", "Base blocks")
+        _ = path.write_text(final, encoding="utf-8")
+        _ = self.git("add", "f.txt")
+        prepared = self.prepare(scope="staged")
+        plan = self.write_json(
+            "slices.json",
+            {
+                "commits": [
+                    {
+                        "summary": f"Select slice {index}",
+                        "dependencies": [index - 1] if index else [],
+                        "changes": [
+                            {
+                                "path": "f.txt",
+                                "hunks": {"type": "lines", "start": start, "end": end},
+                            }
+                        ],
+                    }
+                    for index, (start, end) in enumerate(ranges)
+                ]
+            },
+        )
+        arguments = ["--snapshot", prepared["snapshot"], "--plan-file", str(plan)]
+        _ = self.cli("validate-plan", *arguments)
+        _ = self.cli("apply", *arguments)
+        commits = self.git(
+            "log", f"-{len(images)}", "--reverse", "--format=%H"
+        ).stdout.splitlines()
+        for commit, image in zip(commits, images, strict=True):
+            self.assertEqual(self.git("show", f"{commit}:f.txt").stdout, image)
+
+    def test_duplicate_lines_exact_cli(self) -> None:
+        base = "a\n}\nb\n}\nc\n}\nd\n}\ne\n}\n"
+        final = "a\nA1\nA2\nA3\n}\nb\n};\nc\n}\nd\n}\ne\n}\n"
+        self.exact_slices(
+            base, final, ((7, 7), (2, 4)), (base.replace("b\n}\n", "b\n};\n"), final)
+        )
+
+    def test_range_spanning_two_hunks_exact_cli(self) -> None:
+        base = "".join(f"line {i}\n" for i in range(1, 25))
+        first = base.replace("line 3\n", "THREE\n").replace("line 12\n", "TWELVE\n")
+        final = first.replace("line 23\n", "LAST\n")
+        self.exact_slices(base, final, ((3, 12), (23, 23)), (first, final))
+
+    def test_pure_deletion_selected_alone_exact_cli(self) -> None:
+        base = "a\nremove\nb\nc\nd\ne\nf\ng\nh\n"
+        first = base.replace("remove\n", "")
+        final = first.replace("h\n", "H\n")
+        self.exact_slices(base, final, ((1, 1), (8, 8)), (first, final))
+
+    def test_beginning_deletion_anchor_exact_cli(self) -> None:
+        base = "remove\na\nb\nc\nd\ne\nf\ng\nh\n"
+        first = base.removeprefix("remove\n")
+        final = first.replace("h\n", "H\n")
+        self.exact_slices(base, final, ((1, 1), (8, 8)), (first, final))
+
+    def test_eof_deletion_and_no_newline_exact_cli(self) -> None:
+        base = "a\nb\nc\nd\ne\nf\ng\nh\nremove"
+        first = base.removesuffix("remove")
+        final = first.replace("a\n", "A\n")
+        self.exact_slices(base, final, ((8, 8), (1, 1)), (first, final))
+
+    def test_three_nonsequential_slices_exact_cli(self) -> None:
+        base = "a\n}\nb\n}\nc\n}\nd\n}\ne\n}\n"
+        first = base.replace("e\n}\n", "e\n};\n")
+        second = first.replace("c\n}\n", "c\n};\n")
+        final = second.replace("a\n}", "a\n};")
+        self.exact_slices(
+            base, final, ((10, 10), (6, 6), (2, 2)), (first, second, final)
+        )
+
+    def test_binary_and_mode_changes_whole_file_exact_cli(self) -> None:
+        _ = (self.repo / "binary").write_bytes(b"old\0data")
+        _ = self.git("add", "binary")
+        _ = self.git("commit", "-m", "Add binary")
+        _ = (self.repo / "binary").write_bytes(b"new\0data")
+        _ = self.git("add", "binary")
+        _ = self.git("update-index", "--chmod=+x", "tracked.txt")
+        prepared = self.prepare(scope="staged")
+        plan = self.write_json(
+            "whole.json",
+            {
+                "commits": [
+                    {
+                        "summary": "Update binary",
+                        "changes": [{"path": "binary", "hunks": "all"}],
+                    },
+                    {
+                        "summary": "Make executable",
+                        "changes": [{"path": "tracked.txt", "hunks": "all"}],
+                    },
+                ]
+            },
+        )
+        arguments = ["--snapshot", prepared["snapshot"], "--plan-file", str(plan)]
+        _ = self.cli("validate-plan", *arguments)
+        _ = self.cli("apply", *arguments)
+        for revision, mode in (("HEAD~1", "100644"), ("HEAD", "100755")):
+            self.assertEqual(self.git("show", f"{revision}:binary").stdout, "new\0data")
+            self.assertEqual(
+                self.git("show", f"{revision}:tracked.txt").stdout, "base\n"
+            )
+            self.assertTrue(
+                self.git("ls-tree", revision, "tracked.txt").stdout.startswith(mode)
+            )
+
     def test_prepare_stages_all_only_when_the_index_is_empty(self) -> None:
         _ = (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         result = self.prepare("keep formatting out", "split docs")
@@ -427,6 +544,14 @@ class AutommitCliTests(unittest.TestCase):
         self.assertEqual(
             self.git("log", "-2", "--format=%s").stdout.splitlines(),
             ["Change eleventh line", "Change first line"],
+        )
+        self.assertEqual(
+            self.git("show", "HEAD~1:tracked.txt").stdout,
+            original.replace("line 1\n", "first changed\n"),
+        )
+        self.assertEqual(
+            self.git("show", "HEAD:tracked.txt").stdout,
+            "\n".join(changed_lines) + "\n",
         )
 
     def test_apply_refuses_when_the_prepared_snapshot_changed(self) -> None:
@@ -1254,23 +1379,24 @@ class AutommitUnitTests(unittest.TestCase):
         flags = ("diff", "--cached", "--no-color", "--src-prefix=a/", "--dst-prefix=b/")
         return git(*flags), git(*flags, "-U0")
 
-    def _assert_patch_applies(self, repo: Path, patch: str) -> None:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo),
-                "apply",
-                "--check",
-                "--cached",
-                "--unidiff-zero",
-                "-R",
-            ],
-            input=patch.encode("utf-8"),
-            capture_output=True,
-            check=False,
+    def _selected_blob(
+        self,
+        repo: Path,
+        diff: str,
+        zero: str,
+        selector: IndicesSelector | LinesSelector,
+    ) -> bytes:
+        work = CommitWork(
+            repo,
+            repo,
+            repo,
+            run_git(repo, "write-tree").strip(),
+            "refs/heads/main",
+            run_git(repo, "rev-parse", "HEAD").strip(),
+            diff,
+            zero,
         )
-        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+        return _partial_blob(work, CommitChange("f.txt", selector))
 
     def test_hunk_selection_keeps_non_newline_separators(self) -> None:
         for char in "\v\f\x1c\x1d\x1e\x85\u2028\u2029":
@@ -1284,17 +1410,15 @@ class AutommitUnitTests(unittest.TestCase):
                     f"one\nsep{char}inside\ntwo\n".encode(),
                     f"ONE\nsep{char}INSIDE\ntwo\n".encode(),
                 )
-                by_index = build_commit_patch(
-                    (CommitChange("f.txt", IndicesSelector((1,))),), diff, diff
+                expected = f"ONE\nsep{char}INSIDE\ntwo\n".encode()
+                self.assertEqual(
+                    self._selected_blob(repo, diff, zero_diff, IndicesSelector((1,))),
+                    expected,
                 )
-                self._assert_patch_applies(repo, by_index)
-                self.assertIn(f"sep{char}inside", by_index)
-
-                by_lines = build_commit_patch(
-                    (CommitChange("f.txt", LinesSelector(1, 2)),), zero_diff, zero_diff
+                self.assertEqual(
+                    self._selected_blob(repo, diff, zero_diff, LinesSelector(1, 2)),
+                    expected,
                 )
-                self._assert_patch_applies(repo, by_lines)
-                self.assertIn(f"+sep{char}INSIDE", by_lines)
 
                 hunk = parse_file_diffs(diff)[0].hunks[0]
                 self.assertEqual(_changed_new_lines(hunk), (1, 2))
@@ -1302,14 +1426,13 @@ class AutommitUnitTests(unittest.TestCase):
     def test_hunk_selection_keeps_carriage_returns(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            diff, _zero = self._stage_change(
+            diff, zero = self._stage_change(
                 repo, b"one\r\ntwo\r\nthree\r\n", b"ONE\r\ntwo\r\nthree\r\n"
             )
-            patch = build_commit_patch(
-                (CommitChange("f.txt", IndicesSelector((1,))),), diff, diff
+            self.assertEqual(
+                self._selected_blob(repo, diff, zero, IndicesSelector((1,))),
+                b"ONE\r\ntwo\r\nthree\r\n",
             )
-            self.assertIn(" two\r\n three\r\n", patch)
-            self._assert_patch_applies(repo, patch)
 
     def test_binary_detection_ignores_hunk_content(self) -> None:
         text_diff = (

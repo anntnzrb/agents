@@ -76,7 +76,9 @@ The runtime planner rules above are the whole contract. This section expands the
 
 Repository policy and history govern naming and grouping only. They are never the atomicity criterion.
 
-Edge cases change evidence, not machinery. Submodules, sparse checkouts, binary files, rename-heavy diffs, generated files, and lockfiles are grouping signals. A binary, metadata-only, or renamed file can only be selected whole.
+Edge cases change evidence, not machinery. Submodules, sparse checkouts, binary files, rename-heavy diffs, generated files, and lockfiles are grouping signals. Binary, metadata-only, deleted files and mode changes require whole-file selection. Detected edited text renames receive an original-content move commit before their selectable content edits at the new path.
+
+Line positions always refer to the final new file. Removed replacement lines belong to the first added line. Pure deletions belong to the preceding surviving line (the zero-context new-file anchor); anchor zero maps to line 1. Ranges may span multiple hunks without selecting unchanged content.
 
 ## Atomicity Critic
 

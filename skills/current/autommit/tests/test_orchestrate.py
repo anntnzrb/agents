@@ -423,6 +423,30 @@ class LargeRefactorTests(_Sandbox):
         )
         self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
 
+    def test_move_commit_reuses_the_prefix_of_the_moved_files_history(self) -> None:
+        _ = (self.repo / "old").mkdir()
+        for subject, content in (
+            ("pi: add moved file", "1\n"),
+            ("pi: tune moved file", "2\n"),
+        ):
+            _ = (self.repo / "old/moved.txt").write_text(content, encoding="utf-8")
+            _ = self.git("add", "old/moved.txt")
+            _ = self.git("commit", "-m", subject)
+        for subject in ("docs: other", "ci: other", "docs: more"):
+            _ = self.git("commit", "--allow-empty", "-m", subject)
+        self.move("old/moved.txt", "new/moved.txt")
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            raise AssertionError("a moves-only snapshot must not call the model")
+
+        code = run_orchestrated(self.options(json_output=True, post=post))
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            self.git("log", "-1", "--format=%s").strip(),
+            "pi: move files without content changes",
+        )
+
     def test_moves_only_snapshot_needs_no_model(self) -> None:
         self.commit_file("old/moved.txt", "same\n")
         self.move("old/moved.txt", "new/moved.txt")
@@ -523,9 +547,7 @@ class LargeRefactorTests(_Sandbox):
                 diff=str(prepared["diff"]),
             )
         )
-        self.assertIn(
-            "- renamed.txt <- original.txt [R] (rename, whole file only)", prompt
-        )
+        self.assertIn("- renamed.txt <- original.txt [R] (rename)", prompt)
         self.assertFalse(inventory[0].is_pure_rename)
 
     def test_hunkless_file_selector_is_coerced_to_all(self) -> None:
@@ -552,7 +574,82 @@ class LargeRefactorTests(_Sandbox):
         self.assertEqual(code, 0)
         self.assertEqual(self.git("log", "-1", "--format=%s").strip(), "Add marker")
 
-    def test_partial_selection_of_an_edited_rename_is_rejected(self) -> None:
+    def test_edited_rename_move_then_two_exact_line_commits(self) -> None:
+        base = "".join(f"line {n}\n" for n in range(20))
+        self.commit_file("original.txt", base)
+        self.move("original.txt", "renamed.txt")
+        first = base.replace("line 15\n", "FIFTEEN\n")
+        final = first.replace("line 3\n", "THREE\n")
+        _ = (self.repo / "renamed.txt").write_text(final, encoding="utf-8")
+        _ = self.git("add", "renamed.txt")
+        self.assertIn("R", self.git("diff", "--cached", "--name-status"))
+        plan = {
+            "commits": [
+                {
+                    "summary": "Edit later line",
+                    "changes": [
+                        {
+                            "path": "renamed.txt",
+                            "hunks": {"type": "lines", "start": 16, "end": 16},
+                        }
+                    ],
+                },
+                {
+                    "summary": "Edit earlier line",
+                    "changes": [
+                        {
+                            "path": "renamed.txt",
+                            "hunks": {"type": "lines", "start": 4, "end": 4},
+                        }
+                    ],
+                },
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(plan)
+
+        self.assertEqual(run_orchestrated(self.options(post=post)), 0)
+        commits = self.git("log", "-3", "--reverse", "--format=%H").splitlines()
+        for commit, image in zip(commits, (base, first, final), strict=True):
+            self.assertEqual(self.git("show", f"{commit}:renamed.txt"), image)
+            self.assertNotIn("original.txt", self.git("ls-tree", "--name-only", commit))
+
+    def test_undetected_rename_delete_add_exact_commits(self) -> None:
+        self.commit_file("original.txt", "old content\n")
+        self.move("original.txt", "renamed.txt")
+        _ = (self.repo / "renamed.txt").write_text(
+            "unrelated replacement\n", encoding="utf-8"
+        )
+        _ = self.git("add", "--all")
+        self.assertNotIn("R", self.git("diff", "--cached", "--name-status"))
+        plan = {
+            "commits": [
+                {
+                    "summary": "Delete old file",
+                    "changes": [{"path": "original.txt", "hunks": "all"}],
+                },
+                {
+                    "summary": "Add new file",
+                    "changes": [{"path": "renamed.txt", "hunks": "all"}],
+                },
+            ]
+        }
+
+        def post(payload: dict[str, object]) -> HttpResponse:
+            del payload
+            return _model_reply(plan)
+
+        self.assertEqual(run_orchestrated(self.options(post=post)), 0)
+        self.assertNotIn("original.txt", self.git("ls-tree", "--name-only", "HEAD~1"))
+        self.assertNotIn("renamed.txt", self.git("ls-tree", "--name-only", "HEAD~1"))
+        self.assertEqual(
+            self.git("show", "HEAD:renamed.txt"), "unrelated replacement\n"
+        )
+        self.assertNotIn("original.txt", self.git("ls-tree", "--name-only", "HEAD"))
+
+    def test_partial_selection_of_an_edited_rename_is_valid(self) -> None:
         self.commit_file("original.txt", "".join(f"line {n}\n" for n in range(20)))
         self.move("original.txt", "renamed.txt")
         path = self.repo / "renamed.txt"
@@ -582,7 +679,7 @@ class LargeRefactorTests(_Sandbox):
         errors = validate_proposal_coverage(
             proposal, ("renamed.txt",), parse_file_diffs(diff)
         )
-        self.assertIn("Renamed file cannot be partially selected: renamed.txt", errors)
+        self.assertEqual(errors, ())
 
     def test_exhausted_attempts_surface_the_last_error(self) -> None:
         self.stage()

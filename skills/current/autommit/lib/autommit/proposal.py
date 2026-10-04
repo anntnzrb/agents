@@ -380,7 +380,8 @@ def _decode_git_path_token(token: str, start: int) -> tuple[str, int]:
     raise AutommitError("invalid_diff", "Unterminated quoted Git path.", 4)
 
 
-def _decode_git_path(value: str) -> str:
+def decode_git_path(value: str) -> str:
+    """Decode a quoted path from Git's diff metadata."""
     stripped = value.strip()
     if stripped.startswith('"') and stripped.endswith('"'):
         res, _ = _decode_git_path_token(stripped, 0)
@@ -403,8 +404,8 @@ def _diff_filename(header: str, content: str) -> str:
     if is_rename:
         for line in _diff_lines(content):
             if line.startswith("rename to "):
-                return _decode_git_path(line.removeprefix("rename to "))
-    path_str = _decode_git_path(second)
+                return decode_git_path(line.removeprefix("rename to "))
+    path_str = decode_git_path(second)
     return path_str.removeprefix("b/")
 
 
@@ -543,7 +544,7 @@ def _changed_new_lines(hunk: DiffHunk) -> tuple[int, ...]:
             line_num += 1
         elif line.startswith(" "):
             line_num += 1
-    return tuple(changed) or (hunk.new_start,)
+    return tuple(changed) or (max(1, hunk.new_start),)
 
 
 def _selector_intersects_hunk(selector: HunkSelector, hunk: DiffHunk) -> bool:
@@ -565,6 +566,7 @@ def validate_proposal_coverage(
     proposal: CommitProposal,
     staged_files: tuple[str, ...],
     parsed_files: tuple[ParsedFile, ...],
+    zero_files: tuple[ParsedFile, ...] = (),
 ) -> tuple[str, ...]:
     """Require every staged change exactly once overall."""
     staged_set = set(staged_files)
@@ -614,17 +616,24 @@ def validate_proposal_coverage(
             not isinstance(item, AllSelector) for item in selections
         ):
             errors.append(f"Binary file cannot be partially selected: {filename}")
-        if _is_rename(parsed) and any(
-            not isinstance(item, AllSelector) for item in selections
-        ):
-            errors.append(f"Renamed file cannot be partially selected: {filename}")
+        if (
+            "\nold mode " in parsed.content or "\ndeleted file mode " in parsed.content
+        ) and any(not isinstance(item, AllSelector) for item in selections):
+            errors.append(
+                f"Mode changes and deletions require whole-file selection: {filename}"
+            )
         if not parsed.hunks and any(
             not isinstance(item, AllSelector) for item in selections
         ):
             errors.append(
                 f"Metadata-only file cannot be partially selected: {filename}"
             )
-        for hunk in parsed.hunks:
+        coverage_file = (
+            next((file for file in zero_files if file.filename == filename), parsed)
+            if all(isinstance(item, LinesSelector) for item in selections)
+            else parsed
+        )
+        for hunk in coverage_file.hunks:
             covered = all(
                 any(
                     selector.start <= line <= selector.end
@@ -641,109 +650,17 @@ def validate_proposal_coverage(
     return tuple(dict.fromkeys(errors))
 
 
-def _build_lines_patch(file: ParsedFile, selector: LinesSelector) -> str:
-    """Build a zero-context patch covering new lines [start, end]."""
-    if not file.hunks:
-        raise AutommitError(
-            "invalid_plan", f"No hunks found to slice for {file.filename}."
-        )
-    first_hunk = file.content.find("\n@@")
-    file_header = file.content if first_hunk < 0 else file.content[:first_hunk]
-    selected_hunks: list[str] = []
-    for hunk in file.hunks:
-        hunk_end = (
-            hunk.new_start
-            if hunk.new_lines == 0
-            else hunk.new_start + hunk.new_lines - 1
-        )
-        if hunk_end < selector.start or hunk.new_start > selector.end:
-            continue
-
-        hunk_lines = _diff_lines(hunk.content)[1:]
-        kept_lines: list[str] = []
-        hunk_old_start = hunk.old_start if selector.start == 1 else selector.start
-        hunk_old_count = 0
-        hunk_new_start = 1 if selector.start == 1 else selector.start
-        hunk_new_count = 0
-        cur_old = hunk.old_start
-        cur_new = hunk.new_start
-
-        for line in hunk_lines:
-            if line.startswith("-"):
-                if selector.start <= cur_new <= selector.end:
-                    kept_lines.append(line)
-                    hunk_old_count += 1
-                cur_old += 1
-            elif line.startswith("+"):
-                if selector.start <= cur_new <= selector.end:
-                    kept_lines.append(line)
-                    hunk_new_count += 1
-                cur_new += 1
-            elif line.startswith(" "):
-                if selector.start <= cur_new <= selector.end:
-                    kept_lines.append(line)
-                    hunk_old_count += 1
-                    hunk_new_count += 1
-                cur_old += 1
-                cur_new += 1
-
-        if kept_lines:
-            old_spec = (
-                f"{hunk_old_start}"
-                if hunk_old_count == 1
-                else f"{hunk_old_start},{hunk_old_count}"
-            )
-            new_spec = (
-                f"{hunk_new_start}"
-                if hunk_new_count == 1
-                else f"{hunk_new_start},{hunk_new_count}"
-            )
-            hunk_header = f"@@ -{old_spec} +{new_spec} @@"
-            selected_hunks.append("\n".join((hunk_header, *kept_lines)))
-    if not selected_hunks:
-        raise AutommitError("invalid_plan", f"No changes selected for {file.filename}.")
-
-    if selector.start > 1:
-        header_lines = [
-            line
-            for line in _diff_lines(file_header)
-            if not line.startswith("new file mode ")
-            and not line.startswith("--- /dev/null")
-        ]
-        if not any(line.startswith("--- a/") for line in header_lines):
-            header_lines.append(f"--- a/{file.filename}")
-        file_header = "\n".join(header_lines)
-
-    return "\n".join((file_header, *selected_hunks))
-
-
 def _is_rename(file: ParsedFile) -> bool:
     return "\nrename from " in file.content or file.content.startswith("rename from ")
 
 
 def select_patch(file: ParsedFile, selector: HunkSelector) -> str:
-    """Select one whole file or a subset of its hunks."""
-    if file.is_binary and not isinstance(selector, AllSelector):
-        raise AutommitError(
-            "invalid_plan", f"Cannot partially select binary file {file.filename}."
-        )
-    if _is_rename(file) and not isinstance(selector, AllSelector):
-        raise AutommitError(
-            "invalid_plan",
-            f"Cannot partially select renamed file {file.filename}; entire file change must be committed together.",
-        )
+    """Return a whole-file patch; partial selections must use blob staging."""
     if isinstance(selector, AllSelector):
         return file.content
-    if isinstance(selector, LinesSelector):
-        return _build_lines_patch(file, selector)
-
-    hunks = [hunk for hunk in file.hunks if hunk.index in selector.indices]
-    if not hunks:
-        raise AutommitError("invalid_plan", f"No changes selected for {file.filename}.")
-
-    first_hunk = file.content.find("\n@@")
-    header = file.content if first_hunk < 0 else file.content[:first_hunk]
-    return "\n".join((header, *(hunk.content for hunk in hunks)))
+    raise AutommitError(
+        "invalid_plan", "Partial selections require exact blob staging."
+    )
 
 
 def build_commit_patch(
@@ -751,7 +668,7 @@ def build_commit_patch(
     staged_diff: str,
     zero_diff: str,
 ) -> str:
-    """Build one patch from normalized commit changes with dynamic offset calculation."""
+    """Build selected diff evidence; partial application uses exact blobs instead."""
     regular_files = {file.filename: file for file in parse_file_diffs(staged_diff)}
     zero_files = {file.filename: file for file in parse_file_diffs(zero_diff)}
     parts: list[str] = []
