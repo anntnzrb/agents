@@ -85,7 +85,7 @@ Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one gro
 
 ## Repository settings
 
-The Settings app (https://github.com/apps/settings) syncs [`.github/settings.yml`](../.github/settings.yml) to GitHub whenever it changes on `main`. The file extends the shared baseline in the `anntnzrb/.github` repository; change a value for every repository there, or override it here for this one. The app does not manage rulesets, so merge protection below stays a separate setting.
+The Settings app (https://github.com/apps/settings) syncs [`.github/settings.yml`](../.github/settings.yml) to GitHub whenever it changes on `main`. The file extends the shared baseline in the `anntnzrb/.github` repository; override a value here for this repository only. A baseline change does not trigger a sync: this repository picks it up the next time its own `.github/settings.yml` changes on `main`, so apply it now with `gh api -X PATCH repos/anntnzrb/agents` when it cannot wait. The app does not manage rulesets, so merge protection below stays a separate setting.
 
 ## Maintain merge protection
 
