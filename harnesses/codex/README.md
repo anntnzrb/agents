@@ -46,6 +46,8 @@ The custom provider advertises Responses WebSocket support. The gateway's Codex 
 
 ## Service ownership
 
+> **Legacy.** The daemon service is retired: `tools/codex-server/deployment.json` lists no hosts, so sync installs no health check. This section stays for reference; do not add a host without the owner's request.
+
 `tools/codex-server/deployment.json` selects hosts. Sync installs a periodic health check that runs the installed wrapper's `codex app-server daemon start`. It leaves a healthy daemon running and ensures its native updater exists. Linux uses a systemd user timer; macOS uses a launch agent at login. Linux user lingering is required for boot and logout availability; a Mac must be awake with a logged-in user session.
 
 Codex owns the detached daemon, its process records, and its updater. The health check leaves detached children alive when it exits or reloads. It repairs a missing daemon or updater on the next check. Sync reconciliation does not restart the daemon. Removing a host stops future health checks but leaves the detached daemon running; run `codex app-server daemon stop` separately when retiring a host.

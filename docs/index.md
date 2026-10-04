@@ -11,7 +11,7 @@ Choose a page by the task you need to complete. Sync application documentation l
 - [CLIProxyAPI](cliproxyapi.md) changes credentials, authenticates OAuth accounts, runs the gateway, and lists artifacts, configuration fields, discovery rules, and routing settings.
 - [Cache sweeper](cache-gc.md) reclaims npm, uv, and bun caches and stale `/tmp` scratch nightly on the hosts declared by `tools/cache-gc/`.
 - [Paseo daemon](paseo.md) runs the Paseo agent daemon on the hosts declared by `tools/paseo/` and publishes it to the tailnet.
-- [T3 Code server](t3.md) installs, repairs, exposes, and moves the T3 background service declared by `tools/t3/`.
+- [T3 Code server](t3.md) (legacy, no hosts) installs, repairs, exposes, and moves the T3 background service declared by `tools/t3/`.
 
 ## Develop
 
