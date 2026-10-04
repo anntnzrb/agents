@@ -27,7 +27,7 @@ from sync.core.cliproxy_deployment import (
     publish_cliproxy_endpoint_templates,
     sync_cliproxy_endpoint_template,
 )
-from sync.core.json_config import sync_json_config
+from sync.core.json_config import sync_json_config, sync_rendered_json
 from sync.core.plan import (
     CliProxyConfigJob,
     CliProxyEndpointTemplatesJob,
@@ -35,6 +35,7 @@ from sync.core.plan import (
     DirJob,
     FileJob,
     Job,
+    PiMcpJob,
     PreserveJsonKeysJob,
     SecretTemplateJob,
     SyncRuntimeInstallJob,
@@ -218,6 +219,10 @@ async def _run_job(  # noqa: C901
 ) -> bool:
     try:
         match job:
+            case PiMcpJob():
+                sync_rendered_json(str(Path(job.root) / "mcp.json"), job.config)
+                sync_rendered_json(str(Path(job.root) / "settings.json"), job.settings)
+                success = True
             case DirJob():
                 success = _run_dir_job(job, preserve_paths_by_dst, source_content_cache)
             case FileJob():
