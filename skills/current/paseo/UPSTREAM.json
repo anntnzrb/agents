@@ -1,0 +1,11 @@
+{
+  "repo": "getpaseo/paseo",
+  "release": "v0.10.3",
+  "commit": "b4af508e2a9e5a34a8b0ffb8dfaff6fd679da6c7",
+  "trees": {
+    "skills/paseo": "89de17b33d0b4d16cd25ca8d41a65ef9117a208d",
+    "skills/paseo-advisor": "fe95db83e0de5cef4817fa7bd70064902bf9c470",
+    "skills/paseo-committee": "eda139e47b498bbe29227f1c30b54abe6c5305ae",
+    "skills/paseo-handoff": "34d24a9a5f2c9f4132b27a2bb9f0027d708e912e"
+  }
+}

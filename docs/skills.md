@@ -81,6 +81,31 @@ See [Metadata budget](#metadata-budget) for the `description` constraint.
 
 Use the `skill-creator` skill for skill creation, audits, packaging, or trigger/structure work.
 
+## Track upstream ports
+
+A skill ported from a repository that keeps evolving records its source in `skills/current/<name>/UPSTREAM.json`:
+
+```json
+{
+  "repo": "<owner>/<repo>",
+  "release": "<tag>",
+  "commit": "<full commit hash of the tag>",
+  "trees": {"<upstream directory>": "<git tree hash at that tag>"}
+}
+```
+
+Get each tree hash from a clone with `git rev-parse <tag>:<upstream directory>`.
+
+The daily `upstream` workflow (`.github/workflows/upstream.yml`) compares the pinned hashes with the repository's latest release. It opens one issue per skill and release when a pinned directory changed or disappeared. To act on an issue, port relevant changes, then update the release, commit, and every tree hash. Update the pin even when nothing applies; otherwise the next release raises the same changes.
+
+Check locally; the command exits `1` while any pin is behind:
+
+```bash
+uv run --script .github/scripts/upstream.py
+```
+
+Never install a port's upstream copy through its vendor's installer. Those installers write into generated harness homes that sync owns.
+
 ## Archive a skill
 
 Move the complete directory into `skills/legacy/`:

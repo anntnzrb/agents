@@ -47,6 +47,8 @@ Control the daemon through systemd, not `paseo daemon start` or `paseo daemon st
 
 Agents launched by the service inherit its `PATH`, which includes `~/.local/bin`, so they can orchestrate other agents with `paseo run` and `paseo agent`. An agent started this way becomes a subagent of its caller. Pi agents need this CLI because Paseo does not inject its tools into Pi; omp agents receive them natively.
 
+The `paseo` skill in `skills/current/paseo/` ports Paseo's orchestration skills; [Track upstream ports](skills.md#track-upstream-ports) keeps it current. Do not install Paseo's own skills from **Settings** or `npx skills add`: that installer writes into `~/.claude/skills`, `~/.codex/skills`, and `~/.agents/skills` and refreshes them on every daemon start, conflicting with sync.
+
 ## Connect a client
 
 - **Browser:** open `https://<host>.<tailnet>.ts.net:6767/`.
