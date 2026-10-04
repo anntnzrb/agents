@@ -458,7 +458,12 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
 
     _ = manifest.write_text(json.dumps({"hosts": ["Munich"]}))
     units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
-    assert set(units) == {"paseo.service"}
+    assert set(units) == {"paseo.service", "paseo-update.service", "paseo-update.timer"}
+    updater = units["paseo-update.service"].content
+    assert "Type=oneshot" in updater
+    assert f"{home}/.config/agents/tools/paseo/update.py" in updater
+    assert "[Install]" not in updater
+    assert "OnCalendar=" in units["paseo-update.timer"].content
     service = units["paseo.service"].content
     assert f"ExecStart={home}/.local/bin/paseo daemon run" in service
     assert "Environment=PASEO_LISTEN=127.0.0.1:6767" in service

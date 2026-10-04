@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `paseo` command | Sync npm launcher (`@getpaseo/cli`, newest release on each launch) | `~/.local/bin/paseo` |
 | Daemon service | Sync, on declared hosts | `paseo.service` (systemd user unit) |
+| Nightly update | Sync, on declared hosts | `paseo-update.timer` runs `tools/paseo/update.py` |
 | Tailnet exposure | The service's `ExecStartPost` / `ExecStopPost` | `tailscale serve` on HTTPS port 6767 |
 | Daemon state and settings | The daemon and its clients | `~/.paseo/` (`config.json`, keypair, worktrees, logs) |
 
@@ -20,7 +21,7 @@ The daemon listens on `127.0.0.1:6767`. Tailscale Serve terminates TLS at `https
 
 Sync does not manage `~/.paseo/config.json`. The daemon and its clients write it (passwords, provider toggles, app settings), and overwriting it on every sync would discard those changes.
 
-The launcher resolves the newest release when the service starts, but the running daemon keeps its version until it restarts. Restart the service to pick up a release.
+The launcher resolves the newest stable release when the service starts, but the running daemon keeps its version until it restarts. `paseo-update.timer` runs on the nightly update schedule (see [User services](sync/sync.md#user-services)). It compares the daemon's reported version with the newest release and restarts the service only when they differ and no agent is initializing or running. An unreadable status or agent listing never restarts. Inspect runs with `journalctl --user -u paseo-update.service`.
 
 Control the daemon through systemd, not `paseo daemon start` or `paseo daemon stop`. A second supervisor started by hand owns `~/.paseo`, and the service's `paseo daemon run` then exits with `already_running` and restarts in a loop. `paseo reload` and `paseo daemon restart` are safe: they act on the existing supervisor.
 
@@ -34,7 +35,7 @@ Control the daemon through systemd, not `paseo daemon start` or `paseo daemon st
    paseo reload
    ```
 
-   Providers are dynamic keys, so `config set` must replace the whole `agents` object. Merge any existing providers into the JSON first: `paseo daemon config get agents`.
+   Providers are dynamic keys, so `config set` must replace the whole `agents.providers` object. Merge existing entries into the JSON first: `paseo daemon config get agents.providers`. Disable unused providers in the same object with `"<id>":{"enabled":false}`.
 3. Choose a metadata model the gateway serves. Paseo matches its built-in candidates for workspace titles, branch names, and commit messages (a `haiku` model, then other small models) against enabled providers and can select models the gateway rejects. Select a small `cliproxy/...` model under **Settings → Host → Metadata → Manual**; the daemon stores it in `agents.metadataGeneration`.
 4. Check the daemon and its providers:
 
