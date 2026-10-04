@@ -267,8 +267,8 @@ def metadata_checker(root: Path) -> None:
     scripts = root / "skills/current/skill-creator/scripts"
     scripts.mkdir(parents=True)
     original = SCRIPT.parents[2] / "skills/current/skill-creator/scripts"
-    for name in ("cli.py", "quick_validate.py", "lint_skills.py"):
-        (original / name).copy(scripts / name)
+    for script in original.glob("*.py"):
+        script.copy(scripts / script.name)
     write(
         root,
         "skills/current/skill-creator/SKILL.md",

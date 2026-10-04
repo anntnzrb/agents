@@ -11,9 +11,9 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, TypeIs, cast
+from typing import Final, TypeIs
 
-import yaml
+from scripts.frontmatter import read_frontmatter
 
 EXIT_OK: Final[int] = 0
 EXIT_FINDINGS: Final[int] = 1
@@ -179,14 +179,7 @@ def _dashes(path: Path, text: str) -> list[Finding]:
 
 
 def _frontmatter(text: str) -> list[str]:
-    lines = text.splitlines()
-    if not lines or lines[0] != "---":
-        return []
-    try:
-        end = lines.index("---", 1)
-    except ValueError:
-        return []
-    return lines[1:end]
+    return list(read_frontmatter(text).lines)
 
 
 def _has_reads_table(text: str) -> bool:
@@ -204,11 +197,11 @@ def _is_str_dict(value: object) -> TypeIs[dict[str, object]]:
 
 def _port_notice(skill_md: Path, text: str) -> list[Finding]:
     """Require preserved notices for ports identified by YAML metadata."""
-    try:
-        frontmatter = cast("object", yaml.safe_load("\n".join(_frontmatter(text))))
-    except yaml.YAMLError:
+    result = read_frontmatter(text)
+    if result.yaml_error:
         return [Finding(skill_md, 1, "invalid YAML in frontmatter")]
-    if not _is_str_dict(frontmatter):
+    frontmatter = result.metadata
+    if frontmatter is None:
         return []
     metadata = frontmatter.get("metadata")
     if not _is_str_dict(metadata):

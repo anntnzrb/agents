@@ -9,11 +9,9 @@
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypeIs
+from typing import Final
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-import yaml
+from scripts.frontmatter import read_frontmatter
 
 MAX_DESCRIPTION_CHARS: Final[int] = 120
 MAX_NAME_CHARS: Final[int] = 64
@@ -30,35 +28,14 @@ ALLOWED_PROPERTIES: Final[set[str]] = {
 }
 
 
-def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _load_yaml(text: str) -> object:
-    fn: Callable[..., object] = yaml.safe_load
-    return fn(text)
-
-
 def _load_frontmatter(skill_md: Path) -> tuple[bool, str | dict[str, object]]:
-    """Load and parse the SKILL.md frontmatter as a dictionary."""
+    """Load frontmatter and render validation errors."""
     if not skill_md.exists():
         return False, "SKILL.md not found"
-
-    content = skill_md.read_text(encoding="utf-8")
-    if not content.startswith("---"):
-        return False, "No YAML frontmatter found"
-
-    match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
-    if not match:
-        return False, "Invalid frontmatter format"
-
-    try:
-        raw = _load_yaml(match.group(1))
-    except yaml.YAMLError as exc:
-        return False, f"Invalid YAML in frontmatter: {exc}"
-    if not _is_str_dict(raw):
-        return False, "Frontmatter must be a YAML dictionary"
-    return True, dict(raw)
+    result = read_frontmatter(skill_md.read_text(encoding="utf-8"))
+    if result.metadata is None:
+        return False, result.error or "Invalid frontmatter format"
+    return True, result.metadata
 
 
 def _validate_name(name: object) -> tuple[bool, str]:

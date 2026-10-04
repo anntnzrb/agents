@@ -16,9 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-from scripts.quick_validate import (
-    _load_frontmatter,  # pyright: ignore[reportPrivateUsage]
-)
+from scripts.frontmatter import read_frontmatter
 
 type Json = str | int | float | bool | list[Json] | dict[str, Json] | None
 MIN_RUNS = 3
@@ -71,9 +69,10 @@ def build_listing(skills_dir: Path, overrides: list[str]) -> dict[str, str]:
     """Read every enabled skill's frontmatter and apply candidate descriptions."""
     listing: dict[str, str] = {}
     for path in sorted(skills_dir.glob("*/SKILL.md")):
-        loaded, metadata = _load_frontmatter(path)
-        if not loaded or not isinstance(metadata, dict):
-            raise ValueError(f"{path}: {metadata}")
+        result = read_frontmatter(path.read_text(encoding="utf-8"))
+        metadata = result.metadata
+        if metadata is None:
+            raise ValueError(f"{path}: {result.error}")
         if metadata.get("disable-model-invocation") is True:
             continue
         name, description = metadata.get("name"), metadata.get("description")
