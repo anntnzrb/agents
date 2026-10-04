@@ -2,7 +2,7 @@
 
 CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider, and the Anthropic Messages endpoint (`/v1/messages`) that Claude Code reaches through `ANTHROPIC_BASE_URL`. `tools/cliproxyapi/deployment.json` selects the gateway host, listener, and client endpoint. An optional HTTP facade adds System One classification without changing the upstream CLIProxyAPI binary.
 
-T3 Code sessions on the gateway host also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
+T3 Code sessions on hosts listed in `tools/t3/deployment.json` also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
 
 Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. See [System One classification](#system-one-classification) for the optional facade and its client contract.
 
@@ -249,7 +249,7 @@ The template exposes upstream model names as-is. Aliases, forked model variants,
 
 With `force-model-prefix`, a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential. A `prefix` belongs to the credential's generated auth file, so reauthentication removes it.
 
-Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role — same model through two pools are distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
+Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role: the same model through two pools has two distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
 
 ### Discovery metadata
 
@@ -266,9 +266,9 @@ Clients can retain their own trusted metadata and use gateway limits only as a f
 
 ### Codex model catalog
 
-The Codex provider in `harnesses/codex/config.toml` declares a command-backed `auth` block. Command auth marks the provider as catalog-fetching, so Codex requests `{base_url}/models?client_version=...` on startup and on each cache expiry. CLIProxyAPI answers that request with a native Codex model catalog (`ModelInfo` entries: slug, display name, context window, reasoning levels, instructions), which Codex merges into its bundled catalog — every gateway model then resolves real metadata instead of the generic fallback, and `model/list` exposes them all as built-ins. The merged result is cached in `~/.codex/models_cache.json` (runtime state, never tracked); bundled native entries always come from the installed binary.
+The Codex provider in `harnesses/codex/config.toml` declares a command-backed `auth` block. Command auth marks the provider as catalog-fetching, so Codex requests `{base_url}/models?client_version=...` on startup and on each cache expiry. CLIProxyAPI answers that request with a native Codex model catalog (`ModelInfo` entries: slug, display name, context window, reasoning levels, instructions), which Codex merges into its bundled catalog. Every gateway model then resolves real metadata instead of the generic fallback, and `model/list` exposes them all as built-ins. The merged result is cached in `~/.codex/models_cache.json` (runtime state, never tracked); bundled native entries always come from the installed binary.
 
-The catalog's per-model metadata comes from the discovered `models[]` records described in [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs): `max-context-length` becomes `context_window`, `thinking.levels` becomes the reasoning-effort ladder, `display-name` becomes the display name. When models.dev reports reasoning_options effort values for the model those values are preserved verbatim as the ladder (e.g. minimal/low/medium/high/xhigh); the low/medium/high default applies only when the catalog marks reasoning without declaring options. Pool models do not advertise `apply_patch_tool_type` — upstream strips it for non-template models — so foreign models edit through shell/exec tools rather than the structured patch tool.
+The catalog's per-model metadata comes from the discovered `models[]` records described in [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs): `max-context-length` becomes `context_window`, `thinking.levels` becomes the reasoning-effort ladder, `display-name` becomes the display name. When models.dev reports reasoning_options effort values for the model those values are preserved verbatim as the ladder (e.g. minimal/low/medium/high/xhigh); the low/medium/high default applies only when the catalog marks reasoning without declaring options. Pool models do not advertise `apply_patch_tool_type` (upstream strips it for non-template models), so foreign models edit through shell/exec tools rather than the structured patch tool.
 
 ## Verify model access
 
@@ -385,7 +385,7 @@ Anthropic's prompt cache is scoped per account, so a conversation must stay on o
 
 ## Upstream truth
 
-When a setting's semantics look wrong or a flag seems off, read the pinned release source — not this page. `config.example.yaml` in the upstream repository documents every accepted key, and `internal/` is authoritative for behavior. `tools/cliproxyapi/release.json` records which release is deployed.
+When a setting's semantics look wrong or a flag seems off, read the pinned release source, not this page. `config.example.yaml` in the upstream repository documents every accepted key, and `internal/` is authoritative for behavior. `tools/cliproxyapi/release.json` records which release is deployed.
 
 ## Control panel
 
