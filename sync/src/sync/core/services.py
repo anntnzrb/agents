@@ -500,6 +500,12 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
         units.extend(_cache_gc_units(sync_env))
     if _is_deployment_host(sync_env, PASEO_DEPLOYMENT):
         units.append(_paseo_unit(sync_env))
+        updater = Path(sync_env.ssot_home) / "tools" / "paseo" / "update.py"
+        units.extend(
+            _nightly_update_units(
+                sync_env, "paseo-update", "the Paseo daemon", str(updater)
+            )
+        )
     if _is_deployment_host(sync_env, T3_DEPLOYMENT):
         units.extend(_t3_refresh_units(sync_env))
         t3ctl = Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py"
