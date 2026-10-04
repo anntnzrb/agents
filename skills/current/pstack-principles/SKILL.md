@@ -6,7 +6,7 @@ license: AGPL-3.0-or-later
 
 # Pstack Principles
 
-Twenty-three engineering principles from pstack (Lauren Tan, MIT). One bundled skill, not twenty-three, to protect the skill-inventory metadata budget.
+Twenty-four engineering principles from pstack (Lauren Tan, MIT). One bundled skill, not twenty-four, to protect the skill-inventory metadata budget.
 
 **Rules of use:**
 
@@ -36,6 +36,7 @@ Twenty-three engineering principles from pstack (Lauren Tan, MIT). One bundled s
 | Separate Before Serializing Shared State rule | [references/principle-separate-before-serializing-shared-state.md](references/principle-separate-before-serializing-shared-state.md) | Concurrent actors might write the same file, branch, key, or object |
 | Prove It Works rule | [references/principle-prove-it-works.md](references/principle-prove-it-works.md) | After a task, before declaring done |
 | Test Behavior, Not Implementation rule | [references/principle-test-behavior-not-implementation.md](references/principle-test-behavior-not-implementation.md) | Writing, changing, or keeping a test |
+| Explain the Number rule | [references/principle-explain-the-number.md](references/principle-explain-the-number.md) | Before trusting, reporting, or acting on a measured speedup, regression, latency, or eval result; performance numbers also need [references/benchmark-checklist.md](references/benchmark-checklist.md) |
 | Fix Root Causes rule | [references/principle-fix-root-causes.md](references/principle-fix-root-causes.md) | Debugging: trace each symptom to its root cause |
 | Attack the Premise rule | [references/principle-attack-the-premise.md](references/principle-attack-the-premise.md) | Two or more fixes sharing one premise failed the same gate |
 | Sequence Work into Verifiable Units rule | [references/principle-sequence-verifiable-units.md](references/principle-sequence-verifiable-units.md) | Multi-step work and how you stack commits and PRs |
