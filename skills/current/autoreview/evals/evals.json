@@ -4,16 +4,16 @@
     "name": "cli_help_discovery",
     "prompt": "Inspect AutoReview CLI capabilities, target modes, and priority threshold flags",
     "expected_output": {
-      "contains": ["--mode", "--max-priority", "--base", "--dry-run"]
+      "contains": ["bundle", "verify", "--mode", "--max-priority", "--base", "--findings"]
     }
   },
   {
     "eval_id": 1,
-    "name": "local_dry_run_inspection",
-    "prompt": "Execute a dry-run review on local uncommitted changes to inspect bundle metadata",
+    "name": "local_bundle_inspection",
+    "prompt": "Prepare a bundle of local uncommitted changes and review it yourself",
     "expected_output": {
       "mode": "local",
-      "dry_run": true
+      "command": "bundle"
     }
   },
   {

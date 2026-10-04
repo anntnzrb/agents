@@ -91,6 +91,7 @@ def git_run(
         [
             resolve_git(repo),
             "--no-optional-locks",
+            "--literal-pathspecs",
             *SAFE_GIT_CONFIG_ARGS,
             *args,
         ],
@@ -117,13 +118,6 @@ def is_dirty(repo: Path) -> bool:
         repo, ["status", "--porcelain", "--untracked-files=all"], check=False
     )
     return bool(proc.stdout.strip())
-
-
-def current_branch(repo: Path) -> str | None:
-    """Return the name of the current branch or None if detached."""
-    proc = git_run(repo, ["branch", "--show-current"], check=False)
-    out = proc.stdout.strip()
-    return out or None
 
 
 def validate_git_ref(repo: Path, ref: str, label: str = "ref") -> str:

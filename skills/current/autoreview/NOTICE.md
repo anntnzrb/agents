@@ -1,6 +1,6 @@
 # NOTICE
 
-Portions of this skill derive from AutoReview in openclaw/openclaw
+The target semantics and review guidance in this skill are adapted from AutoReview in openclaw/openclaw
 (https://github.com/openclaw/openclaw/tree/41cdd02909b9a8749b91dc6eccfb310a90cddce1/.agents/skills/autoreview),
 licensed under the MIT License.
 
