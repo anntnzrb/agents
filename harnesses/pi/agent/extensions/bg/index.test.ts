@@ -1,8 +1,10 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { access } from "node:fs/promises";
 import bg, { middle } from "./index.ts";
 
+// Above the 10 s `until` deadline plus fixed pauses, so slow runners fail on assertions, not the runner clock.
+setDefaultTimeout(30000);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Waits for an asynchronous effect with a generous deadline, so slow runners do not flake.
 async function until(ready: () => boolean, ms = 10000) {
@@ -15,20 +17,23 @@ function load(settings: Record<string, unknown> | null = {}, mode = "rpc", hasUI
   const tools = new Map<string, ToolDefinition>();
   const messages: Array<{ content: string; options: unknown }> = [];
   let shutdown = async () => {};
+  const handlers = new Map<string, () => unknown>();
   bg({
     getSettings: () => (settings === null ? {} : { bg: { thresholdMs: 40, maxJobMs: 5000, ...settings } }),
     registerTool: (tool: ToolDefinition) => tools.set(tool.name, tool),
-    on: (name: string, callback: () => Promise<void>) => { if (name === "session_shutdown") shutdown = callback; },
+    on: (name: string, callback: () => Promise<void>) => { handlers.set(name, callback); if (name === "session_shutdown") shutdown = callback; },
     sendMessage: (message: { content: string }, options: unknown) => messages.push({ content: message.content, options }),
   } as unknown as ExtensionAPI);
   cleanups.push(() => shutdown());
-  const ctx = { cwd: process.cwd(), mode, hasUI, sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } } as unknown as ExtensionContext;
+  const pending = { value: false };
+  const ctx = { cwd: process.cwd(), mode, hasUI, hasPendingMessages: () => pending.value, sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } } as unknown as ExtensionContext;
   const run = (name: string, args: unknown, signal?: AbortSignal) => tools.get(name)!.execute("test", args, signal, undefined, ctx);
   const bash = (command: string, background = false, signal?: AbortSignal, timeout?: number) => run("bash", { command, background, timeout }, signal);
   const jobs = (action: string, id?: string, extra = {}, signal?: AbortSignal) => run("jobs", { action, id, ...extra }, signal);
   const text = (r: Awaited<ReturnType<typeof run>>) => r.content.map(c => c.type === "text" ? c.text : "").join("");
   const id = (r: Awaited<ReturnType<typeof run>>) => text(r).match(/bg-\d+/)![0];
-  return { bash, jobs, text, id, messages, shutdown: () => shutdown() };
+  const emit = async (name: string) => { await handlers.get(name)?.(); };
+  return { bash, jobs, text, id, messages, emit, pending, shutdown: () => shutdown() };
 }
 
 test("threshold backgrounds, streams to disk, and delivers automatically", async () => {
@@ -153,4 +158,32 @@ test("signal and timeout foreground failures preserve built-in behavior", async 
   await expect(h.bash("exec sleep 20", false, undefined, 0.03)).rejects.toThrow("Command timed out after 0.03 seconds");
   await expect(h.bash("echo nope", false, undefined, -1)).rejects.toThrow("Invalid timeout");
   await expect(h.jobs("output", "missing")).rejects.toThrow("Unknown");
+});
+test("completions during a run wait for the run to settle, then arrive once", async () => {
+  const h = load(); await h.emit("agent_start");
+  await h.bash("echo held", true);
+  await pause(1500); expect(h.messages).toHaveLength(0);
+  await h.emit("agent_settled");
+  await until(() => h.messages.length > 0); await pause(1200);
+  expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("held");
+});
+test("a result read by wait during the run is never delivered again", async () => {
+  const h = load(); await h.emit("agent_start");
+  const id = h.id(await h.bash("echo once", true));
+  await pause(1500);
+  expect(h.text(await h.jobs("wait", id))).toContain("once");
+  await h.emit("agent_settled"); await pause(1500);
+  expect(h.messages).toHaveLength(0);
+});
+test("a job stopped with jobs kill is not delivered", async () => {
+  const h = load(); const id = h.id(await h.bash("exec sleep 20", true));
+  await h.jobs("kill", id); await pause(1500);
+  expect(h.messages).toHaveLength(0);
+});
+test("wait returns as soon as a user message is queued", async () => {
+  const h = load(); const id = h.id(await h.bash("exec sleep 20", true));
+  const start = Date.now(); setTimeout(() => { h.pending.value = true; }, 300);
+  expect(h.text(await h.jobs("wait", id))).toContain("new user message");
+  expect(Date.now() - start).toBeLessThan(2000);
+  await h.jobs("kill", id);
 });

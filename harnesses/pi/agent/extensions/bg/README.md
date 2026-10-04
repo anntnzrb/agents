@@ -19,9 +19,16 @@ byte and newline counts. Process output is fenced as untrusted data.
 - `output`: requires an ID; optional byte `offset` starts a bounded read. The result's
   `details.offset` and text report the next byte offset. Advance it to read only new bytes.
 - `kill`: requires an ID; sends SIGTERM to the process group and SIGKILL after three seconds.
-- `wait`: blocks without inference until the named job, or any unconsumed job, settles.
+- `wait`: blocks without inference until the named job, or any unconsumed job, settles. It returns
+  early when a user message is queued (steering or follow-up), so waiting never holds the user off;
+  the jobs keep running.
   Optional `timeout` is in seconds, bounded to ten minutes. Cancellation does not consume a result.
-  A result returned by wait is not also delivered automatically.
+  A result returned by wait, or a job stopped with `kill`, is not also delivered automatically.
+
+Automatic delivery happens only between runs: completions that land while the agent is working are
+held until Pi reports `agent_settled`, then sent as one follow-up that starts a new turn. A follow-up
+queued mid-run cannot be withdrawn, so delivering earlier would duplicate a result that `wait`
+reads in the same run.
 
 Foreground commands beginning with `sleep` of five seconds or longer are rejected: use `jobs wait`
 when blocked, or do other work while automatic delivery is pending.
