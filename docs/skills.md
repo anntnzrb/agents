@@ -110,8 +110,8 @@ git diff <pinned commit> <target> -- <changed directories>
 
 To resolve an issue:
 
-1. Read the upstream diff. Port changes that improve the skill and fit this setup; skip vendor-specific ones.
-2. Apply the skill gate to the ported text.
+1. Read the upstream diff. Port changes that improve the skill and fit this setup; skip vendor-specific ones such as model slugs, vendor tool parameters, and vendor paths.
+2. Apply the skill gate to the ported text, including the final authoring review. Never copy an upstream `description`. Upstream descriptions are usually summaries; here the description is the trigger, so keep the local one or rewrite it under the [Metadata budget](#metadata-budget).
 3. Update the pin: `commit`, `release` for release pins, every tree hash, and `watch` entries for each new directory reviewed, ported or not.
 
 Check locally; the command exits `1` while any pin is behind:
