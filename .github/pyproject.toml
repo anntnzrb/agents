@@ -7,4 +7,5 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.basedpyright]
 typeCheckingMode = "strict"
 include = ["scripts", "tests"]
+extraPaths = ["scripts"]
 pythonVersion = "3.14"
