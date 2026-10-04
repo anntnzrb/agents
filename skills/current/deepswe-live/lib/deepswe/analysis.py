@@ -5,12 +5,11 @@ reinterpret benchmark data.  Leaderboard rows are copied and selected for
 ranking; values calculated by this module are kept in ``derived``.
 """
 
-import json
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from numbers import Real
 
-from .contracts import is_mapping, is_sequence, parse_json_list
+from .contracts import diagnostic_identity, finite_number, is_mapping, is_sequence
 from .diagnostics import merge_diagnostics
 from .identity import classify_duplicates
 from .normalization import normalize_rows
@@ -60,8 +59,6 @@ DEFAULT_PARETO_AXES: tuple[tuple[str, str], ...] = (
     ("mean_agent_steps", "asc"),
 )
 EXPECTED_PAIR_LENGTH = 2
-IDENTITY_COMPONENT_COUNT = 4
-LEGACY_IDENTITY_COMPONENT_COUNT = 3
 
 
 def _rows(value: object, *, normalize: bool = True) -> list[JsonRow]:
@@ -102,8 +99,8 @@ def _metric_value(
     if strict_semantics:
         if evidence is None or evidence.get("comparison_eligibility") != "eligible":
             return None
-        return _number(evidence.get("normalized_value"))
-    return _number(row.get(metric))
+        return finite_number(evidence.get("normalized_value"))
+    return finite_number(row.get(metric))
 
 
 def _metric_blockers(row: Mapping[str, JsonValue], metric: str) -> list[JsonValue]:
@@ -117,23 +114,11 @@ def _metric_blockers(row: Mapping[str, JsonValue], metric: str) -> list[JsonValu
     return [reason or "COMPARISON_INCOMPARABLE"]
 
 
-def _number(value: object) -> Real | None:
-    """Return finite JSON-like numbers, treating null and booleans as unavailable."""
-    if isinstance(value, bool) or not isinstance(value, Real):
-        return None
-    try:
-        if not isfinite(float(value)):
-            return None
-    except OverflowError, ValueError:
-        return None
-    return value
-
-
 def _threshold(value: object) -> Real | None:
     """Validate an optional numeric threshold without coercing caller values."""
     if value is None:
         return None
-    numeric = _number(value)
+    numeric = finite_number(value)
     if numeric is None:
         message = "analysis thresholds must be finite numbers or null"
         raise TypeError(message)
@@ -270,12 +255,12 @@ def _ci_width(
     lo = (
         _metric_value(row, "ci_lo", strict_semantics=strict_semantics)
         if strict_semantics
-        else _number(row.get("ci_lo"))
+        else finite_number(row.get("ci_lo"))
     )
     hi = (
         _metric_value(row, "ci_hi", strict_semantics=strict_semantics)
         if strict_semantics
-        else _number(row.get("ci_hi"))
+        else finite_number(row.get("ci_hi"))
     )
     if lo is None or hi is None:
         return None
@@ -343,24 +328,6 @@ def _filters(
     }
 
 
-def _safe_duplicate_identity(value: object) -> str:
-    """Keep duplicate diagnostics metrics-only when anonymous rows are used."""
-    if not isinstance(value, str):
-        return "<anonymous>"
-    try:
-        parsed = parse_json_list(value)
-    except TypeError, ValueError:
-        return "<anonymous>"
-    if len(parsed) == IDENTITY_COMPONENT_COUNT:
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-    if len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed[:2] != [
-        "published_id",
-        "row",
-    ]:
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-    return "<anonymous>"
-
-
 def _duplicate_facts(
     rows: Sequence[Mapping[str, JsonValue]],
 ) -> tuple[set[int], dict[str, list[dict[str, object]]], list[dict[str, object]]]:
@@ -394,7 +361,7 @@ def _duplicate_facts(
                         else "Identical rows share a configuration identity."
                     ),
                     "details": {
-                        "identity": _safe_duplicate_identity(group.get("identity")),
+                        "identity": diagnostic_identity(group.get("identity")),
                         "row_indexes": row_indexes,
                         "count": len(row_indexes),
                     },
@@ -511,7 +478,7 @@ def rank_rows(  # noqa: C901, PLR0913
         result["duplicate_report"] = {
             bucket: [
                 {
-                    "identity": _safe_duplicate_identity(group.get("identity")),
+                    "identity": diagnostic_identity(group.get("identity")),
                     "row_indexes": _safe_group_indexes(group),
                     "count": len(_safe_group_indexes(group)),
                 }
@@ -725,12 +692,12 @@ def derive_efficiency(
             numerator = (
                 _metric_value(row, numerator_field, strict_semantics=True)
                 if strict_semantics and "." not in numerator_field
-                else _number(_value_at_path(row, numerator_field))
+                else finite_number(_value_at_path(row, numerator_field))
             )
             denominator = (
                 _metric_value(row, denominator_field, strict_semantics=True)
                 if strict_semantics and "." not in denominator_field
-                else _number(_value_at_path(row, denominator_field))
+                else finite_number(_value_at_path(row, denominator_field))
             )
             entry: JsonRow = {
                 "value_status": "derived",

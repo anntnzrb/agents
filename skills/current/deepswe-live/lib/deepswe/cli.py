@@ -18,12 +18,13 @@ from .contracts import (
     EVIDENCE_FIELDS,
     SEMANTIC_STATUSES,
     VALUE_STATUSES,
+    finite_number,
     is_list,
     is_mapping,
     is_sequence,
-    parse_json_list,
 )
 from .contracts import SCHEMA_VERSION as CONTRACT_SCHEMA_VERSION
+from .contracts import diagnostic_identity as _safe_compare_identity
 from .diagnostics import merge_diagnostics, redact
 from .diff import compare_snapshots
 from .identity import canonical_identity, classify_duplicates, identity_json
@@ -39,8 +40,6 @@ if TYPE_CHECKING:
 EXPECTED_SNAPSHOT_COUNT = 2
 
 SCHEMA_VERSION = CONTRACT_SCHEMA_VERSION
-IDENTITY_COMPONENT_COUNT = 4
-LEGACY_IDENTITY_COMPONENT_COUNT = 3
 DEFAULT_VERSION = SOURCE_DEFAULT_VERSION
 BENCHMARK = "DeepSWE"
 ARTIFACT_BASE = "https://deepswe.datacurve.ai/artifacts"
@@ -1222,13 +1221,9 @@ def _handle_trials(args: argparse.Namespace) -> dict[str, object]:
 
 
 def _numeric(value: object) -> float | int | None:
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, (int, float))
-        or not math.isfinite(float(value))
-    ):
-        return None
-    return value
+    if isinstance(value, (int, float)) and finite_number(value) is not None:
+        return value
+    return None
 
 
 def _stats_for_rows(
@@ -1397,9 +1392,7 @@ def _diagnose_duplicates(
                 else []
             )
             identity = group.get("identity")
-            safe_identity = identity if isinstance(identity, str) else "<anonymous>"
-            if safe_identity.startswith('["published_id","row",'):
-                safe_identity = "<anonymous>"
+            safe_identity = _safe_compare_identity(identity)
             bucket_groups.append(
                 {
                     "identity": safe_identity,
@@ -1607,24 +1600,6 @@ def _compare_paths(args: argparse.Namespace) -> tuple[Path, Path]:
         message = "compare requires exactly two snapshots (left and right)"
         raise CliUsageError(message)
     return Path(values[0]).expanduser(), Path(values[1]).expanduser()
-
-
-def _safe_compare_identity(value: object) -> str:
-    """Keep comparison diagnostics free of anonymous row bodies."""
-    if not isinstance(value, str):
-        return "<anonymous>"
-    try:
-        parsed = parse_json_list(value)
-    except TypeError, ValueError:
-        return "<anonymous>"
-    if len(parsed) == IDENTITY_COMPONENT_COUNT:
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-    if len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed[:2] != [
-        "published_id",
-        "row",
-    ]:
-        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-    return "<anonymous>"
 
 
 def _safe_compare_diagnostics(
