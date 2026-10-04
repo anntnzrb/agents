@@ -445,6 +445,42 @@ def test_darwin_declares_cache_gc_agent_only_on_declared_hosts(
     assert "KeepAlive" not in sweep
 
 
+def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
+    home: Path, monkeypatch: pytest.MonkeyPatch, calls: list[list[str]]
+) -> None:
+    """A declared host runs the daemon on loopback and publishes it to the tailnet."""
+    monkeypatch.setattr("socket.gethostname", lambda: "munich")
+    deployment = home / ".config" / "agents" / "tools" / "paseo"
+    deployment.mkdir(parents=True)
+    manifest = deployment / "deployment.json"
+    _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
+    assert declared_user_units(_linux(home), gateway_host=False) == []
+
+    _ = manifest.write_text(json.dumps({"hosts": ["Munich"]}))
+    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    assert set(units) == {"paseo.service"}
+    service = units["paseo.service"].content
+    assert f"ExecStart={home}/.local/bin/paseo daemon run" in service
+    assert "Environment=PASEO_LISTEN=127.0.0.1:6767" in service
+    assert "Environment=PASEO_RELAY_ENABLED=false" in service
+    assert "Environment=PASEO_WEB_UI_ENABLED=true" in service
+    assert "Environment=PASEO_TRUSTED_PROXIES=loopback" in service
+    assert (
+        "ExecStartPost=/usr/bin/env tailscale serve --bg --https=6767 http://127.0.0.1:6767"
+        in service
+    )
+    assert "ExecStopPost=-/usr/bin/env tailscale serve --https=6767 off" in service
+    assert "WantedBy=default.target" in service
+    _reconcile(home, list(units.values()))
+    assert ["systemctl", "--user", "enable", "paseo.service"] in calls
+    assert ["systemctl", "--user", "restart", "paseo.service"] in calls
+
+    calls.clear()
+    _ = manifest.write_text(json.dumps({"hosts": []}))
+    _reconcile(home, declared_user_units(_linux(home), gateway_host=False))
+    assert ["systemctl", "--user", "disable", "--now", "paseo.service"] in calls
+
+
 def test_darwin_declares_updater_and_runner_launch_agents(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -39,6 +39,11 @@ TOOL_LAUNCHERS: tuple[ToolLauncherSpec, ...] = (
         config_home_segments=(".mcporter", "mcporter.json"),
     ),
     ToolLauncherSpec(
+        id="paseo",
+        package="@getpaseo/cli",
+        bin="paseo",
+    ),
+    ToolLauncherSpec(
         id="summarize",
         package="@steipete/summarize",
         bin="summarize",
