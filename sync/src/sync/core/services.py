@@ -57,6 +57,11 @@ AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
 CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
 CACHE_GC_DEPLOYMENT = ("tools", "cache-gc", "deployment.json")
+PASEO_DEPLOYMENT = ("tools", "paseo", "deployment.json")
+PASEO_UNIT = "paseo.service"
+# Paseo's default daemon port; reused as the tailnet HTTPS port so clients
+# configured with the default port reach the daemon through Tailscale Serve.
+PASEO_PORT = 6767
 CACHE_GC_UNIT = "cache-gc"
 CACHE_GC_LABEL = "dev.agents.cache-gc"
 T3_REFRESH_UNIT = "t3-refresh-models"
@@ -372,6 +377,40 @@ WantedBy=timers.target
     ]
 
 
+def _paseo_unit(sync_env: SyncEnv) -> UserUnit:
+    """Run the Paseo daemon on loopback and publish it to the tailnet only.
+
+    Tailscale Serve terminates TLS and forwards from loopback, so the daemon
+    trusts loopback for X-Forwarded-Proto and accepts the tailnet hostname.
+    The relay stays off: clients connect only through the tailnet.
+    """
+    upstream = f"http://127.0.0.1:{PASEO_PORT}"
+    content = f"""\
+[Unit]
+Description=Paseo agent daemon
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=PATH={_service_path(sync_env.home)}
+Environment=PASEO_LISTEN=127.0.0.1:{PASEO_PORT}
+Environment=PASEO_RELAY_ENABLED=false
+Environment=PASEO_WEB_UI_ENABLED=true
+Environment=PASEO_HOSTNAMES=.ts.net
+Environment=PASEO_TRUSTED_PROXIES=loopback
+ExecStart={sync_env.home}/.local/bin/paseo daemon run
+ExecStartPost=/usr/bin/env tailscale serve --bg --https={PASEO_PORT} {upstream}
+ExecStopPost=-/usr/bin/env tailscale serve --https={PASEO_PORT} off
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+"""
+    return UserUnit(PASEO_UNIT, content)
+
+
 def _codex_server_units(sync_env: SyncEnv) -> list[UserUnit]:
     # Native Codex owns the detached daemon and its updater. The timer repairs
     # missing processes; starting an already-running daemon is idempotent.
@@ -459,6 +498,8 @@ def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUn
         units.extend(_codex_server_units(sync_env))
     if _is_deployment_host(sync_env, CACHE_GC_DEPLOYMENT):
         units.extend(_cache_gc_units(sync_env))
+    if _is_deployment_host(sync_env, PASEO_DEPLOYMENT):
+        units.append(_paseo_unit(sync_env))
     if _is_deployment_host(sync_env, T3_DEPLOYMENT):
         units.extend(_t3_refresh_units(sync_env))
         t3ctl = Path(sync_env.ssot_home) / "tools" / "t3" / "t3ctl.py"

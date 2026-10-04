@@ -878,6 +878,11 @@ def test_tool_launcher_launch_uses_the_registered_npm_spec(
         "--metrics",
         "detailed",
     )
+    paseo = tool_launcher("paseo")
+    assert paseo is not None
+    assert paseo.package == "@getpaseo/cli"
+    assert paseo.bin == "paseo"
+    assert paseo.default_args == ()
     assert tool_launcher("codex") is None
 
 
