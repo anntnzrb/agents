@@ -4,33 +4,30 @@
 
 import math
 
-from artificial_analysis.cli import (
-    _attach_row_evidence,
-    _evidence_record,
-    _sort_metric,
-)
+from artificial_analysis.cli import _sort_metric
 from artificial_analysis.contracts import as_dict
+from artificial_analysis.evidence import attach_row_evidence, evidence_record
 
 
 def test_metric_evidence_retains_known_missing_unknown_and_derived_statuses() -> None:
-    known = _evidence_record(
+    known = evidence_record(
         "42",
         source_path="$.rows[0].score",
         source_field="score",
         artifact_hash="a" * 64,
     )
-    missing = _evidence_record(
+    missing = evidence_record(
         None,
         source_path="$.rows[0].missing",
         source_field="missing",
     )
-    unknown = _evidence_record(
+    unknown = evidence_record(
         7,
         source_path="$.rows[0].mystery",
         source_field="mystery",
         semantics="unknown",
     )
-    derived = _evidence_record(
+    derived = evidence_record(
         21,
         source_path="$.derived.total",
         source_field="total",
@@ -61,7 +58,7 @@ def test_evidence_sorting_places_only_eligible_finite_values_first() -> None:
         {
             "score": None,
             "metric_evidence": {
-                "score": _evidence_record(
+                "score": evidence_record(
                     None, source_path="$.score", source_field="score"
                 )
             },
@@ -69,7 +66,7 @@ def test_evidence_sorting_places_only_eligible_finite_values_first() -> None:
         {
             "score": True,
             "metric_evidence": {
-                "score": _evidence_record(
+                "score": evidence_record(
                     True, source_path="$.score", source_field="score"
                 )
             },
@@ -77,7 +74,7 @@ def test_evidence_sorting_places_only_eligible_finite_values_first() -> None:
         {
             "score": float("nan"),
             "metric_evidence": {
-                "score": _evidence_record(
+                "score": evidence_record(
                     float("nan"), source_path="$.score", source_field="score"
                 )
             },
@@ -85,17 +82,13 @@ def test_evidence_sorting_places_only_eligible_finite_values_first() -> None:
         {
             "score": 2,
             "metric_evidence": {
-                "score": _evidence_record(
-                    2, source_path="$.score", source_field="score"
-                )
+                "score": evidence_record(2, source_path="$.score", source_field="score")
             },
         },
         {
             "score": 9,
             "metric_evidence": {
-                "score": _evidence_record(
-                    9, source_path="$.score", source_field="score"
-                )
+                "score": evidence_record(9, source_path="$.score", source_field="score")
             },
         },
     ]
@@ -119,7 +112,7 @@ def test_row_projection_preserves_raw_unknowns_and_published_values() -> None:
         "raw_fields": {"futureMetric": 123},
         "unknowns": {"sourceFlag": "x"},
     }
-    _ = _attach_row_evidence(
+    _ = attach_row_evidence(
         row,
         metric_paths=("coding", "agentic", "mystery"),
         derived_paths={"mystery": ("coding / 2", ("$.coding",))},

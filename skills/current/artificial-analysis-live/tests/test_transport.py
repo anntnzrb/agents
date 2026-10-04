@@ -14,9 +14,9 @@ from artificial_analysis.cli import (
     _evaluation_namespace,
     _evaluation_payload,
     _fetch_payload,
-    _validate_304,
 )
 from artificial_analysis.contracts import as_dict, is_str_mapping, parse_json
+from artificial_analysis.fetch_results import validate_304
 
 
 @final
@@ -121,7 +121,7 @@ def test_200_then_304_reuses_exact_bytes_and_sends_both_validators(
             if_modified_since=first.last_modified,
         )
     cached = rsc.load_cached_artifact(tmp_path)
-    validated = _validate_304(
+    validated = validate_304(
         second,
         cached,
         sent_etag=first.etag,
@@ -140,7 +140,7 @@ def test_200_then_304_reuses_exact_bytes_and_sends_both_validators(
 def test_304_missing_and_mismatched_validator_are_structured(tmp_path: Path) -> None:
     response = rsc.FetchResult("", 304, {}, "2026-08-09T00:00:00+00:00")
     with pytest.raises(rsc.CacheError) as missing:
-        _ = _validate_304(response, None, sent_etag=None, sent_last_modified=None)
+        _ = validate_304(response, None, sent_etag=None, sent_last_modified=None)
     assert missing.value.code == "CACHE_MISSING"
 
     rsc.save_cache(
@@ -160,9 +160,7 @@ def test_304_missing_and_mismatched_validator_are_structured(tmp_path: Path) -> 
         etag='"other"',
     )
     with pytest.raises(rsc.CacheError) as invalid:
-        _ = _validate_304(
-            mismatch, cached, sent_etag='"known"', sent_last_modified=None
-        )
+        _ = validate_304(mismatch, cached, sent_etag='"known"', sent_last_modified=None)
     assert invalid.value.code == "CACHE_VALIDATOR_INVALID"
 
 
