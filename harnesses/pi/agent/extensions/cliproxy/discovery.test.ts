@@ -45,7 +45,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
     const { default: cliproxy } = await import("./index.ts");
     let config!: ProviderConfig;
     const handlers = new Map<string, (event: { model?: ExtensionContext["model"] }, ctx: ExtensionContext) => void>();
-    cliproxy({
+    await cliproxy({
       registerProvider: (_name: string, value: ProviderConfig) => { config = value; },
       on: (name: string, handler: (event: { model?: ExtensionContext["model"] }, ctx: ExtensionContext) => void) => {
         handlers.set(name, handler);
@@ -53,7 +53,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
       },
     } as unknown as ExtensionAPI);
     // cliproxy registers chat models only.
-    const refresh = async () => (await config.refreshModels!({ signal: new AbortController().signal } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0])) as Extract<ProviderModelConfig, { type?: "chat" }>[];
+    const refresh = async () => (await config.refreshModels!({ signal: new AbortController().signal, allowNetwork: true, publish: async () => true } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0])) as Extract<ProviderModelConfig, { type?: "chat" }>[];
     expect((await refresh())[0]?.contextWindow).toBe(200000);
     expect(catalogRequests).toBe(0);
 
@@ -89,7 +89,7 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
     expect((await refresh())[0]?.contextWindow).toBe(1050000);
     const aborted = new AbortController();
     aborted.abort();
-    await config.refreshModels!({ signal: aborted.signal } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0]);
+    await config.refreshModels!({ signal: aborted.signal, allowNetwork: true, publish: async () => true } as Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0]);
     expect(catalogRequests).toBe(2);
 
     process.env.PI_OFFLINE = "1";

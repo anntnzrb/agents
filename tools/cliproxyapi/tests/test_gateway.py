@@ -1,5 +1,6 @@
 """Wire-level tests; all listeners and upstreams are isolated loopback fakes."""
 
+import gzip
 import http.client
 import json
 import queue
@@ -16,6 +17,28 @@ import pytest
 
 SCRIPT = Path(__file__).parents[1] / "gateway.py"
 MODEL = "typesafe/jev-1.13"
+OPENAI_CATALOG = [
+    {"id": "chat-model", "object": "model", "owned_by": "openai"},
+    {"id": "claude-opus-5-5", "object": "model", "owned_by": "anthropic"},
+    {"id": "claude-opus-5-5-high", "object": "model", "owned_by": "antigravity"},
+    {"id": "pool/vendor/new-model", "object": "model", "owned_by": "pool"},
+    {"id": "claude-invalid-list", "owned_by": []},
+    {"id": "claude-invalid-object", "owned_by": {}},
+]
+# CLIProxyAPI's Codex-shaped catalog (?client_version=pi) carries per-model limits.
+CODEX_CATALOG = [
+    {
+        "slug": "chat-model",
+        "context_window": 272000,
+        "input_modalities": ["text", "image"],
+    },
+    {
+        "slug": "claude-opus-5-5",
+        "context_window": 1000000,
+        "input_modalities": ["text"],
+    },
+    {"slug": "claude-opus-5-5-high", "context_window": 200000},
+]
 
 
 @contextmanager
@@ -24,6 +47,19 @@ def upstream():
     release = threading.Event()
 
     class Handler(BaseHTTPRequestHandler):
+        def json_response(self, status, payload):
+            body = json.dumps(payload).encode()
+            compress = "gzip" in self.headers.get("Accept-Encoding", "")
+            if compress:
+                body = gzip.compress(body)
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            if compress:
+                self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def respond(self):
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
             requests.put((self.command, self.path, dict(self.headers), body))
@@ -49,10 +85,16 @@ def upstream():
                 self.wfile.write(
                     b'{"answers":{"spam":{"type":"noul","noul":0.75}},"usage":{"input_tokens":12,"output_tokens":0,"cost":0.000042}}'
                 )
+            elif self.path.startswith("/v1/models?client_version=pi"):
+                self.json_response(
+                    int(self.headers.get("X-Test-Catalog-Status", "200")),
+                    {"models": CODEX_CATALOG},
+                )
             elif self.path.startswith("/v1/models"):
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b'{"data":[{"id":"chat-model"}]}')
+                self.json_response(
+                    int(self.headers.get("X-Test-Listing-Status", "200")),
+                    {"object": "list", "data": OPENAI_CATALOG},
+                )
             elif self.path.startswith("/v1/chat/completions"):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
@@ -209,13 +251,72 @@ def test_native_errors_and_redirects(gateway, mode, status):
     assert router.empty()
 
 
+def test_model_list_reports_limits_and_endpoints(gateway):
+    """Clients read context limits and Anthropic routing from the OpenAI model list."""
+    port, cpa, _, _ = gateway
+    status, _, body = request(port, "GET", "/v1/models")
+    assert status == 200
+    models = {model["id"]: model for model in json.loads(body)["data"]}
+    assert models["chat-model"]["context_length"] == 272000
+    assert models["chat-model"]["supported_endpoint_types"] == ["openai"]
+    # Claude served by Anthropic credentials speaks Anthropic Messages natively.
+    assert models["claude-opus-5-5"]["context_length"] == 1000000
+    assert models["claude-opus-5-5"]["supported_endpoint_types"] == [
+        "anthropic",
+        "openai",
+    ]
+    # The same family through another pool may not serve /v1/messages.
+    assert models["claude-opus-5-5-high"]["supported_endpoint_types"] == ["openai"]
+    # Models the Codex catalog omits keep their entry without invented limits.
+    assert "context_length" not in models["pool/vendor/new-model"]
+    assert models["pool/vendor/new-model"]["owned_by"] == "pool"
+    assert models["claude-invalid-list"]["supported_endpoint_types"] == ["openai"]
+    assert models["claude-invalid-object"]["supported_endpoint_types"] == ["openai"]
+    paths = {cpa.get(timeout=1)[1], cpa.get(timeout=1)[1]}
+    assert paths == {"/v1/models", "/v1/models?client_version=pi"}
+
+
+def test_compressed_client_request_still_receives_enriched_catalog(gateway):
+    port, cpa, _, _ = gateway
+    status, headers, body = request(
+        port, "GET", "/v1/models", headers={"Accept-Encoding": "gzip"}
+    )
+    assert status == 200 and "Content-Encoding" not in headers
+    models = {model["id"]: model for model in json.loads(body)["data"]}
+    assert models["chat-model"]["context_length"] == 272000
+    assert all(cpa.get(timeout=1)[2]["Accept-Encoding"] == "identity" for _ in range(2))
+
+
+def test_model_list_survives_metadata_catalog_failure(gateway):
+    port, _, _, _ = gateway
+    status, _, body = request(
+        port, "GET", "/v1/models", headers={"X-Test-Catalog-Status": "503"}
+    )
+    assert status == 200
+    models = {model["id"]: model for model in json.loads(body)["data"]}
+    assert set(models) == {model["id"] for model in OPENAI_CATALOG}
+    assert all("context_length" not in model for model in models.values())
+    assert models["claude-opus-5-5"]["supported_endpoint_types"] == [
+        "anthropic",
+        "openai",
+    ]
+
+
+def test_model_list_preserves_upstream_failure_status(gateway):
+    port, _, _, _ = gateway
+    status, _, body = request(
+        port, "GET", "/v1/models", headers={"X-Test-Listing-Status": "503"}
+    )
+    assert status == 503
+    assert json.loads(body)["data"] == OPENAI_CATALOG
+
+
 def test_catalog_and_sse_passthrough(gateway):
     port, cpa, _, release = gateway
-    assert (
-        request(port, "GET", "/v1/models?client_version=1")[2]
-        == b'{"data":[{"id":"chat-model"}]}'
-    )
-    assert cpa.get(timeout=1)[1] == "/v1/models?client_version=1"
+    assert json.loads(request(port, "GET", "/v1/models?client_version=pi")[2]) == {
+        "models": CODEX_CATALOG
+    }
+    assert cpa.get(timeout=1)[1] == "/v1/models?client_version=pi"
     with closing(http.client.HTTPConnection("127.0.0.1", port, timeout=2)) as client:
         client.request(
             "POST",
@@ -340,11 +441,11 @@ def test_websocket_upgrade_preserves_early_frames(gateway, path):
 def test_ipv6_listener(gateway):
     port, cpa, _, _ = gateway
     with closing(http.client.HTTPConnection("::1", port, timeout=3)) as client:
-        client.request("GET", "/v1/models")
+        client.request("GET", "/v1/embeddings")
         response = client.getresponse()
         assert response.status == 200
-        assert response.read() == b'{"data":[{"id":"chat-model"}]}'
-    assert cpa.get(timeout=1)[1] == "/v1/models"
+        assert response.read() == b"ordinary"
+    assert cpa.get(timeout=1)[1] == "/v1/embeddings"
 
 
 def test_chunked_cpa_upload(gateway):

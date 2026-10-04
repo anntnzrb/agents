@@ -1,9 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { typesafeSystemOneApi } from "@earendil-works/pi-ai/api/typesafe-system-one.lazy";
 import { getBuiltinClassifierModels, getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ExtensionContext, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import { markTransientStreamError } from "./retry.js";
 import {
 	findBuiltinMetadata,
 	findStaticCatalogModel,
@@ -15,6 +17,7 @@ import {
 
 // Sync replaces this placeholder with the deployment endpoint.
 const BASE_URL = "${CLIPROXY_CLIENT_BASE_URL}";
+const GATEWAY_ORIGIN = BASE_URL.replace(/\/+$/, "").replace(/\/v1$/, "");
 const GATEWAY_TIMEOUT_MS = 5000;
 
 // models.dev supplies limits, pricing, and modalities the gateway does not report.
@@ -23,6 +26,12 @@ const CATALOG_TIMEOUT_MS = 10000;
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
 const MISSING_MODEL_RETRY_MS = 60 * 60 * 1000;
 const CATALOG_VERSION = 2;
+// Pi asks for the model list as soon as it starts; RPC clients such as Paseo read it before
+// discovery can finish. The last discovered catalog is cached so that first read is complete.
+const MODELS_CACHE_VERSION = 2;
+const MODELS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// A model absent from this many consecutive listings is dropped; fewer is a transient gap.
+const MISSING_LISTINGS_BEFORE_DROP = 3;
 
 const FALLBACK_CONTEXT_WINDOW = 128000;
 const FALLBACK_MAX_TOKENS = 16384;
@@ -35,7 +44,21 @@ const SYSTEM_ONE_UPSTREAM = "openrouter";
 const SYSTEM_ONE_MODELS: readonly string[] = ["typesafe/jev-1.13"];
 
 interface GatewayModelsResponse {
-	data?: Array<{ id?: unknown; owned_by?: unknown }>;
+	data?: Array<{ id?: unknown; owned_by?: unknown; context_length?: unknown; supported_endpoint_types?: unknown }>;
+}
+interface GatewayModel {
+	id: string;
+	ownedBy?: string;
+	contextLength?: number;
+	anthropic: boolean;
+}
+interface ModelsCache {
+	version: number;
+	baseUrl: string;
+	fetchedAt: number;
+	models: ChatModelConfig[];
+	missingListings: Record<string, number>;
+	fallbackModelIds: string[];
 }
 interface CatalogCache {
 	version: number;
@@ -50,6 +73,7 @@ let lastKnown: ChatModelConfig[] = [];
 let builtinIndex: Map<string, BuiltinMetadata[]> | undefined;
 let lastCatalogAttempt = -Infinity;
 let fallbackModels = new Set<string>();
+const missingListings = new Map<string, number>();
 
 // Pi does not export the chat or classifier members of the ProviderModelConfig union.
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
@@ -119,6 +143,91 @@ function effortLevelMap(options: ReasoningOption[] | undefined): ModelMetadata["
 function catalogPath(): string {
 	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
 	return join(cacheHome, "agents", "models-dev.json");
+}
+
+function modelsCachePath(): string {
+	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
+	return join(cacheHome, "agents", "cliproxy-models.json");
+}
+
+// Pi awaits extension factories. Seed registration before RPC starts serving catalog requests.
+async function readModelsCache(): Promise<ChatModelConfig[]> {
+	try {
+		const parsed = JSON.parse(await readFile(modelsCachePath(), "utf8")) as ModelsCache;
+		if (
+			parsed?.version !== MODELS_CACHE_VERSION || parsed.baseUrl !== BASE_URL ||
+			!Number.isFinite(parsed.fetchedAt) || parsed.fetchedAt > Date.now() ||
+			Date.now() - parsed.fetchedAt > MODELS_CACHE_TTL_MS || !Array.isArray(parsed.models) ||
+			!parsed.models.every((model) =>
+				model && typeof model.id === "string" && model.id.length > 0 &&
+				typeof model.name === "string" && model.name.length > 0 &&
+				typeof model.reasoning === "boolean" &&
+				Array.isArray(model.input) && model.input.length > 0 &&
+				model.input.every((input) => input === "text" || input === "image") &&
+				model.cost && [model.cost.input, model.cost.output, model.cost.cacheRead, model.cost.cacheWrite]
+					.every((cost) => Number.isFinite(cost) && cost >= 0) &&
+				Number.isFinite(model.contextWindow) && model.contextWindow > 0 &&
+				Number.isFinite(model.maxTokens) && model.maxTokens > 0 &&
+				(model.api === undefined || model.api === "anthropic-messages") &&
+				(model.api === "anthropic-messages" ? model.baseUrl === GATEWAY_ORIGIN : model.baseUrl === undefined)
+			)
+		) return [];
+		missingListings.clear();
+		for (const model of parsed.models) {
+			const misses = parsed.missingListings?.[model.id];
+			if (Number.isInteger(misses) && misses > 0 && misses < MISSING_LISTINGS_BEFORE_DROP) {
+				missingListings.set(model.id, misses);
+			}
+		}
+		const ids = new Set(parsed.models.map((model) => model.id));
+		fallbackModels = new Set(
+			Array.isArray(parsed.fallbackModelIds) ? parsed.fallbackModelIds.filter((id) => ids.has(id)) : [],
+		);
+		return parsed.models;
+	} catch {
+		// No usable cache.
+	}
+	return [];
+}
+
+async function writeModelsCache(models: ChatModelConfig[]): Promise<void> {
+	const path = modelsCachePath();
+	const temporary = `${path}.${randomUUID()}.tmp`;
+	try {
+		await mkdir(dirname(path), { recursive: true });
+		const cache: ModelsCache = {
+			version: MODELS_CACHE_VERSION, baseUrl: BASE_URL, fetchedAt: Date.now(), models,
+			missingListings: Object.fromEntries(missingListings),
+			fallbackModelIds: [...fallbackModels],
+		};
+		// Multiple Pi sessions publish here. Readers must never see a partially written catalog.
+		await writeFile(temporary, JSON.stringify(cache), { mode: 0o600 });
+		await rename(temporary, path);
+	} catch {
+		// Cache writes are best effort.
+	} finally {
+		await rm(temporary, { force: true }).catch(() => {});
+	}
+}
+
+/**
+ * Keep models that dropped out of the latest listing until they miss several in a row: a pool
+ * that briefly loses an account should not remove a model mid-session.
+ */
+function retainBrieflyMissing(previous: ChatModelConfig[], current: ChatModelConfig[]): ChatModelConfig[] {
+	const listed = new Set(current.map((model) => model.id));
+	for (const id of listed) missingListings.delete(id);
+	const retained = previous.filter((model) => {
+		if (listed.has(model.id)) return false;
+		const misses = (missingListings.get(model.id) ?? 0) + 1;
+		if (misses >= MISSING_LISTINGS_BEFORE_DROP) {
+			missingListings.delete(model.id);
+			return false;
+		}
+		missingListings.set(model.id, misses);
+		return true;
+	});
+	return [...current, ...retained];
 }
 
 function widest(current: CatalogModel | undefined, candidate: CatalogModel): CatalogModel {
@@ -195,7 +304,10 @@ function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogMod
 	);
 }
 
-function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): ChatModelConfig {
+function toModel(
+	{ id, ownedBy, contextLength, anthropic }: GatewayModel,
+	catalog: CatalogCache | undefined,
+): ChatModelConfig {
 	const entry = catalogModel(catalog, id);
 	const inputs = entry?.modalities?.input ?? ["text"];
 	const metadata = builtinMetadata(id);
@@ -217,24 +329,35 @@ function toModel(id: string, ownedBy: string | undefined, catalog: CatalogCache 
 			cacheRead: entry?.cost?.cache_read ?? 0,
 			cacheWrite: entry?.cost?.cache_write ?? 0,
 		},
-		contextWindow: entry?.limit?.context ?? FALLBACK_CONTEXT_WINDOW,
+		contextWindow: entry?.limit?.context ?? contextLength ?? FALLBACK_CONTEXT_WINDOW,
 		maxTokens: entry?.limit?.output ?? FALLBACK_MAX_TOKENS,
+		// Claude through Chat Completions loses its thinking text and signatures, which multi-turn
+		// reasoning replay needs. The gateway marks the Claude models /v1/messages serves natively;
+		// Pi's Anthropic transport appends /v1/messages to the origin itself.
+		...(anthropic ? { api: "anthropic-messages", baseUrl: GATEWAY_ORIGIN, compat: undefined } : {}),
 	};
 }
 
-function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; ownedBy?: string }> {
-	return (payload.data ?? []).flatMap((model) =>
-		typeof model.id === "string" && model.id.length > 0
-			? [{ id: model.id, ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined }]
-			: [],
-	);
+function gatewayModels(payload: GatewayModelsResponse): GatewayModel[] {
+	return (payload.data ?? []).flatMap((model) => {
+		if (typeof model.id !== "string" || model.id.length === 0) return [];
+		const contextLength = model.context_length;
+		const endpoints = model.supported_endpoint_types;
+		return [{
+			id: model.id,
+			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
+			contextLength: typeof contextLength === "number" && Number.isFinite(contextLength) && contextLength > 0
+				? contextLength : undefined,
+			anthropic: Array.isArray(endpoints) && endpoints.includes("anthropic"),
+		}];
+	});
 }
 
 async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	const response = await fetch(`${BASE_URL}/models`, {
 		signal: AbortSignal.any([signal, AbortSignal.timeout(GATEWAY_TIMEOUT_MS)]),
 	});
-	if (!response.ok) return lastKnown;
+	if (!response.ok) return [];
 	const [payload, catalog] = await Promise.all([
 		response.json() as Promise<GatewayModelsResponse>,
 		loadCatalog(signal),
@@ -247,12 +370,14 @@ async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	) {
 		resolvedCatalog = await loadCatalog(signal, true);
 	}
-	if (gateway.length > 0) {
-		fallbackModels = new Set(gateway
-			.filter((entry) => catalogModel(resolvedCatalog, entry.id)?.limit?.context === undefined)
-			.map((entry) => entry.id));
+	for (const entry of gateway) {
+		if (catalogModel(resolvedCatalog, entry.id)?.limit?.context === undefined && entry.contextLength === undefined) {
+			fallbackModels.add(entry.id);
+		} else {
+			fallbackModels.delete(entry.id);
+		}
 	}
-	return gateway.map((entry) => toModel(entry.id, entry.ownedBy, resolvedCatalog));
+	return gateway.map((entry) => toModel(entry, resolvedCatalog));
 }
 
 /**
@@ -277,7 +402,7 @@ function classifierModels(): ClassifierModelConfig[] {
 	});
 }
 
-export default function cliproxy(pi: ExtensionAPI): void {
+export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
 	const warnedModels = new Set<string>();
 	const warnFallback = (model: ExtensionContext["model"], ctx: ExtensionContext): void => {
 		if (!ctx.hasUI || model?.provider !== "cliproxy" || !fallbackModels.has(model.id) || warnedModels.has(model.id)) return;
@@ -290,28 +415,41 @@ export default function cliproxy(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => warnFallback(ctx.model, ctx));
 	pi.on("model_select", (event, ctx) => warnFallback(event.model, ctx));
 	pi.on("before_agent_start", (_event, ctx) => warnFallback(ctx.model, ctx));
+	pi.on("message_end", (event) => {
+		if (event.message.role !== "assistant") return;
+		const message = markTransientStreamError(event.message);
+		return message ? { message } : undefined;
+	});
 
-	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel(id, undefined, undefined));
+	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel({ id, anthropic: false }, undefined));
+	if (lastKnown.length === 0) lastKnown = await readModelsCache();
 	const classifiers = classifierModels();
 	pi.registerProvider("cliproxy", {
 		name: "CLIProxyAPI",
 		baseUrl: BASE_URL,
 		apiKey: "keyless",
 		api: "openai-completions",
-		models: [...staticModels, ...classifiers],
+		models: [...(lastKnown.length > 0 ? lastKnown : staticModels), ...classifiers],
 		classifiers: { "typesafe-system-one": typesafeSystemOneApi() },
 		refreshModels: async (context) => {
+			// Pi refreshes in two phases: cache-only at startup (allowNetwork false), then the network.
+			if (lastKnown.length === 0) lastKnown = await readModelsCache();
 			// The gateway is a LAN endpoint; only explicit offline mode skips discovery.
-			if (process.env.PI_OFFLINE === undefined && !context.signal.aborted) {
+			if (context.allowNetwork && process.env.PI_OFFLINE === undefined && !context.signal.aborted) {
 				try {
 					const models = await discover(context.signal);
-					if (models.length > 0) lastKnown = models;
+					if (models.length > 0 && !context.signal.aborted) {
+						lastKnown = retainBrieflyMissing(lastKnown, models);
+						const ids = new Set(lastKnown.map((model) => model.id));
+						fallbackModels = new Set([...fallbackModels].filter((id) => ids.has(id)));
+						await writeModelsCache(lastKnown);
+					}
 				} catch {
 					// Keep the previous catalog when the gateway is unreachable.
 				}
 			}
 			// The returned list replaces every model, so classifiers ride along with chat discovery.
-			return [...lastKnown, ...classifiers];
+			return [...(lastKnown.length > 0 ? lastKnown : staticModels), ...classifiers];
 		},
 	});
 }

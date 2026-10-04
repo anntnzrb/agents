@@ -4,7 +4,10 @@ providers:
     apiKey: keyless
     api: openai-completions
     discovery:
-      type: openai-models-list
+      # The gateway's /v1/models marks Claude models that /v1/messages serves natively with
+      # supported_endpoint_types; proxy discovery routes those to anthropic-messages and keeps
+      # the rest on openai-completions. It also reports context_length per model.
+      type: proxy
     modelOverrides:
       gemini-3.7-flash-high:
         contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits; matches the google-antigravity profile
@@ -17,10 +20,15 @@ providers:
           cacheWrite: 0
       gpt-6-astra:
         contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
+        # Proxy discovery disables effort by default; these GPT routes accept reasoning_effort.
+        compat:
+          supportsReasoningEffort: true
       gpt-6.1-sol:
         reasoning: true
         contextWindow: 320000 # 320K * 85% = 272K trigger, compacting at OpenAI's long-context pricing line (>272K input bills 2x input / 1.5x output)
         maxTokens: 128000
+        compat:
+          supportsReasoningEffort: true
         thinking:
           mode: effort
           efforts:
