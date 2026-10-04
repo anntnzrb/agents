@@ -72,7 +72,7 @@ Read `references/eval-workflow.md` for aggregate/review usage; `references/packa
 Three load levels:
 
 1. Metadata (`name` + `description`): always in context (~100 words).
-2. `SKILL.md` body: when triggered (<500 lines ideal; under 250 when practical).
+2. `SKILL.md` body: when triggered. Target at most 150 lines; hard cap 250 lines unless the skill has no bundled references.
 3. Bundled resources: on demand; scripts can execute without loading.
 
 Patterns:

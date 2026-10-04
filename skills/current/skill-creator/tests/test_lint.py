@@ -224,6 +224,60 @@ def test_upstream_requires_notice(tmp_path: Path) -> None:
     assert lint_skill(skill) == []
 
 
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        "  author: openclaw\n",
+        "  upstream: https://github.com/example/skills\n",
+        "  author: anntnzrb\n  upstream: https://github.com/example/skills\n",
+        '  author: "openclaw"\n',
+        "  {author: openclaw}\n",
+    ],
+)
+@pytest.mark.parametrize("notice", ["NOTICE.md", "references/NOTICE.md"])
+def test_port_metadata_requires_notice(
+    tmp_path: Path, metadata: str, notice: str
+) -> None:
+    """Upstream metadata requires attribution at either supported location."""
+    skill = make_skill(tmp_path / "s", _READS_TABLE)
+    _ = write(
+        skill,
+        "SKILL.md",
+        _FRONTMATTER.replace("license:", f"metadata:\n{metadata}license:")
+        + _READS_TABLE,
+    )
+    assert messages(lint_skill(skill)) == [
+        "SKILL.md:1: port metadata requires NOTICE.md at skill root or references/"
+    ]
+    _ = write(skill, notice, "# NOTICE\n")
+    assert lint_skill(skill) == []
+
+
+def test_owner_metadata_needs_no_notice(tmp_path: Path) -> None:
+    """Repository-authored skills and body mentions are not upstream ports."""
+    skill = make_skill(tmp_path / "s")
+    _ = write(
+        skill,
+        "SKILL.md",
+        _FRONTMATTER.replace("license:", "metadata:\n  author: anntnzrb\nlicense:")
+        + "# Fixture\nauthor: openclaw\nupstream: example\n",
+    )
+    assert lint_skill(skill) == []
+
+
+def test_invalid_yaml_is_reported_without_crashing(tmp_path: Path) -> None:
+    """A malformed metadata value produces a finding rather than a traceback."""
+    skill = make_skill(tmp_path / "s")
+    _ = write(
+        skill,
+        "SKILL.md",
+        _FRONTMATTER.replace("license:", "metadata: [\nlicense:"),
+    )
+    findings = lint_skill(skill)
+    assert len(findings) == 1
+    assert findings[0].message == "invalid YAML in frontmatter"
+
+
 def test_cli_exit_codes_and_output_format(tmp_path: Path) -> None:
     """Clean exits 0, findings exit 1 as path:line: message, bad usage exits 2."""
     clean = make_skill(tmp_path / "clean")
