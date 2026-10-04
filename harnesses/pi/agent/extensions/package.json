@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "effect": "4.0.0-rc.110"
+    "effect": "4.0.0"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.0.0",
