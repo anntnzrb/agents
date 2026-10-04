@@ -10,7 +10,16 @@ Move one scoped task to the requested outcome. Reconstruct the current state bef
 
 ## Public entrypoint
 
-Invoke this skill in natural language with a problem, issue, PR, or current change. There is no bundled CLI. Use available tools and applicable skills for repository access, commits, review, verification, and tracker operations. Do not require a particular agent runtime, delegation mechanism, or watcher.
+Invoke this skill in natural language with a problem, issue, PR, or current change. Use available tools and applicable skills for repository access, commits, review, verification, and tracker operations.
+
+For authorized landing, run `uv run --script <skill-dir>/scripts/cli.py land <number>`. Omit the number for the current branch.
+
+- Use `--repo owner/name` to select the repository. The checkout's `origin` must match; fork PRs stop without writes.
+- Use `--base` only to assert the expected base and `--method` for the allowed merge method (default `merge`).
+- Pass `--worktree <path>` only for a task checkout authorized for removal. The command also deletes the merged local and remote branch.
+- `--timeout` bounds the total wait in seconds (default 1800). `--interval` sets the polling interval (default 10).
+- `--json` emits one result. Exit codes are 0 for merged and cleaned up, 1 for a stopped operation, and 2 for usage errors.
+- A failure reports completed steps and preserves unfinished cleanup. Rerun from a surviving checkout to reconcile live state.
 
 ## Choose the destination
 
@@ -75,16 +84,16 @@ Merge-ready means the current patch satisfies acceptance criteria, relevant veri
 
 ## Deliver and confirm
 
-1. Re-read the PR's current head, base, checks, review state, and mergeability immediately before integration. If the patch changed since verification, verify the affected behavior again. Use a head-bound merge operation when supported to avoid merging an unverified replacement.
-2. Use the repository's allowed merge method and queue. Do not bypass protections or assume squash is always appropriate. Dependent PRs require verification of their bases and integration order. Do not merge a child into its parent as a substitute for delivery to the default branch.
-3. If merge is queued or automatic, monitor until the PR actually merges or a real blocker appears. A queued request is not completed delivery. Do not claim unattended monitoring after the session ends.
+1. Run the `autoreview` skill before landing and resolve verified findings. Re-read the PR's current head, base, checks, review state, and mergeability. If the patch changed since verification, verify the affected behavior again.
+2. Once the reviewed PR is open and delivery is authorized, route GitHub landing to `land` with the repository's allowed merge method. It pins the local head, queues auto-merge, polls live state, rebases a behind branch, and cleans up only after MERGED. Do not replace it with a shell merge or cleanup loop. Dependent PRs retain their parent's branch as base and land bottom-up after each parent reaches the intended branch.
+3. Treat a failed check, closed unmerged PR, head mismatch, or timeout as a stop. Report the command's blocker without deleting branches or worktrees. A queued request is not completed delivery.
 4. Confirm the remote PR is merged and its change reached the intended branch. Inspect applicable post-merge checks. Report a post-merge failure as a delivery problem rather than concealing it behind a successful merge.
 5. Verify automatic issue closure. Close the linked issue only when its acceptance criteria are fully resolved and closure is authorized by the request. Keep partially resolved issues open with an accurate note. Never claim a closed PR without a merge solved the issue.
-6. Clean up merged local branches using the rules below, including branches merged before this invocation. Resume cleanup when the requested change was already delivered.
+6. `land` owns its target branch and optional worktree cleanup. Use the rules below for other merged local branches, including branches merged before this invocation.
 
 ## Clean up merged local branches
 
-Run this phase only for Deliver or Cleanup. Honor user and project approval requirements before deletion. Restrict cleanup to the resolved repository. Do not delete remote branches or remove worktrees.
+Run this phase only for Deliver or Cleanup. Honor user and project approval requirements before deletion. Restrict cleanup to the resolved repository. Outside `land`'s authorized target cleanup, do not delete remote branches or remove worktrees.
 
 1. Fetch the verified remote's default branch before evaluating candidates. Use its remote-tracking ref, not a stale local `main`. If the fetch fails, report cleanup as blocked.
 2. Inspect local branch tips, upstreams, and `git worktree list --porcelain`. Exclude the default branch, protected branches, and branches checked out in another worktree. Report worktree-bound skips with their checkout paths.

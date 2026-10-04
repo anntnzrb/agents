@@ -63,21 +63,9 @@ For a local comparison, use fresh `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, and `
 
 ## Merge a pull request
 
-The ruleset requires the branch to be up to date with `main` before merging, so the tree that merges is the tree CI tested. A second run on `main` would retest the same tree, so CI has no push trigger. The weekly scheduled run catches drift from dependencies that move without a commit, such as `latest` tool versions.
+The repository requires `CI required` and a strict up-to-date ruleset before merging. Use merge commits titled from the PR. CI has no push trigger because the merged tree has already passed CI; the weekly scheduled run catches dependency drift.
 
-Queue the merge as soon as the PR is open, instead of waiting for green:
-
-```bash
-gh pr merge <number> --auto --merge --match-head-commit "$(git rev-parse HEAD)"
-```
-
-GitHub merges when `CI required` passes and deletes the branch. A failed check leaves the PR open. If `main` moves first, update the branch; CI runs again and the queued merge still applies.
-
-Clean up only after the merge is confirmed. Deleting a branch whose PR is still open closes the PR, so gate local branch and worktree removal on the PR state:
-
-```bash
-[ "$(gh pr view <number> --json state -q .state)" = MERGED ] && git worktree remove <path> && git branch -d <branch>
-```
+Land with `uv run --script skills/current/ship/scripts/cli.py land <number>`.
 
 ## Update dependencies
 
@@ -85,7 +73,7 @@ Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one gro
 
 ## Repository settings
 
-The Settings app (https://github.com/apps/settings) syncs [`.github/settings.yml`](../.github/settings.yml) to GitHub whenever it changes on `main`. The file extends the shared baseline in the `anntnzrb/.github` repository; change a value for every repository there, or override it here for this one. The app does not manage rulesets, so merge protection below stays a separate setting.
+The Settings app (https://github.com/apps/settings) syncs [`.github/settings.yml`](../.github/settings.yml) to GitHub whenever it changes on `main`. The file extends the shared baseline in the `anntnzrb/.github` repository; override a value here for this repository only. A baseline change does not trigger a sync: this repository picks it up the next time its own `.github/settings.yml` changes on `main`, so apply it now with `gh api -X PATCH repos/anntnzrb/agents` when it cannot wait. The app does not manage rulesets, so merge protection below stays a separate setting.
 
 ## Maintain merge protection
 

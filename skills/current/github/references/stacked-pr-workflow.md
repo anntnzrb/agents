@@ -2,6 +2,8 @@
 
 Scope: Before publishing a branch, creating a pull request, or linking a pull request to a stack. Repository-agnostic; read-only audit separate from each authorized write.
 
+When work depends on an unmerged PR, open the new PR with that PR's branch as its base. For individually authorized landing, use `ship land` bottom-up and verify each child's live base after its parent merges.
+
 ## Audit before writing
 
 Fresh session MUST run:
