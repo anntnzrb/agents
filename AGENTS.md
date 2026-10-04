@@ -41,6 +41,11 @@ Boundaries:
 - A skill change MUST NOT add tests under `sync/tests/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
 - A change under `harnesses/` MUST NOT update `docs/` or `sync/tests/`. Adapter-contract changes in `sync/src/sync/core/harness_adapters.py` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
 
+Documentation describes the current system, not its history:
+
+- Write procedures, behavior, constraints, and rationale that stays true while the design stands. NEVER record why something was temporarily changed, incidents, account or billing state, or a change log; commits and pull requests carry that.
+- Add a README only for what the files themselves cannot express. A harness or tool whose configuration is self-explanatory needs none.
+
 Configuration files are the source of truth for what is set:
 
 - Documentation MUST NOT mirror configuration: no per-key tables, current values, or enabled/disabled lists that a config file already states. Point to the file instead.

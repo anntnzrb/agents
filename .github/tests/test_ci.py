@@ -311,3 +311,19 @@ def test_metadata_runs_the_skill_lint_over_every_current_skill(
     result = metadata(tmp_path)
     assert result.returncode == 1
     assert "skills/current/prose/SKILL.md:6: trailing whitespace" in result.stdout
+
+
+def test_metadata_rejects_dashes_in_repository_prose(tmp_path: Path) -> None:
+    metadata_checker(tmp_path)
+    write(tmp_path, "docs/page.md", "Ranges like 1\N{EN DASH}2 are prose.\n")
+    write(tmp_path, "harnesses/x/legacy/old.md", "Archived \N{EM DASH} ignored.\n")
+    write(
+        tmp_path,
+        "harnesses/x/node_modules/dep/README.md",
+        "Vendor \N{EM DASH} ignored.\n",
+    )
+    result = metadata(tmp_path)
+    assert result.returncode == 1
+    assert "docs/page.md:1: U+2013 en dash" in result.stdout
+    assert "legacy" not in result.stdout
+    assert "node_modules" not in result.stdout

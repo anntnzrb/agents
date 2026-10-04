@@ -91,6 +91,29 @@ def metadata(root: Path) -> None:
     relative = [str(skill.relative_to(root)) for skill in skills]
     run(["uv", "run", "--script", validator, "lint", *relative], cwd=root)
     print(f"Validated {len(skills)} active skills", flush=True)
+    prose(root)
+
+
+DASHES = {"\N{EN DASH}": "U+2013 en dash", "\N{EM DASH}": "U+2014 em dash"}
+
+
+def prose(root: Path) -> None:
+    """Reject en and em dashes in Markdown outside skills, which the skill lint owns."""
+    skip = {".git", "node_modules", "legacy"}
+    findings: list[str] = []
+    for path in sorted(root.rglob("*.md")):
+        relative = path.relative_to(root)
+        if skip & set(relative.parts) or relative.parts[:1] == ("skills",):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            findings.extend(
+                f"{relative}:{number}: {name}"
+                for dash, name in DASHES.items()
+                if dash in line
+            )
+    if findings:
+        print("\n".join(findings), flush=True)
+        raise ValueError(f"{len(findings)} dash finding(s) in repository prose")
 
 
 def skills(root: Path, raw: str) -> None:
