@@ -3,7 +3,7 @@ name: webpaste
 description: "Use when sharing or fetching text, screenshots, recordings, or archives via anonymous URLs; not for clipboard copying."
 license: AGPL-3.0-or-later
 metadata:
-  author: anonymous
+  author: anntnzrb
 ---
 
 # Webpaste

@@ -111,6 +111,7 @@ uv run --script skills/current/skill-creator/scripts/cli.py lint skills/current/
 - `license: AGPL-3.0-or-later` in the `SKILL.md` frontmatter.
 - When bundled docs exist: a follow-up reads table with `Need`, `Read`, and `When` columns, and at most 250 `SKILL.md` lines.
 - A `NOTICE.md` beside every `UPSTREAM.json`.
+- A `NOTICE.md` at the skill root or in `references/` when frontmatter `metadata` contains `upstream` or an `author` other than `anntnzrb`.
 
 Without arguments, `lint` checks every skill under `skills/current/` that differs from `origin/main`, including untracked files. It exits `0` when clean and `1` with `path:line: message` findings. Fix findings in prose and metadata. For verbatim fixtures, data, code, or upstream bytes, add a `-whitespace` entry to the root `.gitattributes` instead of editing them; `lint` and `git diff --check` both honor it. CI runs `quick-validate` and `lint` over every current skill through `.github/scripts/ci.py metadata`.
 
@@ -204,6 +205,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Every `SKILL.md` declares `license: AGPL-3.0-or-later`, including `legacy/`; root `COPYING` holds the official text.
 - No license headers in non-Markdown files.
 - Before porting from another repo, read its license: MIT/Apache/BSD/GPL/AGPL port as AGPL with a `NOTICE.md` preserving upstream notices; CC BY-SA keeps attribution; no-license, BUSL, or CC BY-NC: do not port.
+- Put a port's `NOTICE.md` at the skill root or in `references/`. An existing `references/NOTICE.md` satisfies this rule; do not duplicate it. A tracked port with `UPSTREAM.json` still requires a notice beside that file.
 
 ## Model-facing text
 

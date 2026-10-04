@@ -11,7 +11,9 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, TypeIs, cast
+
+import yaml
 
 EXIT_OK: Final[int] = 0
 EXIT_FINDINGS: Final[int] = 1
@@ -196,8 +198,40 @@ def _has_reads_table(text: str) -> bool:
     return False
 
 
+def _is_str_dict(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _port_notice(skill_md: Path, text: str) -> list[Finding]:
+    """Require preserved notices for ports identified by YAML metadata."""
+    try:
+        frontmatter = cast("object", yaml.safe_load("\n".join(_frontmatter(text))))
+    except yaml.YAMLError:
+        return [Finding(skill_md, 1, "invalid YAML in frontmatter")]
+    if not _is_str_dict(frontmatter):
+        return []
+    metadata = frontmatter.get("metadata")
+    if not _is_str_dict(metadata):
+        return []
+    port = "upstream" in metadata or (
+        "author" in metadata and metadata["author"] != "anntnzrb"
+    )
+    if not port or any(
+        (skill_md.parent / notice).is_file()
+        for notice in ("NOTICE.md", "references/NOTICE.md")
+    ):
+        return []
+    return [
+        Finding(
+            skill_md,
+            1,
+            "port metadata requires NOTICE.md at skill root or references/",
+        )
+    ]
+
+
 def _skill_md(skill_md: Path, text: str, *, bundled_docs: bool) -> list[Finding]:
-    findings: list[Finding] = []
+    findings = _port_notice(skill_md, text)
     if not any(_LICENSE_LINE.match(line) for line in _frontmatter(text)):
         findings.append(Finding(skill_md, 1, f"frontmatter lacks license: {LICENSE}"))
     if not bundled_docs:
