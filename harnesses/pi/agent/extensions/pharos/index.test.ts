@@ -47,6 +47,17 @@ test("adds a guidance section without replacing the prompt or other guidance", (
   expect(input.systemPrompt).toBe("Existing prompt");
 });
 
+test("routes meaning searches to find only while find is active", () => {
+  const run = load();
+  const withFind = event(["bash", "find"]);
+  run(withFind);
+  expect(withFind.systemPromptOptions.sections.pharos).toContain("semantic find tool");
+  const withoutFind = event(["bash"]);
+  run(withoutFind);
+  expect(withoutFind.systemPromptOptions.sections.pharos).not.toContain("semantic find tool");
+  expect(withoutFind.systemPromptOptions.sections.pharos).toContain("Known literal or identifier: use rg.");
+});
+
 test("repeated starts do not accumulate guidance", () => {
   const run = load();
   const input = event(["bash"]);
