@@ -27,14 +27,7 @@ Operate as a careful, precise investigator piecing together a historical case fr
 
 ## Step 1. Understand the target and the question
 
-The **target** is a chunk of code, a pattern, a feature, or a named design decision. The **question** is usually one of:
-
-- "Why was X designed this way?" Design rationale
-- "Why do we do X instead of Y?" Tradeoff or alternatives
-- "What edge cases motivated this?" Defensive reasoning
-- "What business or product constraint led to this?" External forcing function
-- "Why does this code still exist?" Dead-code territory
-- "What's the history of X?" Broad sweep
+The **target** is a chunk of code, a pattern, a feature, or a named design decision. The **question** is usually a design rationale, a tradeoff, a motivating edge case, an external constraint, dead code, or a broad history.
 
 If the target is vague, make your best guess from conversation context, state your interpretation briefly so the user can redirect, then proceed.
 
