@@ -330,6 +330,20 @@ def test_whitespace_attribute_is_honored_like_git_diff_check(tmp_path: Path) -> 
     ]
 
 
+def test_whitespace_attribute_holds_under_a_git_hook_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hooks export GIT_DIR without GIT_WORK_TREE; root attributes still apply."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _ = write(repo, ".gitattributes", "s/fixtures/** -whitespace\n")
+    skill = make_skill(repo / "s")
+    _ = write(skill, "fixtures/raw.txt", "a \n")
+    monkeypatch.setenv("GIT_DIR", str(repo / ".git"))
+    assert messages(lint_skill(skill)) == []
+
+
 def test_no_arguments_lints_skills_changed_against_origin_main(
     tmp_path: Path,
 ) -> None:
