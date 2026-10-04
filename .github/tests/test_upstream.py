@@ -106,3 +106,5 @@ def test_issue_body_diffs_upstream_against_itself() -> None:
     assert "`pack/skills/new`" in body
     assert f"git diff {COMMIT} {'b' * 40} -- pack/skills/x" in body
     assert "skills/current/pstack/UPSTREAM.json" in body
+    assert "docs/skills.md" in body
+    assert "trigger" in body
