@@ -31,6 +31,8 @@ In scope: create, repair, refactor, validate, design evals, benchmark, optimize 
 
 Start at the user's current stage. Drafts, evals, and vague ideas each enter the appropriate loop stage. An explicitly requested lighter collaborative pass MAY replace full evals; keep the full loop available.
 
+When the repository's `AGENTS.md` names a skill gate, such as `docs/skills.md`, follow it. Its location, licensing, metadata, validation, and review rules override the defaults in this skill.
+
 ## Core Loop
 
 1. Identify capability and trigger conditions.
@@ -52,12 +54,14 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Useful commands:
 
+```text
 uv run --script <skill-dir>/scripts/cli.py aggregate-benchmark <workspace>/iteration-N --skill-name <name>
 uv run --script <skill-dir>/scripts/cli.py gates <path-to-skill-folder> [--tests]
 uv run --script <skill-dir>/scripts/cli.py generate-review <workspace>/iteration-N --skill-name <name>
 uv run --script <skill-dir>/scripts/cli.py lint [<path-to-skill-folder> ...]
 uv run --script <skill-dir>/scripts/cli.py package <path-to-skill-folder>
 uv run --script <skill-dir>/scripts/cli.py quick-validate <path-to-skill-folder>
+```
 
 Run `lint` after every skill change. It checks the mechanical rules of the repository skill gate: dashes in Markdown prose, whitespace, the license, the follow-up reads table, the line cap, and `NOTICE.md`. Without paths, it checks the skills that differ from `origin/main`.
 
