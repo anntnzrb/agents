@@ -1,5 +1,6 @@
 """Protocol layer: loading, enrichment, serialization, and schemas."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
@@ -236,6 +237,73 @@ def search_and_filter(
         if limit is not None:
             filtered_results = filtered_results[:limit]
     return raw_results, filtered_results, details_by_asin, attempted, scores_by_asin
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SearchRequest:
+    """Resolved search parameters shared by both transports."""
+
+    query: str = ""
+    html_path: str | None = None
+    page: int = 1
+    pages: int = 1
+    amazon_sort: str | None = None
+    zip_code: str | None = None
+    min_rating: float | Decimal | None = None
+    max_price: float | Decimal | None = None
+    badge: str | None = None
+    title_contains: str | None = None
+    include: Sequence[str] | None = None
+    exclude: Sequence[str] | None = None
+    limit: int | None = None
+    details: bool = False
+    detail_limit: int | None = None
+    scoring: bool = False
+
+    def execute(self) -> tuple[SearchResultsPayload, list[SearchResult]]:
+        """Search once and serialize the domain envelope using real result data."""
+        raw, filtered, details, attempted, scores = search_and_filter(
+            query=self.query,
+            html_path=self.html_path,
+            page=self.page,
+            pages=self.pages,
+            amazon_sort=self.amazon_sort,
+            zip_code=self.zip_code,
+            min_rating=self.min_rating,
+            max_price=self.max_price,
+            badge=self.badge,
+            title_contains=self.title_contains,
+            include=self.include,
+            exclude=self.exclude,
+            limit=self.limit,
+            details=self.details,
+            detail_limit=self.detail_limit,
+            scoring=self.scoring,
+        )
+        payload = build_llm_json(
+            query=self.query,
+            html_path=self.html_path,
+            page=self.page,
+            pages=self.pages,
+            amazon_sort=self.amazon_sort,
+            zip_code=self.zip_code,
+            min_rating=self.min_rating,
+            max_price=self.max_price,
+            badge=self.badge,
+            title_contains=self.title_contains,
+            include=self.include,
+            exclude=self.exclude,
+            limit=self.limit,
+            details=self.details,
+            detail_limit=self.detail_limit,
+            scoring=self.scoring,
+            raw_results=raw,
+            filtered_results=filtered,
+            details_by_asin=details,
+            detail_attempted=attempted,
+            scores_by_asin=scores,
+        )
+        return payload, filtered
 
 
 def build_llm_json(
