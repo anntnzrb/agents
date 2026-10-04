@@ -781,12 +781,27 @@ def truncate_critic_diff(diff: str) -> tuple[str, bool]:
 
 
 def requires_atomicity_review(proposal: CommitProposal, staged_diff: str) -> bool:
-    """Match the narrow-proposal critic bypass."""
+    """Match the narrow-proposal critic bypass.
+
+    A commit of only pure renames is the deterministic move-only commit; it never
+    counts toward the review, so the decision matches the planner, which judges
+    the model's commits alone.
+    """
+    moves = {
+        file.filename
+        for file in parse_file_diffs(staged_diff)
+        if _is_rename(file) and not file.hunks and not file.is_binary
+    }
+    commits = [
+        commit
+        for commit in proposal.commits
+        if not commit.changes or any(c.path not in moves for c in commit.changes)
+    ]
+    if not commits:
+        return not proposal.commits
     if len(proposal.commits) > 1:
         return False
-    if not proposal.commits:
-        return True
-    single = proposal.commits[0]
+    single = commits[0]
     narrow = (
         len(single.changes) == 1
         and isinstance(single.changes[0].hunks, AllSelector)
