@@ -1,8 +1,8 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "2a8044425c7bddf429c3bdedf3ab61e791d34d65",
+  "commit": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
   "trees": {
-    "pstack/skills/swarm": "78b490b8c095ede6d7bea1f5fbdaca0f89019c46"
+    "pstack/skills/swarm": "02682a23503724cfeafedf30610f6246c615827f"
   }
 }

@@ -151,7 +151,11 @@ def issue_body(pin: Pin, target: str, found: Drift) -> str:
         sections.append(f"New upstream directories not yet reviewed:\n\n{listed}")
     sections.append(
         f"Port the relevant upstream changes into `skills/current/{pin.skill}/`, "
-        "keeping local adaptations. Then update "
+        "keeping local adaptations. Apply the skill gate in `docs/skills.md` "
+        "to the ported text, including its final authoring review. Never copy an "
+        "upstream `description`: it is the skill's trigger, so keep the local one "
+        "or rewrite it under the metadata budget and compare a request that should "
+        "load the skill with a near-miss that should not. Then update "
         f"`skills/current/{pin.skill}/UPSTREAM.json`: the commit, the release "
         "for release pins, every tree hash, and each reviewed new directory in "
         "`watch`, ported or not. This issue is updated while the pin stays behind."

@@ -17,33 +17,18 @@ Adapted from pstack (Lauren Tan, MIT): model-pinned Cursor subagents replaced wi
 
 ## Explain Mode
 
-### Step 1. Understand the Question and Assess Complexity
+### Step 1. Assess Complexity
 
-Parse what the user is asking about:
+If the scope is ambiguous, state your interpretation and explore. The user can redirect.
 
-- "How does the rate limiter work?", a subsystem
-- "How do we handle billing for on-demand usage?", a feature flow
-- "How is the auth service structured?", an architectural overview
-- "Walk me through what happens when a user submits a form", a runtime trace
+- **Simple** (a single module, a small utility, a narrow question such as "how does function X work"): no explorers. Explore and explain in a single pass. Go to Step 2b.
+- **Complex** (a subsystem spanning multiple files or services, a cross-cutting feature, a full architectural overview): spawn parallel explorers first, then synthesize. Go to Step 2a.
 
-Identify the scope. If ambiguous, state your best-guess interpretation before exploring. Don't ask. Let the user redirect if you're off.
-
-**Assess complexity to decide the approach:**
-
-- **Simple** (a single module, a small utility, a narrow question like "how does function X work"): skip explorer agents; explore and explain in a single pass. Go to Step 2b.
-- **Complex** (a subsystem spanning multiple files/services, a cross-cutting feature, a full architectural overview): spawn parallel explorer agents first, then synthesize. Go to Step 2a.
-
-When in doubt, lean simple. You can always spawn explorers if you hit a wall.
+When in doubt, take the simple path.
 
 ### Step 2a. Explore (complex questions only)
 
-Decompose the question into 2-4 parallel exploration angles, each a distinct slice of the subsystem so explorers don't duplicate work. Example split for "how does the rate limiter work?":
-
-- Explorer 1: data model and state management
-- Explorer 2: request path and enforcement
-- Explorer 3: configuration and metrics infrastructure
-
-The right decomposition depends on the question. Use your judgment. Narrow questions: 2 explorers is fine. Broad subsystems: up to 4.
+Decompose the question into 2 to 4 exploration angles, each a distinct slice of the subsystem.
 
 Spawn read-only explorer subagents in parallel when the harness supports them; otherwise do the passes sequentially yourself. Each explorer gets the same base instructions plus a specific angle naming its slice. Each explorer should:
 
@@ -65,7 +50,7 @@ Proceed to Step 4.
 
 ### Step 3. Synthesize (complex questions only)
 
-Once all explorers return, write one coherent explanation from their findings (output format below). Reconcile overlapping findings, resolve contradictions, and weave the slices into a unified picture. Keep summaries in the main thread, not raw payloads.
+Once all explorers have returned, write one coherent explanation from their findings (output format below). Reconcile overlapping findings, resolve contradictions, and weave the slices into a unified picture. Keep summaries in the main thread, not raw payloads.
 
 ### Step 4. Present
 
@@ -79,11 +64,11 @@ Follow this structure, adapted to the question. Not every section is needed for 
 
 **Key Concepts.** The important types, services, or abstractions. Brief definition of each. Not exhaustive, just the ones needed to understand the rest.
 
-**How It Works.** The core of the explanation. Walk through the flow: what triggers it, what happens step by step, where data goes, the decision points. Prose, not pseudocode. Reference specific files and functions so the reader can go look, but don't dump code blocks unless a snippet is genuinely necessary.
+**How It Works.** The core of the explanation. Walk through the flow: what triggers it, what happens step by step, where data goes, the decision points. Prose, not pseudocode. Reference specific files and functions so the reader can go look, but don't dump code blocks unless a snippet is essential to a point.
 
 **Where Things Live.** A brief map of the relevant files/directories. Not every file, just the ones needed to start working in this area.
 
-**Gotchas.** Non-obvious or surprising things that would trip someone up. Historical context that explains why something looks weird. Known sharp edges.
+**Gotchas.** Non-obvious or surprising things that would trip someone up. Historical context that explains why something looks weird. Known pitfalls.
 
 ## Critique Mode
 

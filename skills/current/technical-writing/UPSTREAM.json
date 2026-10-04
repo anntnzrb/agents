@@ -1,8 +1,8 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "2a8044425c7bddf429c3bdedf3ab61e791d34d65",
+  "commit": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
   "trees": {
-    "pstack/skills/technical-writing": "08b040cf2ec3e053b51d08ea0a56138483b87697"
+    "pstack/skills/technical-writing": "51c1a0ec9526c3976455f6e6ab00e0e0c5f3de5e"
   }
 }

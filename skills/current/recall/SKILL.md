@@ -8,7 +8,7 @@ metadata:
 
 # Recall
 
-Before starting or resuming work, rebuild the user's recent working context and hand back a tight capsule of where things stand now and what to do next. Use for "recall my work on X", "catch me up", "what have I been working on", or "where did I leave off".
+Before starting or resuming work, rebuild the user's recent working context and hand back a tight capsule of where things stand now and what to do next.
 
 Two records hold the context. Session history holds what was done and decided. Live state (git branches, PRs, issues) holds what is true now. Search the first, verify against the second.
 
@@ -40,7 +40,7 @@ NEVER reconstruct, display, or execute a shell-formatted resume command. `resume
 2. **Lock scope.** Pin the window ("recent" defaults to the last 7 days), the topic if named, and the workspace (default the active one). State the scope back. Never quietly turn "all" into "recent N", and never search another project's sessions without being asked.
 3. **Search sessions.** Run the CLI broad first (no `--harness`); for `[]`, broaden or replace whitespace terms. For noisy results, tighten terms or add `--harness` filters. For a large corpus, fan out parallel read-only subagents, each with a query slice, returning the same schema per chat: topic, the user's goal, decisions, open threads, struggles, artifacts (PRs, tickets, branches), each citing the session id. Keep raw transcripts in the subagents; the main thread gets findings only.
 4. **Sweep the shared record** when the topic names a feature, file, subsystem, area, or bug. Run `git log` and `gh` (issues, PRs, search) over the named target; read repo-local docs if the target has any. Search terms come from the topic and the session findings. A source that is unavailable is a gap: say so. Skip this step only for pure activity recall ("what did I do this week").
-5. **Verify against live state.** Transcripts and stale tickets are history. Check surfaced PRs, branches, and tickets with `git` and `gh` before putting them in the brief.
+5. **Verify against live state.** Check surfaced PRs, branches, and tickets with `git` and `gh` before putting them in the brief.
 6. **Write the brief.** See the contract below. Group by thread. Stay on the named topic.
 
 ## Output contract
