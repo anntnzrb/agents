@@ -1,15 +1,8 @@
-import { expect, mock, spyOn, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-
-// Gateway catalog handling does not need Pi's bundled request-dialect metadata.
-mock.module("@earendil-works/pi-ai/providers/all", () => ({
-  getBuiltinProviders: () => [],
-  getBuiltinModels: () => [],
-  getBuiltinClassifierModels: () => [],
-}));
 
 type RefreshContext = Parameters<NonNullable<ProviderConfig["refreshModels"]>>[0];
 type ChatModel = Extract<ProviderModelConfig, { type?: "chat" }>;

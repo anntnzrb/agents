@@ -1,15 +1,8 @@
-import { expect, mock, spyOn, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-
-// Catalog discovery does not need Pi's bundled request-dialect metadata.
-mock.module("@earendil-works/pi-ai/providers/all", () => ({
-  getBuiltinProviders: () => [],
-  getBuiltinModels: () => [],
-  getBuiltinClassifierModels: () => [],
-}));
 
 test("refreshes missing metadata in a fresh cache, throttles retries, and retains cached data on failure", async () => {
   const directory = await mkdtemp(join(tmpdir(), "cliproxy-discovery-"));
