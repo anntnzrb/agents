@@ -10,10 +10,8 @@ if TYPE_CHECKING:
 
 from .models import AmazonLiveSearchError, SearchResult
 from .protocol import (
-    build_llm_json,
+    SearchRequest,
     get_schema_document,
-    search_and_filter,
-    serialize_results,
 )
 from .rpc import run_rpc
 
@@ -219,67 +217,32 @@ def main(
         )
 
     try:
-        raw_results, filtered_results, details_by_asin, detail_attempted, scores_by_asin = (
-            search_and_filter(
-                query=query,
-                html_path=html_path,
-                page=page,
-                pages=pages,
-                amazon_sort=amazon_sort,
-                zip_code=zip_code,
-                min_rating=min_rating,
-                max_price=max_price,
-                badge=badge,
-                title_contains=title_contains,
-                include=include,
-                exclude=exclude,
-                limit=limit,
-                details=details,
-                detail_limit=detail_limit,
-                scoring=scoring,
-            )
-        )
+        payload, filtered_results = SearchRequest(
+            query=query,
+            html_path=html_path,
+            page=page,
+            pages=pages,
+            amazon_sort=amazon_sort,
+            zip_code=zip_code,
+            min_rating=min_rating,
+            max_price=max_price,
+            badge=badge,
+            title_contains=title_contains,
+            include=include,
+            exclude=exclude,
+            limit=limit,
+            details=details,
+            detail_limit=detail_limit,
+            scoring=scoring,
+        ).execute()
     except (AmazonLiveSearchError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=error_stream)
         return 1
 
     if json_output:
-        _print_json(
-            serialize_results(
-                filtered_results,
-                details=details,
-                details_by_asin=details_by_asin,
-                scores_by_asin=scores_by_asin,
-            ),
-            stdout=output_stream,
-        )
+        _print_json(payload["results"], stdout=output_stream)
     elif llm_json:
-        _print_json(
-            build_llm_json(
-                query=query,
-                html_path=html_path,
-                page=page,
-                pages=pages,
-                amazon_sort=amazon_sort,
-                zip_code=zip_code,
-                min_rating=min_rating,
-                max_price=max_price,
-                badge=badge,
-                title_contains=title_contains,
-                include=include,
-                exclude=exclude,
-                limit=limit,
-                raw_results=raw_results,
-                filtered_results=filtered_results,
-                details=details,
-                detail_limit=detail_limit,
-                details_by_asin=details_by_asin,
-                detail_attempted=detail_attempted,
-                scoring=scoring,
-                scores_by_asin=scores_by_asin,
-            ),
-            stdout=output_stream,
-        )
+        _print_json(payload, stdout=output_stream)
     else:
         _print_human(filtered_results, stdout=output_stream)
     return 0

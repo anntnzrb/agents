@@ -8,6 +8,8 @@ wire constants and pure JSON/envelope helpers that later callers can adopt.
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from math import isfinite
+from numbers import Real
 from typing import TypeIs
 
 # The envelope is the existing DeepSWE protocol.  Keep this an integer: it is
@@ -59,6 +61,38 @@ EVIDENCE_FIELDS = (
     "blocked_reasons",
 )
 COMPARISON_SEMANTIC_FIELDS = ("unit", "scope", "denominator")
+IDENTITY_COMPONENT_COUNT = 4
+LEGACY_IDENTITY_COMPONENT_COUNT = 3
+
+
+def finite_number(value: object) -> Real | None:
+    """Return finite JSON-like numbers, treating null and booleans as unavailable."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        return None
+    try:
+        if not isfinite(float(value)):
+            return None
+    except OverflowError, ValueError:
+        return None
+    return value
+
+
+def diagnostic_identity(value: object) -> str:
+    """Keep duplicate diagnostics metrics-only when anonymous rows are used."""
+    if not isinstance(value, str):
+        return "<anonymous>"
+    try:
+        parsed = parse_json_list(value)
+    except TypeError, ValueError:
+        return "<anonymous>"
+    if len(parsed) == IDENTITY_COMPONENT_COUNT:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    if len(parsed) == LEGACY_IDENTITY_COMPONENT_COUNT and parsed[:2] != [
+        "published_id",
+        "row",
+    ]:
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    return "<anonymous>"
 
 
 def compact_json(value: object) -> str:

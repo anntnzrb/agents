@@ -11,7 +11,6 @@ import math
 import os
 import re
 import sys
-import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -34,7 +33,42 @@ from .contracts import (
 from .diagnose import diagnose
 from .diagnostics import redact, redact_query
 from .diff import schema_aware_diff
+from .evidence import (
+    attach_payload_evidence,
+    attach_row_evidence,
+    lookup_path,
+    numeric_scalar,
+    source_hash_from_payload,
+)
+from .fetch_results import (
+    materialize_fetch_result,
+    result_artifact_ref,
+    result_byte_length,
+    result_etag,
+    result_fetched_at,
+    result_final_url,
+    result_header,
+    result_headers,
+    result_last_modified,
+    result_sha256,
+    validate_304,
+    validator_from,
+)
 from .overlap import overlap_metadata
+from .requests import (
+    DEFAULT_OUTPUT_ENDPOINTS,
+    DEFAULT_OUTPUT_JSON,
+    DEFAULT_OUTPUT_URL,
+    EVALUATION_OPTIONS,
+    QA_OPTIONS,
+    QUERY_OPTIONS,
+    STATS_OPTIONS,
+    Option,
+    decode_options,
+    default_cache_dir,
+    fetch_options,
+    schema_options,
+)
 from .rsc import (
     BASE_URL,
     MODEL_API_KEY_ENV,
@@ -66,7 +100,6 @@ from .rsc import (
     snapshot_slugs,
     write_outputs,
 )
-from .values import parse_numeric
 
 
 class _Subparsers(Protocol):
@@ -75,10 +108,6 @@ class _Subparsers(Protocol):
 
 PROTOCOL_VERSION = "1"
 
-DEFAULT_ARTIFACT_DIR = Path(tempfile.gettempdir()) / "artifacts" / "artificial-analysis"
-DEFAULT_OUTPUT_JSON = DEFAULT_ARTIFACT_DIR / "full-data.json"
-DEFAULT_OUTPUT_ENDPOINTS = DEFAULT_ARTIFACT_DIR / "endpoints.txt"
-DEFAULT_OUTPUT_URL = DEFAULT_ARTIFACT_DIR / "full-url.txt"
 DEFAULT_SNAPSHOT_MAX_AGE = timedelta(hours=24)
 MIN_QUOTED_VALUE_LENGTH = 2
 SCHEMA_V2 = 2
@@ -101,219 +130,6 @@ def _finite_number(value: object) -> bool:
         return math.isfinite(float(value))
     except OverflowError, ValueError:
         return False
-
-
-def _numeric_scalar(value: object) -> bool:
-    """Recognize numeric values including non-finite values for evidence."""
-    return isinstance(value, int | float) and not isinstance(value, bool)
-
-
-def _evidence_record(  # noqa: PLR0913
-    raw_value: object,
-    *,
-    source_path: str | None,
-    source_field: str | None,
-    artifact_hash: str | None = None,
-    value_status: str = "published",
-    semantics: str = "known",
-    unit: str | None = None,
-    normalization: str | None = None,
-    blocked_reasons: tuple[str, ...] = (),
-    formula: str | None = None,
-    input_paths: tuple[str, ...] = (),
-) -> dict[str, object]:
-    """Project ``values.parse_numeric`` into the additive CLI evidence shape."""
-    parsed = parse_numeric(
-        raw_value,
-        unit=unit,
-        normalization=normalization,
-        source_path=source_path,
-        source_field=source_field,
-        value_status=value_status,
-        metric_semantics_status=semantics,
-        blocked_reasons=blocked_reasons,
-        parser="artificial-analysis.cli",
-        parser_version="1",
-        sha256=artifact_hash,
-    )
-    evidence: dict[str, object] = parsed.to_dict()
-    if value_status == "derived" and evidence.get("normalized_value") is None:
-        # ``parse_numeric`` classifies a null/raw-unparseable value as missing
-        # or unparsed.  A declared derived path still describes provenance as
-        # derived; only its usability is unavailable.
-        raw_reasons = evidence.get("blocked_reasons")
-        reasons: list[object] = (
-            [
-                reason
-                for reason in raw_reasons
-                if reason not in {"missing_value", "unparsed_value"}
-            ]
-            if is_object_list(raw_reasons)
-            else []
-        )
-        if "MISSING_REQUIRED_INPUT" not in reasons:
-            reasons.append("MISSING_REQUIRED_INPUT")
-        evidence["value_status"] = "derived"
-        evidence["comparison_eligibility"] = "blocked"
-        evidence["blocked_reasons"] = reasons
-    # Keep the values.py names and expose the concise contract aliases.  This
-    # lets old consumers use source_field/value_status while new consumers can
-    # inspect field/status without a translation table.
-    raw_blockers = evidence.get("blocked_reasons")
-    blockers_list: list[object] = (
-        [str(r) for r in raw_blockers]
-        if is_object_list(raw_blockers) or is_object_tuple(raw_blockers)
-        else []
-    )
-    evidence.update(
-        {
-            "raw": evidence.get("raw_value"),
-            "normalized": evidence.get("normalized_value"),
-            "field": evidence.get("source_field"),
-            "version": evidence.get("parser_version"),
-            "artifact_hash": evidence.get("sha256"),
-            "status": evidence.get("value_status"),
-            "semantics": evidence.get("metric_semantics_status"),
-            "eligibility": evidence.get("comparison_eligibility"),
-            "blockers": blockers_list,
-        },
-    )
-    if formula is not None:
-        evidence["formula"] = formula
-        evidence["input_paths"] = list(input_paths)
-    return evidence
-
-
-def _lookup_path(row: dict[str, object], path: str) -> object:
-    current: object = row
-    for part in path.split("."):
-        if not is_str_dict(current):
-            return None
-        current = current.get(part)
-    return current
-
-
-def _source_hash_from_payload(payload: dict[str, object]) -> str | None:
-    for container_key in ("source", "meta"):
-        container = _as_dict(payload.get(container_key))
-        for key in ("sha256", "artifact_hash", "source_hash"):
-            value = container.get(key)
-            if isinstance(value, str) and value:
-                return value
-        nested = _as_dict(container.get("source"))
-        value = nested.get("sha256")
-        if isinstance(value, str) and value:
-            return value
-    return None
-
-
-def _attach_row_evidence(  # noqa: PLR0913
-    row: dict[str, object],
-    *,
-    metric_paths: tuple[str, ...] = (),
-    source_prefix: str = "$",
-    artifact_hash: str | None = None,
-    derived_paths: dict[str, tuple[str, tuple[str, ...]] | None] | None = None,
-    raw_values: dict[str, object] | None = None,
-    unknown_paths: tuple[str, ...] = (),
-) -> dict[str, object]:
-    """Attach evidence for source and derived scalars without changing values."""
-    metric_evidence: dict[str, object] = _as_dict(row.get("metric_evidence"))
-    resolved_derived_paths = derived_paths or {}
-    resolved_raw_values = raw_values or {}
-    unknown_set = set(unknown_paths)
-
-    def add(path: str, value: object, *, unknown: bool = False) -> None:
-        if path in metric_evidence:
-            return
-        formula_and_inputs = resolved_derived_paths.get(path)
-        if formula_and_inputs is not None:
-            formula, input_paths = formula_and_inputs
-            metric_evidence[path] = _evidence_record(
-                value,
-                source_path=f"{source_prefix}.{path}",
-                source_field=path.rsplit(".", 1)[-1],
-                artifact_hash=artifact_hash,
-                value_status="derived",
-                semantics="known",
-                formula=formula,
-                input_paths=input_paths,
-            )
-            return
-        metric_evidence[path] = _evidence_record(
-            resolved_raw_values.get(path, value),
-            source_path=f"{source_prefix}.{path}",
-            source_field=path.rsplit(".", 1)[-1],
-            artifact_hash=artifact_hash,
-            semantics="unknown" if (unknown or path in unknown_set) else "known",
-        )
-
-    for path in metric_paths:
-        add(
-            path,
-            _lookup_path(row, path),
-            unknown=path.startswith(("raw_fields.", "unknowns.")),
-        )
-
-    def walk(node: object, prefix: str) -> None:
-        if is_str_dict(node):
-            for key, value in node.items():
-                if key in {"metric_evidence", "raw_metadata"}:
-                    continue
-                path = f"{prefix}.{key}" if prefix else key
-                if _numeric_scalar(value):
-                    add(
-                        path,
-                        value,
-                        unknown=prefix.startswith(("raw_fields", "unknowns")),
-                    )
-                elif is_str_dict(value):
-                    walk(value, path)
-                elif is_object_list(value):
-                    for index, item in enumerate(value):
-                        walk(item, f"{path}[{index}]")
-        elif is_object_list(node):
-            for index, item in enumerate(node):
-                walk(item, f"{prefix}[{index}]")
-
-    walk(row, "")
-    row["metric_evidence"] = metric_evidence
-    return row
-
-
-def _attach_payload_evidence(
-    payload: dict[str, object],
-    *,
-    artifact_hash: str | None = None,
-) -> dict[str, object]:
-    """Attach evidence for payload-level derived scalar fields."""
-    resolved_hash = artifact_hash or _source_hash_from_payload(payload)
-    metric_evidence: dict[str, object] = _as_dict(payload.get("metric_evidence"))
-
-    def walk(node: object, prefix: str) -> None:
-        if is_str_dict(node):
-            for key, value in node.items():
-                if key in {"metric_evidence", "raw_metadata"}:
-                    continue
-                path = f"{prefix}.{key}" if prefix else key
-                if _numeric_scalar(value):
-                    if path not in metric_evidence:
-                        metric_evidence[path] = _evidence_record(
-                            value,
-                            source_path=f"$.{path}",
-                            source_field=key,
-                            artifact_hash=resolved_hash,
-                            value_status="derived",
-                        )
-                elif is_str_dict(value) or is_object_list(value):
-                    walk(value, path)
-        elif is_object_list(node):
-            for index, item in enumerate(node):
-                walk(item, f"{prefix}[{index}]")
-
-    walk(payload, "")
-    payload["metric_evidence"] = metric_evidence
-    return payload
 
 
 def _snapshot_overlap(
@@ -359,9 +175,7 @@ def _raise_extraction_error(
 
 
 def _default_cache_dir() -> Path:
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg_cache) if xdg_cache else Path.home() / ".cache"
-    return base / "artificial-analysis"
+    return default_cache_dir()
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
@@ -488,37 +302,8 @@ def _add_fetch_parser(subparsers: _Subparsers) -> None:
             "a snapshot."
         ),
     )
-    _ = fetch_parser.add_argument(
-        "--output-json", type=Path, default=DEFAULT_OUTPUT_JSON
-    )
-    _ = fetch_parser.add_argument(
-        "--output-endpoints",
-        type=Path,
-        default=DEFAULT_OUTPUT_ENDPOINTS,
-    )
-    _ = fetch_parser.add_argument("--output-url", type=Path, default=DEFAULT_OUTPUT_URL)
-    _ = fetch_parser.add_argument(
-        "--cache-dir", type=Path, default=_default_cache_dir()
-    )
-    _ = fetch_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    _ = fetch_parser.add_argument("--min-endpoints", type=int, default=700)
-    _ = fetch_parser.add_argument("--min-providers", type=int, default=40)
-    _ = fetch_parser.add_argument(
-        "--stale-policy",
-        choices=("error", "allow-last-good"),
-        default="error",
-        help="Refresh failure policy; stale fallback is opt-in.",
-    )
-    _ = fetch_parser.add_argument(
-        "--allow-stale",
-        action="store_true",
-        help="Alias for --stale-policy allow-last-good.",
-    )
-    _ = fetch_parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Alias for --stale-policy error.",
-    )
+    for option in fetch_options():
+        option.add(fetch_parser)
     fetch_parser.set_defaults(handler=_handle_fetch)
 
 
@@ -533,7 +318,8 @@ def _add_stats_parser(subparsers: _Subparsers) -> None:
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    _ = stats_parser.add_argument("--top", type=int, default=10)
+    for option in STATS_OPTIONS:
+        option.add(stats_parser)
     stats_parser.set_defaults(handler=_handle_stats)
 
 
@@ -563,15 +349,6 @@ def _add_diagnose_parser(subparsers: _Subparsers) -> None:
     diagnose_parser.set_defaults(handler=_handle_diagnose)
 
 
-def _add_order(parser: argparse.ArgumentParser, *, default: str) -> None:
-    _ = parser.add_argument(
-        "--order",
-        type=str,
-        default=default,
-        choices=("auto", "asc", "desc"),
-    )
-
-
 def _add_evaluation_parser(subparsers: _Subparsers) -> None:
     evaluation_parser = subparsers.add_parser(
         "evaluation",
@@ -580,21 +357,8 @@ def _add_evaluation_parser(subparsers: _Subparsers) -> None:
     _ = evaluation_parser.add_argument(
         "url", nargs="?", help="public evaluation page URL"
     )
-    _ = evaluation_parser.add_argument(
-        "--input",
-        type=Path,
-        help="read a saved HTML/RSC response instead of fetching a URL",
-    )
-    _ = evaluation_parser.add_argument("--output-json", type=Path)
-    _ = evaluation_parser.add_argument("--timeout-seconds", type=float, default=60.0)
-    _ = evaluation_parser.add_argument("--min-rows", type=int, default=1)
-    _ = evaluation_parser.add_argument("--sort-by", type=str)
-    _ = evaluation_parser.add_argument(
-        "--order",
-        choices=("auto", "asc", "desc"),
-        default="auto",
-    )
-    _ = evaluation_parser.add_argument("--limit", type=int)
+    for option in EVALUATION_OPTIONS:
+        option.add(evaluation_parser)
     evaluation_parser.set_defaults(handler=_handle_evaluation)
 
 
@@ -609,41 +373,8 @@ def _add_query_parser(subparsers: _Subparsers) -> None:
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    _ = query_parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model slug/name contains filter.",
-    )
-    _ = query_parser.add_argument(
-        "--provider",
-        type=str,
-        default=None,
-        help="Provider slug/name contains filter.",
-    )
-    _ = query_parser.add_argument(
-        "--endpoint",
-        type=str,
-        default=None,
-        help="Endpoint slug contains filter.",
-    )
-    _ = query_parser.add_argument(
-        "--sort-by",
-        type=str,
-        default="intelligence",
-        choices=(
-            "intelligence",
-            "agentic",
-            "coding",
-            "math",
-            "price_blended",
-            "speed",
-            "ttfc",
-            "e2e",
-        ),
-    )
-    _add_order(query_parser, default="auto")
-    _ = query_parser.add_argument("--limit", type=int, default=20)
+    for option in QUERY_OPTIONS:
+        option.add(query_parser)
     query_parser.set_defaults(handler=_handle_query)
 
 
@@ -663,46 +394,8 @@ def _add_qa_parser(subparsers: _Subparsers) -> None:
         type=Path,
         default=DEFAULT_OUTPUT_JSON,
     )
-    _ = qa_parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Override inferred model filter.",
-    )
-    _ = qa_parser.add_argument(
-        "--provider",
-        type=str,
-        default=None,
-        help="Override inferred provider filter.",
-    )
-    _ = qa_parser.add_argument(
-        "--sort-by",
-        type=str,
-        default=None,
-        choices=(
-            "intelligence",
-            "agentic",
-            "coding",
-            "math",
-            "price_blended",
-            "speed",
-            "ttfc",
-            "e2e",
-        ),
-    )
-    _ = qa_parser.add_argument(
-        "--order",
-        type=str,
-        default=None,
-        choices=("asc", "desc"),
-        help="Override inferred order.",
-    )
-    _ = qa_parser.add_argument(
-        "--limit",
-        type=int,
-        default=None,
-        help="Override inferred result limit.",
-    )
+    for option in QA_OPTIONS:
+        option.add(qa_parser)
     qa_parser.set_defaults(handler=_handle_qa)
 
 
@@ -906,11 +599,6 @@ def _model_rows(snapshot: dict[str, object]) -> list[dict[str, object]]:
     return result
 
 
-def _artifact_record_metadata(record: dict[str, object]) -> dict[str, object]:
-    nested = record.get("metadata")
-    return nested if is_str_dict(nested) else {}
-
-
 def _cached_source_info(
     cache_dir: Path,
 ) -> tuple[bytes, dict[str, object]] | None:
@@ -918,189 +606,6 @@ def _cached_source_info(
     if cached is not None:
         return cached
     return None
-
-
-def _result_headers(result: object) -> dict[str, str]:
-    headers = getattr(result, "headers", None)
-    if not is_str_dict(headers):
-        return {}
-    return {str(k): str(v) for k, v in headers.items()}
-
-
-def _result_header(result: object, name: str) -> str | None:
-    headers = _result_headers(result)
-    value = headers.get(name)
-    if isinstance(value, str) and value:
-        return value
-    folded_name = name.casefold()
-    for key, candidate in headers.items():
-        if key.casefold() == folded_name and candidate:
-            return candidate
-    return None
-
-
-def _result_fetched_at(result: object) -> str:
-    value = getattr(result, "fetched_at", None)
-    return value if isinstance(value, str) else ""
-
-
-def _result_etag(result: object) -> str | None:
-    value = getattr(result, "etag", None)
-    if isinstance(value, str) and value:
-        return value
-    return _result_header(result, "etag")
-
-
-def _result_last_modified(result: object) -> str | None:
-    value = getattr(result, "last_modified", None)
-    if isinstance(value, str) and value:
-        return value
-    return _result_header(result, "last-modified")
-
-
-def _result_final_url(result: object, fallback: str | None = None) -> str | None:
-    value = getattr(result, "final_url", None)
-    return value if isinstance(value, str) and value else fallback
-
-
-def _result_sha256(result: object) -> str | None:
-    value = getattr(result, "sha256", None)
-    if isinstance(value, str) and value:
-        return value
-    body = getattr(result, "body", None)
-    if isinstance(body, str):
-        return hashlib.sha256(body.encode("utf-8")).hexdigest()
-    return None
-
-
-def _result_byte_length(result: object) -> int | None:
-    value = getattr(result, "byte_length", None)
-    if isinstance(value, int):
-        return value
-    body = getattr(result, "body", None)
-    if isinstance(body, str):
-        return len(body.encode("utf-8"))
-    return None
-
-
-def _result_artifact_ref(result: object) -> str | None:
-    value = getattr(result, "artifact_ref", None)
-    return value if isinstance(value, str) and value else None
-
-
-def _materialize_fetch_result(
-    result: object,
-    *,
-    fallback_url: str,
-) -> FetchResult:
-    if isinstance(result, FetchResult):
-        return result
-    body = getattr(result, "body", None)
-    status_code = getattr(result, "status_code", None)
-    fetched_at = _result_fetched_at(result)
-    if not isinstance(body, str) or not isinstance(status_code, int):
-        message = "FetchResult compatibility object is missing base fields"
-        raise TypeError(message)
-    return FetchResult(
-        body=body,
-        status_code=status_code,
-        headers=_result_headers(result),
-        fetched_at=fetched_at,
-        final_url=_result_final_url(result, fallback_url),
-        etag=_result_etag(result),
-        last_modified=_result_last_modified(result),
-        sha256=_result_sha256(result),
-        byte_length=_result_byte_length(result),
-        artifact_ref=_result_artifact_ref(result),
-    )
-
-
-def _validator_from(
-    cache_meta: object,
-    record: dict[str, object] | None,
-    name: str,
-) -> str | None:
-    value: object = None
-    if record is not None:
-        value = _artifact_record_metadata(record).get(name)
-    if not isinstance(value, str) and cache_meta is not None:
-        value = getattr(cache_meta, name, None)
-    return value if isinstance(value, str) and value else None
-
-
-def _validate_304(
-    result: FetchResult,
-    cached: tuple[bytes, dict[str, object]] | None,
-    *,
-    sent_etag: str | None,
-    sent_last_modified: str | None,
-) -> FetchResult:
-    if cached is None:
-        _raise_cache_failure(
-            "CACHE_MISSING",
-            "Upstream returned 304 but no matching cached artifact exists.",
-        )
-    raw, record = cached
-    cached_etag = _validator_from(None, record, "etag") or sent_etag
-    cached_last_modified = (
-        _validator_from(None, record, "last_modified") or sent_last_modified
-    )
-    response_etag = _result_etag(result)
-    response_last_modified = _result_last_modified(result)
-    if (
-        response_etag is not None
-        and cached_etag is not None
-        and response_etag != cached_etag
-    ) or (
-        response_last_modified is not None
-        and cached_last_modified is not None
-        and response_last_modified != cached_last_modified
-    ):
-        _raise_cache_failure(
-            "CACHE_VALIDATOR_INVALID",
-            "Upstream returned a validator that does not match cached bytes.",
-            {
-                "etag_sent": sent_etag,
-                "etag_received": response_etag,
-                "last_modified_sent": sent_last_modified,
-                "last_modified_received": response_last_modified,
-            },
-        )
-    if not any(
-        (
-            response_etag,
-            response_last_modified,
-            cached_etag,
-            cached_last_modified,
-        ),
-    ):
-        _raise_cache_failure(
-            "CACHE_VALIDATOR_INVALID",
-            "Upstream returned 304 without a returned or known validator.",
-        )
-    body = raw.decode("utf-8", errors="replace")
-    digest = hashlib.sha256(raw).hexdigest()
-    return FetchResult(
-        body=body,
-        status_code=NOT_MODIFIED,
-        headers=dict(_result_headers(result)),
-        fetched_at=_result_fetched_at(result),
-        final_url=_result_final_url(result),
-        last_modified=response_last_modified or cached_last_modified,
-        sha256=digest,
-        byte_length=len(raw),
-        artifact_ref=(
-            str(record.get("raw_path")) if record.get("raw_path") is not None else None
-        ),
-    )
-
-
-def _raise_cache_failure(
-    code: str,
-    message: str,
-    details: dict[str, object] | None = None,
-) -> NoReturn:
-    raise CacheError(code, message, details)
 
 
 def _stale_allowed(args: argparse.Namespace) -> bool:
@@ -1218,8 +723,8 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
     cache_meta = load_cache_metadata(cache_dir)
     cached = _cached_source_info(cache_dir)
     cached_record = cached[1] if cached is not None else None
-    sent_etag = _validator_from(cache_meta, cached_record, "etag")
-    sent_last_modified = _validator_from(cache_meta, cached_record, "last_modified")
+    sent_etag = validator_from(cache_meta, cached_record, "etag")
+    sent_last_modified = validator_from(cache_meta, cached_record, "last_modified")
     result: FetchResult | None = None
     official_result: FetchResult | None = None
     response_etag: str | None = sent_etag
@@ -1236,9 +741,9 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
             if_none_match=sent_etag,
             if_modified_since=sent_last_modified,
         )
-        result = _materialize_fetch_result(result, fallback_url=BASE_URL)
+        result = materialize_fetch_result(result, fallback_url=BASE_URL)
         if result.status_code == NOT_MODIFIED:
-            result = _validate_304(
+            result = validate_304(
                 result,
                 cached,
                 sent_etag=sent_etag,
@@ -1246,9 +751,9 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
             )
             reused_cached_body = True
             freshness = "cache-revalidated"
-        response_etag = _result_etag(result) or sent_etag
-        response_last_modified = _result_last_modified(result) or sent_last_modified
-        official_result = _materialize_fetch_result(
+        response_etag = result_etag(result) or sent_etag
+        response_last_modified = result_last_modified(result) or sent_last_modified
+        official_result = materialize_fetch_result(
             fetch_models(api_key, timeout_seconds=timeout_seconds),
             fallback_url=(
                 os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL
@@ -1318,21 +823,21 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
     if not fallback_used and result is not None:
         save_cache(
             cache_dir=cache_dir,
-            fetched_at=_result_fetched_at(result),
+            fetched_at=result_fetched_at(result),
             status_code=result.status_code,
             etag=response_etag,
             last_modified=response_last_modified,
             body=None if result.status_code == NOT_MODIFIED else result.body,
             source_url=BASE_URL,
-            final_url=_result_final_url(result),
-            headers=_result_headers(result),
+            final_url=result_final_url(result),
+            headers=result_headers(result),
         )
         _ = save_last_good_snapshot(cache_dir, payload)
 
     rsc_source: dict[str, object] = {
         "url": redact_query(BASE_URL),
         "final_url": (
-            redact_query(_result_final_url(result, BASE_URL) or BASE_URL)
+            redact_query(result_final_url(result, BASE_URL) or BASE_URL)
             if result is not None
             else None
         ),
@@ -1341,9 +846,9 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
         "etag_received": response_etag,
         "last_modified_sent": sent_last_modified,
         "last_modified_received": response_last_modified,
-        "sha256": _result_sha256(result) if result is not None else None,
-        "byte_length": _result_byte_length(result) if result is not None else None,
-        "artifact_ref": _result_artifact_ref(result) if result is not None else None,
+        "sha256": result_sha256(result) if result is not None else None,
+        "byte_length": result_byte_length(result) if result is not None else None,
+        "artifact_ref": result_artifact_ref(result) if result is not None else None,
         "reused_cached_payload": reused_cached_body,
         "freshness": freshness,
     }
@@ -1354,7 +859,7 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
         "url": api_url,
         "final_url": (
             redact_query(
-                _result_final_url(
+                result_final_url(
                     official_result,
                     os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL,
                 )
@@ -1367,23 +872,21 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
             official_result.status_code if official_result is not None else None
         ),
         "etag_received": (
-            _result_etag(official_result) if official_result is not None else None
+            result_etag(official_result) if official_result is not None else None
         ),
         "last_modified_received": (
-            _result_last_modified(official_result)
+            result_last_modified(official_result)
             if official_result is not None
             else None
         ),
         "sha256": (
-            _result_sha256(official_result) if official_result is not None else None
+            result_sha256(official_result) if official_result is not None else None
         ),
         "byte_length": (
-            _result_byte_length(official_result)
-            if official_result is not None
-            else None
+            result_byte_length(official_result) if official_result is not None else None
         ),
         "artifact_ref": (
-            _result_artifact_ref(official_result)
+            result_artifact_ref(official_result)
             if official_result is not None
             else None
         ),
@@ -1446,7 +949,7 @@ def _stats_payload(args: argparse.Namespace) -> dict[str, object]:
         ],
         "overlap": _snapshot_overlap(snapshot),
     }
-    return _attach_payload_evidence(payload)
+    return attach_payload_evidence(payload)
 
 
 def _diff_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -1496,7 +999,7 @@ def _diff_payload(args: argparse.Namespace) -> dict[str, object]:
     }
     if bool(getattr(args, "schema_aware", False)):
         payload["schema_diff"] = schema_aware_diff(old_snapshot, new_snapshot)
-    return _attach_payload_evidence(payload)
+    return attach_payload_evidence(payload)
 
 
 def _diagnose_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -1548,21 +1051,21 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
             _raise_cli_usage_error("evaluation requires --url when --input is absent")
         if urlsplit(url_arg).scheme.casefold() != "https":
             _raise_cli_usage_error("evaluation public URL must use HTTPS")
-        result = _materialize_fetch_result(
+        result = materialize_fetch_result(
             fetch_page(url_arg, timeout_seconds=timeout_seconds),
             fallback_url=url_arg,
         )
         body = result.body
         source_url = redact_query(url_arg)
         source_status = result.status_code
-        fetched_at = _result_fetched_at(result)
-        content_type = _result_header(result, "content-type")
+        fetched_at = result_fetched_at(result)
+        content_type = result_header(result, "content-type")
         freshness = "fresh"
-        final_url = redact_query(_result_final_url(result, url_arg) or url_arg)
-        etag = _result_etag(result)
-        last_modified = _result_last_modified(result)
-        digest = _result_sha256(result)
-        byte_length = _result_byte_length(result)
+        final_url = redact_query(result_final_url(result, url_arg) or url_arg)
+        etag = result_etag(result)
+        last_modified = result_last_modified(result)
+        digest = result_sha256(result)
+        byte_length = result_byte_length(result)
 
     frames = parse_next_payload(body)
     manifest = extract_evaluation_manifest(frames)
@@ -1589,7 +1092,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
             for key, value in row.items()
             if key not in {"value_status", "raw_fields", "unknowns"}
             and (
-                _numeric_scalar(value)
+                numeric_scalar(value)
                 or value is None
                 or key.casefold() in {"score", "value", "metric", "rank", "rating"}
             )
@@ -1611,7 +1114,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
             "intelligenceindex",
             "gdppdfallpass",
         }
-        _ = _attach_row_evidence(
+        _ = attach_row_evidence(
             row,
             metric_paths=metric_paths,
             source_prefix=f"$.rows[{row_index}]",
@@ -1682,7 +1185,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
             },
         },
     }
-    _ = _attach_payload_evidence(payload, artifact_hash=digest)
+    _ = attach_payload_evidence(payload, artifact_hash=digest)
     if output_json_path is not None:
         atomic_write(
             output_json_path,
@@ -1712,7 +1215,7 @@ def _evaluation_payload(args: argparse.Namespace) -> dict[str, object]:
         "overlap": overlap_metadata(),
         "derived": payload["derived"],
     }
-    return _attach_payload_evidence(result_payload, artifact_hash=digest)
+    return attach_payload_evidence(result_payload, artifact_hash=digest)
 
 
 def _nested_sort_metric(
@@ -1721,7 +1224,7 @@ def _nested_sort_metric(
     *,
     reverse: bool,
 ) -> tuple[int, float]:
-    current: object = _lookup_path(row, path)
+    current: object = lookup_path(row, path)
     evidence = _as_dict(row.get("metric_evidence"))
     target_evidence = evidence.get(path)
     if is_str_dict(target_evidence):
@@ -1829,7 +1332,7 @@ def _query_row(
             if is_object_list(preserved):
                 row[preserved_key] = list(preserved)
                 break
-    _ = _attach_row_evidence(
+    _ = attach_row_evidence(
         row,
         metric_paths=(
             "intelligence",
@@ -1950,7 +1453,7 @@ def _query_payload(args: argparse.Namespace) -> dict[str, object]:
         "rows": limited,
         "overlap": _snapshot_overlap(snapshot),
     }
-    return _attach_payload_evidence(payload)
+    return attach_payload_evidence(payload)
 
 
 def _resolve_reverse(*, sort_key: str, order: str) -> bool:
@@ -2093,7 +1596,7 @@ def _qa_payload(args: argparse.Namespace) -> dict[str, object]:
             },
         },
     }
-    return _attach_payload_evidence(payload)
+    return attach_payload_evidence(payload)
 
 
 def _normalize_for_match(value: str) -> str:
@@ -2272,10 +1775,10 @@ def _compare_payload(args: argparse.Namespace) -> dict[str, object]:
         for row in rows_val:
             if is_str_dict(row):
                 source_index = model_positions[row.get("slug")]
-                _ = _attach_row_evidence(
+                _ = attach_row_evidence(
                     row,
                     source_prefix=f"$.models[{source_index}]",
-                    artifact_hash=_source_hash_from_payload(snapshot),
+                    artifact_hash=source_hash_from_payload(snapshot),
                 )
     return payload
 
@@ -2315,32 +1818,12 @@ def _capability_schema() -> dict[str, object]:
                     "by ETag, and write outputs."
                 ),
                 "outputs": ["full-data.json", "endpoints.txt", "full-url.txt"],
-                "flags": {
-                    "output_json": (
-                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
-                        + "full-data.json)"
-                    ),
-                    "output_endpoints": (
-                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
-                        + "endpoints.txt)"
-                    ),
-                    "output_url": (
-                        "Path (default <temp-dir>/artifacts/artificial-analysis/"
-                        + "full-url.txt)"
-                    ),
-                    "cache_dir": "Path to ETag/Last-Modified/payload cache",
-                    "timeout_seconds": "float network timeout",
-                    "min_endpoints": "int sanity threshold (default 700)",
-                    "min_providers": "int sanity threshold (default 40)",
-                    "stale_policy": "error|allow-last-good (default error)",
-                    "allow_stale": "bool alias for stale_policy allow-last-good",
-                    "strict": "bool alias for stale_policy error",
-                },
+                "flags": schema_options(fetch_options()),
             },
             "stats": {
                 "description": "Read a snapshot and return counts + top providers.",
                 "args": ["snapshot (optional)"],
-                "flags": {"top": "int top N providers (default 10)"},
+                "flags": schema_options(STATS_OPTIONS),
             },
             "diff": {
                 "description": (
@@ -2370,15 +1853,7 @@ def _capability_schema() -> dict[str, object]:
                     "Analysis evaluation page or saved HTML/RSC response."
                 ),
                 "args": ["url (optional when input is supplied)"],
-                "flags": {
-                    "input": "Path to saved HTML/RSC response",
-                    "output_json": ("Optional path for the full extracted row set"),
-                    "timeout_seconds": "float network timeout",
-                    "min_rows": "minimum recognizable rows (default 1)",
-                    "sort_by": "optional dotted numeric field path",
-                    "order": "auto|asc|desc",
-                    "limit": "optional maximum returned rows",
-                },
+                "flags": schema_options(EVALUATION_OPTIONS),
                 "value_status": "published rows; filters/counts are derived",
             },
             "query": {
@@ -2386,16 +1861,7 @@ def _capability_schema() -> dict[str, object]:
                     "Filter/sort endpoint benchmark rows by model/provider/endpoint."
                 ),
                 "args": ["snapshot (optional)"],
-                "flags": {
-                    "model": "str contains filter on model slug/name",
-                    "provider": "str contains filter on provider slug/name",
-                    "endpoint": "str contains filter on endpoint slug",
-                    "sort_by": (
-                        "intelligence|agentic|coding|math|price_blended|speed|ttfc|e2e"
-                    ),
-                    "order": "auto|asc|desc",
-                    "limit": "int max rows (default 20)",
-                },
+                "flags": schema_options(QUERY_OPTIONS),
             },
             "qa": {
                 "description": (
@@ -2403,13 +1869,7 @@ def _capability_schema() -> dict[str, object]:
                     "filters/sort and returns query output."
                 ),
                 "args": ["question", "snapshot (optional)"],
-                "flags": {
-                    "model": "override inferred model",
-                    "provider": "override inferred provider",
-                    "sort_by": "override inferred metric",
-                    "order": "override inferred order",
-                    "limit": "override inferred limit",
-                },
+                "flags": schema_options(QA_OPTIONS),
             },
             "compare": {
                 "description": (
@@ -2501,11 +1961,6 @@ def _arg_value(args: dict[str, object], key: str, default: object = None) -> obj
     return args.get(camel, default)
 
 
-def _dict_str(args: dict[str, object], key: str, default: str = "") -> str:
-    val = _arg_value(args, key, default)
-    return val if isinstance(val, str) else default
-
-
 def _dict_optional_str(
     args: dict[str, object], key: str, default: str | None = None
 ) -> str | None:
@@ -2535,89 +1990,35 @@ def _dict_optional_path(
     return default
 
 
-def _dict_int(args: dict[str, object], key: str, default: int = 0) -> int:
-    val = _arg_value(args, key, default)
-    if isinstance(val, int) and not isinstance(val, bool):
-        return val
-    if isinstance(val, float):
-        return int(val)
-    if isinstance(val, (str, bytes, bytearray)):
-        try:
-            return int(val)
-        except ValueError:
-            return default
-    return default
-
-
-def _dict_optional_int(
-    args: dict[str, object], key: str, default: int | None = None
-) -> int | None:
-    val = _arg_value(args, key, default)
-    if val is None:
-        return None
-    if isinstance(val, int) and not isinstance(val, bool):
-        return val
-    if isinstance(val, float):
-        return int(val)
-    if isinstance(val, (str, bytes, bytearray)):
-        try:
-            return int(val)
-        except ValueError:
-            return default
-    return default
-
-
-def _dict_float(args: dict[str, object], key: str, default: float = 0.0) -> float:
-    val = _arg_value(args, key, default)
-    if isinstance(val, (int, float)) and not isinstance(val, bool):
-        return float(val)
-    if isinstance(val, (str, bytes, bytearray)):
-        try:
-            return float(val)
-        except ValueError:
-            return default
-    return default
-
-
 def _dict_bool(args: dict[str, object], key: str, default: bool = False) -> bool:
     val = _arg_value(args, key, default)
     return bool(val)
 
 
 def _fetch_namespace(args: dict[str, object]) -> argparse.Namespace:
-    return argparse.Namespace(
-        output_json=_dict_path(args, "output_json", DEFAULT_OUTPUT_JSON),
-        output_endpoints=_dict_path(args, "output_endpoints", DEFAULT_OUTPUT_ENDPOINTS),
-        output_url=_dict_path(args, "output_url", DEFAULT_OUTPUT_URL),
-        cache_dir=_dict_path(args, "cache_dir", _default_cache_dir()),
-        timeout_seconds=_dict_float(args, "timeout_seconds", 60.0),
-        min_endpoints=_dict_int(args, "min_endpoints", 700),
-        min_providers=_dict_int(args, "min_providers", 40),
-        stale_policy=_dict_str(args, "stale_policy", "error"),
-        allow_stale=_dict_bool(args, "allow_stale", False),
-        strict=_dict_bool(args, "strict", False),
-    )
+    return argparse.Namespace(**_request_options(fetch_options(), args))
+
+
+def _request_options(
+    options: tuple[Option, ...], args: dict[str, object]
+) -> dict[str, object]:
+    try:
+        return decode_options(options, args)
+    except (TypeError, ValueError) as exc:
+        raise CliUsageError(str(exc)) from exc
 
 
 def _stats_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
         snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
-        top=_dict_int(args, "top", 10),
+        **_request_options(STATS_OPTIONS, args),
     )
 
 
 def _evaluation_namespace(args: dict[str, object]) -> argparse.Namespace:
-    input_path = _dict_optional_path(args, "input")
-    output_json_path = _dict_optional_path(args, "output_json")
     return argparse.Namespace(
         url=_dict_optional_str(args, "url"),
-        input=input_path,
-        output_json=output_json_path,
-        timeout_seconds=_dict_float(args, "timeout_seconds", 60.0),
-        min_rows=_dict_int(args, "min_rows", 1),
-        sort_by=_dict_optional_str(args, "sort_by"),
-        order=_dict_str(args, "order", "auto"),
-        limit=_dict_optional_int(args, "limit"),
+        **_request_options(EVALUATION_OPTIONS, args),
     )
 
 
@@ -2650,12 +2051,7 @@ def _diagnose_namespace(args: dict[str, object]) -> argparse.Namespace:
 def _query_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
         snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
-        model=_dict_optional_str(args, "model"),
-        provider=_dict_optional_str(args, "provider"),
-        endpoint=_dict_optional_str(args, "endpoint"),
-        sort_by=_dict_str(args, "sort_by", "intelligence"),
-        order=_dict_str(args, "order", "auto"),
-        limit=_dict_int(args, "limit", 20),
+        **_request_options(QUERY_OPTIONS, args),
     )
 
 
@@ -2667,11 +2063,7 @@ def _qa_namespace(args: dict[str, object]) -> argparse.Namespace:
     return argparse.Namespace(
         question=question,
         snapshot=_dict_path(args, "snapshot", DEFAULT_OUTPUT_JSON),
-        model=_dict_optional_str(args, "model"),
-        provider=_dict_optional_str(args, "provider"),
-        sort_by=_dict_optional_str(args, "sort_by"),
-        order=_dict_optional_str(args, "order"),
-        limit=_dict_optional_int(args, "limit"),
+        **_request_options(QA_OPTIONS, args),
     )
 
 

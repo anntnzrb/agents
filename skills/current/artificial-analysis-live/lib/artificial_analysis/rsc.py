@@ -1156,7 +1156,7 @@ def _normalize_current_rows(
             endpoints.append(endpoint)
     if not endpoints:
         return None
-    return _deduplicate_endpoints(
+    return _deduplicate_models(
         endpoints,
         source_path=source_path,
         diagnostics=diagnostics,
@@ -1379,30 +1379,6 @@ def _looks_like_current_endpoint_rows(value: list[object]) -> bool:
     return hits >= max(1, len(sample) // 2)
 
 
-def _deduplicate_endpoints(
-    rows: list[dict[str, object]],
-    *,
-    source_path: str | None,
-    diagnostics: list[Diagnostic] | None,
-) -> list[dict[str, object]]:
-    def key(row: object) -> str | None:
-        if is_str_dict(row):
-            val = row.get("slug")
-            return val if isinstance(val, str) else None
-        return None
-
-    return [
-        row
-        for row in classify_duplicate_rows(
-            rows,
-            identity=key,
-            source_path=source_path,
-            diagnostics=diagnostics,
-        )
-        if isinstance(row, dict)
-    ]
-
-
 def _normalize_provider_rows(
     rows: list[object],
     *,
@@ -1462,7 +1438,7 @@ def _normalize_provider_rows(
             diagnostics=diagnostics,
         )
     if kind == "hostsModels":
-        return _deduplicate_endpoints(
+        return _deduplicate_models(
             normalized_rows,
             source_path=source_path,
             diagnostics=diagnostics,

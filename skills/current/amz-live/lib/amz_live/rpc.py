@@ -7,9 +7,8 @@ from typing import Literal, NotRequired, TextIO, TypedDict, TypeIs, overload
 from .models import AmazonLiveSearchError
 from .protocol import (
     PROTOCOL_VERSION,
-    build_llm_json,
+    SearchRequest,
     get_schema_document,
-    search_and_filter,
 )
 
 RequestId = str | int | float | None
@@ -157,27 +156,7 @@ def _handle_search(request: Mapping[str, object]) -> RpcSuccessResponse:
     detail_limit = _read_int(request, "detailLimit", default=None, minimum=0)
     scoring = _read_optional_bool(request, "scoring") or False
 
-    raw_results, filtered_results, details_by_asin, detail_attempted, scores_by_asin = (
-        search_and_filter(
-            query=query,
-            html_path=html_path,
-            page=page,
-            pages=pages,
-            amazon_sort=amazon_sort,
-            zip_code=zip_code,
-            min_rating=min_rating,
-            max_price=max_price,
-            badge=badge,
-            title_contains=title_contains,
-            include=include,
-            exclude=exclude,
-            limit=limit,
-            details=details,
-            detail_limit=detail_limit,
-            scoring=scoring,
-        )
-    )
-    payload = build_llm_json(
+    payload, _ = SearchRequest(
         query=query,
         html_path=html_path,
         page=page,
@@ -191,15 +170,10 @@ def _handle_search(request: Mapping[str, object]) -> RpcSuccessResponse:
         include=include,
         exclude=exclude,
         limit=limit,
-        raw_results=raw_results,
-        filtered_results=filtered_results,
         details=details,
         detail_limit=detail_limit,
-        details_by_asin=details_by_asin,
-        detail_attempted=detail_attempted,
         scoring=scoring,
-        scores_by_asin=scores_by_asin,
-    )
+    ).execute()
     return _success_response(command="search", data=payload, request_id=request_id)
 
 

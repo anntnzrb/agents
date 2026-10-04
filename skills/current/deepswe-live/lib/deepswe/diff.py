@@ -9,11 +9,13 @@ before touching metric values, and keeps unavailable source states visible.
 
 import copy
 import json
-import math
 from collections.abc import Iterable, Mapping, Sequence
-from numbers import Real
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
+if TYPE_CHECKING:
+    from numbers import Real
+
+from .contracts import finite_number as _numeric
 from .contracts import is_mapping, is_sequence
 from .identity import canonical_identity, identity_json
 
@@ -121,17 +123,6 @@ def _rows(snapshot: object) -> list[Mapping[str, object]]:
     ):
         return [snapshot]
     return []
-
-
-def _numeric(value: object) -> Real | None:
-    if isinstance(value, bool) or not isinstance(value, Real):
-        return None
-    try:
-        if not math.isfinite(float(value)):
-            return None
-    except OverflowError, ValueError:
-        return None
-    return value
 
 
 def _as_reasons(value: object) -> tuple[str, ...]:

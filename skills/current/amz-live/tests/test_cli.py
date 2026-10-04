@@ -3,15 +3,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 from amz_live.cli import main
-from amz_live.protocol import serialize_results
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
-    from decimal import Decimal
+    from collections.abc import Callable
 
     import pytest
 
-    from amz_live.models import SearchResult
     from amz_live.protocol import SearchResultsPayload
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "search_results_fragment.html"
@@ -19,11 +16,6 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "search_results_fragment.htm
 
 class _ScoredResult(TypedDict):
     asin: str
-    score: float
-    reasons: list[str]
-
-
-class _FakeScore(TypedDict):
     score: float
     reasons: list[str]
 
@@ -209,72 +201,9 @@ def test_cli_schema_output_shape(
 
 
 def test_cli_llm_json_scoring_mode_emits_scores_and_reasons(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    scoring_boundary: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    score_map: dict[str, _FakeScore] = {
-        "B07CWC39TL": {"score": 0.97, "reasons": ["best title match", "best price"]},
-        "B0CG1LGWR6": {"score": 0.72, "reasons": ["strong rating"]},
-        "B0CHJF41K4": {"score": 0.41, "reasons": ["weaker title match"]},
-    }
-
-    def fake_build_llm_json(
-        *,
-        query: str,
-        html_path: str | None,
-        page: int,
-        pages: int,
-        amazon_sort: str | None,
-        min_rating: float | Decimal | None,
-        max_price: float | Decimal | None,
-        badge: str | None,
-        title_contains: str | None,
-        include: Sequence[str] | None,
-        exclude: Sequence[str] | None,
-        limit: int | None,
-        raw_results: Sequence[SearchResult],
-        filtered_results: Sequence[SearchResult],
-        scoring: bool = False,
-        **_rest: object,
-    ) -> dict[str, object]:
-        assert scoring is True
-        ranked_results = sorted(
-            filtered_results,
-            key=lambda result: score_map[result.asin]["score"],
-            reverse=True,
-        )
-        results = serialize_results(ranked_results)
-        for item in results:
-            entry = score_map[item["asin"]]
-            item["score"] = entry["score"]
-            item["reasons"] = entry["reasons"]
-        return {
-            "type": "amz-live.search_results",
-            "version": "1",
-            "ok": True,
-            "source": {"mode": "html", "html_path": html_path},
-            "query": {
-                "keywords": query,
-                "page": page,
-                "pages": pages,
-                "amazon_sort": amazon_sort,
-            },
-            "filters": {
-                "min_rating": min_rating,
-                "max_price": max_price,
-                "badge": badge,
-                "title_contains": title_contains,
-                "include": list(include or []),
-                "exclude": list(exclude or []),
-                "limit": limit,
-            },
-            "summary": {
-                "raw_result_count": len(raw_results),
-                "returned_result_count": len(ranked_results),
-            },
-            "results": results,
-        }
-
-    monkeypatch.setattr("amz_live.cli.build_llm_json", fake_build_llm_json)
+    del scoring_boundary
 
     exit_code = main(
         [
