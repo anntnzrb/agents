@@ -44,6 +44,8 @@ Control the daemon through systemd, not `paseo daemon start` or `paseo daemon st
    tailscale serve status
    ```
 
+Agents launched by the service inherit its `PATH`, which includes `~/.local/bin`, so they can orchestrate other agents with `paseo run` and `paseo agent`. An agent started this way becomes a subagent of its caller. Pi agents need this CLI because Paseo does not inject its tools into Pi; omp agents receive them natively.
+
 ## Connect a client
 
 - **Browser:** open `https://<host>.<tailnet>.ts.net:6767/`.
