@@ -21,7 +21,6 @@ from sync.core.harness import SyncEnv
 from sync.core.services import (
     AMP_RUNNER_LABEL,
     AMP_RUNNER_UPDATE_LABEL,
-    AUTH_GATEWAY_ENV,
     CACHE_GC_LABEL,
     LAUNCHD_LABEL,
     T3_REFRESH_LABEL,
@@ -166,10 +165,10 @@ def _names(units: Sequence[UserUnit]) -> set[str]:
 def test_updater_units_need_a_git_checkout(home: Path) -> None:
     """Without a git checkout there is nothing to pull, so no updater."""
     (home / ".config" / "agents").mkdir(parents=True)
-    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+    assert _names(declared_user_units(_linux(home))) == set()
 
     _git_checkout(home)
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    units = {u.name: u for u in declared_user_units(_linux(home))}
     assert set(units) == {"agents-update.service", "agents-update.timer"}
     service = units["agents-update.service"].content
     assert "sync-current/.venv/bin/python -m sync.cli update" in service
@@ -179,88 +178,10 @@ def test_updater_units_need_a_git_checkout(home: Path) -> None:
     assert "[Install]" not in service
 
 
-def test_gateway_units_only_on_gateway_host(home: Path) -> None:
-    """The gateway runs on its host; the Funnel auth gateway needs its env file."""
-    (home / ".config" / "agents").mkdir(parents=True)
-    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
-
-    names = _names(declared_user_units(_linux(home), gateway_host=True))
-    assert names == {"cliproxyapi.service"}
-
-    env_file = home / ".cli-proxy-api" / AUTH_GATEWAY_ENV
-    env_file.parent.mkdir(parents=True)
-    _ = env_file.write_text("GATEWAY_SECRET=x\n")
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=True)}
-    assert set(units) == {"cliproxyapi.service", "cliproxy-auth-gateway.service"}
-    gateway = units["cliproxy-auth-gateway.service"].content
-    assert f"EnvironmentFile={env_file}" in gateway
-    assert "auth-gateway.py" in gateway
-    assert f"ExecStart={home}/.local/bin/cli-proxy-api" in (
-        units["cliproxyapi.service"].content
-    )
-
-
-def test_gateway_unit_changes_when_its_launcher_changes(home: Path) -> None:
-    """A new CLIProxyAPI release rewrites the launcher; the gateway must restart."""
-    (home / ".config" / "agents").mkdir(parents=True)
-    launcher = home / ".local" / "bin" / "cli-proxy-api"
-    launcher.parent.mkdir(parents=True)
-
-    def gateway_unit() -> str:
-        units = declared_user_units(_linux(home), gateway_host=True)
-        return next(u.content for u in units if u.name == "cliproxyapi.service")
-
-    _ = launcher.write_text("exec .../versions/8.0.2/cli-proxy-api\n")
-    old = gateway_unit()
-    _ = launcher.write_text("exec .../versions/8.0.3/cli-proxy-api\n")
-    assert gateway_unit() != old
-
-
-def test_auth_gateway_unit_changes_when_its_env_changes(home: Path) -> None:
-    """A rotated token must restart the gateway, so the unit tracks its env."""
-    (home / ".config" / "agents").mkdir(parents=True)
-    env_file = home / ".cli-proxy-api" / AUTH_GATEWAY_ENV
-    env_file.parent.mkdir(parents=True)
-
-    def auth_unit() -> str:
-        units = declared_user_units(_linux(home), gateway_host=True)
-        return next(u.content for u in units if u.name.startswith("cliproxy-auth"))
-
-    _ = env_file.write_text("GATEWAY_SECRET=old\n")
-    before = auth_unit()
-    _ = env_file.write_text("GATEWAY_SECRET=new\n")
-
-    assert auth_unit() != before
-    assert "GATEWAY_SECRET" not in auth_unit()
-
-
-def test_auth_gateway_unit_changes_when_its_script_changes(home: Path) -> None:
-    """New gateway code must restart the gateway, so the unit tracks its script."""
-    env_file = home / ".cli-proxy-api" / AUTH_GATEWAY_ENV
-    env_file.parent.mkdir(parents=True)
-    _ = env_file.write_text("GATEWAY_SECRET=x\n")
-    script = home / ".config" / "agents" / "tools" / "cliproxyapi" / "auth-gateway.py"
-    script.parent.mkdir(parents=True)
-
-    def auth_unit() -> str:
-        units = declared_user_units(_linux(home), gateway_host=True)
-        return next(u.content for u in units if u.name.startswith("cliproxy-auth"))
-
-    _ = script.write_text("old = 1\n")
-    before = auth_unit()
-    _ = script.write_text("new = 2\n")
-
-    assert auth_unit() != before
-
-
 def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> None:
     """On macOS the updater is a launch agent; no systemd units are written."""
     _git_checkout(home)
-    asyncio.run(
-        reconcile_services(
-            SyncEnv.from_home(str(home), platform="darwin"), gateway_host=True
-        )
-    )
+    asyncio.run(reconcile_services(SyncEnv.from_home(str(home), platform="darwin")))
 
     assert not _unit_dir(home).exists()
     plist = (home / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist").read_text()
@@ -283,10 +204,10 @@ def test_amp_runner_unit_only_on_declared_hosts(
     """The runner serves repos and the SSOT from a neutral working directory."""
     monkeypatch.setattr("socket.gethostname", lambda: "munich")
     _declare_runner_hosts(home, ["oulu"])
-    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+    assert _names(declared_user_units(_linux(home))) == set()
 
     _declare_runner_hosts(home, ["oulu", "munich"])
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    units = {u.name: u for u in declared_user_units(_linux(home))}
     runner = units["amp-runner-agents.service"].content
     assert "WorkingDirectory=%h" in runner
     assert f"ExecStart={home}/.local/bin/amp --no-tui --runner-id munich " in runner
@@ -316,10 +237,10 @@ def test_codex_server_only_on_declared_hosts(
     deployment.mkdir(parents=True)
     manifest = deployment / "deployment.json"
     _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
-    assert declared_user_units(_linux(home), gateway_host=False) == []
+    assert declared_user_units(_linux(home)) == []
 
     _ = manifest.write_text(json.dumps({"hosts": ["Munich"]}))
-    units = declared_user_units(_linux(home), gateway_host=False)
+    units = declared_user_units(_linux(home))
     assert _names(units) == {"codex-app-server.service", "codex-app-server.timer"}
     service = units[0].content
     assert f"ExecStart={home}/.local/bin/codex app-server daemon start" in service
@@ -336,7 +257,7 @@ def test_codex_server_only_on_declared_hosts(
     assert calls == []
 
     _ = manifest.write_text(json.dumps({"hosts": []}))
-    _reconcile(home, declared_user_units(_linux(home), gateway_host=False))
+    _reconcile(home, declared_user_units(_linux(home)))
     assert [
         "systemctl",
         "--user",
@@ -366,10 +287,10 @@ def test_codex_server_macos_health_check_only_on_declared_hosts(
     assert "<key>RunAtLoad</key><true/>" in content
     assert "<key>AbandonProcessGroup</key><true/>" in content
     assert "KeepAlive" not in content
-    asyncio.run(reconcile_services(env, gateway_host=False))
+    asyncio.run(reconcile_services(env))
     assert any("bootstrap" in call for call in calls)
     calls.clear()
-    asyncio.run(reconcile_services(env, gateway_host=False))
+    asyncio.run(reconcile_services(env))
     assert calls == []
 
 
@@ -379,10 +300,10 @@ def test_t3_model_refresh_timer_only_on_declared_t3_hosts(
     """Each T3 host refreshes Claude's gateway models on a timer, off the sync path."""
     monkeypatch.setattr("socket.gethostname", lambda: "munich")
     _declare_t3_hosts(home, ["oulu"])
-    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+    assert _names(declared_user_units(_linux(home))) == set()
 
     _declare_t3_hosts(home, ["oulu", "Munich"])
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    units = {u.name: u for u in declared_user_units(_linux(home))}
     assert set(units) == {
         "t3-refresh-models.service",
         "t3-refresh-models.timer",
@@ -413,10 +334,10 @@ def test_cache_gc_runs_nightly_only_on_declared_hosts(
     """A declared host sweeps package caches nightly at idle priority."""
     monkeypatch.setattr("socket.gethostname", lambda: "oulu")
     _declare_cache_gc_hosts(home, ["munich"])
-    assert _names(declared_user_units(_linux(home), gateway_host=False)) == set()
+    assert _names(declared_user_units(_linux(home))) == set()
 
     _declare_cache_gc_hosts(home, ["munich", "Oulu"])
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    units = {u.name: u for u in declared_user_units(_linux(home))}
     assert set(units) == {"cache-gc.service", "cache-gc.timer"}
     service = units["cache-gc.service"].content
     assert f"{home}/.config/agents/tools/cache-gc/cache_gc.py" in service
@@ -454,10 +375,10 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
     deployment.mkdir(parents=True)
     manifest = deployment / "deployment.json"
     _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
-    assert declared_user_units(_linux(home), gateway_host=False) == []
+    assert declared_user_units(_linux(home)) == []
 
     _ = manifest.write_text(json.dumps({"hosts": ["Munich"]}))
-    units = {u.name: u for u in declared_user_units(_linux(home), gateway_host=False)}
+    units = {u.name: u for u in declared_user_units(_linux(home))}
     assert set(units) == {"paseo.service", "paseo-update.service", "paseo-update.timer"}
     updater = units["paseo-update.service"].content
     assert "Type=oneshot" in updater
@@ -482,7 +403,7 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
 
     calls.clear()
     _ = manifest.write_text(json.dumps({"hosts": []}))
-    _reconcile(home, declared_user_units(_linux(home), gateway_host=False))
+    _reconcile(home, declared_user_units(_linux(home)))
     assert ["systemctl", "--user", "disable", "--now", "paseo.service"] in calls
 
 
@@ -543,18 +464,18 @@ def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
     agents_dir.mkdir(parents=True)
     _ = (agents_dir / "hand.made.plist").write_text("<plist/>")
 
-    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    asyncio.run(reconcile_services(darwin))
     bootstrapped = [c[3] for c in calls if c[:2] == ["launchctl", "bootstrap"]]
     assert sorted(
         p.rsplit("/", 1)[1].removesuffix(".plist") for p in bootstrapped
     ) == sorted([LAUNCHD_LABEL, AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL])
 
     calls.clear()
-    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    asyncio.run(reconcile_services(darwin))
     assert calls == []
 
     _declare_runner_hosts(home, [])
-    asyncio.run(reconcile_services(darwin, gateway_host=False))
+    asyncio.run(reconcile_services(darwin))
     assert not (agents_dir / f"{AMP_RUNNER_LABEL}.plist").exists()
     assert any(
         c[:2] == ["launchctl", "bootout"] and AMP_RUNNER_LABEL in c[2] for c in calls
@@ -579,39 +500,3 @@ def test_suite_cannot_reach_the_host_service_manager() -> None:
         check=False,
     )
     assert "Failed to connect" in result.stderr
-
-
-def test_facade_unit_uses_installed_state_and_restarts_on_configuration_changes(
-    home: Path,
-) -> None:
-    """The optional facade uses installed code and tracks private config changes."""
-    state = home / ".cli-proxy-api"
-    state.mkdir()
-    config = state / "gateway.json"
-    script = state / "gateway.py"
-    _ = config.write_text('{"key":"first"}\n', encoding="utf-8")
-    _ = script.write_text("first = 1\n", encoding="utf-8")
-
-    def facade_unit() -> str:
-        units = declared_user_units(_linux(home), gateway_host=True)
-        return next(
-            unit.content for unit in units if unit.name == "cliproxy-gateway.service"
-        )
-
-    first = facade_unit()
-    assert f"{script} --config {config}" in first
-    assert "After=cliproxyapi.service" in first
-    assert "TimeoutStopSec=10min" in first
-    assert '"key"' not in first
-    _ = config.write_text('{"key":"second"}\n', encoding="utf-8")
-    second = facade_unit()
-    assert first != second
-    _ = script.write_text("second = 2\n", encoding="utf-8")
-    assert facade_unit() != second
-    assert "cliproxy-gateway.service" not in _names(
-        declared_user_units(_linux(home), gateway_host=False)
-    )
-    config.unlink()
-    assert "cliproxy-gateway.service" not in _names(
-        declared_user_units(_linux(home), gateway_host=True)
-    )

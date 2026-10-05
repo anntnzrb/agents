@@ -9,7 +9,6 @@ units are never touched. System-level services are out of scope.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import socket
@@ -17,9 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from sync.core.cliproxy_config import AUTH_GATEWAY_ENV
-from sync.core.cliproxy_deployment import CLI_PROXY_SOURCE_DIR
-from sync.core.cliproxy_gateway import GATEWAY_CONFIG, GATEWAY_SCRIPT
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict, is_obj_list
@@ -32,7 +28,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AMP_RUNNER_LABEL",
-    "AUTH_GATEWAY_ENV",
     "CACHE_GC_LABEL",
     "LAUNCHD_LABEL",
     "UserUnit",
@@ -46,7 +41,6 @@ UPDATE_UNIT = "agents-update"
 LAUNCHD_LABEL = "dev.agents.update"
 UPDATE_INTERVAL_SECONDS = 300
 OWNED_STATE_FILE = "services.json"
-AUTH_GATEWAY_SCRIPT = "auth-gateway.py"
 SERVICE_TIMEOUT_MS = 30_000
 # Existing names, so sync adopts the hand-made runner in place instead of
 # starting a second one that would crash-loop on the working-directory lock.
@@ -144,106 +138,6 @@ WantedBy=timers.target
         UserUnit(f"{UPDATE_UNIT}.service", service),
         UserUnit(f"{UPDATE_UNIT}.timer", timer),
     ]
-
-
-def _gateway_units(sync_env: SyncEnv) -> list[UserUnit]:
-    home = sync_env.home
-    state = Path(home) / ".cli-proxy-api"
-    # The launcher pins the release; its digest in the unit makes a version
-    # bump change the unit, which is what triggers a restart.
-    launcher = Path(home) / ".local" / "bin" / "cli-proxy-api"
-    launcher_digest = (
-        hashlib.sha256(launcher.read_bytes()).hexdigest()[:16]
-        if launcher.is_file()
-        else "none"
-    )
-    gateway = f"""\
-# launcher sha256 {launcher_digest}
-[Unit]
-Description=CLIProxyAPI gateway
-StartLimitIntervalSec=300
-StartLimitBurst=10
-
-[Service]
-Type=simple
-WorkingDirectory=%h
-Environment=PATH={_service_path(home)}
-ExecStart={home}/.local/bin/cli-proxy-api
-KillMode=mixed
-Restart=always
-RestartSec=5
-UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-"""
-    units = [UserUnit("cliproxyapi.service", gateway)]
-    facade_config = state / GATEWAY_CONFIG
-    if facade_config.is_file():
-        config_digest = hashlib.sha256(facade_config.read_bytes()).hexdigest()[:16]
-        facade_script = state / GATEWAY_SCRIPT
-        script_digest = (
-            hashlib.sha256(facade_script.read_bytes()).hexdigest()[:16]
-            if facade_script.is_file()
-            else "none"
-        )
-        facade = f"""\
-# config sha256 {config_digest}
-# script sha256 {script_digest}
-[Unit]
-Description=CLIProxyAPI System One facade
-After=cliproxyapi.service
-
-[Service]
-Type=simple
-ExecStart={_runtime_python(sync_env)} {facade_script} --config {facade_config}
-TimeoutStopSec=10min
-Restart=always
-RestartSec=3
-UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-"""
-        units.append(UserUnit("cliproxy-gateway.service", facade))
-    env_file = state / AUTH_GATEWAY_ENV
-    if env_file.is_file():
-        # The env file carries the token and the script is the gateway's code;
-        # their digests in the unit make a token rotation or a code change
-        # change the unit, which is what triggers a restart.
-        env_digest = hashlib.sha256(env_file.read_bytes()).hexdigest()[:16]
-        script = Path(sync_env.ssot_home) / CLI_PROXY_SOURCE_DIR / AUTH_GATEWAY_SCRIPT
-        script_digest = (
-            hashlib.sha256(script.read_bytes()).hexdigest()[:16]
-            if script.is_file()
-            else "none"
-        )
-        facade_after = " cliproxy-gateway.service" if facade_config.is_file() else ""
-        auth = f"""\
-# env sha256 {env_digest}
-# script sha256 {script_digest}
-[Unit]
-Description=CLIProxyAPI public Funnel auth gateway
-After=cliproxyapi.service{facade_after}
-
-[Service]
-Type=simple
-EnvironmentFile={env_file}
-ExecStart={_runtime_python(sync_env)} {state / AUTH_GATEWAY_SCRIPT}
-Restart=always
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-"""
-        units.append(UserUnit("cliproxy-auth-gateway.service", auth))
-    return units
 
 
 def _short_hostname() -> str:
@@ -482,11 +376,9 @@ WantedBy=timers.target
     ]
 
 
-def declared_user_units(sync_env: SyncEnv, *, gateway_host: bool) -> list[UserUnit]:
+def declared_user_units(sync_env: SyncEnv) -> list[UserUnit]:
     """Return the systemd user units this host should run."""
     units = _updater_units(sync_env) if _is_git_checkout(sync_env) else []
-    if gateway_host:
-        units.extend(_gateway_units(sync_env))
     if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         units.append(_amp_runner_unit(sync_env))
         updater = Path(sync_env.ssot_home) / "tools" / "amp-runner" / "update.py"
@@ -749,14 +641,12 @@ async def _reconcile_launch_agents(
         _record_owned(sync_env, declared)
 
 
-async def reconcile_services(sync_env: SyncEnv, *, gateway_host: bool) -> None:
+async def reconcile_services(sync_env: SyncEnv) -> None:
     """Reconcile this host's declared services; best-effort, warnings only."""
     try:
         if sync_env.platform == "darwin":
             await _reconcile_launch_agents(sync_env, declared_launch_agents(sync_env))
         else:
-            await reconcile_user_units(
-                sync_env, declared_user_units(sync_env, gateway_host=gateway_host)
-            )
+            await reconcile_user_units(sync_env, declared_user_units(sync_env))
     except OSError as error:
         warn(f"services: {panic_message(error)}")

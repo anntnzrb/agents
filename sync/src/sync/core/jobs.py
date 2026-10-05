@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Literal, Protocol
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-from sync.core.cliproxy_config import sync_cliproxy_config
 from sync.core.cliproxy_deployment import (
     CliProxyEndpointPublication,
     CliProxyEndpointSyncOptions,
@@ -29,7 +28,6 @@ from sync.core.cliproxy_deployment import (
 )
 from sync.core.json_config import sync_json_config, sync_rendered_json
 from sync.core.plan import (
-    CliProxyConfigJob,
     CliProxyEndpointTemplatesJob,
     CliProxyReadinessJob,
     DirJob,
@@ -172,8 +170,6 @@ def _run_secret_template_job(job: SecretTemplateJob) -> bool:
 
 
 def _run_cliproxy_readiness_job(job: CliProxyReadinessJob, state: JobRunState) -> bool:
-    if job.gateway_host:
-        return True
     state.cli_proxy_target_ready = is_cliproxy_target_ready(job.deployment)
     if not state.cli_proxy_target_ready:
         warn("CLIProxyAPI endpoint is not ready; preserving existing client artifacts")
@@ -195,19 +191,6 @@ def _run_cliproxy_endpoint_templates_job(
     )
     if publication == "skipped" and len(job.targets) > 0:
         warn("CLIProxyAPI endpoint is not ready; preserving existing harness endpoints")
-    return True
-
-
-def _run_cliproxy_config_job(job: CliProxyConfigJob, state: JobRunState) -> bool:
-    if state.cli_proxy_target_ready is False or not job.gateway_host:
-        return True
-    if not Path(job.src).exists():
-        err(f"missing source: {job.src}")
-        return True
-    if not Path(job.secrets_path).exists():
-        warn(f"missing local secrets {job.secrets_path}; skipping {job.dst}")
-        return True
-    sync_cliproxy_config(job.src, job.dst, job.secrets_path, job.deployment)
     return True
 
 
@@ -235,8 +218,6 @@ async def _run_job(  # noqa: C901
                 success = _run_cliproxy_readiness_job(job, state)
             case CliProxyEndpointTemplatesJob():
                 success = _run_cliproxy_endpoint_templates_job(job, state)
-            case CliProxyConfigJob():
-                success = _run_cliproxy_config_job(job, state)
             case SyncRuntimeInstallJob():
                 success = await _run_sync_runtime_install_job(job)
             case _:

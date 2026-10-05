@@ -16,7 +16,6 @@ The repository separates committed sources, local inputs, generated targets, and
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `.github/` | CI workflows, their orchestration scripts, and adjacent tests; see [Verify a change in CI](ci.md) |
 | `.githooks/` | Local Git hooks; see [Git hooks](../.githooks/README.md) |
-| `secrets.local.example.json` | Schema and placeholder values for local CLIProxyAPI secrets |
 | `.env.example` | Template and guidance for shared harness environment variables |
 
 ### Harness sources
@@ -38,8 +37,6 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 
 ## Local inputs
 
-`secrets.local.json` contains host-local CLIProxyAPI credentials. The repository ignores it. Create it from `secrets.local.example.json` and keep it outside Git.
-
 `.env` contains host-local default environment variables forwarded to launched harnesses. The repository ignores it. Create it from `.env.example` and restrict permissions with `chmod 600`.
 
 ## Generated targets
@@ -53,8 +50,7 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-releases/<releaseId>/` | Installed sync runtime releases |
 | `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
-| `~/.local/bin/` | Harness and managed-tool wrappers |
-| `~/.cli-proxy-api/` (gateway host) | Rendered CLIProxyAPI configuration; see [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs) |
+| `~/.local/bin/` | Harness and tool wrappers |
 | `~/.mcporter/mcporter.json`, `~/.summarize/config.json` | Tool configuration copied from `tools/`; see [Tool launchers](sync/sync.md#tool-launchers) |
 | `~/.config/systemd/user/` units (Linux) and `~/Library/LaunchAgents/` launch agents (macOS) that sync owns | Declared user services; see [User services](sync/sync.md#user-services) |
 
@@ -66,9 +62,8 @@ Credentials, OAuth files, sessions, logs, databases, and HTTP caches remain outs
 
 Sync changes only paths owned by a job, a wrapper marker, or recorded managed state.
 
-The main caches use these default paths. `XDG_CACHE_HOME` replaces `~/.cache` for managed releases and harness packages when the variable is set.
+The main caches use these default paths. `XDG_CACHE_HOME` replaces `~/.cache` for harness packages when the variable is set:
 
 | Path | Contents |
 | --- | --- |
-| `<cache-home>/github-tools/cliproxyapi/` | Verified CLIProxyAPI releases |
 | `<cache-home>/npm-tools/` | Versioned harness npm packages |

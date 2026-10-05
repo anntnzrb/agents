@@ -7,7 +7,6 @@ import asyncio
 import json
 import os
 import shutil
-import socket
 from pathlib import Path
 
 from sync.core.harness import SyncEnv
@@ -23,7 +22,7 @@ TEST_TIMEOUT_MS = 60_000
 EXPECTED_TWO_RELEASES_COUNT = 2
 
 
-def make_home(tmp_path: Path, *, gateway_host: bool = True) -> str:
+def make_home(tmp_path: Path) -> str:
     """Create a temporary test home directory with required SSOT layout."""
     home = str(tmp_path)
     tools = Path(home) / ".config" / "agents" / "tools"
@@ -31,10 +30,7 @@ def make_home(tmp_path: Path, *, gateway_host: bool = True) -> str:
     (tools / "mcporter").mkdir(parents=True, exist_ok=True)
     (tools / "summarize").mkdir(parents=True, exist_ok=True)
 
-    hostname = socket.gethostname() if gateway_host else "test-gateway"
     deployment = {
-        "server": {"hostname": hostname},
-        "listen": {"host": "127.0.0.1", "port": 9443},
         "client": {"baseUrl": "http://127.0.0.1:9443/v1"},
     }
     _ = (tools / "cliproxyapi" / "deployment.json").write_text(
@@ -293,7 +289,7 @@ def test_remove_legacy_runtime_install_removes_legacy_directory(
     tmp_path: Path,
 ) -> None:
     """Test that remove_legacy_runtime_install removes legacy mutable sync dir."""
-    home = make_home(tmp_path, gateway_host=False)
+    home = make_home(tmp_path)
     runtime_home = str(Path(home) / ".local" / "share" / "agents")
     legacy = Path(runtime_home) / "sync"
     (legacy / "src").mkdir(parents=True, exist_ok=True)
@@ -308,7 +304,7 @@ def test_run_sync_removes_the_legacy_mutable_runtime_after_current_link_and_wrap
     tmp_path: Path,
 ) -> None:
     """run_sync removes legacy mutable runtime directory e2e."""
-    home = make_home(tmp_path, gateway_host=False)
+    home = make_home(tmp_path)
     legacy = Path(home) / ".local" / "share" / "agents" / "sync"
     (legacy / "src").mkdir(parents=True, exist_ok=True)
     _ = (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")

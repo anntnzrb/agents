@@ -23,7 +23,6 @@ test("refreshes missing metadata in a fresh cache, throttles retries, and retain
   let failure = false;
   // Bun's fetch type adds preconnect, which the mock does not need.
   const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
-    if (String(url).endsWith("/systemone/models")) return Response.json({ data: [] });
     if (String(url).endsWith("/models")) {
       return Response.json({ data: ids.map((id) => ({ id, owned_by: "openai" })) });
     }

@@ -1,8 +1,8 @@
 # Set up agent configuration
 
-Follow this tutorial on the gateway host, whose name matches `server.hostname` in `tools/cliproxyapi/deployment.json`. It creates the generated files, starts CLIProxyAPI, verifies the model endpoint, and starts a harness. A client host can run sync without local secrets; see [Sync reference](sync/sync.md) for that path.
+Follow this tutorial to configure and synchronize agent environments, launch wrappers, and harness configuration files.
 
-Sync supports macOS and Linux. `tools/cliproxyapi/release.json` lists the platforms the managed CLIProxyAPI release covers.
+Sync supports macOS and Linux.
 
 ## Install the required commands
 
@@ -55,24 +55,6 @@ $EDITOR .env
 
 The repository root `.env` provides default environment variables that `sync` forwards to child processes of launched harnesses. Parent-process environment variables override values in this file.
 
-## Add local secrets
-Copy the example and restrict access to the new file:
-
-```bash
-cp secrets.local.example.json secrets.local.json
-chmod 600 secrets.local.json
-```
-
-Edit the secrets file:
-
-```bash
-$EDITOR secrets.local.json
-```
-
-Replace every `replace-me` value with an upstream provider API key. Use `weight: 1` when accounts have equal priority. The [CLIProxyAPI reference](cliproxyapi.md#local-secrets) describes the file shape.
-
-The repository ignores `secrets.local.json`. Keep the file out of Git and transfer it through an encrypted channel.
-
 ## Generate the runtime files
 
 Run sync from the repository root:
@@ -81,49 +63,11 @@ Run sync from the repository root:
 uv run --project sync sync
 ```
 
-The first gateway-host run may download the managed CLIProxyAPI release for this platform. Sync verifies its SHA-256 checksum and generates the runtime files. Sync can warn that CLIProxyAPI is not running yet.
+Sync creates the self-hosted runtime link, harness configuration files, tool configs, and launch wrappers in `~/.local/bin/`.
 
-Confirm that sync created the main artifacts:
+## Verify gateway connectivity
 
-```bash
-test -x ~/.local/bin/cli-proxy-api
-test -f ~/.cli-proxy-api/config.yaml
-```
-Each test exits with status `0` when the required path exists with the expected type and permissions.
-
-## Authenticate a ChatGPT account
-
-On macOS, start browser authentication:
-
-```bash
-cli-proxy-api --codex-login
-```
-
-On a headless Linux host, start device authentication:
-
-```bash
-cli-proxy-api --codex-device-login
-```
-
-After authentication, restrict the generated OAuth file:
-
-```bash
-chmod 600 ~/.cli-proxy-api/codex-*.json
-```
-
-## Start CLIProxyAPI
-
-Start the gateway in a separate terminal:
-
-```bash
-cli-proxy-api
-```
-
-The process uses the listener from `tools/cliproxyapi/deployment.json`. Keep it running for the remaining steps.
-
-## Verify the gateway
-
-Query the model endpoint without authentication:
+Sync checks `client.baseUrl` in `tools/cliproxyapi/deployment.json` before publishing endpoint templates to harnesses. Query the model endpoint directly:
 
 ```bash
 CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' tools/cliproxyapi/deployment.json)"
@@ -132,12 +76,10 @@ curl -fsS "$CLIPROXY_BASE_URL/models" | \
 unset CLIPROXY_BASE_URL
 ```
 
-`jq` prints `true`. Model IDs depend on the current upstream catalogs and authenticated OAuth accounts.
+`jq` prints `true` when the external gateway is reachable and responding.
 
 ## Start a harness
 
-Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/sync/core/harness_adapters.py`, then run that wrapper command.
+Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/sync/core/harness_adapters.py`, then run that wrapper command (for example `codex`, `pi`, or `omp`).
 
-The wrapper runs sync, prepares the cached harness package, forwards your arguments, and returns the harness exit status.
-
-For later gateway operations, use [Operate CLIProxyAPI](cliproxyapi.md).
+The wrapper runs sync, prepares the cached harness package, forwards arguments, and returns the harness exit status.

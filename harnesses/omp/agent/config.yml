@@ -55,9 +55,6 @@ retry:
   #   default:
   #     - cliproxy/gemini-3.8-flash-high:medium
   fallbackChains:
-    # Native System One only: non-native entries after a native one are dropped.
-    judge:
-      - cliproxy-jev/typesafe/jev-1.13
     web:
       - web/firecrawl
       - web/brave

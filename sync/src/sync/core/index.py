@@ -35,11 +35,6 @@ from sync.core.managed_state import (
     plan_managed_entries_for_sync_plan,
     record_managed_entries,
 )
-from sync.core.managed_tools import (
-    PreparedManagedTool,
-    is_cli_proxy_running,
-    prepare_managed_tools,
-)
 from sync.core.plan import (
     ExtensionDepsHookPlan,
     SyncHookPlan,
@@ -52,11 +47,7 @@ from sync.core.update import (
     read_synced_commit,
     record_synced_commit,
 )
-from sync.core.wrappers import (
-    WrapperRuntime,
-    managed_tool_wrapper_destination,
-    reconcile_wrappers,
-)
+from sync.core.wrappers import reconcile_wrappers
 from sync.extensions.install import install_extension_deps
 from sync.packages.index import (
     PackageBootstrapTarget,
@@ -170,8 +161,6 @@ def start_sync_watchdog(timeout_seconds: int) -> Callable[[], None]:
 
 async def run_sync(
     sync_env: SyncEnv,
-    *,
-    warn_managed_services: bool = False,
 ) -> bool:
     """Execute complete synchronization lifecycle in the strict plan order."""
     try:
@@ -200,28 +189,7 @@ async def run_sync(
         except (OSError, RuntimeError, ValueError, TypeError) as error:
             err(panic_message(error))
 
-    managed_tools: list[PreparedManagedTool] = []
-    managed_tool_success = base_success
-    if base_success and sync_plan.gateway_host:
-        try:
-            managed_tools = list(prepare_managed_tools(sync_env))
-        except (OSError, RuntimeError, ValueError, TypeError) as error:
-            err(panic_message(error))
-            managed_tool_success = False
-
-    wrapper_success = (
-        reconcile_wrappers(
-            sync_env,
-            WrapperRuntime(
-                additional_destinations=tuple(
-                    managed_tool_wrapper_destination(sync_env, tool)
-                    for tool in managed_tools
-                )
-            ),
-        )
-        if managed_tool_success
-        else False
-    )
+    wrapper_success = reconcile_wrappers(sync_env) if base_success else False
 
     legacy_cleanup_success = (
         remove_legacy_runtime_install(sync_env.runtime_home)
@@ -235,7 +203,7 @@ async def run_sync(
             str(Path(sync_env.runtime_home) / "sync-current"),
             sync_env.install_timeout_ms,
         )
-        await reconcile_services(sync_env, gateway_host=sync_plan.gateway_host)
+        await reconcile_services(sync_env)
 
     managed_state_success = (
         record_managed_entries(managed_plan)
@@ -249,24 +217,13 @@ async def run_sync(
         else True
     )
 
-    success = (
+    return (
         base_success
-        and managed_tool_success
         and wrapper_success
         and managed_state_success
         and hook_success
         and legacy_cleanup_success
     )
-
-    if (
-        success
-        and warn_managed_services
-        and any(tool.name == "cliproxyapi" for tool in managed_tools)
-        and not is_cli_proxy_running(sync_plan.cli_proxy_deployment)
-    ):
-        warn("CLIProxyAPI is installed but not running; start it with: cli-proxy-api")
-
-    return success
 
 
 def main() -> int:
@@ -277,7 +234,7 @@ def main() -> int:
 async def run_sync_with_deadline(sync_env: SyncEnv) -> int:
     """Run sync with cancellation-first deadline and grace backstop."""
     stop_backstop = start_sync_watchdog(sync_timeout() + CLEANUP_GRACE_SECONDS)
-    sync_task = asyncio.create_task(run_sync(sync_env, warn_managed_services=True))
+    sync_task = asyncio.create_task(run_sync(sync_env))
     try:
         async with asyncio.timeout(sync_timeout()):
             success = await sync_task

@@ -164,7 +164,7 @@ The Python implementation (`sync/src/sync/packages/validate.py`) performs import
 
 ### JSON with Comments (JSONC)
 
-- **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, and local secrets (`secrets.local.json`, `deployment.json`, `release-manifest.json`, hook states, wrapper state).
+- **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, hook states, and wrapper state.
 - **Trailing comma tolerance**: Permits trailing commas in objects and arrays.
 
 Deployment input is validated once by strict Pydantic models, including nested unknown-field rejection.
@@ -172,11 +172,6 @@ Deployment input is validated once by strict Pydantic models, including nested u
 ### TOML preservation
 
 Endpoint publication uses Python's `tomllib` to recognize table headers, including quoted keys, Unicode escapes, and array tables. It retains the original text of owned sections rather than serializing the whole file, preserving comments and formatting.
-
-### YAML
-
-- **Standard YAML mappings**: Parses and emits standard YAML configuration templates (e.g., CLIProxyAPI `config.yaml.tmpl`).
-- **Credential pool expansion**: Expands declared `x-credential-pool` markers into native credential profiles and compatibility provider blocks, merging shared profile attributes while enforcing pool reference completeness.
 
 ### Dotenv (`.env`)
 
