@@ -1,5 +1,7 @@
 providers:
   cliproxy:
+    # Select gateway models as cliproxy/<id>; a bare prefix can resolve to a native
+    # provider instead (for example opencode-zen), bypassing the gateway.
     baseUrl: "${CLIPROXY_CLIENT_BASE_URL}"
     apiKey: keyless
     api: openai-completions

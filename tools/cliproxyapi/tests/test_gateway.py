@@ -5,6 +5,7 @@ import http.client
 import json
 import queue
 import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -25,7 +26,7 @@ OPENAI_CATALOG = [
     {"id": "claude-invalid-list", "owned_by": []},
     {"id": "claude-invalid-object", "owned_by": {}},
 ]
-# CLIProxyAPI's Codex-shaped catalog (?client_version=pi) carries per-model limits.
+# CLIProxyAPI's Codex-shaped catalog carries per-model limits.
 CODEX_CATALOG = [
     {
         "slug": "chat-model",
@@ -85,7 +86,7 @@ def upstream():
                 self.wfile.write(
                     b'{"answers":{"spam":{"type":"noul","noul":0.75}},"usage":{"input_tokens":12,"output_tokens":0,"cost":0.000042}}'
                 )
-            elif self.path.startswith("/v1/models?client_version=pi"):
+            elif self.path.startswith("/v1/models?client_version="):
                 self.json_response(
                     int(self.headers.get("X-Test-Catalog-Status", "200")),
                     {"models": CODEX_CATALOG},
@@ -103,6 +104,11 @@ def upstream():
                 self.wfile.flush()
                 release.wait(5)
                 self.wfile.write(b"st\n\ndata: [DONE]\n\n")
+            elif self.path == "/v1/responses?delayed":
+                release.wait(5)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ordinary")
             else:
                 self.send_response(200)
                 self.end_headers()
@@ -125,6 +131,45 @@ def upstream():
             release.set()
             server.shutdown()
             thread.join()
+
+
+@contextmanager
+def gateway_process(config, *, fast_select=False):
+    command = [sys.executable, str(SCRIPT), "--config", str(config)]
+    if fast_select:
+        # Accelerate only the socket wait clock, not the gateway implementation.
+        command = [
+            sys.executable,
+            "-c",
+            "import runpy,select,sys; original=select.select; "
+            "select.select=lambda r,w,x,timeout=None: original(r,w,x,0.05); "
+            "sys.argv=sys.argv[1:]; runpy.run_path(sys.argv[0],run_name='__main__')",
+            str(SCRIPT),
+            "--config",
+            str(config),
+        ]
+    with subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    ) as process:
+        ready = queue.Queue()
+        threading.Thread(
+            target=lambda: ready.put(process.stdout.readline()), daemon=True
+        ).start()
+        try:
+            line = ready.get(timeout=5)
+            assert line, (
+                process.stderr.read()
+                if process.poll() is not None
+                else "Gateway did not start"
+            )
+            yield process, json.loads(line)["port"]
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
 
 
 @pytest.fixture
@@ -155,28 +200,8 @@ def gateway(tmp_path, request):
             ),
             encoding="utf-8",
         )
-        with subprocess.Popen(
-            [sys.executable, str(SCRIPT), "--config", str(config)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        ) as process:
-            ready = queue.Queue()
-            threading.Thread(
-                target=lambda: ready.put(process.stdout.readline()), daemon=True
-            ).start()
-            try:
-                line = ready.get(timeout=5)
-                assert line, (
-                    process.stderr.read()
-                    if process.poll() is not None
-                    else "Gateway did not start"
-                )
-                address = json.loads(line)
-                yield address["port"], cpa_requests, router_requests, release
-            finally:
-                process.terminate()
-                process.wait(timeout=5)
+        with gateway_process(config) as (_, port):
+            yield port, cpa_requests, router_requests, release
 
 
 def request(port, method, path, body=None, headers=None):
@@ -184,6 +209,114 @@ def request(port, method, path, body=None, headers=None):
         client.request(method, path, body=body, headers=headers or {})
         response = client.getresponse()
         return response.status, dict(response.headers), response.read()
+
+
+@pytest.fixture
+def relay_config(tmp_path):
+    with upstream() as (url, requests, release):
+        config = tmp_path / "gateway.json"
+        config.write_text(
+            json.dumps(
+                {
+                    "listen": {"host": "127.0.0.1", "port": 0},
+                    "upstream": url,
+                    "systemOne": {
+                        "baseUrl": url,
+                        "apiKeyEntries": [{"apiKey": "test-key"}],
+                        "models": [MODEL],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        yield config, requests, release
+
+
+def test_client_reset_before_headers_is_not_an_upstream_error(relay_config):
+    config, requests, release = relay_config
+    with gateway_process(config) as (process, port):
+        with socket.create_connection(("127.0.0.1", port), timeout=3) as client:
+            client.sendall(
+                b"GET /v1/responses?delayed HTTP/1.0\r\nHost: localhost\r\n\r\n"
+            )
+            assert requests.get(timeout=1)[1] == "/v1/responses?delayed"
+            client.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+        release.set()
+        # A second response proves the facade still serves after the reset.
+        assert request(port, "GET", "/v1/embeddings")[0] == 200
+        process.terminate()
+        process.wait(timeout=5)
+        assert process.stderr.read() == ""
+
+
+def test_upstream_disconnect_before_headers_still_returns_502(relay_config):
+    config, _, _ = relay_config
+    with socket.socket() as unavailable:
+        unavailable.bind(("127.0.0.1", 0))
+        data = json.loads(config.read_text())
+        data["upstream"] = f"http://127.0.0.1:{unavailable.getsockname()[1]}"
+        config.write_text(json.dumps(data), encoding="utf-8")
+        with gateway_process(config) as (_, port):
+            status, _, body = request(port, "GET", "/v1/embeddings")
+            assert status == 502
+            assert (
+                json.loads(body)["error"]["message"]
+                == "Inference upstream is unavailable"
+            )
+
+
+def test_sigterm_drains_inflight_stream(relay_config):
+    config, _, release = relay_config
+    with gateway_process(config) as (process, port):
+        with closing(
+            http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+        ) as client:
+            client.request("POST", "/v1/chat/completions", b"{}")
+            response = client.getresponse()
+            assert response.read(9) == b"data: fir"
+            process.terminate()
+            # Wait until shutdown closes the listener, without releasing the stream.
+            for _ in range(100):
+                try:
+                    with socket.create_connection(("127.0.0.1", port), timeout=0.05):
+                        threading.Event().wait(0.01)
+                except ConnectionRefusedError:
+                    break
+            else:
+                pytest.fail("Gateway did not stop accepting connections")
+            assert process.poll() is None
+            release.set()
+            assert response.read() == b"st\n\ndata: [DONE]\n\n"
+        assert process.wait(timeout=5) == 0
+
+
+def test_websocket_silence_does_not_close_tunnel(relay_config):
+    config, _, _ = relay_config
+    with gateway_process(config, fast_select=True) as (_, port):
+        with socket.create_connection(("127.0.0.1", port), timeout=3) as client:
+            client.sendall(
+                b"GET /v1/responses HTTP/1.1\r\nHost: localhost\r\n"
+                b"Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n"
+            )
+            received = b""
+            while b"\r\n\r\n" not in received:
+                received += client.recv(4096)
+            _, body = received.split(b"\r\n\r\n", 1)
+            while len(body) < 4:
+                body += client.recv(4096)
+            assert body == b"\x81\x02hi"
+            client.settimeout(0.2)
+            with pytest.raises(TimeoutError):
+                client.recv(1)
+            frame = b"\x81\x82abcd\x09\x0b"
+            client.sendall(frame)
+            client.settimeout(3)
+            echoed = b""
+            while len(echoed) < len(frame):
+                echoed += client.recv(4096)
+            assert echoed == frame
 
 
 def test_classifier_discovery_is_local_nonsecret_and_separate(gateway):
@@ -286,7 +419,7 @@ def test_model_list_reports_limits_and_endpoints(gateway):
     assert models["claude-invalid-list"]["supported_endpoint_types"] == ["openai"]
     assert models["claude-invalid-object"]["supported_endpoint_types"] == ["openai"]
     paths = {cpa.get(timeout=1)[1], cpa.get(timeout=1)[1]}
-    assert paths == {"/v1/models", "/v1/models?client_version=pi"}
+    assert paths == {"/v1/models", "/v1/models?client_version="}
 
 
 def test_compressed_client_request_still_receives_enriched_catalog(gateway):

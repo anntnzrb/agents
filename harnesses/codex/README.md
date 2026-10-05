@@ -44,6 +44,16 @@ The app proxies WebSocket traffic over SSH to the local Unix socket. No app-serv
 
 The custom provider advertises Responses WebSocket support. The gateway's Codex OAuth credentials must also enable their native `websockets` metadata through the private management API. This repository does not automatically change credential metadata. These model-request connections are separate from the app-server connection over SSH. Use the private gateway endpoint: the public Funnel auth gateway forwards HTTP streams and does not tunnel WebSocket upgrades.
 
+## Model discovery
+
+The provider in `config.toml` uses command-backed authentication, which enables
+native catalog discovery. Codex requests the provider's `/models` endpoint with
+`client_version` on startup and when its cache expires. The gateway returns
+Codex `ModelInfo` metadata, which Codex merges into its bundled catalog and
+exposes through `model/list`. The merged cache lives in
+`~/.codex/models_cache.json` and remains untracked. Bundled native entries come
+from the installed Codex binary.
+
 ## Service ownership
 
 > **Legacy.** Kept for reference. Do not add a host to `tools/codex-server/deployment.json` without the owner's request.

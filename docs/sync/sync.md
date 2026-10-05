@@ -142,6 +142,12 @@ User units keep running after logout only when lingering is enabled for the user
 
 The facade unit is `cliproxy-gateway.service`. Its installed script and private configuration digests trigger a restart when code, credentials, or the allowlist change. Removing the facade listener removes its owned unit and installed configuration without changing the CLIProxyAPI listener.
 
+The Linux facade unit allows ten minutes for graceful shutdown. The facade stops
+accepting connections and drains active requests during that window. Remaining
+requests are terminated at the deadline. This does not provide zero-downtime
+replacement or protect requests when another gateway component restarts. See
+[System One classification](../cliproxyapi.md#system-one-classification).
+
 ## Background updates
 
 Every machine converges on `origin/main`: commit and push from any machine, and the others pick the change up on their own. Pushing stays manual; pulling and reconciling are automatic. The git hooks stay pure quality gates, so only commits that passed the `pre-push` tests reach `origin/main`.
