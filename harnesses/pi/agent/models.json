@@ -1,0 +1,17 @@
+{
+  "providers": {
+    "cliproxy": {
+      "modelOverrides": {
+        // Pi compacts above contextWindow - reserveTokens, not OMP's 85% threshold.
+        // 288384 - the default 16384 reserve = 272000: use the full pricing boundary.
+        // This is a trigger, not a billing ceiling; one turn can overshoot. Recalculate if the reserve changes.
+        "gpt-6.1-sol": {
+          "contextWindow": 288384
+        },
+        "gpt-6-luna": {
+          "contextWindow": 288384
+        }
+      }
+    }
+  }
+}
