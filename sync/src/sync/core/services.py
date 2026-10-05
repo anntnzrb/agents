@@ -199,6 +199,7 @@ After=cliproxyapi.service
 [Service]
 Type=simple
 ExecStart={_runtime_python(sync_env)} {facade_script} --config {facade_config}
+TimeoutStopSec=10min
 Restart=always
 RestartSec=3
 UMask=0077

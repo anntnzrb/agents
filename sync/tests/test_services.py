@@ -601,6 +601,7 @@ def test_facade_unit_uses_installed_state_and_restarts_on_configuration_changes(
     first = facade_unit()
     assert f"{script} --config {config}" in first
     assert "After=cliproxyapi.service" in first
+    assert "TimeoutStopSec=10min" in first
     assert '"key"' not in first
     _ = config.write_text('{"key":"second"}\n', encoding="utf-8")
     second = facade_unit()

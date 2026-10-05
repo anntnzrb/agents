@@ -1,10 +1,10 @@
 {
-	"hosts": [],
-	"channel": "nightly",
+	"hosts": ["munich"],
+	"channel": "0.0.46-nightly.20261004.2657",
 	"exposure": {
 		"tailscaleServe": true,
 		"tailscaleServePort": 8443,
-		"connect": true,
-		"publishAgentActivity": true
+		"connect": false,
+		"publishAgentActivity": false
 	}
 }

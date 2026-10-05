@@ -1,8 +1,6 @@
 # CLIProxyAPI
 
-CLIProxyAPI provides the OpenAI-compatible endpoint for harnesses that configure a `cliproxy` provider, and the Anthropic Messages endpoint (`/v1/messages`) that Claude Code reaches through `ANTHROPIC_BASE_URL`. `tools/cliproxyapi/deployment.json` selects the gateway host, listener, and client endpoint. An optional HTTP facade adds System One classification without changing the upstream CLIProxyAPI binary.
-
-T3 Code sessions on hosts listed in `tools/t3/deployment.json` also consume this endpoint through the Codex provider configuration; their load draws from the Codex OAuth pool.
+CLIProxyAPI provides OpenAI-compatible endpoints and the Anthropic Messages endpoint (`/v1/messages`). `tools/cliproxyapi/deployment.json` selects the gateway host, listener, and client endpoint. An optional HTTP facade adds System One classification without changing the upstream CLIProxyAPI binary.
 
 Use the procedures to change credentials, authenticate ChatGPT, run the gateway, and check model access. See [System One classification](#system-one-classification) for the optional facade and its client contract.
 
@@ -146,6 +144,18 @@ The facade accepts client requests without authentication on its private listene
 
 The facade buffers request bodies, caps System One bodies at 16 MiB, and uses a 120-second I/O timeout while leaving forwarded CLIProxyAPI uploads uncapped.
 
+Upgraded WebSocket connections stay open through idle periods and forward frames,
+including pings, unchanged. EOF or a socket error closes the tunnel. A client
+disconnect does not trigger an upstream-unavailable response. Upstream failures
+before response headers return `502`; failures after headers close the stream.
+
+On `SIGTERM`, the facade closes its listener and waits for active requests to
+finish. New connections cannot enter during this drain. The managed Linux unit
+allows up to ten minutes before systemd forcibly terminates remaining requests,
+including persistent WebSockets. Schedule deployment while clients are idle:
+draining is not zero-downtime replacement and does not protect against a separate
+CLIProxyAPI or Funnel auth-gateway restart.
+
 Any HTTP client or native System One SDK can use the facade. Configure its base URL with the facade's `/v1` endpoint and discover classifiers through `/systemone/models`. A chat-only agent still needs a client adapter for System One. The server has no dependency on a particular harness or orchestrator.
 
 ### Enable the facade
@@ -180,7 +190,7 @@ Only loopback networking is available. Dropping capabilities also keeps filesyst
 
 ## Expose the gateway through Tailscale Funnel
 
-Hosted clients outside the tailnet (Amp) reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. The auth gateway answers `404` for CLIProxyAPI's management surface before it checks the token, so the control panel is never reachable from the internet, even with a valid client token. It matches the decoded, slash-normalized path, so encoded or doubled slashes cannot bypass the check. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
+Hosted clients outside the tailnet reach the gateway through Tailscale Funnel on port 443. CLIProxyAPI accepts any client key, so the public path goes through the auth gateway (`tools/cliproxyapi/auth-gateway.py`), which requires one bearer token and forwards to the private listener. The auth gateway answers `404` for CLIProxyAPI's management surface before it checks the token, so the control panel is never reachable from the internet, even with a valid client token. It matches the decoded, slash-normalized path, so encoded or doubled slashes cannot bypass the check. Sync installs the script on the gateway host and runs it as `cliproxy-auth-gateway.service` only while `CLIPROXY_FUNNEL_TOKEN` is set in `secrets.local.json`; removing the token removes the service and its env file.
 
 The Funnel mapping itself lives in Tailscale's state, not in this repository. Recreate it on a new gateway host:
 
@@ -254,7 +264,7 @@ The template exposes upstream model names as-is. Aliases, forked model variants,
 
 With `force-model-prefix`, a credential or compatibility profile that carries a `prefix` exposes its models as `<prefix>/<model>`, and requests without that prefix cannot use the prefixed credential. A `prefix` belongs to the credential's generated auth file, so reauthentication removes it.
 
-Client-side, OMP references gateway models as `cliproxy/<id>`; the prefix is mandatory because a bare first segment can collide with a bundled native provider (e.g. `opencode-zen/...` resolves to OMP's own opencode-zen, bypassing the proxy). Single-segment ids are OAuth-backed pools (antigravity, codex); multi-segment ids are `openai-compatibility` pools. Pin one route per model role: the same model through two pools has two distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential.
+Pin one route per model role: the same model through two pools has two distinct ids with distinct upstream caches, so alternating them cold-starts prompt caching; `routing.session-affinity` already keeps a session on one credential. Harness-specific provider prefixes belong to the harness configuration, not the gateway's model IDs.
 
 ### Discovery metadata
 
@@ -271,7 +281,7 @@ Clients can retain their own trusted metadata and use gateway limits only as a f
 
 ### Codex model catalog
 
-The Codex provider in `harnesses/codex/config.toml` declares a command-backed `auth` block. Command auth marks the provider as catalog-fetching, so Codex requests `{base_url}/models?client_version=...` on startup and on each cache expiry. CLIProxyAPI answers that request with a native Codex model catalog (`ModelInfo` entries: slug, display name, context window, reasoning levels, instructions), which Codex merges into its bundled catalog. Every gateway model then resolves real metadata instead of the generic fallback, and `model/list` exposes them all as built-ins. The merged result is cached in `~/.codex/models_cache.json` (runtime state, never tracked); bundled native entries always come from the installed binary.
+Requests to `/v1/models` with a `client_version` query parameter receive the native Codex catalog format (`ModelInfo` entries: slug, display name, context window, reasoning levels, and instructions). An empty version requests unfiltered metadata. Client authentication, discovery, and cache behavior belong to the [Codex harness](../harnesses/codex/README.md#model-discovery).
 
 The catalog's per-model metadata comes from the discovered `models[]` records described in [CLIProxyAPI jobs](sync/sync.md#cliproxyapi-jobs): `max-context-length` becomes `context_window`, `thinking.levels` becomes the reasoning-effort ladder, `display-name` becomes the display name. When models.dev reports reasoning_options effort values for the model those values are preserved verbatim as the ladder (e.g. minimal/low/medium/high/xhigh); the low/medium/high default applies only when the catalog marks reasoning without declaring options. Pool models do not advertise `apply_patch_tool_type` (upstream strips it for non-template models), so foreign models edit through shell/exec tools rather than the structured patch tool.
 
@@ -341,7 +351,7 @@ Sync compares the local OS hostname with `server.hostname` to choose the host ro
 - An unavailable client endpoint preserves existing harness endpoint files.
 - A ready client endpoint lets sync update harness endpoints without replacing the local server configuration.
 
-Endpoint publication is transactional. Publication preserves Codex-owned hook and project trust tables in `~/.codex/config.toml`. To change the gateway host or endpoint values, use [Set the deployment](#set-the-deployment).
+Endpoint publication is transactional; adapter-specific preservation rules belong to the [sync adapter reference](sync/harnesses.md#cliproxyapi-integration). To change the gateway host or endpoint values, use [Set the deployment](#set-the-deployment).
 
 ## Local secrets
 
