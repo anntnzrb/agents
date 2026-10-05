@@ -61,6 +61,7 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 
 # Machines (Tailscale)
 - `beirut`: my MacBook, where I work interactively
-- `munich`: Debian server, moving to NixOS later. Runs the CLIProxyAPI gateway and Hermes
+- `munich`: Debian server, moving to NixOS later. Runs Hermes
+- `solna`: NixOS server. Runs the CLIProxyAPI gateway, reachable on the tailnet at `solna:8317`
 - `oulu`: my work machine and Nix builder; never install, experiment, or deploy there without explicit approval
 - `iphone17`: my phone
