@@ -12,7 +12,7 @@ modelRoles:
   advisor: "@gem"
   tiny: local/lfm2.5-230m,@gem
   web: web/parallel
-  judge: cliproxy-jev/typesafe/jev-1.13
+  judge: opencode-zen-jev/jev-1.13-free
 
   opus: cliproxy/claude-opus-5-5:medium
   sonnet: cliproxy/claude-sonnet-5-5:high
@@ -55,6 +55,9 @@ retry:
   #   default:
   #     - cliproxy/gemini-3.8-flash-high:medium
   fallbackChains:
+    # Native System One only: non-native entries after a native one are dropped.
+    judge:
+      - cliproxy-jev/typesafe/jev-1.13
     web:
       - web/firecrawl
       - web/brave
