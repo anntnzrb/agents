@@ -235,6 +235,23 @@ providers:
           output: 0
           cacheRead: 0
           cacheWrite: 0
+  opencode-zen-jev:
+    # Zen serves Jev over native System One (POST {baseUrl}/v1/systemone); its catalog/cliproxy rows are chat-only.
+    # Free tier needs a Zen account key (keyless is rejected); reuse the /login opencode-zen credential.
+    baseUrl: https://opencode.ai/zen
+    apiKey: "!omp token opencode-zen"
+    api: typesafe
+    models:
+      - id: jev-1.13-free
+        name: Jev 1.13 (Zen free)
+        input:
+          - text
+        supportsTools: false
+        cost:
+          input: 0
+          output: 0
+          cacheRead: 0
+          cacheWrite: 0
   openai-codex:
     baseUrl: https://chatgpt.com/backend-api/codex
     api: openai-codex-responses
