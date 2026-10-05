@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { typesafeSystemOneApi } from "@earendil-works/pi-ai/api/typesafe-system-one.lazy";
-import { getBuiltinClassifierModels, getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
+import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ExtensionAPI, ExtensionContext, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { markTransientStreamError } from "./retry.js";
 import {
@@ -38,9 +37,6 @@ const FALLBACK_MAX_TOKENS = 16384;
 
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
-// Pi's shipped catalog supplies classifier metadata, not gateway availability policy.
-const SYSTEM_ONE_UPSTREAM = "openrouter";
-
 interface GatewayModelsResponse {
 	data?: Array<{ id?: unknown; owned_by?: unknown; context_length?: unknown; supported_endpoint_types?: unknown }>;
 }
@@ -65,12 +61,6 @@ interface CatalogCache {
 	suffixes: Record<string, CatalogModel>;
 	stripped: Record<string, CatalogModel>;
 }
-interface ClassifierCache {
-	version: number;
-	baseUrl: string;
-	fetchedAt: number;
-	ids: string[];
-}
 
 let memoryCatalog: CatalogCache | undefined;
 let lastKnown: ChatModelConfig[] = [];
@@ -79,9 +69,8 @@ let lastCatalogAttempt = -Infinity;
 let fallbackModels = new Set<string>();
 const missingListings = new Map<string, number>();
 
-// Pi does not export the chat or classifier members of the ProviderModelConfig union.
+// Pi does not export the chat members of the ProviderModelConfig union.
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
-type ClassifierModelConfig = Extract<ProviderModelConfig, { type: "classifier" }>;
 type ModelMetadata = Pick<ChatModelConfig, "compat" | "thinkingLevelMap">;
 
 interface BuiltinMetadata {
@@ -393,78 +382,6 @@ async function discover(signal: AbortSignal): Promise<ChatModelConfig[]> {
 	return gateway.map((entry) => toModel(entry, resolvedCatalog));
 }
 
-/**
- * Classifiers the facade serves, described by pi's catalog entry for the upstream provider. The
- * model inherits the gateway endpoint, and classifiers stay out of `/models` discovery because the
- * gateway does not list them there.
- */
-function classifierModels(ids: string[]): ClassifierModelConfig[] {
-	const upstream = getBuiltinClassifierModels(SYSTEM_ONE_UPSTREAM);
-	return ids.flatMap((id) => {
-		const model = upstream.find((entry) => entry.id === id && entry.api === "typesafe-system-one");
-		if (!model) return [];
-		return [{
-			type: "classifier",
-			id,
-			name: `${model.name} (${SYSTEM_ONE_UPSTREAM})`,
-			api: model.api,
-			input: model.input,
-			cost: model.cost,
-			contextWindow: model.contextWindow,
-		}];
-	});
-}
-
-function classifiersCachePath(): string {
-	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
-	return join(cacheHome, "agents", "cliproxy-classifiers-pi.json");
-}
-
-async function readClassifierCache(): Promise<string[]> {
-	try {
-		const cache = JSON.parse(await readFile(classifiersCachePath(), "utf8")) as ClassifierCache;
-		if (
-			cache?.version === 1 && cache.baseUrl === BASE_URL &&
-			Number.isFinite(cache.fetchedAt) && cache.fetchedAt <= Date.now() &&
-			Date.now() - cache.fetchedAt <= MODELS_CACHE_TTL_MS &&
-			Array.isArray(cache.ids) && cache.ids.every((id) => typeof id === "string" && id.length > 0)
-		) return cache.ids;
-	} catch {
-		// No usable cache.
-	}
-	return [];
-}
-
-async function discoverClassifiers(signal: AbortSignal, cached: string[]): Promise<string[]> {
-	try {
-		const response = await fetch(`${BASE_URL}/systemone/models`, {
-			signal: AbortSignal.any([signal, AbortSignal.timeout(GATEWAY_TIMEOUT_MS)]),
-		});
-		if (!response.ok) return cached;
-		const payload = await response.json() as GatewayModelsResponse;
-		if (!Array.isArray(payload?.data) || !payload.data.every((model) =>
-			model && typeof model.id === "string" && model.id.length > 0
-		)) return cached;
-		const ids = [...new Set(payload.data.map((model) => model.id as string))];
-		if (signal.aborted) return cached;
-		const path = classifiersCachePath();
-		const temporary = `${path}.${randomUUID()}.tmp`;
-		try {
-			await mkdir(dirname(path), { recursive: true });
-			const cache: ClassifierCache = { version: 1, baseUrl: BASE_URL, fetchedAt: Date.now(), ids };
-			await writeFile(temporary, JSON.stringify(cache), { mode: 0o600 });
-			await rename(temporary, path);
-		} catch {
-			// Cache writes are best effort.
-		} finally {
-			await rm(temporary, { force: true }).catch(() => {});
-		}
-		return ids;
-	} catch {
-		return cached;
-	}
-}
-
 export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
 	const warnedModels = new Set<string>();
 	const warnFallback = (model: ExtensionContext["model"], ctx: ExtensionContext): void => {
@@ -486,20 +403,17 @@ export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
 
 	const staticModels = Object.keys(STATIC_CATALOG_MODELS).map((id) => toModel({ id, anthropic: false }, undefined));
 	if (lastKnown.length === 0) lastKnown = await readModelsCache();
-	let classifierIds = await readClassifierCache();
 	pi.registerProvider("cliproxy", {
 		name: "CLIProxyAPI",
 		baseUrl: BASE_URL,
 		apiKey: "keyless",
 		api: "openai-completions",
-		models: [...(lastKnown.length > 0 ? lastKnown : staticModels), ...classifierModels(classifierIds)],
-		classifiers: { "typesafe-system-one": typesafeSystemOneApi() },
+		models: lastKnown.length > 0 ? lastKnown : staticModels,
 		refreshModels: async (context) => {
 			// Pi refreshes in two phases: cache-only at startup (allowNetwork false), then the network.
 			if (lastKnown.length === 0) lastKnown = await readModelsCache();
 			// The gateway is a LAN endpoint; only explicit offline mode skips discovery.
 			if (context.allowNetwork && process.env.PI_OFFLINE === undefined && !context.signal.aborted) {
-				classifierIds = await discoverClassifiers(context.signal, classifierIds);
 				try {
 					const models = await discover(context.signal);
 					if (models.length > 0 && !context.signal.aborted) {
@@ -512,8 +426,7 @@ export default async function cliproxy(pi: ExtensionAPI): Promise<void> {
 					// Keep the previous catalog when the gateway is unreachable.
 				}
 			}
-			// The returned list replaces every model, so classifiers ride along with chat discovery.
-			return [...(lastKnown.length > 0 ? lastKnown : staticModels), ...classifierModels(classifierIds)];
+			return lastKnown.length > 0 ? lastKnown : staticModels;
 		},
 	});
 }

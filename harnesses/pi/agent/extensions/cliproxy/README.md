@@ -24,28 +24,6 @@ Discovery order during a network-enabled refresh:
    nonpositive. Nonpositive output limits also use the defaults in `index.ts`. Image-model catalog
    entries often carry zero token limits; those values must not invalidate the entire startup cache.
 
-## System One classifiers
-
-The gateway's optional System One facade serves classification at `POST {baseUrl}/systemone`; see
-[CLIProxyAPI](../../../../../docs/cliproxyapi.md#system-one-classification).
-During a network-enabled refresh, the extension reads `GET {baseUrl}/systemone/models` and registers
-the returned allowlisted models as `cliproxy` classifiers with the `typesafe-system-one` API and
-Pi's shipped TypeSafe transport. The gateway owns availability in
-[gateway.json](../../../../../tools/cliproxyapi/gateway.json). Price, context window, and display
-name come from Pi's catalog entry for the facade's upstream provider, OpenRouter, so classifier usage
-counts toward session cost.
-
-Classifiers stay out of the chat `/models` list. Discovery runs independently of chat discovery and
-honors the same timeout, cancellation, and offline controls. Successful listings, including empty
-ones, replace classifier availability. Failed requests retain the last listing. The endpoint-bound,
-versioned listing is cached atomically at `$XDG_CACHE_HOME/agents/cliproxy-classifiers-pi.json` and
-expires according to `MODELS_CACHE_TTL_MS` in `index.ts`. Startup and cache-only refreshes use that
-cache without network access. A first run needs a network refresh to discover classifiers.
-A model the installed Pi catalog does not know is skipped. Configure `find.classifier` with the
-`cliproxy/` prefix followed by a discovered classifier id.
-
-A request reaches the facade only when the gateway host deploys it; otherwise the gateway answers `404`.
-
 Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
 use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
 field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).

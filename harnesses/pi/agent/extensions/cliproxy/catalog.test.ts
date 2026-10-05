@@ -37,7 +37,6 @@ async function withGateway(
   delete process.env.PI_OFFLINE;
   const gateway = { models: [] as unknown[], catalog: {} as unknown, up: true, status: 200, requests: 0 };
   const network = spyOn(globalThis as { fetch: (url: URL | RequestInfo) => Promise<Response> }, "fetch").mockImplementation(async (url) => {
-    if (String(url).endsWith("/systemone/models")) return Response.json({ data: [] });
     if (String(url).endsWith("/models")) {
       gateway.requests++;
       if (!gateway.up) throw new Error("gateway unreachable");
