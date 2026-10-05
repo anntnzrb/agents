@@ -82,7 +82,7 @@ Static release harnesses install one directory per resolved manifest version und
 
 ## Shared harness environment
 
-`sync` resolves shared environment variables from `.env` in the repository root (`~/.config/agents/.env`).
+`sync` resolves shared environment variables from `.env` in the repository root (`~/src/agents/.env`).
 
 - If `.env` is absent, `sync` continues with an empty default environment map.
 - Variables are decoded at the `SyncEnv` boundary with variable expansion disabled, preserving quoted and unquoted strings as well as literal variable syntax while omitting empty values.

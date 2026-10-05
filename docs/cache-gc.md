@@ -21,7 +21,7 @@ The first launch after a sweep re-downloads that tool's dependencies. That cost 
 
 ```sh
 # Preview without deleting anything
-~/.local/share/agents/sync-current/.venv/bin/python ~/.config/agents/tools/cache-gc/cache_gc.py --dry-run
+~/.local/share/agents/sync-current/.venv/bin/python ~/src/agents/tools/cache-gc/cache_gc.py --dry-run
 
 # Run now (Linux)
 systemctl --user start cache-gc.service

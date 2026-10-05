@@ -138,17 +138,18 @@ class SyncEnv:
     ) -> SyncEnv:
         """Create a SyncEnv for a specified user home directory."""
         home_path = Path(home)
-        agents_home = str(home_path / ".config" / "agents")
-        harnesses_home = str(home_path / ".config" / "agents" / "harnesses")
+        ssot_root = home_path / "src" / "agents"
+        agents_home = str(ssot_root)
+        harnesses_home = str(ssot_root / "harnesses")
         resolved_platform = (
             platform if platform is not None else platform_from_process()
         )
-        env_path = str(home_path / ".config" / "agents" / ".env")
+        env_path = str(ssot_root / ".env")
         return cls(
             home=home,
             ssot_home=agents_home,
             runtime_home=str(home_path / ".local" / "share" / "agents"),
-            skills_home=str(home_path / ".config" / "agents" / "skills"),
+            skills_home=str(ssot_root / "skills"),
             harnesses_home=harnesses_home,
             mcporter_home=str(home_path / ".mcporter"),
             summarize_home=str(home_path / ".summarize"),

@@ -150,7 +150,7 @@ def test_reconcile_restarts_a_unit_whose_content_changed(
 
 
 def _git_checkout(home: Path) -> None:
-    ssot = home / ".config" / "agents"
+    ssot = home / "src" / "agents"
     ssot.mkdir(parents=True, exist_ok=True)
     _ = subprocess.run(  # noqa: S603 - fixed git invocation in tests
         ["git", "init", "-q", str(ssot)],  # noqa: S607 - git from PATH
@@ -164,7 +164,7 @@ def _names(units: Sequence[UserUnit]) -> set[str]:
 
 def test_updater_units_need_a_git_checkout(home: Path) -> None:
     """Without a git checkout there is nothing to pull, so no updater."""
-    (home / ".config" / "agents").mkdir(parents=True)
+    (home / "src" / "agents").mkdir(parents=True)
     assert _names(declared_user_units(_linux(home))) == set()
 
     _git_checkout(home)
@@ -193,7 +193,7 @@ def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> 
 
 
 def _declare_runner_hosts(home: Path, hosts: Sequence[str]) -> None:
-    deployment = home / ".config" / "agents" / "tools" / "amp-runner"
+    deployment = home / "src" / "agents" / "tools" / "amp-runner"
     deployment.mkdir(parents=True, exist_ok=True)
     _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": list(hosts)}))
 
@@ -212,18 +212,18 @@ def test_amp_runner_unit_only_on_declared_hosts(
     assert "WorkingDirectory=%h" in runner
     assert f"ExecStart={home}/.local/bin/amp --no-tui --runner-id munich " in runner
     assert f"--discover-dirs={home}/repos" in runner
-    assert f"--dir {home}/.config/agents" in runner
+    assert f"--dir {home}/src/agents" in runner
     assert " --desktop " in runner
     assert "[Install]" in runner
     updater = units["amp-runner-update.service"].content
     assert "Type=oneshot" in updater
-    assert f"{home}/.config/agents/tools/amp-runner/update.py" in updater
+    assert f"{home}/src/agents/tools/amp-runner/update.py" in updater
     assert "[Install]" not in updater
     assert "OnCalendar=" in units["amp-runner-update.timer"].content
 
 
 def _declare_t3_hosts(home: Path, hosts: list[str]) -> None:
-    deployment = home / ".config" / "agents" / "tools" / "t3"
+    deployment = home / "src" / "agents" / "tools" / "t3"
     deployment.mkdir(parents=True, exist_ok=True)
     _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": hosts}))
 
@@ -233,7 +233,7 @@ def test_codex_server_only_on_declared_hosts(
 ) -> None:
     """An SSH app server is supervised only on opted-in hosts and survives resync."""
     monkeypatch.setattr("socket.gethostname", lambda: "munich")
-    deployment = home / ".config" / "agents" / "tools" / "codex-server"
+    deployment = home / "src" / "agents" / "tools" / "codex-server"
     deployment.mkdir(parents=True)
     manifest = deployment / "deployment.json"
     _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
@@ -271,7 +271,7 @@ def test_codex_server_macos_health_check_only_on_declared_hosts(
     home: Path, monkeypatch: pytest.MonkeyPatch, calls: list[list[str]]
 ) -> None:
     """A Mac adopts the native daemon without killing it on agent reload."""
-    deployment = home / ".config" / "agents" / "tools" / "codex-server"
+    deployment = home / "src" / "agents" / "tools" / "codex-server"
     deployment.mkdir(parents=True)
     monkeypatch.setattr("socket.gethostname", lambda: "beirut")
     env = SyncEnv.from_home(str(home), platform="darwin")
@@ -311,19 +311,19 @@ def test_t3_model_refresh_timer_only_on_declared_t3_hosts(
         "t3-update.timer",
     }
     updater = units["t3-update.service"].content
-    assert f"{home}/.config/agents/tools/t3/t3ctl.py auto-update" in updater
+    assert f"{home}/src/agents/tools/t3/t3ctl.py auto-update" in updater
     assert "[Install]" not in updater
     assert "OnCalendar=" in units["t3-update.timer"].content
     service = units["t3-refresh-models.service"].content
     assert "Type=oneshot" in service
     assert "sync-current/.venv/bin/python " in service
-    assert f"{home}/.config/agents/tools/t3/t3ctl.py refresh-models" in service
+    assert f"{home}/src/agents/tools/t3/t3ctl.py refresh-models" in service
     assert "[Install]" not in service
     assert "OnUnitActiveSec=" in units["t3-refresh-models.timer"].content
 
 
 def _declare_cache_gc_hosts(home: Path, hosts: list[str]) -> None:
-    deployment = home / ".config" / "agents" / "tools" / "cache-gc"
+    deployment = home / "src" / "agents" / "tools" / "cache-gc"
     deployment.mkdir(parents=True, exist_ok=True)
     _ = (deployment / "deployment.json").write_text(json.dumps({"hosts": hosts}))
 
@@ -340,7 +340,7 @@ def test_cache_gc_runs_nightly_only_on_declared_hosts(
     units = {u.name: u for u in declared_user_units(_linux(home))}
     assert set(units) == {"cache-gc.service", "cache-gc.timer"}
     service = units["cache-gc.service"].content
-    assert f"{home}/.config/agents/tools/cache-gc/cache_gc.py" in service
+    assert f"{home}/src/agents/tools/cache-gc/cache_gc.py" in service
     assert "Type=oneshot" in service
     assert "Nice=19" in service
     assert "IOSchedulingClass=idle" in service
@@ -361,7 +361,7 @@ def test_darwin_declares_cache_gc_agent_only_on_declared_hosts(
     agents = {a.name: a.content for a in declared_launch_agents(darwin)}
     assert set(agents) == {CACHE_GC_LABEL}
     sweep = agents[CACHE_GC_LABEL]
-    assert f"<string>{home}/.config/agents/tools/cache-gc/cache_gc.py</string>" in sweep
+    assert f"<string>{home}/src/agents/tools/cache-gc/cache_gc.py</string>" in sweep
     assert "<key>StartCalendarInterval</key>" in sweep
     assert "KeepAlive" not in sweep
 
@@ -371,7 +371,7 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
 ) -> None:
     """A declared host runs the daemon on loopback and publishes it to the tailnet."""
     monkeypatch.setattr("socket.gethostname", lambda: "munich")
-    deployment = home / ".config" / "agents" / "tools" / "paseo"
+    deployment = home / "src" / "agents" / "tools" / "paseo"
     deployment.mkdir(parents=True)
     manifest = deployment / "deployment.json"
     _ = manifest.write_text(json.dumps({"hosts": ["oulu"]}))
@@ -382,7 +382,7 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
     assert set(units) == {"paseo.service", "paseo-update.service", "paseo-update.timer"}
     updater = units["paseo-update.service"].content
     assert "Type=oneshot" in updater
-    assert f"{home}/.config/agents/tools/paseo/update.py" in updater
+    assert f"{home}/src/agents/tools/paseo/update.py" in updater
     assert "[Install]" not in updater
     assert "OnCalendar=" in units["paseo-update.timer"].content
     service = units["paseo.service"].content
@@ -425,7 +425,7 @@ def test_darwin_declares_updater_and_runner_launch_agents(
     assert f"<key>WorkingDirectory</key><string>{home}</string>" in runner
     assert "--desktop" not in runner
     updater = agents[AMP_RUNNER_UPDATE_LABEL]
-    assert f"{home}/.config/agents/tools/amp-runner/update.py" in updater
+    assert f"{home}/src/agents/tools/amp-runner/update.py" in updater
     assert "<key>StartCalendarInterval</key>" in updater
     assert "KeepAlive" not in updater
 
@@ -442,7 +442,7 @@ def test_darwin_declares_t3_agents_only_on_declared_t3_hosts(
     _declare_t3_hosts(home, ["munich", "beirut"])
     agents = {a.name: a.content for a in declared_launch_agents(darwin)}
     assert set(agents) == {T3_REFRESH_LABEL, T3_UPDATE_LABEL}
-    t3ctl = f"{home}/.config/agents/tools/t3/t3ctl.py"
+    t3ctl = f"{home}/src/agents/tools/t3/t3ctl.py"
     refresh = agents[T3_REFRESH_LABEL]
     assert f"<string>{t3ctl}</string><string>refresh-models</string>" in refresh
     assert "<key>StartInterval</key><integer>900</integer>" in refresh

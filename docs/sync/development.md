@@ -10,7 +10,7 @@ From the repository root, use the public entrypoint:
 uv run --project sync sync
 ```
 
-Sync always reads its sources from `~/.config/agents`, not from the current directory. From another checkout or a worktree, this command runs that checkout's sync code against the sources in `~/.config/agents`, so the checkout's skill, harness, and tool changes are not published. They reach harness homes after the change merges and each host's [background updater](sync.md#background-updates) fast-forwards `~/.config/agents`.
+Sync always reads its sources from `~/src/agents`, not from the current directory. From another checkout or a worktree, this command runs that checkout's sync code against the sources in `~/src/agents`, so the checkout's skill, harness, and tool changes are not published. They reach harness homes after the change merges and each host's [background updater](sync.md#background-updates) fast-forwards `~/src/agents`.
 
 Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline. Contributor gates live behind the dev-only `sync-gates` console script (`sync/src/sync/gates.py`), not the public CLI.
 
@@ -112,7 +112,7 @@ Keep these contracts intact:
 
 1. Edit the matching source under `harnesses/`.
 2. Run the harness's own validation from its README. Harnesses with bun test suites run them with `uv run --script .github/scripts/ci.py harness <name>`; `uv run --script .github/scripts/ci.py harness --help` lists them.
-3. Run `uv run --project sync sync` from `~/.config/agents`; see [Run sync from source](#run-sync-from-source).
+3. Run `uv run --project sync sync` from `~/src/agents`; see [Run sync from source](#run-sync-from-source).
 4. Inspect the generated root derived from the adapter's `home_segments` and `runtime_subdir` fields.
 5. Run the wrapper with `--version`.
 6. Commit as `<harness>: ...` (see the Git Contract in `AGENTS.md`).
@@ -138,7 +138,7 @@ Do not add a supported-harness roster to the documentation. `HARNESS_ADAPTERS` o
 
 ## Add a managed tool
 
-Tool sources live under `tools/<tool>/`. Sync reads them from `~/.config/agents` and never publishes the directory itself. Wire a tool through the declaration that matches its need, following [Change sync behavior](#change-sync-behavior) for each:
+Tool sources live under `tools/<tool>/`. Sync reads them from `~/src/agents` and never publishes the directory itself. Wire a tool through the declaration that matches its need, following [Change sync behavior](#change-sync-behavior) for each:
 
 - To give an npm CLI a wrapper and a versioned cache, append it to `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py`.
 - To copy a configuration file into the tool's home, add a `FileJob` to `_config_jobs` in `sync/src/sync/core/plan.py`.
@@ -202,8 +202,8 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 
 ### 2. Missing source vs. malformed configuration
 
-- **Missing SSOT source tree**: When `.config/agents/sync` (or required source manifests) is absent or unreadable, sync fails fast with exit code `1` and emits a descriptive diagnostic to stderr (`missing or unreadable runtime source`).
-- **Malformed configuration**: When structured configuration files (such as `.config/agents/tools/cliproxyapi/deployment.json` or hook manifests) contain invalid JSON/YAML or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
+- **Missing SSOT source tree**: When `src/agents/sync` (or required source manifests) is absent or unreadable, sync fails fast with exit code `1` and emits a descriptive diagnostic to stderr (`missing or unreadable runtime source`).
+- **Malformed configuration**: When structured configuration files (such as `src/agents/tools/cliproxyapi/deployment.json` or hook manifests) contain invalid JSON/YAML or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
 
 ### 3. Owned entry cleanup vs. unmanaged file preservation
 
@@ -242,6 +242,6 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 ### 9. Environment variable precedence cascade
 
 Subprocess environments during launch are resolved according to strict hierarchical precedence:
-1. **Base defaults**: Loaded from `.config/agents/.env` in the SSOT.
+1. **Base defaults**: Loaded from `~/src/agents/.env` in the SSOT.
 2. **Parent process environment**: Overrides values from `.env`.
 3. **Adapter overrides**: Configured in adapter launcher specifications (`harness.launcher.env`), taking precedence over both parent process environment and `.env`.

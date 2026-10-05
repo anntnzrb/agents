@@ -163,7 +163,7 @@ def _is_deployment_host(sync_env: SyncEnv, deployment: tuple[str, ...]) -> bool:
 
 
 def _amp_runner_command(sync_env: SyncEnv) -> list[str]:
-    """Serve ~/repos checkouts and the hidden SSOT checkout from a neutral cwd.
+    """Serve ~/repos checkouts and the SSOT checkout from a neutral cwd.
 
     Only Linux runners share a desktop: there the runner starts a private
     virtual one, while on macOS it would expose the Mac's real screen.

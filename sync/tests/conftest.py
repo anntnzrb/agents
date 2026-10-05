@@ -78,12 +78,17 @@ def _cleanup_shared_caches() -> None:
         _RELEASE_CACHE.release = None
 
 
+def ssot_root(home: Path) -> Path:
+    """Return the SSOT checkout root under the given home directory."""
+    return home / "src" / "agents"
+
+
 _ = atexit.register(_cleanup_shared_caches)
 
 
 def _build_shared_release() -> SharedRelease:
     template_home = Path(tempfile.mkdtemp(prefix="agents-shared-release-"))
-    source = template_home / ".config" / "agents" / "sync"
+    source = ssot_root(template_home) / "sync"
     source.mkdir(parents=True, exist_ok=True)
     _ = shutil.copytree(SYNC_ROOT / "src", source / "src")
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
@@ -93,7 +98,7 @@ def _build_shared_release() -> SharedRelease:
 
     # Sync aborts on a missing deployment manifest before reaching the
     # runtime install job, so create a minimal dummy manifest.
-    tools = template_home / ".config" / "agents" / "tools" / "cliproxyapi"
+    tools = ssot_root(template_home) / "tools" / "cliproxyapi"
     tools.mkdir(parents=True, exist_ok=True)
     deployment = {
         "client": {"baseUrl": "http://127.0.0.1:1/v1"},

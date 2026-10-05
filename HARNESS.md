@@ -56,7 +56,7 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 # Where things live
 - `~/repos/`: my projects and external ones
 - `~/repos/rice/`: machine configuration
-- `~/.config/agents/`: agent configuration and sync (my SSOT)
+- `~/src/agents/`: agent configuration and sync (my SSOT)
 - `~/src/vendored/<host>/<owner>/<repo>`: read-only upstream checkouts. Trust them over memory; the installed version is still the ground truth
 
 # Machines (Tailscale)

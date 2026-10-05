@@ -48,7 +48,7 @@ def _add_harness_sources(
     ids: Sequence[str] = ("codex", "opencode", "pi", "omp"),
 ) -> None:
     for harness_id in ids:
-        Path(home, ".config", "agents", "harnesses", harness_id).mkdir(
+        Path(home, "src", "agents", "harnesses", harness_id).mkdir(
             parents=True, exist_ok=True
         )
 
@@ -59,10 +59,10 @@ def test_harnesses_are_discovered_from_known_harness_directories(
     """Test discovery of harnesses from configured harness directories."""
     home = str(tmp_path)
     _add_harness_sources(home, ["codex", "opencode"])
-    (tmp_path / ".config" / "agents" / "harnesses" / "unrelated").mkdir(
+    (tmp_path / "src" / "agents" / "harnesses" / "unrelated").mkdir(
         parents=True, exist_ok=True
     )
-    _ = (tmp_path / ".config" / "agents" / "harnesses" / "pi").write_text(
+    _ = (tmp_path / "src" / "agents" / "harnesses" / "pi").write_text(
         "not a directory", encoding="utf-8"
     )
 
@@ -84,7 +84,7 @@ def test_installed_runtime_resolves_known_harness_without_ssot(
 ) -> None:
     """Test supported harness resolution when SSOT configuration is absent."""
     home = str(tmp_path)
-    assert not (tmp_path / ".config" / "agents").exists()
+    assert not (tmp_path / "src" / "agents").exists()
     codex = supported_harness(home, "codex", "linux")
     assert codex is not None
     assert codex.home == str(tmp_path / ".codex")
@@ -125,7 +125,7 @@ def test_wrapper_destinations_render_unix_launchers(tmp_path: Path) -> None:
         / "python"
     )
     assert expected_venv_python in codex.content
-    assert str(tmp_path / ".config" / "agents") not in codex.content
+    assert str(tmp_path / "src" / "agents") not in codex.content
 
     # Golden comparison for codex launch wrapper
     golden_path = Path(__file__).parent / "golden" / "wrapper-launch.sh"
@@ -188,7 +188,7 @@ def test_amp_wrapper_uses_the_npm_launcher(
     assert "launch 'amp'" in amp.content
     assert WRAPPER_MARKER in amp.content
     assert ".local/share/agents/sync-current" in amp.content
-    assert str(tmp_path / ".config" / "agents") not in amp.content
+    assert str(tmp_path / "src" / "agents") not in amp.content
     # The default argument precedes caller arguments so a caller can override it.
     assert "'--remote-control-terminal' \"$@\"" in amp.content
 
@@ -225,7 +225,7 @@ def test_generated_wrappers_do_not_embed_root_env_values(
     _add_harness_sources(home)
     sentinel_key = "SECRET_SENTINEL_ROOT_ENV_KEY"
     sentinel_val = "super_secret_payload_12345"
-    agents_home = Path(home, ".config", "agents")
+    agents_home = Path(home, "src", "agents")
     _ = (agents_home / ".env").write_text(
         f"{sentinel_key}={sentinel_val}\n", encoding="utf-8"
     )

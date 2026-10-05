@@ -49,7 +49,7 @@ def repos(home: Path, tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, P
     _ = _git(peer, "checkout", "-qb", "main")
     _ = _commit(peer, "base")
     _ = _git(peer, "push", "-q", "origin", "main")
-    ssot = home / ".config" / "agents"
+    ssot = home / "src" / "agents"
     ssot.parent.mkdir(parents=True, exist_ok=True)
     _ = _git(home, "clone", "-q", str(origin), str(ssot))
     return ssot, peer

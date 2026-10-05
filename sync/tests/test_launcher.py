@@ -396,7 +396,7 @@ def test_harness_launch_plans_exec_of_cached_binary_with_arguments(
 ) -> None:
     """Harness launch plans an exec of the prepared binary with forwarded args."""
     home = str(tmp_path)
-    (tmp_path / ".config" / "agents" / "harnesses" / "codex").mkdir(
+    (tmp_path / "src" / "agents" / "harnesses" / "codex").mkdir(
         parents=True, exist_ok=True
     )
 
@@ -435,7 +435,7 @@ def test_harness_launch_merges_root_env_parent_env_and_adapter_env_with_preceden
     parent_key_override = "AGENTS_SYNC_TEST_PARENT_OVERRIDE_VAR"
     adapter_collision_key = "AGENTS_SYNC_TEST_ADAPTER_COLLISION_VAR"
 
-    agents_home = tmp_path / ".config" / "agents"
+    agents_home = tmp_path / "src" / "agents"
     (agents_home / "harnesses" / "codex").mkdir(parents=True, exist_ok=True)
     env_content = "\n".join(
         [
@@ -802,7 +802,7 @@ def test_static_release_harness_launch_dispatches_prepared_binary(
     )
 
     home = str(tmp_path)
-    (tmp_path / ".config" / "agents" / "harnesses" / "devin").mkdir(
+    (tmp_path / "src" / "agents" / "harnesses" / "devin").mkdir(
         parents=True, exist_ok=True
     )
     sync_env = SyncEnv.from_home(home, DEFAULT_PREPARE_TIMEOUT_MS, platform="linux")

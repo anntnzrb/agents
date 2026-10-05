@@ -10,7 +10,7 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 4. Run the checks that match the changed files: [Validate an executable skill](#validate-an-executable-skill) and [Validate skill metadata](#validate-skill-metadata).
 5. Complete the [Final authoring review](#final-authoring-review).
 6. Commit with the `autommit` skill; the subject starts with `skills(<name>):`. Open a pull request as described in [Verify a change in CI](ci.md#merge-a-pull-request).
-7. Run `uv run --project sync sync` from `~/.config/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/.config/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
+7. Run `uv run --project sync sync` from `~/src/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/src/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
 
 ## Create a skill
 
