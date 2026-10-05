@@ -3,6 +3,12 @@
   "defaultThreadEnvMode": "worktree",
   "addProjectBaseDirectory": "~/repos",
   "defaultAutoPull": true,
+  "defaultRuntimeMode": "full-access",
+  "defaultModelSelection": {
+    "instanceId": "pi",
+    "model": "cliproxy/gpt-6.1-sol",
+    "options": [{ "id": "thinking", "value": "medium" }]
+  },
   "backgroundActivity": {
     "profile": "custom",
     "baseProfile": "performance",
@@ -18,9 +24,9 @@
   },
   "pullRequestMergeMethod": "squash",
   "textGenerationModelSelection": {
-    "instanceId": "codex",
-    "model": "gemini-3.8-flash-high",
-    "options": [{ "id": "reasoningEffort", "value": "high" }]
+    "instanceId": "pi",
+    "model": "openai-codex/gpt-6.1-sol",
+    "options": []
   },
   "sourceControlWritingStyle": {
     "mode": "conventional_commits"
@@ -28,11 +34,13 @@
   "providers": {
     "cursor": { "enabled": false },
     "grok": { "enabled": false },
-    "opencode": { "enabled": false }
+    "opencode": { "enabled": false },
+    "antigravity": { "enabled": false }
   },
   "providerInstances": {
-    "codex": { "driver": "codex", "enabled": true },
-    "claudeAgent": { "driver": "claudeAgent", "enabled": true },
+    "pi": { "driver": "pi", "enabled": true },
+    "codex": { "driver": "codex", "enabled": false },
+    "claudeAgent": { "driver": "claudeAgent", "enabled": false },
     "cursor": { "driver": "cursor", "enabled": false },
     "grok": { "driver": "grok", "enabled": false },
     "opencode": { "driver": "opencode", "enabled": false },

@@ -44,7 +44,7 @@ T3_HOME = Path(os.environ.get("T3CODE_HOME") or Path.home() / ".t3")
 STATE_FILE = T3_HOME / "runtime" / "service-state.json"
 RUNTIME_JSON = T3_HOME / "userdata" / "server-runtime.json"
 SETTINGS_TARGET = T3_HOME / "userdata" / "settings.json"
-STATE_DB = T3_HOME / "userdata" / "state.sqlite"
+STATE_DB = T3_HOME / "userdata" / "statev2.sqlite"
 BOOT_LOG = T3_HOME / "userdata" / "logs" / "boot-service.log"
 UNIT = "t3code.service"
 ENVIRONMENT_PATH = "/.well-known/t3/environment"
@@ -55,7 +55,7 @@ CLAUDE_INSTANCE = "claudeAgent"
 
 # Sync launch wrappers for the harnesses T3 drives, keyed by T3 provider instance.
 WRAPPER_DIR = Path.home() / ".local" / "bin"
-HARNESS_WRAPPERS: dict[str, str] = {"codex": "codex", "claudeAgent": "claude"}
+HARNESS_WRAPPERS: dict[str, str] = {"pi": "pi"}
 
 # launchd uses the same label the T3 installer writes into its plist.
 IS_MACOS = sys.platform == "darwin"
@@ -355,9 +355,9 @@ def launcher_version() -> str | None:
 
 
 def busy_threads() -> int:
-    """Count threads mid-turn, by the predicate startup reconcile treats as live.
+    """Count threads with live orchestrator-v2 runs.
 
-    Upstream: apps/server/src/serverRuntimeStartup.ts (orphaned sessions).
+    Upstream: packages/shared/src/orchestrationV2PendingBackgroundWork.ts.
     An unreadable database raises, so an unknown state never restarts.
     """
     conn = sqlite3.connect(f"file:{STATE_DB}?mode=ro", uri=True, timeout=10)
@@ -365,9 +365,8 @@ def busy_threads() -> int:
         row = cast(
             "tuple[int]",
             conn.execute(
-                "SELECT count(*) FROM projection_thread_sessions"
-                + " WHERE status IN ('starting', 'running')"
-                + " OR active_turn_id IS NOT NULL"
+                "SELECT count(DISTINCT thread_id) FROM orchestration_v2_projection_runs"
+                + " WHERE status IN ('preparing', 'starting', 'running')"
             ).fetchone(),
         )
         return row[0]
@@ -378,6 +377,9 @@ def busy_threads() -> int:
 def cmd_auto_update(args: argparse.Namespace) -> int:
     """Update to the channel head, but only when behind and no turn is running."""
     require_declared_host()
+    if re.fullmatch(r"\d+\.\d+\.\d+(?:-[\w.]+)?", channel()):
+        print(f"t3: pinned at {channel()}; automatic updates disabled")
+        return 0
     if active_version() is None:
         die("T3 is not installed on this host; run `t3ctl.py install` first")
     head = channel_head()
@@ -409,7 +411,8 @@ def cmd_install(_args: argparse.Namespace) -> int:
         )
     if run([*install_cli(), "service", "install"]) != 0:
         return 1
-    apply_settings()
+    if cmd_apply_settings(_args) != 0:
+        return 1
     port = wait_for_endpoint()
     print(
         f"t3code: installed and active on http://127.0.0.1:{port}"
@@ -491,16 +494,16 @@ def gateway_claude_models() -> list[Json] | None:
 
 def sync_claude_models(live: JsonObject) -> bool:
     """Replace the Claude instance's customModels with the gateway catalog."""
+    instances = live.get("providerInstances")
+    instance = instances.get(CLAUDE_INSTANCE) if isinstance(instances, dict) else None
+    if not isinstance(instance, dict) or not instance.get("enabled"):
+        return False
     models = gateway_claude_models()
     if models is None:
         print(
             "t3ctl: warning — gateway catalog unreachable; Claude models unchanged",
             file=sys.stderr,
         )
-        return False
-    instances = live.setdefault("providerInstances", {})
-    instance = instances.get(CLAUDE_INSTANCE) if isinstance(instances, dict) else None
-    if not isinstance(instance, dict):
         return False
     config = instance.setdefault("config", {})
     if not isinstance(config, dict) or config.get("customModels") == models:
