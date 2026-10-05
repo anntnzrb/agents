@@ -55,7 +55,11 @@ CLAUDE_INSTANCE = "claudeAgent"
 
 # Sync launch wrappers for the harnesses T3 drives, keyed by T3 provider instance.
 WRAPPER_DIR = Path.home() / ".local" / "bin"
-HARNESS_WRAPPERS: dict[str, str] = {"pi": "pi"}
+HARNESS_WRAPPERS: dict[str, str] = {
+    "pi": "pi",
+    "codex": "codex",
+    "claudeAgent": "claude",
+}
 
 # launchd uses the same label the T3 installer writes into its plist.
 IS_MACOS = sys.platform == "darwin"

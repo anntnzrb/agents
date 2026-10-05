@@ -68,5 +68,35 @@ class BusyThreadsTest(unittest.TestCase):
             self.assertEqual(module.busy_threads(), 0)
 
 
+class BinaryPathsTest(unittest.TestCase):
+    def test_all_enabled_harnesses_use_installed_wrappers(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "t3ctl", Path(__file__).parents[1] / "t3ctl.py"
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            module.WRAPPER_DIR = Path(directory)
+            expected = {"pi": "pi", "codex": "codex", "claudeAgent": "claude"}
+            live = {
+                "providerInstances": {
+                    instance: {"driver": instance, "enabled": True}
+                    for instance in expected
+                }
+            }
+            for binary in expected.values():
+                wrapper = module.WRAPPER_DIR / binary
+                wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                wrapper.chmod(0o755)
+            module.sync_binary_paths(live)
+            for instance, binary in expected.items():
+                self.assertEqual(
+                    live["providerInstances"][instance]["config"]["binaryPath"],
+                    str(module.WRAPPER_DIR / binary),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
