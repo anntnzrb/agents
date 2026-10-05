@@ -25,7 +25,7 @@ EXPECTED_TWO_RELEASES_COUNT = 2
 def make_home(tmp_path: Path) -> str:
     """Create a temporary test home directory with required SSOT layout."""
     home = str(tmp_path)
-    tools = Path(home) / ".config" / "agents" / "tools"
+    tools = Path(home) / "src" / "agents" / "tools"
     (tools / "cliproxyapi").mkdir(parents=True, exist_ok=True)
     (tools / "mcporter").mkdir(parents=True, exist_ok=True)
     (tools / "summarize").mkdir(parents=True, exist_ok=True)
@@ -48,7 +48,7 @@ def make_home(tmp_path: Path) -> str:
 def seed_source_root(home: str, cli_content: str = 'print("ok")\n') -> str:
     """Seed the sync source directory with src/, pyproject.toml, and uv.lock."""
     repo_sync = Path(__file__).resolve().parent.parent
-    source_root = Path(home) / ".config" / "agents" / "sync"
+    source_root = Path(home) / "src" / "agents" / "sync"
     source_root.mkdir(parents=True, exist_ok=True)
 
     src_dst = source_root / "src"
@@ -136,7 +136,7 @@ def test_fails_and_leaves_current_link_untouched_when_lockfile_is_missing(
     """Test that installation fails when uv.lock is absent."""
     home = make_home(tmp_path)
     _ = seed_source_root(home)
-    (Path(home) / ".config" / "agents" / "sync" / "uv.lock").unlink()
+    (Path(home) / "src" / "agents" / "sync" / "uv.lock").unlink()
     _, job = get_runtime_install_job(home)
 
     ok = asyncio.run(run_jobs_with_preserve([job]))
@@ -150,7 +150,7 @@ def test_fails_and_removes_stage_on_broken_pyproject_toml(
     """Test that installation fails and cleans up stage on broken pyproject.toml."""
     home = make_home(tmp_path)
     _ = seed_source_root(home)
-    _ = (Path(home) / ".config" / "agents" / "sync" / "pyproject.toml").write_text(
+    _ = (Path(home) / "src" / "agents" / "sync" / "pyproject.toml").write_text(
         "{ broken toml\n", encoding="utf-8"
     )
     _, job = get_runtime_install_job(home)

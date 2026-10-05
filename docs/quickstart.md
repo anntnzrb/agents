@@ -31,11 +31,11 @@ Each command prints its version.
 Clone the repository at the path that sync expects:
 
 ```bash
-git clone https://github.com/anntnzrb/agents.git ~/.config/agents
-cd ~/.config/agents
+git clone https://github.com/anntnzrb/agents.git ~/src/agents
+cd ~/src/agents
 ```
 
-The shell is now in `~/.config/agents`.
+The shell is now in `~/src/agents`.
 
 Enable the repository's [Git hooks](../.githooks/README.md), which run the sync quality gates and keep commits off `main`:
 

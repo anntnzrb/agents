@@ -12,7 +12,7 @@
 - `docs/sync/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
 - `harnesses/<harness>/`: directory presence opts into a supported harness; sync owns its internal adapter metadata
-- Agent config root: `~/.config/agents/`
+- Agent config root: `~/src/agents/`
 - Installed runtime root: `~/.local/share/agents/`
 - Synced tool homes (`~/.codex`, `~/.claude`, etc.) and agent launch wrappers are generated targets
 - Make durable changes in this repository so sync does not overwrite them

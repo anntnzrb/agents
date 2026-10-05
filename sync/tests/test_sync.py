@@ -146,7 +146,7 @@ def _make_sync_env(
     install_timeout_ms: int = 10_000,
 ) -> SyncEnv:
     """Build a test SyncEnv backed by directory layout under root."""
-    agents_root = root / ".config" / "agents"
+    agents_root = root / "src" / "agents"
     sync_source = agents_root / "sync"
     sync_source.mkdir(parents=True, exist_ok=True)
 
@@ -620,7 +620,7 @@ def test_sync_env_harness_lookup_is_typed(home: Path) -> None:
     pi = sync_env.harness("pi")
     assert pi is not None
     assert harness_source_root(pi, sync_env.harnesses_home) == str(
-        home / ".config" / "agents" / "harnesses" / "pi" / "agent"
+        home / "src" / "agents" / "harnesses" / "pi" / "agent"
     )
     assert harness_instruction_target(pi) == str(home / ".pi" / "agent" / "AGENTS.md")
 
@@ -642,7 +642,7 @@ def test_sync_plan_resolves_hook_targets_from_harness_specs(
 
     assert package_hook is not None
     assert package_hook.manifest_path == str(
-        home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
+        home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
     )
     assert package_hook.runtime_settings_path == str(
         home / ".pi" / "agent" / "settings.json"
@@ -661,7 +661,7 @@ def test_sync_plan_resolves_hook_targets_from_harness_specs(
 def test_sync_plan_preserves_declared_devin_config_keys(home: Path) -> None:
     """Verify devin config copies SSOT keys and preserves declared local keys."""
     _ = _make_sync_env(home)
-    devin_source = home / ".config" / "agents" / "harnesses" / "devin"
+    devin_source = home / "src" / "agents" / "harnesses" / "devin"
     _write_file(devin_source / "config.json", '{"version": 1, "auto_update": false}\n')
     sync_env = SyncEnv.from_home(str(home), 10_000, platform="linux")
 
@@ -703,7 +703,7 @@ def test_sync_plan_preserves_declared_devin_config_keys(home: Path) -> None:
 def test_sync_plan_publishes_client_origin_templates(home: Path) -> None:
     """Verify a file carrying only the origin placeholder is an endpoint target."""
     _ = _make_sync_env(home)
-    claude_source = home / ".config" / "agents" / "harnesses" / "claude"
+    claude_source = home / "src" / "agents" / "harnesses" / "claude"
     _write_file(
         claude_source / "settings.json",
         '{"env": {"ANTHROPIC_BASE_URL": "${CLIPROXY_CLIENT_ORIGIN}"}}\n',
@@ -730,38 +730,32 @@ def test_run_sync_happy_path(seeded_home: Path) -> None:
     sync_env = _make_sync_env(seeded_home)
 
     _write_file(
-        seeded_home / ".config" / "agents" / "HARNESS.md",
+        seeded_home / "src" / "agents" / "HARNESS.md",
         "agent-instructions",
     )
     _write_file(
-        seeded_home / ".config" / "agents" / "tools" / "mcporter" / "mcporter.jsonc",
+        seeded_home / "src" / "agents" / "tools" / "mcporter" / "mcporter.jsonc",
         '{"x":1}',
     )
     _write_file(
-        seeded_home / ".config" / "agents" / "tools" / "summarize" / "config.json",
+        seeded_home / "src" / "agents" / "tools" / "summarize" / "config.json",
         '{"env":{"OPENAI_BASE_URL":"${CLIPROXY_CLIENT_BASE_URL}"}}',
     )
     _write_file(
-        seeded_home / ".config" / "agents" / "skills" / "current" / "skill.txt",
+        seeded_home / "src" / "agents" / "skills" / "current" / "skill.txt",
         "skill-content",
     )
     _write_file(
-        seeded_home / ".config" / "agents" / "harnesses" / "codex" / "config.toml",
+        seeded_home / "src" / "agents" / "harnesses" / "codex" / "config.toml",
         "codex = true",
     )
     _write_file(
-        seeded_home
-        / ".config"
-        / "agents"
-        / "harnesses"
-        / "omp"
-        / "agent"
-        / "config.yml",
+        seeded_home / "src" / "agents" / "harnesses" / "omp" / "agent" / "config.yml",
         "theme:\n  dark: graphite\n",
     )
     _write_file(
         seeded_home
-        / ".config"
+        / "src"
         / "agents"
         / "harnesses"
         / "pi"
@@ -773,7 +767,7 @@ def test_run_sync_happy_path(seeded_home: Path) -> None:
     )
     (
         seeded_home
-        / ".config"
+        / "src"
         / "agents"
         / "harnesses"
         / "pi"
@@ -824,7 +818,7 @@ def test_run_sync_cleans_managed_entries_for_multiple_harnesses(
 ) -> None:
     """Verify stale managed entries are removed across multiple harnesses."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(
@@ -870,7 +864,7 @@ def test_run_sync_omp_cleans_managed_entries_but_preserves_local_files(
 ) -> None:
     """Verify OMP sync cleans managed entries while preserving unmanaged files."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(
@@ -903,7 +897,7 @@ def test_run_sync_cleans_legacy_pi_entries_without_prior_state(
 ) -> None:
     """Verify legacy pi entries are purged during initial sync without prior state."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(seeded_home / ".pi" / "agent" / "legacy" / "old.txt", "stale")
@@ -919,7 +913,7 @@ def test_run_sync_removes_entries_removed_from_ssot_after_prior_sync(
 ) -> None:
     """Verify deleted SSOT items are removed on subsequent sync run."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
     codex_config = agents_root / "harnesses" / "codex" / "config.toml"
     skills_root = agents_root / "skills" / "current"
 
@@ -951,7 +945,7 @@ def test_run_sync_copies_current_skills_but_not_legacy_skills(
 ) -> None:
     """Verify only skills under current/ are deployed to harness skill directories."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(
@@ -977,11 +971,11 @@ def test_run_sync_preserves_generated_extension_runtime_when_hook_inputs_match(
     sync_env = _make_sync_env(seeded_home)
 
     _write_file(
-        seeded_home / ".config" / "agents" / "HARNESS.md",
+        seeded_home / "src" / "agents" / "HARNESS.md",
         "agent-instructions",
     )
     ext_src = (
-        seeded_home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "extensions"
+        seeded_home / "src" / "agents" / "harnesses" / "pi" / "agent" / "extensions"
     )
     _write_file(ext_src / "context" / "index.ts", "export const live = true;\n")
     _write_file(seeded_home / ".pi" / "agent" / "auth.json", '{"token":1}')
@@ -1036,7 +1030,7 @@ def test_run_sync_drops_legacy_npm_extension_state_entries_without_reinstall(
     """Verify legacy package lock entries in state are removed cleanly."""
     sync_env = _make_sync_env(seeded_home)
     source_root = (
-        seeded_home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "extensions"
+        seeded_home / "src" / "agents" / "harnesses" / "pi" / "agent" / "extensions"
     )
     state_path = (
         seeded_home
@@ -1048,7 +1042,7 @@ def test_run_sync_drops_legacy_npm_extension_state_entries_without_reinstall(
     )
 
     _write_file(
-        seeded_home / ".config" / "agents" / "HARNESS.md",
+        seeded_home / "src" / "agents" / "HARNESS.md",
         "agent-instructions",
     )
     _write_file(
@@ -1127,12 +1121,12 @@ def test_run_sync_removes_generated_extension_runtime_when_hook_inputs_change(
     sync_env = _make_sync_env(seeded_home)
 
     _write_file(
-        seeded_home / ".config" / "agents" / "HARNESS.md",
+        seeded_home / "src" / "agents" / "HARNESS.md",
         "agent-instructions",
     )
     _write_file(
         seeded_home
-        / ".config"
+        / "src"
         / "agents"
         / "harnesses"
         / "pi"
@@ -1185,7 +1179,7 @@ def test_run_sync_omp_does_not_bootstrap_packages(
 ) -> None:
     """Verify OMP harness skips package bootstrap step."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(
@@ -1209,7 +1203,7 @@ def test_run_sync_omp_ignores_runtime_session_sources_when_inferring_dependencie
 ) -> None:
     """Verify session script imports are ignored during OMP dependency scan."""
     sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
+    agents_root = seeded_home / "src" / "agents"
 
     _write_file(agents_root / "HARNESS.md", "agent-instructions")
     _write_file(
@@ -1436,7 +1430,7 @@ def test_run_sync_bootstraps_packages_and_patches_runtime_settings(
     """Verify bootstrap hook builds and registers packages in settings.json."""
     sync_env = _make_sync_env(seeded_home)
     _write_file(
-        seeded_home / ".config" / "agents" / "HARNESS.md",
+        seeded_home / "src" / "agents" / "HARNESS.md",
         "agent-instructions",
     )
     _write_file(seeded_home / ".pi" / "agent" / "settings.json", "{}\n")
@@ -1460,13 +1454,7 @@ def test_run_sync_bootstraps_packages_and_patches_runtime_settings(
     _init_git_repo(build_repo)
 
     _write_file(
-        seeded_home
-        / ".config"
-        / "agents"
-        / "harnesses"
-        / "pi"
-        / "agent"
-        / "packages.json",
+        seeded_home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json",
         f"{json.dumps({'packages': [str(source_repo), str(build_repo)]}, indent=2)}\n",
     )
 

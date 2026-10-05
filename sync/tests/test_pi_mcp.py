@@ -20,7 +20,7 @@ from tests.test_integration import make_fixture, run_sync_process
 def test_pi_mcp_publication_and_removal(tmp_path: Path) -> None:
     """Publish native servers and exact exclusions without changing other homes."""
     home = make_fixture(tmp_path)
-    source = home / ".config/agents"
+    source = home / "src" / "agents"
     registry = source / "tools/mcporter/mcporter.jsonc"
     settings = source / "harnesses/pi/agent/settings.json"
     _ = settings.write_text('{"skills": ["+extra"], "theme": "test"}', encoding="utf-8")
@@ -67,7 +67,7 @@ def test_pi_mcp_environment_defaults(
 ) -> None:
     """Keep secrets as references, omit unset optional headers, and retain defaults."""
     home = make_fixture(tmp_path)
-    source = home / ".config/agents/tools/mcporter/mcporter.jsonc"
+    source = home / "src" / "agents" / "tools" / "mcporter" / "mcporter.jsonc"
     monkeypatch.setenv("MCP_TEST_KEY", "do-not-publish")
     monkeypatch.delenv("MCP_TEST_MISSING", raising=False)
     monkeypatch.setenv("MCP_TEST_EMPTY", "")

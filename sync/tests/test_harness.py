@@ -35,6 +35,17 @@ if TYPE_CHECKING:
 TEST_TIMEOUT_MS: int = 1000
 
 
+def test_sync_env_from_home_derives_ssot_paths_under_src_agents(tmp_path: Path) -> None:
+    """SyncEnv.from_home derives ssot, skills, harnesses under ~/src/agents."""
+    home = str(tmp_path)
+    sync_env = SyncEnv.from_home(home, TEST_TIMEOUT_MS, platform="linux")
+    ssot_path = tmp_path / "src" / "agents"
+    assert sync_env.ssot_home == str(ssot_path)
+    assert sync_env.skills_home == str(ssot_path / "skills")
+    assert sync_env.harnesses_home == str(ssot_path / "harnesses")
+    assert sync_env.runtime_home == str(tmp_path / ".local" / "share" / "agents")
+
+
 def test_root_env_returns_empty_when_env_file_is_missing(tmp_path: Path) -> None:
     """Test that an absent .env file yields an empty dictionary without error."""
     home = str(tmp_path)
@@ -46,7 +57,7 @@ def test_root_env_parses_dotenv_contents_with_expected_precedence_and_literals(
     tmp_path: Path,
 ) -> None:
     """Test .env parsing preserves literals, skips empty keys, and ignores comments."""
-    agents_home = tmp_path / ".config" / "agents"
+    agents_home = tmp_path / "src" / "agents"
     agents_home.mkdir(parents=True, exist_ok=True)
     env_lines = [
         "# Shared test env",
@@ -79,7 +90,7 @@ def test_root_env_throws_when_reading_env_fails_with_non_enoent_error(
     tmp_path: Path,
 ) -> None:
     """Test that reading a non-file (directory) .env raises RootEnvReadError."""
-    agents_home = tmp_path / ".config" / "agents"
+    agents_home = tmp_path / "src" / "agents"
     bad_env_path = agents_home / ".env"
     bad_env_path.mkdir(parents=True, exist_ok=True)
 
@@ -94,7 +105,7 @@ def test_load_root_env_returns_tagged_error_when_reading_fails(
     tmp_path: Path,
 ) -> None:
     """Test load_root_env directly raises RootEnvReadError with the target path."""
-    agents_home = tmp_path / ".config" / "agents"
+    agents_home = tmp_path / "src" / "agents"
     bad_env_path = agents_home / ".env"
     bad_env_path.mkdir(parents=True, exist_ok=True)
 

@@ -3,7 +3,7 @@ description: Merge ~/.omp/agent/managed-skills into SSOT skills, then empty it
 ---
 workflowz
 
-Consolidate ~/.omp/agent/managed-skills/ into my SSOT skills (~/.config/agents/skills/current/), then empty that directory.
+Consolidate ~/.omp/agent/managed-skills/ into my SSOT skills (~/src/agents/skills/current/), then empty that directory.
 
 1. Read every managed SKILL.md and docs/skills.md.
 2. For each managed skill, find the SSOT skill(s) it overlaps with.

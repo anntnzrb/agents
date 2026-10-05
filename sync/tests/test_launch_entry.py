@@ -26,7 +26,7 @@ TOOL_EXIT_STATUS: Final[int] = 7
 
 def _make_ssot(home: Path, harness_ids: Sequence[str] = ()) -> None:
     """Create an SSOT tree with the given harness source directories."""
-    harnesses = home / ".config" / "agents" / "harnesses"
+    harnesses = home / "src" / "agents" / "harnesses"
     harnesses.mkdir(parents=True, exist_ok=True)
     for harness_id in harness_ids:
         (harnesses / harness_id).mkdir(parents=True, exist_ok=True)

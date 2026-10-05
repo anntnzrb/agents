@@ -160,7 +160,7 @@ def write_deployment(
     client_base_url: str = "http://127.0.0.1:1/v1",
 ) -> None:
     """Write a minimal CLIProxyAPI deployment.json configuration."""
-    tools = home / ".config" / "agents" / "tools" / "cliproxyapi"
+    tools = home / "src" / "agents" / "tools" / "cliproxyapi"
     tools.mkdir(parents=True, exist_ok=True)
     deployment = {
         "client": {"baseUrl": client_base_url},
@@ -174,38 +174,34 @@ def write_deployment(
 def write_fixture_files(home: Path) -> None:
     """Populate home directory with standard SSOT configurations and targets."""
     write_deployment(home)
-    _ = (home / ".config" / "agents" / "HARNESS.md").write_text(
+    _ = (home / "src" / "agents" / "HARNESS.md").write_text(
         "agent-instructions",
         encoding="utf-8",
     )
-    _ = (
-        home / ".config" / "agents" / "tools" / "mcporter" / "mcporter.jsonc"
-    ).write_text('{"x":1}', encoding="utf-8")
-    _ = (
-        home / ".config" / "agents" / "tools" / "summarize" / "config.json"
-    ).write_text(
+    _ = (home / "src" / "agents" / "tools" / "mcporter" / "mcporter.jsonc").write_text(
+        '{"x":1}', encoding="utf-8"
+    )
+    _ = (home / "src" / "agents" / "tools" / "summarize" / "config.json").write_text(
         f'{{"env": {{"OPENAI_BASE_URL": "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"}}}}',
         encoding="utf-8",
     )
-    skills_current = home / ".config" / "agents" / "skills" / "current"
+    skills_current = home / "src" / "agents" / "skills" / "current"
     skills_current.mkdir(parents=True, exist_ok=True)
     _ = (skills_current / "skill.txt").write_text("skill-content", encoding="utf-8")
 
-    skills_legacy = home / ".config" / "agents" / "skills" / "legacy"
+    skills_legacy = home / "src" / "agents" / "skills" / "legacy"
     skills_legacy.mkdir(parents=True, exist_ok=True)
     _ = (skills_legacy / "old.txt").write_text("legacy-content", encoding="utf-8")
 
-    _ = (
-        home / ".config" / "agents" / "harnesses" / "amp" / "settings.json"
-    ).write_text('{"fixture": "amp-settings"}\n', encoding="utf-8")
-    _ = (
-        home / ".config" / "agents" / "harnesses" / "codex" / "config.toml"
-    ).write_text(
+    _ = (home / "src" / "agents" / "harnesses" / "amp" / "settings.json").write_text(
+        '{"fixture": "amp-settings"}\n', encoding="utf-8"
+    )
+    _ = (home / "src" / "agents" / "harnesses" / "codex" / "config.toml").write_text(
         f'base_url = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
     )
     _ = (
-        home / ".config" / "agents" / "harnesses" / "opencode" / "opencode.jsonc"
+        home / "src" / "agents" / "harnesses" / "opencode" / "opencode.jsonc"
     ).write_text(
         f'"baseURL": "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"\n',
         encoding="utf-8",
@@ -219,10 +215,10 @@ def write_fixture_files(home: Path) -> None:
         encoding="utf-8",
     )
     _ = (
-        home / ".config" / "agents" / "harnesses" / "omp" / "agent" / "config.yml"
+        home / "src" / "agents" / "harnesses" / "omp" / "agent" / "config.yml"
     ).write_text("theme:\n  dark: graphite\n", encoding="utf-8")
     _ = (
-        home / ".config" / "agents" / "harnesses" / "omp" / "agent" / "models.yml"
+        home / "src" / "agents" / "harnesses" / "omp" / "agent" / "models.yml"
     ).write_text(
         f"baseUrl: {CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}\n",
         encoding="utf-8",
@@ -244,14 +240,14 @@ def make_fixture(root: Path) -> Path:
     """Create complete SSOT layout fixture inside root and return home directory."""
     home = root / "fixture-home"
     for p in (
-        home / ".config" / "agents" / "harnesses" / "codex",
-        home / ".config" / "agents" / "harnesses" / "opencode",
-        home / ".config" / "agents" / "harnesses" / "amp",
-        home / ".config" / "agents" / "harnesses" / "omp" / "agent",
-        home / ".config" / "agents" / "harnesses" / "pi" / "agent",
-        home / ".config" / "agents" / "tools" / "mcporter",
-        home / ".config" / "agents" / "tools" / "summarize",
-        home / ".config" / "agents" / "tools" / "cliproxyapi",
+        home / "src" / "agents" / "harnesses" / "codex",
+        home / "src" / "agents" / "harnesses" / "opencode",
+        home / "src" / "agents" / "harnesses" / "amp",
+        home / "src" / "agents" / "harnesses" / "omp" / "agent",
+        home / "src" / "agents" / "harnesses" / "pi" / "agent",
+        home / "src" / "agents" / "tools" / "mcporter",
+        home / "src" / "agents" / "tools" / "summarize",
+        home / "src" / "agents" / "tools" / "cliproxyapi",
         home / ".pi" / "agent",
         home / ".omp" / "agent" / "logs",
         home / ".codex",
@@ -264,7 +260,7 @@ def make_fixture(root: Path) -> Path:
     ):
         p.mkdir(parents=True, exist_ok=True)
 
-    sync_source = home / ".config" / "agents" / "sync"
+    sync_source = home / "src" / "agents" / "sync"
     sync_source.mkdir(parents=True, exist_ok=True)
     _ = shutil.copytree(SYNC_ROOT / "src", sync_source / "src")
     for filename in ("pyproject.toml", "uv.lock", "README.md"):
@@ -461,7 +457,7 @@ def test_integration_missing_runtime_sources_fails_sync_exit_1(
 ) -> None:
     """Test sync fails with exit code 1 when runtime sources are missing."""
     home = tmp_path / "home"
-    (home / ".config" / "agents").mkdir(parents=True, exist_ok=True)
+    (home / "src" / "agents").mkdir(parents=True, exist_ok=True)
     write_deployment(home)
 
     result = run_sync_process(home)
@@ -475,7 +471,7 @@ def test_integration_malformed_config_fails_sync_exit_1(
     """Test sync fails with exit code 1 on malformed JSON deployment config."""
     home = make_fixture(tmp_path)
     _ = (
-        home / ".config" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
+        home / "src" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
     ).write_text("{ invalid json syntax\n", encoding="utf-8")
 
     result = run_sync_process(home)
@@ -549,7 +545,7 @@ def test_integration_happy_path_matches_expected_outputs(
         assert "agents-managed-wrapper:v1" in text
         assert ".local/share/agents/sync-current" in text
         assert str(SYNC_ROOT) not in text
-        assert ".config/agents/sync" not in text
+        assert "src/agents/sync" not in text
 
 
 def test_integration_repeated_runs_remain_idempotent(tmp_path: Path) -> None:
@@ -593,7 +589,7 @@ def test_integration_owned_entry_cleanup_and_unmanaged_file_preservation(
     assert unmanaged_log.read_text(encoding="utf-8") == "user-log-content\n"
     assert unmanaged_bin.is_file()
 
-    shutil.rmtree(home / ".config" / "agents" / "skills" / "legacy", ignore_errors=True)
+    shutil.rmtree(home / "src" / "agents" / "skills" / "legacy", ignore_errors=True)
 
     second_result = run_sync_process(home)
     assert second_result.exit_code == 0, second_result.stderr or second_result.stdout
@@ -767,7 +763,7 @@ def test_integration_environment_variable_precedence_dot_env_vs_parent(
 ) -> None:
     """Test parent environment variables override values defined in .env file."""
     home = make_fixture(tmp_path)
-    _ = (home / ".config" / "agents" / ".env").write_text(
+    _ = (home / "src" / "agents" / ".env").write_text(
         "BASE_FROM_DOTENV=dotenv_val\nOVERRIDE_VAR=dotenv_val\n",
         encoding="utf-8",
     )
@@ -847,9 +843,7 @@ def test_integration_package_bootstrap_patches_settings_and_cache_paths(
     build_repo = tmp_path / "repos" / "build-pkg"
     setup_package_repos(source_repo, build_repo)
 
-    pkgs_json = (
-        home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
-    )
+    pkgs_json = home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
     pkgs_json.parent.mkdir(parents=True, exist_ok=True)
     _ = pkgs_json.write_text(
         json.dumps({"packages": [str(source_repo), str(build_repo)]}, indent=2) + "\n",
@@ -880,9 +874,7 @@ def test_integration_invalid_package_json_fails_package_bootstrap(
     _ = (bad_repo / "package.json").write_text("{not valid json", encoding="utf-8")
     init_git_repo(bad_repo)
 
-    pkgs_json = (
-        home / ".config" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
-    )
+    pkgs_json = home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
     pkgs_json.parent.mkdir(parents=True, exist_ok=True)
     _ = pkgs_json.write_text(
         json.dumps({"packages": [str(bad_repo)]}, indent=2) + "\n",
@@ -914,7 +906,7 @@ def test_integration_wrapper_forwards_arguments_to_faked_runtime(
     assert ".venv/bin/python" in wrapper_text
     assert "-m sync.cli" in wrapper_text
     assert str(SYNC_ROOT) not in wrapper_text
-    assert ".config/agents/sync" not in wrapper_text
+    assert "src/agents/sync" not in wrapper_text
 
     # Replace the seeded venv symlink with a fake venv python that echoes the
     # module invocation, isolating this test from the shared release venv.
