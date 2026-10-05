@@ -1,6 +1,0 @@
-{
-  "systemOne": {
-    "baseUrl": "https://openrouter.ai/api/v1",
-    "models": ["typesafe/jev-1.13"]
-  }
-}

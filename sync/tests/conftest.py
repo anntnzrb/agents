@@ -7,7 +7,6 @@ import atexit
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -97,8 +96,6 @@ def _build_shared_release() -> SharedRelease:
     tools = template_home / ".config" / "agents" / "tools" / "cliproxyapi"
     tools.mkdir(parents=True, exist_ok=True)
     deployment = {
-        "server": {"hostname": socket.gethostname()},
-        "listen": {"host": "100.64.0.42", "port": 8317},
         "client": {"baseUrl": "http://127.0.0.1:1/v1"},
     }
     _ = (tools / "deployment.json").write_text(

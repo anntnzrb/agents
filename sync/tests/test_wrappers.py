@@ -18,13 +18,11 @@ from sync.core.harness import (
     supported_harness,
 )
 from sync.core.harness_adapters import HARNESS_ADAPTERS
-from sync.core.managed_tools import PreparedManagedTool
 from sync.core.wrappers import (
     WRAPPER_MARKER,
     WRAPPER_STATE_FILE,
     WrapperState,
     is_managed_wrapper,
-    managed_tool_wrapper_destination,
     read_wrapper_state,
     reconcile_wrapper_files,
     reconcile_wrappers,
@@ -253,40 +251,31 @@ def test_codex_wrapper_defers_sandbox_and_hook_policies_to_config(
     assert codex is not None
     assert "--dangerously-bypass-approvals-and-sandbox" not in codex.content
     assert "--dangerously-bypass-hook-trust" not in codex.content
-    for entry in destinations:
-        if entry.path.endswith("/codex"):
-            continue
-        assert "--dangerously-bypass-approvals-and-sandbox" not in entry.content
-        assert "--dangerously-bypass-hook-trust" not in entry.content
 
 
-def test_managed_tool_wrappers_use_the_cached_binary_and_generated_config(
-    tmp_path: Path,
-) -> None:
-    """Test managed tool wrapper points to cached binary and config path."""
+def test_reconcile_wrappers_cleans_up_stale_owned_wrapper(tmp_path: Path) -> None:
+    """reconcile_wrappers removes a previously owned wrapper when no longer declared."""
     home = str(tmp_path)
-    tool = PreparedManagedTool(
-        name="cliproxyapi",
-        command="cli-proxy-api",
-        executable=str(tmp_path / ".cache" / "cli-proxy-api"),
-        version="7.2.132",
-        config_path=str(tmp_path / ".cli-proxy-api" / "config.yaml"),
+    sync_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
+    state_path = Path(sync_env.managed_state_home) / WRAPPER_STATE_FILE
+    stale_wrapper = Path(tmp_path) / ".local" / "bin" / "cli-proxy-api"
+    stale_wrapper.parent.mkdir(parents=True, exist_ok=True)
+    _ = stale_wrapper.write_text(
+        f"#!/bin/sh\n# {WRAPPER_MARKER}\nexit 0\n",
+        encoding="utf-8",
     )
-    unix_env = SyncEnv.from_home(home, DEFAULT_SYNC_TIMEOUT_MS, platform="linux")
-    unix = managed_tool_wrapper_destination(unix_env, tool)
-    assert unix.path == str(tmp_path / ".local" / "bin" / "cli-proxy-api")
-    assert tool.executable in unix.content
-    assert f"--config '{tool.config_path}'" in unix.content
+    stale_wrapper.chmod(MODE_EXECUTABLE)
 
-    # Golden comparison for managed tool wrapper
-    golden_path = Path(__file__).parent / "golden" / "wrapper-managed-tool.sh"
-    if golden_path.exists():
-        expected_content = (
-            golden_path.read_text(encoding="utf-8")
-            .replace("<executable>", tool.executable)
-            .replace("<configPath>", tool.config_path)
-        )
-        assert unix.content == expected_content
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = state_path.write_text(
+        json.dumps({"version": 1, "entries": [str(stale_wrapper)]}),
+        encoding="utf-8",
+    )
+
+    assert reconcile_wrappers(sync_env) is True
+    assert not stale_wrapper.exists()
+    new_state = read_wrapper_state(str(state_path))
+    assert str(stale_wrapper) not in new_state.entries
 
 
 def test_wrapper_reconciliation_is_idempotent_and_removes_owned_stale_entries(

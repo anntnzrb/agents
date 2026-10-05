@@ -7,17 +7,15 @@ import hashlib
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import threading
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeGuard, override
+from typing import TYPE_CHECKING, override
 
 import pytest
-import yaml
 
 from sync.core.cliproxy_deployment import CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER
 from sync.runtime.lock import release_sync_lock, try_acquire_sync_lock
@@ -34,17 +32,8 @@ if TYPE_CHECKING:
 EXIT_SYNTAX_ERROR = 2
 EXIT_RUNTIME_MISSING = 127
 FAKED_RUNTIME_EXIT_CODE = 42
-CLIPROXY_PORT = 8317
 CONFIG_FILE_MODE = 0o600
 PERMISSION_MASK = 0o777
-
-
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
 
 
 OFFLINE_NPM_ENV: dict[str, str] = {
@@ -168,15 +157,12 @@ def run_wrapper(
 
 def write_deployment(
     home: Path,
-    server_hostname: str | None = None,
     client_base_url: str = "http://127.0.0.1:1/v1",
 ) -> None:
     """Write a minimal CLIProxyAPI deployment.json configuration."""
     tools = home / ".config" / "agents" / "tools" / "cliproxyapi"
     tools.mkdir(parents=True, exist_ok=True)
     deployment = {
-        "server": {"hostname": server_hostname or socket.gethostname()},
-        "listen": {"host": "100.64.0.42", "port": 8317},
         "client": {"baseUrl": client_base_url},
     }
     _ = (tools / "deployment.json").write_text(
@@ -199,30 +185,6 @@ def write_fixture_files(home: Path) -> None:
         home / ".config" / "agents" / "tools" / "summarize" / "config.json"
     ).write_text(
         f'{{"env": {{"OPENAI_BASE_URL": "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}"}}}}',
-        encoding="utf-8",
-    )
-    template_content = (
-        "host: ${CLIPROXY_LISTEN_HOST}\n"
-        "port: ${CLIPROXY_LISTEN_PORT}\n"
-        "remote-management:\n"
-        "  allow-remote: true\n"
-        "  secret-key: tailnet\n"
-        "codex-api-key:\n"
-        "  - x-credential-pool: fixture\n"
-        "    prefix: fixture\n"
-    )
-    _ = (
-        home / ".config" / "agents" / "tools" / "cliproxyapi" / "config.yaml.tmpl"
-    ).write_text(template_content, encoding="utf-8")
-    _ = (home / ".config" / "agents" / "secrets.local.json").write_text(
-        json.dumps(
-            {
-                "CLIPROXY_CREDENTIAL_POOLS": {
-                    "fixture": [{"apiKey": "upstream-secret", "weight": 1}],
-                }
-            }
-        )
-        + "\n",
         encoding="utf-8",
     )
     skills_current = home / ".config" / "agents" / "skills" / "current"
@@ -556,28 +518,6 @@ def test_integration_happy_path_matches_expected_outputs(
     assert "127.0.0.1:1" in summarize_config
     assert CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER not in summarize_config
 
-    config_text = (home / ".cli-proxy-api" / "config.yaml").read_text(encoding="utf-8")
-    raw_config: object = yaml.safe_load(config_text)  # pyright: ignore[reportAny]
-    assert _is_obj_dict(raw_config)
-    assert raw_config["host"] == "100.64.0.42"
-    assert raw_config["port"] == CLIPROXY_PORT
-    remote_raw = raw_config["remote-management"]
-    assert _is_obj_dict(remote_raw)
-    assert remote_raw["secret-key"] == "tailnet"
-    assert "api-keys" not in raw_config
-    keys_raw = raw_config["codex-api-key"]
-    assert _is_obj_list(keys_raw)
-    first_key = keys_raw[0]
-    assert _is_obj_dict(first_key)
-    assert first_key["api-key"] == "upstream-secret"
-    assert "x-credential-pool" not in first_key
-    assert (
-        home / ".cli-proxy-api" / "config.yaml"
-    ).stat().st_mode & PERMISSION_MASK == CONFIG_FILE_MODE
-    assert not (
-        home / ".local" / "share" / "agents" / "cliproxyapi" / "client-api-key"
-    ).exists()
-
     for path in (
         home / ".codex" / "config.toml",
         home / ".config" / "opencode" / "opencode.jsonc",
@@ -717,7 +657,7 @@ def test_integration_failed_publication_clean_recovery(
 ) -> None:
     """Test skipped endpoints on unreachable proxy recover on subsequent healthy run."""
     home = make_fixture(tmp_path)
-    write_deployment(home, "different-host", "http://127.0.0.1:1/v1")
+    write_deployment(home, "http://127.0.0.1:1/v1")
 
     endpoint_paths = [
         home / ".codex" / "config.toml",
@@ -731,7 +671,7 @@ def test_integration_failed_publication_clean_recovery(
     for i, path in enumerate(endpoint_paths):
         assert path.read_text(encoding="utf-8") == original_contents[i]
 
-    write_deployment(home, socket.gethostname(), ready_proxy_base_url)
+    write_deployment(home, ready_proxy_base_url)
     recovery_result = run_sync_process(home)
     assert recovery_result.exit_code == 0, (
         recovery_result.stderr or recovery_result.stdout
@@ -868,21 +808,16 @@ def test_integration_environment_variable_precedence_dot_env_vs_parent(
 def test_integration_unavailable_client_preserves_all_cliproxy_artifacts(
     tmp_path: Path,
 ) -> None:
-    """Test unavailable client preserves server config and all harness endpoints."""
+    """Test unavailable client preserves all harness endpoints."""
     home = make_fixture(tmp_path)
-    write_deployment(home, "different-host", "http://127.0.0.1:1/v1")
-
-    config_path = home / ".cli-proxy-api" / "config.yaml"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    _ = config_path.write_text("existing-server-config\n", encoding="utf-8")
-    config_path.chmod(0o600)
+    write_deployment(home, "http://127.0.0.1:1/v1")
 
     endpoint_paths = [
         home / ".codex" / "config.toml",
         home / ".config" / "opencode" / "opencode.jsonc",
         home / ".omp" / "agent" / "models.yml",
     ]
-    active_paths = [config_path, *endpoint_paths]
+    active_paths = endpoint_paths
     before = [
         {
             "content": p.read_text(encoding="utf-8"),

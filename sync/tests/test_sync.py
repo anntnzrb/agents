@@ -5,26 +5,16 @@ from __future__ import annotations
 
 import asyncio
 import errno
-import hashlib
 import json
 import os
-import platform
 import shutil
-import socket
 import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeGuard
 
 import pytest
-import yaml
 
-from sync.core.cliproxy_deployment import (
-    ClientConfig,
-    CliProxyDeployment,
-    ListenConfig,
-    ServerConfig,
-)
 from sync.core.harness import (
     SyncEnv,
     harness_instruction_target,
@@ -47,13 +37,10 @@ from sync.core.managed_state import (
     record_managed_entries,
     write_recorded_entry_names,
 )
-from sync.core.managed_tools import supported_arch
 from sync.core.plan import (
-    CliProxyConfigJob,
     CliProxyEndpointTemplatesJob,
     DirJob,
     ExtensionDepsHookPlan,
-    FileJob,
     Job,
     PackageBootstrapHookPlan,
     PreserveJsonKeysJob,
@@ -114,19 +101,6 @@ EXPECTED_TREE_PIDS: Final[int] = 2
 
 def _is_dict(value: object) -> TypeGuard[dict[str, object]]:
     return isinstance(value, dict)
-
-
-def _is_list(value: object) -> TypeGuard[list[object]]:
-    return isinstance(value, list)
-
-
-def _test_cliproxy_deployment() -> CliProxyDeployment:
-    """Create standard CLI proxy deployment for test runs."""
-    return CliProxyDeployment(
-        server=ServerConfig(hostname=socket.gethostname()),
-        listen=ListenConfig(host="100.64.0.42", port=9443),
-        client=ClientConfig(baseUrl="https://gateway.example.test:9443/v1"),
-    )
 
 
 def _write_file(path: Path, content: str) -> None:
@@ -192,8 +166,6 @@ def _make_sync_env(
         f"{
             json.dumps(
                 {
-                    'server': {'hostname': socket.gethostname()},
-                    'listen': {'host': '100.64.0.42', 'port': 9443},
                     'client': {'baseUrl': 'https://gateway.example.test:9443/v1'},
                 }
             )
@@ -267,135 +239,6 @@ def test_run_jobs_with_preserve_rejects_missing_template_secret(
     _write_file(Path(secrets_path), "{}\n")
 
     jobs: list[Job] = [SecretTemplateJob(src=src, dst=dst, secrets_path=secrets_path)]
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is False
-    assert Path(dst).read_text(encoding="utf-8") == "keep\n"
-
-
-def test_run_jobs_with_preserve_expands_cliproxy_credential_pools_idempotently(
-    tmp_path: Path,
-) -> None:
-    """Verify credential pool expansion in CLI proxy config is idempotent."""
-    src = str(tmp_path / "config.yaml.tmpl")
-    dst = str(tmp_path / "config.yaml")
-    secrets_path = str(tmp_path / "secrets.local.json")
-    template_content = (
-        "remote-management:\n"
-        "  allow-remote: true\n"
-        "  secret-key: tailnet\n"
-        "codex-api-key:\n"
-        "  - x-credential-pool: opencode-go\n"
-        "    prefix: go\n"
-        "    base-url: https://example.test/v1\n"
-        "openai-compatibility:\n"
-        "  - x-credential-pool: deepseek\n"
-        "    name: deepseek\n"
-        "    base-url: https://deepseek.example/v1\n"
-    )
-    _write_file(Path(src), template_content)
-    _write_file(
-        Path(secrets_path),
-        f"{
-            json.dumps(
-                {
-                    'CLIPROXY_CREDENTIAL_POOLS': {
-                        'opencode-go': [
-                            {'apiKey': 'go-one', 'weight': 1},
-                            {'apiKey': 'go-two', 'weight': 2},
-                        ],
-                        'deepseek': [{'apiKey': 'router-one', 'weight': 1}],
-                    },
-                }
-            )
-        }\n",
-    )
-
-    deployment = _test_cliproxy_deployment()
-    jobs: list[Job] = [
-        CliProxyConfigJob(
-            src=src,
-            dst=dst,
-            secrets_path=secrets_path,
-            deployment=deployment,
-            gateway_host=True,
-        )
-    ]
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    rendered_text = Path(dst).read_text(encoding="utf-8")
-    config_raw: object = yaml.safe_load(rendered_text)  # pyright: ignore[reportAny]
-    assert _is_dict(config_raw)
-    remote_mgmt = config_raw.get("remote-management")
-    assert _is_dict(remote_mgmt)
-    assert remote_mgmt.get("secret-key") == "tailnet"
-    assert "api-keys" not in config_raw
-    codex_keys = config_raw.get("codex-api-key")
-    assert _is_list(codex_keys)
-    extracted_codex: list[dict[str, object]] = [
-        {
-            "apiKey": raw_entry.get("api-key"),
-            "weight": raw_entry.get("weight"),
-            "poolMarker": raw_entry.get("x-credential-pool"),
-        }
-        for raw_entry in codex_keys
-        if _is_dict(raw_entry)
-    ]
-    assert extracted_codex == [
-        {"apiKey": "go-one", "weight": 1, "poolMarker": None},
-        {"apiKey": "go-two", "weight": 2, "poolMarker": None},
-    ]
-    openai_compat = config_raw.get("openai-compatibility")
-    assert _is_list(openai_compat)
-    first_compat = openai_compat[0]
-    assert _is_dict(first_compat)
-    assert first_compat.get("api-key-entries") == [
-        {"api-key": "router-one", "weight": 1}
-    ]
-    assert (Path(dst).lstat().st_mode & PERMISSION_MASK) == MODE_SECRET
-
-    first = Path(dst).lstat()
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    second = Path(dst).lstat()
-    assert second.st_ino == first.st_ino
-    assert second.st_mtime_ns == first.st_mtime_ns
-
-
-def test_run_jobs_with_preserve_rejects_duplicate_cliproxy_credentials(
-    tmp_path: Path,
-) -> None:
-    """Verify duplicate credential in pool causes job failure."""
-    src = str(tmp_path / "config.yaml.tmpl")
-    dst = str(tmp_path / "config.yaml")
-    secrets_path = str(tmp_path / "secrets.local.json")
-    _write_file(
-        Path(src),
-        "codex-api-key:\n  - x-credential-pool: opencode-go\n",
-    )
-    _write_file(Path(dst), "keep\n")
-    _write_file(
-        Path(secrets_path),
-        f"{
-            json.dumps(
-                {
-                    'CLIPROXY_CREDENTIAL_POOLS': {
-                        'opencode-go': [
-                            {'apiKey': 'duplicate'},
-                            {'apiKey': 'duplicate'},
-                        ],
-                    },
-                }
-            )
-        }\n",
-    )
-
-    deployment = _test_cliproxy_deployment()
-    jobs: list[Job] = [
-        CliProxyConfigJob(
-            src=src,
-            dst=dst,
-            secrets_path=secrets_path,
-            deployment=deployment,
-            gateway_host=True,
-        )
-    ]
     assert asyncio.run(run_jobs_with_preserve(jobs)) is False
     assert Path(dst).read_text(encoding="utf-8") == "keep\n"
 
@@ -882,49 +725,6 @@ def test_sync_plan_publishes_client_origin_templates(home: Path) -> None:
     assert "settings.json" in dir_job.preserve_paths
 
 
-def test_sync_plan_deploys_cliproxy_panel_asset_only_on_gateway_host(
-    home: Path,
-) -> None:
-    """Verify CLI proxy panel asset is included in jobs only on gateway host."""
-    sync_env = _make_sync_env(home)
-    panel_src = home / ".config" / "agents" / "tools" / "cliproxyapi" / "panel.html"
-    _write_file(panel_src, "<html>panel</html>\n")
-    panel_dst = str(Path(".cli-proxy-api") / "static" / "management.html")
-
-    gateway_plan = build_sync_plan(sync_env)
-    panel_job = next(
-        (
-            j
-            for j in gateway_plan.jobs
-            if isinstance(j, FileJob) and j.dst.endswith(panel_dst)
-        ),
-        None,
-    )
-    assert panel_job is not None
-    assert panel_job.src == str(panel_src)
-
-    deployment_path = (
-        home / ".config" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
-    )
-    _ = deployment_path.write_text(
-        f"{
-            json.dumps(
-                {
-                    'server': {'hostname': 'not-the-gateway.example.test'},
-                    'listen': {'host': '100.64.0.42', 'port': 9443},
-                    'client': {'baseUrl': 'https://gateway.example.test:9443/v1'},
-                }
-            )
-        }\n",
-        encoding="utf-8",
-    )
-    client_sync_env = SyncEnv.from_home(str(home), 10_000)
-    client_plan = build_sync_plan(client_sync_env)
-    assert not any(
-        isinstance(j, FileJob) and j.dst.endswith(panel_dst) for j in client_plan.jobs
-    )
-
-
 def test_run_sync_happy_path(seeded_home: Path) -> None:
     """Verify full happy-path sync execution reconciles all harness assets."""
     sync_env = _make_sync_env(seeded_home)
@@ -1144,95 +944,6 @@ def test_run_sync_removes_entries_removed_from_ssot_after_prior_sync(
     assert not (seeded_home / ".codex" / "config.toml").exists()
     assert not (seeded_home / ".codex" / "skills").exists()
     assert (seeded_home / ".codex" / "logs" / "keep.txt").exists()
-
-
-def test_run_sync_removes_cli_proxy_api_wrapper_after_gateway_to_client_transition(
-    seeded_home: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verify cli-proxy-api wrapper is deleted when host ceases to be gateway."""
-    sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / ".config" / "agents"
-
-    arch = supported_arch(platform.machine())
-    platform_key = f"{sync_env.platform}-{arch}"
-    version = "7.2.132"
-    repository = "router-for-me/CLIProxyAPI"
-    asset_name = "CLIProxyAPI_fixture.tar.gz"
-    checksum = hashlib.sha256(b"fixture archive").hexdigest()
-    install_dir = (
-        seeded_home
-        / "cache"
-        / "github-tools"
-        / "cliproxyapi"
-        / "versions"
-        / version
-        / platform_key
-    )
-    wrapper_path = seeded_home / ".local" / "bin" / "cli-proxy-api"
-    wrappers_state_path = (
-        seeded_home / ".local" / "share" / "agents" / "sync-managed" / "wrappers.json"
-    )
-
-    _write_file(
-        agents_root / "tools" / "cliproxyapi" / "release.json",
-        f"{
-            json.dumps(
-                {
-                    'repository': repository,
-                    'version': version,
-                    'binary': 'cli-proxy-api',
-                    'assets': {platform_key: {'name': asset_name, 'sha256': checksum}},
-                },
-                indent=2,
-            )
-        }\n",
-    )
-    _write_file(install_dir / "cli-proxy-api", "#!/bin/sh\nexit 0\n")
-    (install_dir / "cli-proxy-api").chmod(MODE_EXECUTABLE)
-    _write_file(
-        install_dir / "receipt.json",
-        f"{
-            json.dumps(
-                {
-                    'repository': repository,
-                    'version': version,
-                    'asset': asset_name,
-                    'sha256': checksum,
-                },
-                indent=2,
-            )
-        }\n",
-    )
-    _write_file(agents_root / "HARNESS.md", "agent-instructions")
-    _write_file(agents_root / "skills" / "current" / "skill.txt", "fresh-skill")
-    _write_file(
-        agents_root / "harnesses" / "codex" / "config.toml",
-        "fresh = true\n",
-    )
-
-    monkeypatch.setenv("XDG_CACHE_HOME", str(seeded_home / "cache"))
-    assert asyncio.run(run_sync(sync_env)) is True
-    assert wrapper_path.exists()
-    assert str(wrapper_path) in wrappers_state_path.read_text(encoding="utf-8")
-
-    _write_file(
-        agents_root / "tools" / "cliproxyapi" / "deployment.json",
-        f"{
-            json.dumps(
-                {
-                    'server': {'hostname': 'different-gateway.example.test'},
-                    'listen': {'host': '100.64.0.42', 'port': 9443},
-                    'client': {'baseUrl': 'https://gateway.example.test:9443/v1'},
-                }
-            )
-        }\n",
-    )
-
-    sync_env2 = SyncEnv.from_home(str(seeded_home), 10_000)
-    assert asyncio.run(run_sync(sync_env2)) is True
-    assert not wrapper_path.exists()
-    assert str(wrapper_path) not in wrappers_state_path.read_text(encoding="utf-8")
 
 
 def test_run_sync_copies_current_skills_but_not_legacy_skills(
@@ -2148,9 +1859,6 @@ def test_run_sync_bootstraps_python_env_from_adapter_declaration(
     def _empty_managed_plan(_env: object, _plan: object) -> ManagedSyncPlan:
         return ManagedSyncPlan(harnesses=[])
 
-    def _no_managed_tools(_env: object) -> list[object]:
-        return []
-
     async def _skip_hooks(_hooks: object, _states: object) -> bool:
         return True
 
@@ -2159,7 +1867,6 @@ def test_run_sync_bootstraps_python_env_from_adapter_declaration(
     monkeypatch.setattr(
         "sync.core.index.plan_managed_entries_for_sync_plan", _empty_managed_plan
     )
-    monkeypatch.setattr("sync.core.index.prepare_managed_tools", _no_managed_tools)
     monkeypatch.setattr("sync.core.index.run_sync_hooks", _skip_hooks)
 
     assert asyncio.run(run_sync(sync_env)) is True

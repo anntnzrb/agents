@@ -21,14 +21,12 @@ if TYPE_CHECKING:
     from typing import NoReturn
 
     from sync.core.harness import SyncEnv
-    from sync.core.managed_tools import PreparedManagedTool
 
 __all__ = [
     "WRAPPER_MARKER",
     "WRAPPER_STATE_FILE",
     "WrapperState",
     "is_managed_wrapper",
-    "managed_tool_wrapper_destination",
     "read_wrapper_state",
     "reconcile_wrapper_files",
     "reconcile_wrappers",
@@ -65,13 +63,6 @@ class WrapperReconcileResult:
     owned: list[str]
     conflicts: list[str]
     removed: list[str]
-
-
-@dataclass(frozen=True, slots=True)
-class WrapperRuntime:
-    """Runtime options for wrapper reconciliation."""
-
-    additional_destinations: tuple[WrapperDestination, ...] = ()
 
 
 def wrapper_directory(sync_env: SyncEnv) -> str:
@@ -144,39 +135,10 @@ def render_launch_wrapper(
     return "\n".join(lines)
 
 
-def managed_tool_wrapper_destination(
-    sync_env: SyncEnv,
-    tool: PreparedManagedTool,
-) -> WrapperDestination:
-    """Create a wrapper destination for a prepared managed tool."""
-    return WrapperDestination(
-        path=str(Path(wrapper_directory(sync_env)) / tool.command),
-        content=render_managed_tool_wrapper(tool),
-    )
-
-
-def render_managed_tool_wrapper(tool: PreparedManagedTool) -> str:
-    """Render a POSIX shell script wrapper for a managed tool binary."""
-    quoted_exec = shell_quote(tool.executable)
-    quoted_cfg = shell_quote(tool.config_path)
-    lines = [
-        "#!/bin/sh",
-        f"# {WRAPPER_MARKER}",
-        "set -eu",
-        f'exec {quoted_exec} --config {quoted_cfg} "$@"',
-        "",
-    ]
-    return "\n".join(lines)
-
-
-def reconcile_wrappers(
-    sync_env: SyncEnv,
-    runtime: WrapperRuntime | None = None,
-) -> bool:
+def reconcile_wrappers(sync_env: SyncEnv) -> bool:
     """Reconcile wrapper scripts on disk and warn on any unmanaged conflicts."""
     try:
-        extra = runtime.additional_destinations if runtime else ()
-        desired = [*wrapper_destinations(sync_env), *extra]
+        desired = wrapper_destinations(sync_env)
         result = reconcile_wrapper_files(sync_env, desired)
     except (RuntimeError, OSError) as error:
         message = panic_message(error)

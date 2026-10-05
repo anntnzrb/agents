@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import contextlib
-import ipaddress
 import json
 import re
 import shutil
-import socket
 import stat
 import tomllib
 import urllib.parse
@@ -24,20 +22,13 @@ from pydantic import (
     Field,
     ValidationError,
     field_validator,
-    model_validator,
 )
 
 from sync.runtime.errors import is_errno, panic_message
 from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
 
-INVALID_LISTEN_HOST_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@]")
-INVALID_SERVER_HOSTNAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\s/?#@:]")
 INVALID_CLIENT_URL_DELIMITER_PATTERN: Final[re.Pattern[str]] = re.compile(r"[?#]")
-IPV4_ZERO_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"^(?:0+(?:\.0+){0,3}|0x0+)$",
-    re.IGNORECASE,
-)
 CLIENT_BASE_URL_PLACEHOLDER_NAME: Final[str] = "CLIPROXY_CLIENT_BASE_URL"
 CLI_PROXY_SOURCE_DIR: Final[str] = "tools/cliproxyapi"
 CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER: Final[str] = (
@@ -50,63 +41,6 @@ CLI_PROXY_ENDPOINT_PLACEHOLDERS: Final[tuple[str, ...]] = (
 )
 
 ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
-MIN_PORT: Final[int] = 1
-MAX_PORT: Final[int] = 65535
-
-
-def _is_unspecified_host(host: str) -> bool:
-    if IPV4_ZERO_PATTERN.match(host):
-        return True
-    address = host.split("%", maxsplit=1)[0]
-    try:
-        ip = ipaddress.ip_address(address)
-    except ValueError:
-        return False
-    else:
-        return ip.is_unspecified
-
-
-class ServerConfig(BaseModel):
-    """Server hostname configuration."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        extra="forbid", frozen=True, strict=True
-    )
-    hostname: str
-
-    @field_validator("hostname")
-    @classmethod
-    def _validate_hostname(cls, h: str) -> str:
-        if not h or h != h.strip() or INVALID_SERVER_HOSTNAME_PATTERN.search(h):
-            msg = "expected a local OS hostname"
-            raise ValueError(msg)
-        return h
-
-
-class ListenConfig(BaseModel):
-    """Network listen address and port configuration."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        extra="forbid", frozen=True, strict=True
-    )
-    host: str
-    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
-
-    @field_validator("host")
-    @classmethod
-    def _validate_host(cls, host: str) -> str:
-        if (
-            not host
-            or host != host.strip()
-            or INVALID_LISTEN_HOST_PATTERN.search(host)
-            or "://" in host
-            or "[" in host
-            or "]" in host
-            or _is_unspecified_host(host)
-        ):
-            msg = "expected a specific host or interface address"
-            raise ValueError(msg)
-        return host
 
 
 class ClientConfig(BaseModel):
@@ -156,7 +90,7 @@ class ClientConfig(BaseModel):
 
 
 class CliProxyDeployment(BaseModel):
-    """Full CLIProxyAPI deployment specification."""
+    """Client-only CLIProxyAPI deployment specification."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
@@ -164,23 +98,7 @@ class CliProxyDeployment(BaseModel):
         strict=True,
         populate_by_name=True,
     )
-    server: ServerConfig
-    listen: ListenConfig
     client: ClientConfig
-    gateway: ListenConfig | None = None
-
-    @model_validator(mode="after")
-    def _validate_gateway_listener(self) -> CliProxyDeployment:
-        if self.gateway == self.listen:
-            msg = "gateway listener conflicts with CLIProxyAPI listener"
-            raise ValueError(msg)
-        return self
-
-
-def cliproxy_listen_origin(listen: ListenConfig) -> str:
-    """Build an HTTP origin, including brackets for IPv6 listeners."""
-    host = f"[{listen.host}]" if ":" in listen.host else listen.host
-    return f"http://{host}:{listen.port}"
 
 
 def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:
@@ -209,15 +127,6 @@ def read_cliproxy_deployment(path: str | Path) -> CliProxyDeployment:
         msg = f"parse CLIProxyAPI deployment {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
     return parse_cliproxy_deployment(parsed)
-
-
-def is_cliproxy_gateway_host(
-    deployment: CliProxyDeployment,
-    hostname: str | None = None,
-) -> bool:
-    """Return True if hostname matches deployment server hostname."""
-    current = socket.gethostname() if hostname is None else hostname
-    return current.strip().lower() == deployment.server.hostname.lower()
 
 
 def cliproxy_models_url(deployment: CliProxyDeployment) -> str:

@@ -3,15 +3,13 @@
 
 from __future__ import annotations
 
-import socket
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypeGuard
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 import httpx
 import pytest
-import yaml
 
 from sync.core.cliproxy_deployment import (
     CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
@@ -20,8 +18,6 @@ from sync.core.cliproxy_deployment import (
     CliProxyDeployment,
     CliProxyEndpointSyncOptions,
     CliProxyEndpointTarget,
-    ListenConfig,
-    ServerConfig,
     append_preserved_sections,
     extract_preserved_top_levels,
     is_cliproxy_target_ready,
@@ -35,18 +31,8 @@ REPOSITORY_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 MODE_640: Final[int] = 0o640
 MODE_600: Final[int] = 0o600
 DEPLOYMENT: Final[CliProxyDeployment] = CliProxyDeployment(
-    server=ServerConfig(hostname=socket.gethostname()),
-    listen=ListenConfig(host="100.64.0.42", port=9443),
     client=ClientConfig(baseUrl="https://gateway.example.test:9443/v1"),
 )
-
-
-def _is_obj_dict(val: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(val, dict)
-
-
-def _is_obj_list(val: object) -> TypeGuard[list[object]]:
-    return isinstance(val, list)
 
 
 def _make_fake_fetch(response: httpx.Response) -> Callable[..., httpx.Response]:
@@ -64,39 +50,18 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
     """Test parsing and strict validation of deployment configuration."""
     parsed = parse_cliproxy_deployment(
         {
-            "server": {"hostname": socket.gethostname()},
-            "listen": {"host": "100.64.0.42", "port": 9443},
             "client": {"baseUrl": "https://gateway.example.test:9443/v1/"},
         }
     )
-    assert parsed.server.hostname == DEPLOYMENT.server.hostname
-    assert parsed.listen.host == DEPLOYMENT.listen.host
-    assert parsed.listen.port == DEPLOYMENT.listen.port
     assert parsed.client.base_url == DEPLOYMENT.client.base_url
 
-    invalid_hosts = [
-        "0.0.0.0",  # noqa: S104
-        "000.000.000.000",
-        "0.0.0",
-        "0",
-        "0x0",
-        "0000000000",
-        "::",
-        "::0",
-        "0::",
-        "0:0:0:0:0:0:0:0",
-        "0:0::0",
-    ]
-    for host in invalid_hosts:
-        with pytest.raises(
-            ValueError,
-            match="specific host or interface address",
-        ):
+    # Server, listen, and gateway keys are rejected
+    for invalid_field in ("server", "listen", "gateway"):
+        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
             _ = parse_cliproxy_deployment(
                 {
-                    "server": {"hostname": "test-gateway"},
-                    "listen": {"host": host, "port": 9443},
                     "client": {"baseUrl": "https://gateway.example.test:9443/v1"},
+                    invalid_field: {},
                 }
             )
 
@@ -106,8 +71,6 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
     ):
         _ = parse_cliproxy_deployment(
             {
-                "server": {"hostname": "test-gateway"},
-                "listen": {"host": "100.64.0.42", "port": 9443},
                 "client": {"baseUrl": "https://gateway.example.test:9443/api"},
             }
         )
@@ -118,8 +81,6 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
     ):
         _ = parse_cliproxy_deployment(
             {
-                "server": {"hostname": "test-gateway"},
-                "listen": {"host": "100.64.0.42", "port": 9443},
                 "client": {"baseUrl": " https://gateway.example.test:9443/v1"},
             }
         )
@@ -134,8 +95,6 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
         ):
             _ = parse_cliproxy_deployment(
                 {
-                    "server": {"hostname": "test-gateway"},
-                    "listen": {"host": "100.64.0.42", "port": 9443},
                     "client": {"baseUrl": base_url},
                 }
             )
@@ -143,8 +102,7 @@ def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> No
     try:
         _ = parse_cliproxy_deployment(
             {
-                "server": {"hostname": "test-gateway"},
-                "listen": {"host": "100.64.0.42", "port": 9443, "typo": True},
+                "typo": True,
                 "client": {"baseUrl": "https://gateway.example.test:9443/v1"},
             }
         )
@@ -481,84 +439,6 @@ def test_append_preserved_sections_handles_various_newline_layouts() -> None:
     )
     assert append_preserved_sections("rendered\n", "") == "rendered\n"
     assert append_preserved_sections("", "[table]\nk = 1\n") == "[table]\nk = 1\n"
-
-
-def test_cliproxy_config_template_uses_upstream_model_names() -> None:
-    """Test the committed cliproxy template exposes upstream model names only."""
-    source = (REPOSITORY_ROOT / "tools" / "cliproxyapi" / "config.yaml.tmpl").read_text(
-        encoding="utf-8"
-    )
-    config: object = yaml.safe_load(source)  # pyright: ignore[reportAny]
-    assert _is_obj_dict(config)
-
-    # Model aliases, payload overrides, and OAuth model exclusions stay absent;
-    # model policy lives in the clients and in upstream discovery.
-    assert "oauth-model-alias" not in config
-    assert "payload" not in config
-    assert "oauth-excluded-models" not in config
-
-    profiles = config.get("openai-compatibility")
-    assert _is_obj_list(profiles)
-    prefixed: set[object] = set()
-    for profile in profiles:
-        assert _is_obj_dict(profile)
-        if "prefix" in profile:
-            prefixed.add(profile.get("name"))
-        models = profile.get("models")
-        if not _is_obj_list(models):
-            continue
-        for model in models:
-            assert _is_obj_dict(model)
-            assert "name" in model
-
-    # Shared pools are namespaced so every model id maps to exactly one owner.
-    assert prefixed == {
-        "opencode-go-custom",
-        "opencode-zen-custom",
-        "cline-pass-custom",
-        "command-code-custom",
-        "mimo-custom",
-    }
-
-    # Compatibility profiles either derive dynamically or declare explicit whitelists.
-    for profile in profiles:
-        assert _is_obj_dict(profile)
-        if profile.get("x-model-discovery") is True:
-            assert "models" not in profile
-        else:
-            assert _is_obj_list(profile.get("models"))
-    # Quota exhaustion falls back across projects, preview variants, and credits
-    # before a request fails; a dead or exhausted credential never sinks a pool.
-    quota = config.get("quota-exceeded")
-    assert quota == {
-        "switch-project": True,
-        "switch-preview-model": True,
-        "antigravity-credits": True,
-    }
-
-    # Subagent sessions inherit the parent's credential binding; failover stays
-    # automatic when the bound auth becomes unavailable.
-    routing = config.get("routing")
-    assert _is_obj_dict(routing)
-    assert routing.get("session-affinity") is True
-    assert routing.get("session-affinity-subagents") is True
-
-    # Long silent generations emit SSE keep-alives so clients never see dead air.
-    keepalive_seconds: Final = 15
-    streaming = config.get("streaming")
-    assert _is_obj_dict(streaming)
-    assert streaming.get("keepalive-seconds") == keepalive_seconds
-    assert config.get("nonstream-keepalive-interval") == keepalive_seconds
-
-    # Antigravity WAF false-flags the literal harness system-conventions block as
-    # a bogus 429 (upstream issue #5751); sensitive-words obfuscation breaks the
-    # literal match before the request leaves the proxy.
-    antigravity = config.get("antigravity")
-    assert _is_obj_dict(antigravity)
-    sensitive_words = antigravity.get("sensitive-words")
-    assert _is_obj_list(sensitive_words)
-    assert "system-conventions" in sensitive_words
-    assert "system-directive" in sensitive_words
 
 
 def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(

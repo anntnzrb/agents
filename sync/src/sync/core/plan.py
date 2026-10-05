@@ -16,10 +16,8 @@ from sync.core.cliproxy_deployment import (
     CliProxyDeployment,
     CliProxyEndpointTarget,
     has_cliproxy_endpoint_placeholder,
-    is_cliproxy_gateway_host,
     read_cliproxy_deployment,
 )
-from sync.core.cliproxy_gateway import GATEWAY_SCRIPT
 from sync.core.harness import (
     DEFAULT_PACKAGE_CACHE_SUBDIR,
     SKILLS_DST_DIR,
@@ -108,7 +106,6 @@ class CliProxyReadinessJob:
     """CLI proxy readiness probe job."""
 
     deployment: CliProxyDeployment
-    gateway_host: bool
     kind: Literal["CliProxyReadiness"] = "CliProxyReadiness"
 
 
@@ -119,18 +116,6 @@ class CliProxyEndpointTemplatesJob:
     targets: tuple[CliProxyEndpointTarget, ...]
     deployment: CliProxyDeployment
     kind: Literal["CliProxyEndpointTemplates"] = "CliProxyEndpointTemplates"
-
-
-@dataclass(frozen=True, slots=True)
-class CliProxyConfigJob:
-    """CLI proxy configuration rendering and synchronization job."""
-
-    src: str
-    dst: str
-    secrets_path: str
-    deployment: CliProxyDeployment
-    gateway_host: bool = False
-    kind: Literal["CliProxyConfig"] = "CliProxyConfig"
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +137,6 @@ type Job = (
     | SecretTemplateJob
     | CliProxyReadinessJob
     | CliProxyEndpointTemplatesJob
-    | CliProxyConfigJob
     | SyncRuntimeInstallJob
 )
 
@@ -208,7 +192,6 @@ class SyncPlan:
     jobs: tuple[Job, ...]
     hooks: tuple[SyncHookPlan, ...]
     cli_proxy_deployment: CliProxyDeployment
-    gateway_host: bool
 
 
 def top_level_entry_names(root: str) -> list[str]:
@@ -355,11 +338,8 @@ def _config_jobs(
     harnesses: Sequence[HarnessPlan],
     deployment: CliProxyDeployment,
     template_paths_by_id: dict[str, tuple[str, ...]],
-    *,
-    gateway_host: bool,
 ) -> list[Job]:
     ssot = Path(sync_env.ssot_home)
-    home = Path(sync_env.home)
     endpoint_targets: list[CliProxyEndpointTarget] = [
         CliProxyEndpointTarget(
             src=str(Path(plan.source_root) / rel_path),
@@ -372,10 +352,9 @@ def _config_jobs(
         for rel_path in template_paths_by_id.get(plan.harness.id, ())
     ]
 
-    jobs: list[Job] = [
+    return [
         CliProxyReadinessJob(
             deployment=deployment,
-            gateway_host=gateway_host,
         ),
         FileJob(
             src=str(ssot / "tools" / "mcporter" / "mcporter.jsonc"),
@@ -387,43 +366,11 @@ def _config_jobs(
             endpoint_template=True,
             deployment=deployment,
         ),
-        CliProxyConfigJob(
-            src=str(ssot / CLI_PROXY_SOURCE_DIR / "config.yaml.tmpl"),
-            dst=str(home / ".cli-proxy-api" / "config.yaml"),
-            secrets_path=str(home / ".config" / "agents" / "secrets.local.json"),
-            deployment=deployment,
-            gateway_host=gateway_host,
-        ),
-    ]
-
-    if gateway_host:
-        jobs.append(
-            FileJob(
-                src=str(ssot / CLI_PROXY_SOURCE_DIR / "panel.html"),
-                dst=str(home / ".cli-proxy-api" / "static" / "management.html"),
-            )
-        )
-        jobs.append(
-            FileJob(
-                src=str(ssot / CLI_PROXY_SOURCE_DIR / "auth-gateway.py"),
-                dst=str(home / ".cli-proxy-api" / "auth-gateway.py"),
-            )
-        )
-    if gateway_host and deployment.gateway is not None:
-        jobs.append(
-            FileJob(
-                src=str(ssot / CLI_PROXY_SOURCE_DIR / GATEWAY_SCRIPT),
-                dst=str(home / ".cli-proxy-api" / GATEWAY_SCRIPT),
-            )
-        )
-    jobs.append(
         CliProxyEndpointTemplatesJob(
             targets=tuple(endpoint_targets),
             deployment=deployment,
-        )
-    )
-
-    return jobs
+        ),
+    ]
 
 
 def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
@@ -436,7 +383,6 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
     cli_proxy_deployment = read_cliproxy_deployment(
         str(ssot / CLI_PROXY_SOURCE_DIR / "deployment.json")
     )
-    gateway_host = is_cliproxy_gateway_host(cli_proxy_deployment)
     template_paths_by_id = {
         plan.harness.id: _cli_proxy_template_paths(
             plan.source_root, plan.harness.cliproxy_templates
@@ -493,7 +439,6 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
             harnesses,
             cli_proxy_deployment,
             template_paths_by_id,
-            gateway_host=gateway_host,
         ),
     ]
 
@@ -525,12 +470,10 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
         jobs=tuple(jobs),
         hooks=hooks,
         cli_proxy_deployment=cli_proxy_deployment,
-        gateway_host=gateway_host,
     )
 
 
 __all__ = [
-    "CliProxyConfigJob",
     "CliProxyEndpointTemplatesJob",
     "CliProxyReadinessJob",
     "DirJob",
