@@ -3,7 +3,7 @@
 
 Every machine converges on ``origin/main``. The updater only fast-forwards a
 clean ``main`` checkout; anything else means someone is working there, so the
-checkout is left untouched. :mod:`sync.core.services` schedules it.
+checkout is left untouched. The machine configuration schedules it.
 """
 
 from __future__ import annotations

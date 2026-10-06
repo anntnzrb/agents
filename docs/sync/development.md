@@ -142,9 +142,9 @@ Tool sources live under `tools/<tool>/`. Sync reads them from `~/src/agents` and
 
 - To give an npm CLI a wrapper and a versioned cache, append it to `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py`.
 - To copy a configuration file into the tool's home, add a `FileJob` to `_config_jobs` in `sync/src/sync/core/plan.py`.
-- To run a per-host user service, declare it in `declared_user_units` and `declared_launch_agents` in `sync/src/sync/core/services.py`, read its hosts from `tools/<tool>/deployment.json`, and update [User services](sync.md#user-services).
+- To implement maintenance jobs or service operations for the machine configuration to schedule, add subcommands under `sync job` or `sync <tool>` in `sync/src/sync/maintenance/`.
 
-To check Python code under `tools/<tool>/` in CI, add its commands to the `repository-checks` job in `.github/workflows/ci.yml`, as `tools/cache-gc` and `tools/paseo` do. Document how to operate the tool on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
+Document how to operate the tool on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
 
 ## Parsing and format contracts
 

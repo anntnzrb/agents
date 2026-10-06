@@ -52,7 +52,6 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
 | `~/.local/bin/` | Harness and tool wrappers |
 | `~/.mcporter/mcporter.json`, `~/.summarize/config.json` | Tool configuration copied from `tools/`; see [Tool launchers](sync/sync.md#tool-launchers) |
-| `~/.config/systemd/user/` units (Linux) and `~/Library/LaunchAgents/` launch agents (macOS) that sync owns | Declared user services; see [User services](sync/sync.md#user-services) |
 
 Sync replaces managed content in these targets. Make durable changes in the matching committed source.
 

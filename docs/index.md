@@ -9,9 +9,8 @@ Choose a page by the task you need to complete. Sync application documentation l
 ## Operate
 
 - [CLIProxyAPI](cliproxyapi.md) describes client endpoint configuration, URL placeholders, and readiness gating.
-- [Cache sweeper](cache-gc.md) reclaims npm, uv, and bun caches and stale `/tmp` scratch nightly on the hosts declared by `tools/cache-gc/`.
-- [Paseo daemon](paseo.md) runs the Paseo agent daemon on the hosts declared by `tools/paseo/` and publishes it to the tailnet.
-- [T3 Code with Pi](t3.md) installs, pairs, and maintains the T3 background service declared by `tools/t3/`.
+- [Paseo daemon](paseo.md) describes the Paseo agent daemon scheduled and exposed by the machine configuration.
+- [T3 Code with Pi](t3.md) manages, pairs, and maintains the T3 background service scheduled by the machine configuration.
 
 ## Develop
 
