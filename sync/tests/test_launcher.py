@@ -1012,6 +1012,43 @@ def test_npm_prune_removes_stages_left_by_dead_installers(tmp_path: Path) -> Non
     assert _version_names(versions) == {"1.0.0", "2.0.0"}
 
 
+def test_npm_install_reclaims_dead_stages_before_staging(tmp_path: Path) -> None:
+    """Stages left by killed installers are freed even when every install fails.
+
+    An installer killed mid-install never reaches its cleanup or a successful
+    prune; without reclaiming first, each failed attempt adds another stage.
+    """
+    spec = NpmPackageSpec(tool="demo", package="demo-package", bin="demo")
+    layout = npm_cache_layout(str(tmp_path), spec, str(tmp_path / "cache"))
+    versions_dir = Path(layout.versions_dir)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    _ = dead.wait()
+    orphan = versions_dir / f".stage-{dead.pid}-deadbeef"
+    (orphan / "node_modules").mkdir(parents=True)
+    seen: list[bool] = []
+
+    async def mock_resolve(_pkg: str, _tag: str, _timeout: int) -> str:
+        return "1.0.0"
+
+    async def failing_install(
+        _cmd: Sequence[str], _options: RunProcessOptions
+    ) -> ProcessResult:
+        seen.append(orphan.exists())
+        return ProcessResult(exit_code=1, stdout="", stderr="", timed_out=False)
+
+    options = PreparePackageOptions(
+        home=str(tmp_path),
+        cache_home=str(tmp_path / "cache"),
+        runtime=LauncherRuntime(resolve_version=mock_resolve, run=failing_install),
+        timeout_ms=DEFAULT_PREPARE_TIMEOUT_MS,
+    )
+    with pytest.raises(RuntimeError):
+        _ = asyncio.run(prepare_npm_package(spec, options))
+
+    assert seen == [False]
+    assert not orphan.exists()
+
+
 def test_npm_prune_keeps_every_version_when_running_processes_are_unknown(
     tmp_path: Path,
 ) -> None:

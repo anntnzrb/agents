@@ -230,6 +230,9 @@ async def _ensure_version_installed(
 
     runtime = options.runtime
     runner = runtime.run if runtime and runtime.run else run_process
+    # A killed installer never reaches its cleanup, and the post-install prune
+    # runs only after a success, so reclaim dead stages before adding another.
+    await asyncio.to_thread(_reclaim_dead_stages, Path(layout.versions_dir))
     stage_name = f".stage-{os.getpid()}-{secrets.token_hex(4)}"
     stage_dir = str(Path(layout.versions_dir) / stage_name)
     try:
@@ -752,6 +755,14 @@ def _prunable(entry_path: Path, keep: set[str], running: set[Path]) -> bool:
     if name in keep:
         return False
     return not _version_in_use(Path(os.path.realpath(entry_path)), running)
+
+
+def _reclaim_dead_stages(versions_dir: Path) -> None:
+    with contextlib.suppress(OSError):
+        for entry in versions_dir.iterdir():
+            name = entry.name
+            if name.startswith(RELEASE_STAGE_PREFIX) and not _stage_owner_alive(name):
+                shutil.rmtree(entry, ignore_errors=True)
 
 
 def prune_versions(layout: NpmCacheLayout, running: set[Path] | None) -> None:
