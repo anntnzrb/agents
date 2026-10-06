@@ -565,20 +565,6 @@ def cmd_refresh_models(_args: argparse.Namespace, sync_env: SyncEnv) -> int:
     return 0
 
 
-def cmd_pair(args: argparse.Namespace, sync_env: SyncEnv) -> int:
-    """Forward arguments to `t3 pair`."""
-    rest: object = getattr(args, "rest", [])
-    extra = [item for item in cast("list[object]", rest) if isinstance(item, str)]
-    return run_cmd([*ops_cli(sync_env), "pair", *extra])
-
-
-def cmd_connect(args: argparse.Namespace, sync_env: SyncEnv) -> int:
-    """Forward arguments to `t3 connect`."""
-    rest: object = getattr(args, "rest", [])
-    extra = [item for item in cast("list[object]", rest) if isinstance(item, str)]
-    return run_cmd([*ops_cli(sync_env), "connect", *extra])
-
-
 def cmd_logs(args: argparse.Namespace, sync_env: SyncEnv) -> int:
     """Show service journal and boot log."""
     lines_val: object = getattr(args, "lines", 30)
@@ -622,10 +608,12 @@ HANDLERS: dict[str, Handler] = {
     "auto-update": cmd_auto_update,
     "apply-settings": cmd_apply_settings,
     "refresh-models": cmd_refresh_models,
-    "pair": cmd_pair,
-    "connect": cmd_connect,
     "logs": cmd_logs,
 }
+
+# T3 CLI commands whose arguments are passed through untouched: argparse
+# would claim leading flags such as --tailscale or --help for itself.
+FORWARDED = ("pair", "connect")
 
 
 def build_t3_parser() -> argparse.ArgumentParser:
@@ -644,14 +632,12 @@ def build_t3_parser() -> argparse.ArgumentParser:
         ("auto-update", "update only when behind the channel and no thread runs"),
         ("apply-settings", "merge server-settings.json offline, then restart"),
         ("refresh-models", "reload Claude's model list from the gateway, live"),
-        ("pair", "mint a tailnet pairing link (extra args forwarded)"),
-        ("connect", "T3 Connect management (args forwarded: login/link/publish/…)"),
+        ("pair", "mint a tailnet pairing link (args forwarded to `t3 pair`)"),
+        ("connect", "T3 Connect management (args forwarded to `t3 connect`)"),
         ("logs", "recent service journal and boot log [-n LINES]"),
     ]
     for name, help_text in commands:
         p = sub.add_parser(name, help=help_text)
-        if name in ("pair", "connect"):
-            _ = p.add_argument("rest", nargs=argparse.REMAINDER)
         if name in ("logs", "doctor"):
             _ = p.add_argument("-n", "--lines", type=int, default=30)
     return parser
@@ -659,6 +645,9 @@ def build_t3_parser() -> argparse.ArgumentParser:
 
 def run_t3(argv: Sequence[str], *, sync_env: SyncEnv | None = None) -> int:
     """Run T3 subcommand and return process exit code."""
+    if argv and argv[0] in FORWARDED:
+        env = sync_env or SyncEnv.from_system()
+        return run_cmd([*ops_cli(env), *argv])
     parser = build_t3_parser()
     try:
         args = parser.parse_args(list(argv))
