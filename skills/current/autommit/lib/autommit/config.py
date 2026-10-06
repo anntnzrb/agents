@@ -5,7 +5,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, TypeIs
 
 from autommit.errors import AutommitError
 
@@ -90,6 +90,10 @@ def _first_timeout(candidates: Sequence[object], default: float) -> float:
     return default
 
 
+def _is_table(value: object) -> TypeIs[Mapping[str, object]]:
+    return isinstance(value, dict)
+
+
 def gateway_base_url(settings: Path) -> str:
     """Read the gateway endpoint from the installed agents settings."""
     try:
@@ -99,8 +103,8 @@ def gateway_base_url(settings: Path) -> str:
             "invalid_config",
             f"No base URL: set AUTOMMIT_BASE_URL or run sync to install {settings}.",
         ) from error
-    gateway = data.get("gateway")
-    base_url = gateway.get("base_url") if isinstance(gateway, dict) else None
+    gateway: object = data.get("gateway")
+    base_url = gateway.get("base_url") if _is_table(gateway) else None
     if not isinstance(base_url, str) or not base_url.strip():
         raise AutommitError(
             "invalid_config", f"{settings} has no gateway.base_url string."
