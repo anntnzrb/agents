@@ -212,6 +212,28 @@ def test_runtime_installation_cleans_up_temporary_stage_on_install_failure(
         assert stages == []
 
 
+def test_runtime_install_refuses_a_release_that_cannot_import(
+    tmp_path: Path,
+) -> None:
+    """A snapshot that fails to import never replaces the working runtime.
+
+    Sync snapshots the checkout's working tree, so a launch during an edit can
+    capture modules from two revisions.
+    """
+    home = make_home(tmp_path)
+    _ = seed_source_root(home)
+    _, job = get_runtime_install_job(home)
+    assert asyncio.run(run_jobs_with_preserve([job])) is True
+    working = Path(job.current_link).resolve()
+
+    _ = seed_source_root(home, cli_content="import sync.no_such_module\n")
+    _, broken = get_runtime_install_job(home)
+    assert asyncio.run(run_jobs_with_preserve([broken])) is False
+
+    assert Path(job.current_link).resolve() == working
+    assert read_dir_names(job.releases_root) == [working.name]
+
+
 def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stages(
     tmp_path: Path,
 ) -> None:

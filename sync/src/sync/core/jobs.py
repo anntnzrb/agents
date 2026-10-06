@@ -248,6 +248,21 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
         message = f"runtime dependency install failed: {detail}"
         raise RuntimeError(message)
 
+    # Sync snapshots the checkout's working tree, so a launch during an edit can
+    # capture modules from two revisions. Publish only a release that imports.
+    probe = await run_process(
+        [str(Path(stage) / ".venv" / "bin" / "python"), "-c", "import sync.cli"],
+        RunProcessOptions(
+            cwd=stage, timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS))
+        ),
+    )
+    if probe.timed_out or probe.exit_code != 0:
+        detail = (
+            "timed out" if probe.timed_out else (probe.stderr or probe.stdout).strip()
+        )
+        message = f"runtime release does not import: {detail[-MAX_DETAIL_CHARS:]}"
+        raise RuntimeError(message)
+
     marker_path = Path(stage) / ".release-complete"
     _ = marker_path.write_text(f"{release_id}\n", encoding="utf-8")
 
