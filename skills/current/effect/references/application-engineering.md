@@ -22,9 +22,9 @@ When maintaining an existing project, inspect its manifest, lockfile, imports, i
 
 Inspect the shared vendored Effect source checkout under the configured vendored sources directory (or the upstream repository `Effect-TS/effect`).
 
-If the checkout is absent, clone it under the global vendored-source policy. If it is clean, fast-forward it before relying on current-main behavior. Read `LLMS.md`, `MIGRATION.md`, package manifests, implementation, tests, and examples relevant to the task. Prefer source patterns over guesses and fragmented web snippets.
+If the checkout is absent, clone it under the global vendored-source policy. Read `LLMS.md`, `MIGRATION.md`, package manifests, implementation, tests, and examples relevant to the task. Prefer source patterns over guesses and fragmented web snippets.
 
-The project version remains authoritative. If the shared checkout does not match the installed project version, state the mismatch. Inspect the matching tag or installed package instead of pretending that `main` is compatible.
+The project version remains authoritative. If the shared checkout does not match the installed project version, state the mismatch. Inspect the installed package or a temporary shallow clone of the matching tag instead of pretending that `main` is compatible.
 
 ## Diagnostics
 
