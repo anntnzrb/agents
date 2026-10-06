@@ -21,7 +21,6 @@ from autommit.client import (
 )
 from autommit.config import (
     DEFAULT_API_KEY,
-    DEFAULT_BASE_URL,
     DEFAULT_MODEL,
     DEFAULT_REASONING_EFFORT,
     DEFAULT_TIMEOUT,
@@ -290,6 +289,12 @@ class TransportLadderTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "invalid_atomicity_decision")
 
 
+def _agents_settings(root: Path, base_url: str) -> Path:
+    settings = root / "agents.toml"
+    _ = settings.write_text(f'[gateway]\nbase_url = "{base_url}"\n', encoding="utf-8")
+    return settings
+
+
 class ConfigResolutionTests(unittest.TestCase):
     """Cover flag and environment resolution for the required settings."""
 
@@ -336,14 +341,17 @@ class ConfigResolutionTests(unittest.TestCase):
             )
 
             config = load_config(
-                environ={"XDG_CONFIG_HOME": str(config_home), "HOME": str(root)}
+                environ={"XDG_CONFIG_HOME": str(config_home), "HOME": str(root)},
+                settings=_agents_settings(root, "https://gateway.test/v1"),
             )
             self.assertEqual(config.model, DEFAULT_MODEL)
 
     def test_unset_settings_fall_back_to_the_owner_defaults(self) -> None:
-        config = load_config(environ={})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            settings = _agents_settings(Path(temp_dir), "https://gateway.test/v1/")
+            config = load_config(environ={}, settings=settings)
         self.assertEqual(config.model, DEFAULT_MODEL)
-        self.assertEqual(config.base_url, DEFAULT_BASE_URL)
+        self.assertEqual(config.base_url, "https://gateway.test/v1")
         self.assertEqual(config.api_key, DEFAULT_API_KEY)
         self.assertEqual(config.reasoning_effort, DEFAULT_REASONING_EFFORT)
         self.assertEqual(config.timeout, DEFAULT_TIMEOUT)
@@ -355,10 +363,21 @@ class ConfigResolutionTests(unittest.TestCase):
                 api_key="flag-key",
             ),
             environ={},
+            settings=Path("/nonexistent/agents.toml"),
         )
         self.assertEqual(chosen.model, "chosen-model")
         self.assertEqual(chosen.base_url, "https://flag.test/v1")
         self.assertEqual(chosen.api_key, "flag-key")
+
+    def test_missing_gateway_without_base_url_is_a_config_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            broken = root / "agents.toml"
+            _ = broken.write_text("[gateway]\n", encoding="utf-8")
+            for settings in (root / "missing.toml", broken):
+                with self.assertRaises(AutommitError) as raised:
+                    _ = load_config(environ={}, settings=settings)
+                self.assertEqual(raised.exception.code, "invalid_config")
 
     def test_openai_environment_aliases_are_honored(self) -> None:
         config = load_config(

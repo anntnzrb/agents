@@ -8,10 +8,11 @@ The repository separates committed sources, local inputs, generated targets, and
 | --- | --- |
 | `AGENTS.md` | Repository policy for contributors and agents |
 | `HARNESS.md` | Global harness-independent agent instructions; sync publishes it to every harness as its instruction file |
+| `agents.toml` | Settings shared by several harnesses and tools; see [Shared settings](sync/sync.md#shared-settings-and-gateway-endpoints) |
 | `skills/current/` | Shared skills published to enabled harnesses |
 | `skills/legacy/` | Archived skills excluded from sync |
 | `harnesses/<harness>/` | Harness-owned configuration, implementation, adjacent tests, and local documentation |
-| `tools/` | Managed-tool sources |
+| `tools/` | Configuration sources for sync-managed CLI tools |
 | `sync/` | The Python (uv) sync application |
 | `docs/` | Repository workflow documentation indexed by `docs/index.md`; sync application documentation under `docs/sync/` |
 | `.github/` | CI workflows, their orchestration scripts, and adjacent tests; see [Verify a change in CI](ci.md) |
@@ -50,6 +51,7 @@ Other jobs use fixed generated targets:
 | `~/.local/share/agents/sync-releases/<releaseId>/` | Installed sync runtime releases |
 | `~/.local/share/agents/sync-current` | Symlink to the current installed sync runtime |
 | `~/.local/share/agents/sync-managed/` | Managed ownership and hook state |
+| `~/.local/share/agents/agents.toml` | Installed copy of `agents.toml` |
 | `~/.local/bin/` | Harness and tool wrappers |
 | `~/.mcporter/mcporter.json`, `~/.summarize/config.json` | Tool configuration copied from `tools/`; see [Tool launchers](sync/sync.md#tool-launchers) |
 

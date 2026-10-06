@@ -35,7 +35,7 @@ Other subcommands: `cli.py models [--filter TEXT]` lists the model ids the confi
 
 Environment variables: `AUTOMMIT_MODEL`, `AUTOMMIT_BASE_URL`, `AUTOMMIT_API_KEY`, `AUTOMMIT_TIMEOUT`, `AUTOMMIT_REASONING_EFFORT`, plus the `OPENAI_*` aliases.
 
-Precedence: CLI flags, then environment variables, then the owner defaults in `lib/autommit/config.py` (`DEFAULT_MODEL`, `DEFAULT_BASE_URL`, `DEFAULT_API_KEY`, `DEFAULT_REASONING_EFFORT`, `DEFAULT_TIMEOUT`). With the defaults set, a bare `cli.py` run needs no flag or variable. Change a default in that file in the SSOT. Autommit reads no configuration file and creates none.
+Precedence: CLI flags, then environment variables, then the owner defaults in `lib/autommit/config.py` (`DEFAULT_MODEL`, `DEFAULT_API_KEY`, `DEFAULT_REASONING_EFFORT`, `DEFAULT_TIMEOUT`). The default endpoint is `gateway.base_url` from the `agents.toml` that sync installs under `~/.local/share/agents/`; without it, pass `--base-url` or set `AUTOMMIT_BASE_URL`. With sync installed, a bare `cli.py` run needs no flag or variable. Change a default in the SSOT. Autommit creates no configuration file.
 
 `keyless` is the conventional value for a gateway that accepts any key. Against an endpoint that requires a real key it produces `provider_error` with HTTP 401 or 403, not `missing_api_key`.
 

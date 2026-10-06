@@ -1,10 +1,9 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""CLIProxyAPI deployment schema, validation, template preservation, and publication."""
+"""Shared agents settings, gateway endpoint templates, and publication."""
 
 from __future__ import annotations
 
 import contextlib
-import json
 import re
 import shutil
 import stat
@@ -19,18 +18,17 @@ import httpx
 from pydantic import (
     BaseModel,
     ConfigDict,
-    Field,
     ValidationError,
     field_validator,
 )
 
 from sync.runtime.errors import is_errno, panic_message
 from sync.runtime.fs import sync_text_file
-from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
+from sync.runtime.jsonc import is_obj_dict, is_obj_list
 
 INVALID_CLIENT_URL_DELIMITER_PATTERN: Final[re.Pattern[str]] = re.compile(r"[?#]")
 CLIENT_BASE_URL_PLACEHOLDER_NAME: Final[str] = "CLIPROXY_CLIENT_BASE_URL"
-CLI_PROXY_SOURCE_DIR: Final[str] = "tools/cliproxyapi"
+AGENTS_SETTINGS_FILE: Final[str] = "agents.toml"
 CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER: Final[str] = (
     f"${{{CLIENT_BASE_URL_PLACEHOLDER_NAME}}}"
 )
@@ -43,16 +41,15 @@ CLI_PROXY_ENDPOINT_PLACEHOLDERS: Final[tuple[str, ...]] = (
 ENDPOINT_READY_TIMEOUT_MS: Final[int] = 500
 
 
-class ClientConfig(BaseModel):
-    """Client endpoint base URL configuration."""
+class GatewaySettings(BaseModel):
+    """Model gateway endpoint as clients reach it."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
-        populate_by_name=True,
     )
-    base_url: str = Field(alias="baseUrl")
+    base_url: str
 
     @field_validator("base_url")
     @classmethod
@@ -89,49 +86,48 @@ class ClientConfig(BaseModel):
         return raw.rstrip("/")
 
 
-class CliProxyDeployment(BaseModel):
-    """Client-only CLIProxyAPI deployment specification."""
+class AgentsSettings(BaseModel):
+    """Settings shared by several harnesses and tools (`agents.toml`)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         frozen=True,
         strict=True,
-        populate_by_name=True,
     )
-    client: ClientConfig
+    gateway: GatewaySettings
 
 
-def parse_cliproxy_deployment(value: object) -> CliProxyDeployment:
-    """Parse and validate CLIProxyAPI deployment dictionary."""
+def parse_agents_settings(value: object) -> AgentsSettings:
+    """Validate a decoded `agents.toml` table."""
     if not is_obj_dict(value):
-        msg = "invalid CLIProxyAPI deployment: expected object"
+        msg = "invalid agents settings: expected table"
         raise ValueError(msg)
     try:
-        return CliProxyDeployment.model_validate(value)
+        return AgentsSettings.model_validate(value)
     except ValidationError as error:
-        msg = f"invalid CLIProxyAPI deployment ({panic_message(error)})"
+        msg = f"invalid agents settings ({panic_message(error)})"
         raise ValueError(msg) from error
 
 
-def read_cliproxy_deployment(path: str | Path) -> CliProxyDeployment:
-    """Read and validate CLIProxyAPI deployment from a JSONC file."""
+def read_agents_settings(path: str | Path) -> AgentsSettings:
+    """Read and validate `agents.toml`."""
     path_obj = Path(path)
     try:
         text = path_obj.read_text(encoding="utf-8")
     except OSError as error:
-        msg = f"read CLIProxyAPI deployment {path_obj} ({panic_message(error)})"
+        msg = f"read agents settings {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
     try:
-        parsed: object = json.loads(strip_jsonc(text))  # pyright: ignore[reportAny]
-    except (ValueError, TypeError) as error:
-        msg = f"parse CLIProxyAPI deployment {path_obj} ({panic_message(error)})"
+        parsed: object = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        msg = f"parse agents settings {path_obj} ({panic_message(error)})"
         raise RuntimeError(msg) from error
-    return parse_cliproxy_deployment(parsed)
+    return parse_agents_settings(parsed)
 
 
-def cliproxy_models_url(deployment: CliProxyDeployment) -> str:
-    """Return the /models endpoint URL for this deployment."""
-    base = deployment.client.base_url.rstrip("/")
+def cliproxy_models_url(deployment: AgentsSettings) -> str:
+    """Return the gateway's /models endpoint URL."""
+    base = deployment.gateway.base_url.rstrip("/")
     return f"{base}/models"
 
 
@@ -148,7 +144,7 @@ class CliProxyEndpointSyncOptions:
 
 
 def is_cliproxy_target_ready(
-    deployment: CliProxyDeployment,
+    deployment: AgentsSettings,
     options: CliProxyEndpointSyncOptions | None = None,
 ) -> bool:
     """Check if CLIProxyAPI /models endpoint is responding with non-empty data array."""
@@ -178,7 +174,7 @@ def is_cliproxy_target_ready(
 
 def render_cliproxy_endpoint_template(
     template: str,
-    deployment: CliProxyDeployment,
+    deployment: AgentsSettings,
 ) -> str:
     """Render endpoint template by substituting the client endpoint placeholders.
 
@@ -191,7 +187,7 @@ def render_cliproxy_endpoint_template(
             f"{' or '.join(CLI_PROXY_ENDPOINT_PLACEHOLDERS)}"
         )
         raise ValueError(msg)
-    base_url = deployment.client.base_url
+    base_url = deployment.gateway.base_url
     return template.replace(CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER, base_url).replace(
         CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER, base_url.removesuffix("/v1")
     )
@@ -318,7 +314,7 @@ def _existing_file_mode(path: Path) -> int | None:
 def sync_cliproxy_endpoint_template(
     src: str | Path,
     dst: str | Path,
-    deployment: CliProxyDeployment,
+    deployment: AgentsSettings,
     preserve_top_levels: Sequence[str] = (),
 ) -> None:
     """Render endpoint template and synchronize to destination preserving sections."""
@@ -446,7 +442,7 @@ def _restore_endpoint_targets(
 
 def publish_cliproxy_endpoint_templates(
     targets: Sequence[CliProxyEndpointTarget],
-    deployment: CliProxyDeployment,
+    deployment: AgentsSettings,
     options: CliProxyEndpointSyncOptions | None = None,
 ) -> CliProxyEndpointPublication:
     """Publish rendered endpoint templates or roll back on write failure."""

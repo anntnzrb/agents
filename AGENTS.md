@@ -21,8 +21,8 @@ Generated homes are overwritten on every sync, so an edit there is lost and the 
 
 - NEVER edit generated synced homes unless the user asks and the SSOT impact is clear
 - Sync reads the SSOT to reconcile installed state. Generated wrappers, harness configuration, skills, and runtime adapters must consume installed state, not load their configuration or code from the checkout.
-- The machine configuration schedules maintenance and service jobs with the installed runtime's Python (`sync job`, `sync t3`). These jobs maintain machine state or refresh long-lived processes outside harness launches.
-- The Amp runner may serve the checkout as a work directory through `--dir`; it still launches through the installed wrapper. Sync reads the auth-gateway checkout source to hash it for restart detection, but the service executes the installed copy.
+- The machine configuration owns every long-running service and its update logic, including services that run sync-managed wrappers; this repository ships no service code. It may schedule `sync job` with the installed runtime's Python.
+- `agents.toml` holds settings shared by several harnesses and tools; sync validates it and installs a copy under the runtime root.
 
 ## Skills
 

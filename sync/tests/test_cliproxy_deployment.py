@@ -1,5 +1,5 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""Tests for CLIProxyAPI deployment parsing, template preservation, and publication."""
+"""Tests for agents settings parsing, template preservation, and publication."""
 
 from __future__ import annotations
 
@@ -14,15 +14,16 @@ import pytest
 from sync.core.cliproxy_deployment import (
     CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER,
     CLI_PROXY_CLIENT_ORIGIN_PLACEHOLDER,
-    ClientConfig,
-    CliProxyDeployment,
+    AgentsSettings,
     CliProxyEndpointSyncOptions,
     CliProxyEndpointTarget,
+    GatewaySettings,
     append_preserved_sections,
     extract_preserved_top_levels,
     is_cliproxy_target_ready,
-    parse_cliproxy_deployment,
+    parse_agents_settings,
     publish_cliproxy_endpoint_templates,
+    read_agents_settings,
     render_cliproxy_endpoint_template,
     sync_cliproxy_endpoint_template,
 )
@@ -30,8 +31,8 @@ from sync.core.cliproxy_deployment import (
 REPOSITORY_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 MODE_640: Final[int] = 0o640
 MODE_600: Final[int] = 0o600
-DEPLOYMENT: Final[CliProxyDeployment] = CliProxyDeployment(
-    client=ClientConfig(baseUrl="https://gateway.example.test:9443/v1"),
+DEPLOYMENT: Final[AgentsSettings] = AgentsSettings(
+    gateway=GatewaySettings(base_url="https://gateway.example.test:9443/v1"),
 )
 
 
@@ -46,70 +47,43 @@ def _fetch_ready(_url: str, **_kw: object) -> httpx.Response:
     return httpx.Response(200, json={"data": [{"id": "ready"}]})
 
 
-def test_cliproxy_deployment_parses_and_normalizes_the_endpoint_boundary() -> None:
-    """Test parsing and strict validation of deployment configuration."""
-    parsed = parse_cliproxy_deployment(
-        {
-            "client": {"baseUrl": "https://gateway.example.test:9443/v1/"},
-        }
+def test_agents_settings_parse_and_normalize_the_endpoint_boundary() -> None:
+    """Test parsing and strict validation of agents settings."""
+    parsed = parse_agents_settings(
+        {"gateway": {"base_url": "https://gateway.example.test:9443/v1/"}}
     )
-    assert parsed.client.base_url == DEPLOYMENT.client.base_url
+    assert parsed.gateway.base_url == DEPLOYMENT.gateway.base_url
 
-    # Server, listen, and gateway keys are rejected
-    for invalid_field in ("server", "listen", "gateway"):
-        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-            _ = parse_cliproxy_deployment(
-                {
-                    "client": {"baseUrl": "https://gateway.example.test:9443/v1"},
-                    invalid_field: {},
-                }
-            )
-
-    with pytest.raises(
-        ValueError,
-        match=r"HTTP\(S\) /v1 endpoint",
-    ):
-        _ = parse_cliproxy_deployment(
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        _ = parse_agents_settings(
             {
-                "client": {"baseUrl": "https://gateway.example.test:9443/api"},
-            }
-        )
-
-    with pytest.raises(
-        ValueError,
-        match=r"HTTP\(S\) /v1 endpoint",
-    ):
-        _ = parse_cliproxy_deployment(
-            {
-                "client": {"baseUrl": " https://gateway.example.test:9443/v1"},
+                "gateway": {"base_url": "https://gateway.example.test:9443/v1"},
+                "typo": {},
             }
         )
 
     for base_url in [
+        "https://gateway.example.test:9443/api",
+        " https://gateway.example.test:9443/v1",
         "https://gateway.example.test:9443/v1?migrate=true",
         "https://gateway.example.test:9443/v1#fragment",
     ]:
-        with pytest.raises(
-            ValueError,
-            match=r"HTTP\(S\) /v1 endpoint",
-        ):
-            _ = parse_cliproxy_deployment(
-                {
-                    "client": {"baseUrl": base_url},
-                }
-            )
+        with pytest.raises(ValueError, match=r"HTTP\(S\) /v1 endpoint"):
+            _ = parse_agents_settings({"gateway": {"base_url": base_url}})
 
-    try:
-        _ = parse_cliproxy_deployment(
-            {
-                "typo": True,
-                "client": {"baseUrl": "https://gateway.example.test:9443/v1"},
-            }
-        )
-    except ValueError:
-        pass
-    else:
-        pytest.fail("unknown deployment field was accepted")
+
+def test_repository_agents_settings_are_valid() -> None:
+    """The committed agents.toml parses under the strict schema."""
+    settings = read_agents_settings(REPOSITORY_ROOT / "agents.toml")
+    assert settings.gateway.base_url.endswith("/v1")
+
+
+def test_malformed_agents_settings_name_the_file(tmp_path: Path) -> None:
+    """A TOML syntax error is reported with the offending path."""
+    path = tmp_path / "agents.toml"
+    _ = path.write_text("[gateway\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="parse agents settings"):
+        _ = read_agents_settings(path)
 
 
 def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None:
@@ -124,7 +98,7 @@ def test_cliproxy_endpoint_template_renders_idempotently(tmp_path: Path) -> None
 
     sync_cliproxy_endpoint_template(src, dst, DEPLOYMENT)
     assert dst.read_text(encoding="utf-8") == (
-        f'base_url = "{DEPLOYMENT.client.base_url}"\n'
+        f'base_url = "{DEPLOYMENT.gateway.base_url}"\n'
     )
     assert dst.stat().st_mode & 0o777 == MODE_640
     first_ino = dst.stat().st_ino
@@ -464,8 +438,8 @@ def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
     )
 
     assert (dst_dir / "opencode.jsonc").read_text(encoding="utf-8") == (
-        f'const x = "{DEPLOYMENT.client.base_url}";\n'
+        f'const x = "{DEPLOYMENT.gateway.base_url}";\n'
     )
     assert (dst_dir / "plugins" / "cliproxy.ts").read_text(encoding="utf-8") == (
-        f'const x = "{DEPLOYMENT.client.base_url}";\n'
+        f'const x = "{DEPLOYMENT.gateway.base_url}";\n'
     )

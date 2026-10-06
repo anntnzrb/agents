@@ -1,0 +1,9 @@
+# Settings shared by several harnesses and tools. Sync validates this file
+# before reconciling and installs a copy in its runtime home for tools that run
+# outside a sync launch.
+
+[gateway]
+# OpenAI-compatible /v1 endpoint of the model gateway, as clients reach it. The
+# machine configuration deploys the gateway; keep this in step with its host
+# and port.
+base_url = "http://solna.trex-gamut.ts.net:8317/v1"

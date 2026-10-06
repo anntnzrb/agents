@@ -1,32 +1,18 @@
-# CLIProxyAPI
+# Model gateway clients
 
-CLIProxyAPI provides OpenAI-compatible and Anthropic-compatible endpoints for harnesses. The gateway service itself is operated outside this repository.
+Harnesses reach models through a CLIProxyAPI gateway that exposes OpenAI-compatible and Anthropic-compatible endpoints. The machine configuration deploys and operates the gateway; this repository configures only its clients.
 
-`tools/cliproxyapi/deployment.json` defines the client-side configuration for sync:
+`gateway.base_url` in `agents.toml` is the `/v1` endpoint clients use. Change it when the gateway moves.
 
-```json
-{
-  "client": {
-    "baseUrl": "http://solna.trex-gamut.ts.net:8317/v1"
-  }
-}
-```
+## Placeholders
 
-## Client endpoint publication and placeholders
+Sync replaces endpoint placeholders in the harness files declared under `cliproxy_templates` and in `tools/summarize/config.json`:
 
-Sync replaces endpoint placeholders in harness configuration files declared under `cliproxy_templates`:
+- `${CLIPROXY_CLIENT_BASE_URL}` renders to `gateway.base_url`.
+- `${CLIPROXY_CLIENT_ORIGIN}` renders to the same URL without `/v1`, for clients that append the version path themselves.
 
-- `${CLIPROXY_CLIENT_BASE_URL}` renders to `client.baseUrl` (for example, `http://solna.trex-gamut.ts.net:8317/v1`).
-- `${CLIPROXY_CLIENT_ORIGIN}` renders to `client.baseUrl` without the trailing `/v1` path (for example, `http://solna.trex-gamut.ts.net:8317`), for clients that append `/v1` themselves.
+Tools that run outside a sync launch read the installed copy at `~/.local/share/agents/agents.toml`.
 
 ## Readiness gating
 
-Before publishing rendered endpoint templates to harness homes, sync probes `client.baseUrl/models` without authorization. The endpoint must respond with HTTP 2xx and a JSON body containing a non-empty `data` array:
-
-```bash
-CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' tools/cliproxyapi/deployment.json)"
-curl -fsS "$CLIPROXY_BASE_URL/models" | jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_BASE_URL
-```
-
-If the endpoint is unreachable or returns an empty model list, sync preserves existing client configuration and harness endpoint files without failing or overwriting them.
+Before publishing rendered templates, sync requests `gateway.base_url` + `/models` without authorization. The response must be HTTP 2xx with a non-empty `data` array. Otherwise sync keeps the previously generated harness files and does not fail the run.

@@ -8,9 +8,7 @@ Choose a page by the task you need to complete. Sync application documentation l
 
 ## Operate
 
-- [CLIProxyAPI](cliproxyapi.md) describes client endpoint configuration, URL placeholders, and readiness gating.
-- [Paseo daemon](paseo.md) describes the Paseo agent daemon scheduled and exposed by the machine configuration.
-- [T3 Code with Pi](t3.md) manages, pairs, and maintains the T3 background service scheduled by the machine configuration.
+- [Model gateway clients](cliproxyapi.md) describes the client endpoint, URL placeholders, and readiness gating.
 
 ## Develop
 

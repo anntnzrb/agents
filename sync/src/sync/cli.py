@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING
 
 from sync.core.index import launch_main, update_main
 from sync.core.index import main as run_main
-from sync.maintenance import build_job_parser, run_job, run_t3
-from sync.maintenance.t3 import build_t3_parser
+from sync.maintenance import build_job_parser, run_job
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,8 +31,7 @@ _HELP_LINES = (
     "  sync [sync]",
     "  sync launch <name> [-- <args...>]",
     "  sync update",
-    "  sync job <amp-runner-update|paseo-update|npm-cache-clean> [options]",
-    "  sync t3 <command> [args...]",
+    "  sync job npm-cache-clean",
     "  sync -h | --help | help",
     "",
     "Commands:",
@@ -50,11 +48,8 @@ _HELP_LINES = (
     "    reconciles it when the commit is new. Scheduled in the background by",
     "    the machine configuration.",
     "",
-    "  job <amp-runner-update|paseo-update|npm-cache-clean>",
+    "  job npm-cache-clean",
     "    Runs scheduled maintenance jobs driven by the machine configuration.",
-    "",
-    "  t3 <command> [args...]",
-    "    Manages the T3 Code background service and provider instances.",
     "",
     "Options:",
     "  -h, --help, help    Show this help message.",
@@ -71,10 +66,7 @@ LAUNCH_HELP_TEXT = "\n".join(_LAUNCH_HELP_LINES)
 
 _LAUNCH_USAGE_ERROR = "sync: usage: launch NAME -- [ARGS...]"
 _SYNC_USAGE_ERROR = "sync: usage: sync\nRun 'sync --help' for available commands."
-_JOB_USAGE_ERROR = (
-    "sync: usage: job <amp-runner-update|paseo-update|npm-cache-clean> [options]"
-)
-_T3_USAGE_ERROR = "sync: usage: t3 <command> [args...]"
+_JOB_USAGE_ERROR = "sync: usage: job npm-cache-clean"
 
 
 def _is_help_flag(arg: str | None) -> bool:
@@ -131,17 +123,6 @@ def _run_job_command(args: list[str]) -> int:
     return run_job(args)
 
 
-def _run_t3_command(args: list[str]) -> int:
-    """Dispatch tokens following ``t3``; return exit code."""
-    if not args:
-        _err(_T3_USAGE_ERROR)
-        return EXIT_USAGE
-    if len(args) == 1 and _is_help_flag(args[0]):
-        build_t3_parser().print_help()
-        return EXIT_OK
-    return run_t3(args)
-
-
 def main(argv: list[str] | None = None) -> int:
     """Run the sync CLI; return the process exit code (never raises)."""
     raw_args: list[str] = sys.argv[1:] if argv is None else list(argv)
@@ -156,7 +137,6 @@ def main(argv: list[str] | None = None) -> int:
         "sync": _run_sync_command,
         "update": lambda _args: update_main(),
         "job": _run_job_command,
-        "t3": _run_t3_command,
     }
     handler = handlers.get(first)
     if handler is not None:
