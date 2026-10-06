@@ -1,7 +1,7 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
+  "commit": "df581122cde17e6e27686b5a448bde23e4ad4318",
   "trees": {
     "pstack/skills/benchmark-checklist": "dc1ce4af2fc97f35575f2f05d00ea0850f06528b",
     "pstack/skills/principle-attack-the-premise": "ea77149f38bdfa5002591fa35af87ed45dd5574c",
@@ -45,6 +45,7 @@
       "maintain-verification-skill",
       "make-bot-ui",
       "no-comments",
+      "poteto-help",
       "poteto-mode",
       "principle-attack-the-premise",
       "principle-boundary-discipline",
