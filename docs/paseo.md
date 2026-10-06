@@ -1,18 +1,18 @@
 # Paseo daemon
 
-[Paseo](https://github.com/getpaseo/paseo) drives coding agents (Pi, omp, Claude Code, Codex, OpenCode) from desktop, web, mobile, and CLI clients. Sync runs its daemon on the hosts listed in `tools/paseo/deployment.json` and publishes it to the tailnet only.
+[Paseo](https://github.com/getpaseo/paseo) drives coding agents (Pi, omp, Claude Code, Codex, OpenCode) from desktop, web, mobile, and CLI clients. The machine configuration ("rice") manages its service and exposes it on the tailnet.
 
 ## How it is wired
 
 | Piece | Owner | Where |
 | --- | --- | --- |
 | `paseo` command | Sync npm launcher (`@getpaseo/cli`, newest release on each launch) | `~/.local/bin/paseo` |
-| Daemon service | Sync, on declared hosts | `paseo.service` (systemd user unit) |
-| Nightly update | Sync, on declared hosts | `paseo-update.timer` runs `tools/paseo/update.py` |
-| Tailnet exposure | The service's `ExecStartPost` / `ExecStopPost` | `tailscale serve` on HTTPS port 6767 |
+| Daemon service | Machine configuration | `paseo.service` (systemd user unit) or launchd agent |
+| Nightly update | Machine configuration timer/agent | `sync job paseo-update --service <S>` |
+| Tailnet exposure | Machine configuration | Tailscale Serve on HTTPS port 6767 (NixOS) |
 | Daemon state and settings | The daemon and its clients | `~/.paseo/` (`config.json`, keypair, worktrees, logs) |
 
-The daemon listens on `127.0.0.1:6767`. Tailscale Serve terminates TLS at `https://<host>.<tailnet>.ts.net:6767` and forwards to it, so nothing listens on a public or LAN interface. The unit sets these launch overrides, which take precedence over `config.json`:
+The daemon listens on `127.0.0.1:6767`. Tailscale Serve terminates TLS at `https://<host>.<tailnet>.ts.net:6767` and forwards to it, so nothing listens on a public or LAN interface. The service configuration sets these launch overrides, which take precedence over `config.json`:
 
 - `PASEO_RELAY_ENABLED=false`: no outbound connection to Paseo's relay; clients reach the daemon only through the tailnet.
 - `PASEO_WEB_UI_ENABLED=true`: the daemon serves the web client from the same origin.
@@ -21,13 +21,13 @@ The daemon listens on `127.0.0.1:6767`. Tailscale Serve terminates TLS at `https
 
 Sync does not manage `~/.paseo/config.json`. The daemon and its clients write it (passwords, provider toggles, app settings), and overwriting it on every sync would discard those changes.
 
-The launcher resolves the newest stable release when the service starts, but the running daemon keeps its version until it restarts. `paseo-update.timer` runs on the nightly update schedule (see [User services](sync/sync.md#user-services)). It compares the daemon's reported version with the newest release and restarts the service only when they differ and no agent is initializing or running. An unreadable status or agent listing never restarts. Inspect runs with `journalctl --user -u paseo-update.service`.
+The launcher resolves the newest stable release when the service starts, but the running daemon keeps its version until it restarts. The update timer runs `sync job paseo-update --service <S>` using the installed runtime's Python. It compares the daemon's reported version with the newest release and restarts the service only when they differ and no agent is initializing or running. An unreadable status or agent listing never restarts. Inspect runs with `journalctl --user -u paseo-update.service` on Linux or via launchd logs on macOS.
 
-Control the daemon through systemd, not `paseo daemon start` or `paseo daemon stop`. A second supervisor started by hand owns `~/.paseo`, and the service's `paseo daemon run` then exits with `already_running` and restarts in a loop. `paseo reload` and `paseo daemon restart` are safe: they act on the existing supervisor.
+Control the daemon through the service manager (`systemctl --user restart paseo.service` or launchctl), not `paseo daemon start` or `paseo daemon stop`. A second supervisor started by hand owns `~/.paseo`, and the service's `paseo daemon run` then exits with `already_running` and restarts in a loop. `paseo reload` and `paseo daemon restart` are safe: they act on the existing supervisor.
 
 ## Set up a host
 
-1. Add the host to `tools/paseo/deployment.json`, merge, and let sync install the service.
+1. Enable the Paseo feature in the machine configuration.
 2. Enable omp, which Paseo ships disabled:
 
    ```sh
@@ -58,20 +58,3 @@ The `paseo` skill in `skills/current/paseo/` ports Paseo's orchestration skills;
 Do not pair through the relay (`paseo daemon pair --relay` or **Enable relay** in the app). The service keeps the relay off, and pairing through it would route clients through Paseo's servers.
 
 Push notifications to the mobile app go through Expo's push service. Only the notification title and body take that path; agent traffic stays on the tailnet. Disable notifications in the app to avoid it.
-
-## Remove a host
-
-Remove the host from `tools/paseo/deployment.json`. Sync stops and disables `paseo.service`, and `ExecStopPost` removes the Tailscale Serve entry. `~/.paseo/` stays in place; delete it by hand to discard sessions and worktrees.
-
-## Validate a change
-
-Run these from the repository root after changing `tools/paseo/`:
-
-```sh
-uvx ruff==0.16.10 check --config sync/pyproject.toml tools/paseo
-uvx ruff==0.16.10 format --check --config sync/pyproject.toml tools/paseo
-uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p tools/paseo
-uvx --python 3.14 pytest==9.1.1 tools/paseo/tests -q
-```
-
-CI runs the same checks in `repository-checks`.
