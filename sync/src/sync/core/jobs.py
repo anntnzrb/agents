@@ -252,10 +252,14 @@ async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None
     # capture modules from two revisions. Publish only a release that imports.
     probe = await run_process(
         [str(Path(stage) / ".venv" / "bin" / "python"), "-c", "import sync.cli"],
-        RunProcessOptions(cwd=stage, timeout_ms=float(MIN_INSTALL_TIMEOUT_MS)),
+        RunProcessOptions(
+            cwd=stage, timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS))
+        ),
     )
     if probe.timed_out or probe.exit_code != 0:
-        detail = (probe.stderr or probe.stdout or "unknown error").strip()
+        detail = (
+            "timed out" if probe.timed_out else (probe.stderr or probe.stdout).strip()
+        )
         message = f"runtime release does not import: {detail[-MAX_DETAIL_CHARS:]}"
         raise RuntimeError(message)
 
