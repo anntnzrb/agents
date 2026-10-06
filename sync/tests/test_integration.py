@@ -441,6 +441,8 @@ def test_integration_cli_help_flags_exit_0(
         (["invalid-subcommand"], "sync: usage: sync"),
         (["launch"], "sync: usage: launch NAME -- [ARGS...]"),
         (["launch", "codex", "no-separator"], "sync: usage: launch NAME -- [ARGS...]"),
+        (["job"], "sync: usage: job"),
+        (["t3"], "sync: usage: t3"),
     ],
 )
 def test_integration_cli_syntax_errors_exit_2(

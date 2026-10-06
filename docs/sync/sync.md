@@ -10,6 +10,8 @@ Sync reconciles the repository at `~/src/agents` with harness homes and installe
 | `uv run --project sync sync sync` | Runs the same normal reconciliation |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job <job-name> [options]` | Runs a scheduled maintenance job (`amp-runner-update`, `paseo-update`, `npm-cache-clean`) |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli t3 <command> [arguments]` | Runs T3 Code background service operations and management |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -20,7 +22,7 @@ A manual sync runs these stages in order:
 1. Build and validate the sync plan and managed cleanup plan before any bootstrap effects. Malformed input fails without managed writes. Adapter-declared bootstraps run only when their adapter is enabled.
 2. Remove stale top-level harness entries that earlier sync runs owned.
 3. Install the sync runtime and reconcile source files, managed JSON configuration, shared assets, skills, and generated configuration.
-4. Reconcile harness and tool launch wrappers. Reconcile this host's [user services](#user-services).
+4. Reconcile harness and tool launch wrappers.
 5. Record managed harness entries.
 6. Run package-bootstrap and extension-dependency hooks.
 
@@ -87,26 +89,16 @@ The launcher resolves the adapter's npm dist-tag and installs the resolved versi
 
 A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
 
-## User services
+## Maintenance jobs and background services
 
-Sync installs and controls only the per-user services it declares: systemd user units on Linux and launch agents on macOS. It never touches system-level services. Declarations live in `sync/src/sync/core/services.py`; which ones apply depends on the host:
+The machine configuration ("rice") owns what runs where and when: systemd user services on Linux, launchd agents on macOS, timers, and Tailscale Serve. Sync provides the executable logic as subcommands run with the installed runtime's Python (`$HOME/.local/share/agents/sync-current/.venv/bin/python -m sync.cli ...`):
 
-- Legacy. Each T3 host (listed in `hosts` in `tools/t3/deployment.json`) runs `t3-refresh-models.timer`, which runs `tools/t3/t3ctl.py refresh-models` every 15 minutes with the installed runtime's Python. The gateway catalog changes with upstream discovery rather than with commits, so it runs on its own schedule instead of inside sync. See [T3 Code providers](../t3.md#providers). The same hosts run `t3-update.timer`, which runs `t3ctl.py auto-update` on the nightly schedule below. On macOS both jobs are the launch agents `dev.agents.t3-refresh-models` and `dev.agents.t3-update`. See [T3 Code automatic updates](../t3.md#automatic-updates).
-- Hosts listed in `tools/amp-runner/deployment.json` run an Amp runner through the `amp` wrapper, identified by the short hostname. See the Amp harness README for why it starts from the home directory and serves the SSOT with an explicit `--dir`. On Linux the runner starts with `--desktop`, which gives its threads a private headless virtual desktop and needs `labwc`, `wlr-randr`, and `ffmpeg` on the service `PATH`; without them the runner still serves threads and logs that desktop sharing is unavailable. On macOS `--desktop` would share the Mac's real screen, so the launch agent omits it. Check readiness with `amp runner desktop status`. The same hosts run `amp-runner-update.timer`, which runs `tools/amp-runner/update.py` on the nightly schedule below: the wrapper installs new releases on launch, but the running runner keeps its version until it restarts, so this script restarts it onto the newest cached release when it is behind and idle. It treats any thread event in the runner log within the last 15 minutes, or a thread whose last agent state is not `idle` within the last 2 hours, as busy, and never restarts when the log is unreadable. On macOS the job is the `dev.agents.amp-runner-update` launch agent and restarts the runner with `launchctl kickstart -k`.
-- The nightly update jobs run hourly from 03:00 to 05:00 local time. On Linux they add up to 20 minutes of random delay and catch up after downtime (`Persistent=true`); launchd runs a missed calendar slot once on wake. An attempt that finds the server current or busy does nothing, so a busy hour leaves the later ones. Inspect runs with `journalctl --user -u <name>-update.service` on Linux or `~/Library/Logs/<name>-update.log` on macOS.
-- Adding a host to a service's deployment file is the whole rollout: the host's next sync installs that service's units or launch agents, and removing the host prunes them.
-- Hosts listed in `tools/cache-gc/deployment.json` run `cache-gc.timer` (the `dev.agents.cache-gc` launch agent on macOS) on the nightly schedule, at idle CPU and I/O priority on Linux. It runs `tools/cache-gc/cache_gc.py`, which trims the npm, uv, and bun caches and stale `/tmp` scratch. See [Cache sweeper](../cache-gc.md).
-- Hosts listed in `tools/paseo/deployment.json` run `paseo.service`, the Paseo daemon on loopback, and publish it to the tailnet with `tailscale serve` on HTTPS port 6767. Their nightly `paseo-update.timer` restarts the daemon onto a newer release when no agent is mid-turn. See [Paseo daemon](../paseo.md).
+- `sync job amp-runner-update --service <S> --log-file <PATH>`: restarts the Amp runner onto the newest cached release when behind and idle. `<S>` is a systemd unit name on Linux (`amp-runner.service`) or launchd label on macOS (`org.nix-community.home.amp-runner`).
+- `sync job paseo-update --service <S>`: restarts the Paseo daemon onto the newest release when behind and idle (`paseo.service` or `org.nix-community.home.paseo`).
+- `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed.
+- `sync t3 <command> [args...]`: manages the T3 background service (`install`, `status`, `doctor`, `restart`, `update`, `auto-update`, `apply-settings`, `refresh-models`, `pair`, `connect`, `logs`). `auto-update` automatically installs T3 when it is not yet installed on the host.
 
-Reconcile rules:
-
-- A declared unit or launch agent is authoritative. Sync writes it, replacing a hand-made file of the same name, and records it as owned in `sync-managed/services.json`. Services keep their pre-existing names so adoption replaces a hand-made service in place instead of starting a duplicate.
-- Sync touches the service manager only when a unit's content changes: on Linux it reloads systemd, enables timers, and enables and restarts long-running services; on macOS it unloads and reloads the changed launch agent. A unit without an `[Install]` section is left to the timer that starts it.
-- A unit sync owned but no longer declares is disabled, stopped, and deleted. Units sync never owned are left alone.
-- Every unit declares its own `PATH`, so services never depend on hand-made service-manager environment such as `~/.config/environment.d/`.
-- Service reconcile is best-effort: a host without a user service manager gets a warning, not a failed sync.
-
-User units keep running after logout only when lingering is enabled for the user, which is a machine-level setting outside this repository.
+All jobs exit with status `0` when there is nothing to do, exit nonzero on real failure, and output a one-line status to stdout.
 
 ## Background updates
 

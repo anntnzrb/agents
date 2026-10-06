@@ -40,7 +40,6 @@ from sync.core.plan import (
     SyncHookPlan,
     build_sync_plan,
 )
-from sync.core.services import reconcile_services
 from sync.core.tool_launchers import ToolLauncherSpec, tool_launcher
 from sync.core.update import (
     fast_forward_ssot,
@@ -203,7 +202,6 @@ async def run_sync(
             str(Path(sync_env.runtime_home) / "sync-current"),
             sync_env.install_timeout_ms,
         )
-        await reconcile_services(sync_env)
 
     managed_state_success = (
         record_managed_entries(managed_plan)

@@ -1,5 +1,0 @@
-{
-  "extraPaths": ["."],
-  "pythonVersion": "3.14",
-  "typeCheckingMode": "all"
-}

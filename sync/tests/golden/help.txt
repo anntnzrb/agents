@@ -4,6 +4,8 @@ Usage:
   sync [sync]
   sync launch <name> [-- <args...>]
   sync update
+  sync job <amp-runner-update|paseo-update|npm-cache-clean> [options]
+  sync t3 <command> [args...]
   sync -h | --help | help
 
 Commands:
@@ -19,6 +21,12 @@ Commands:
     Fast-forwards a clean main checkout of the SSOT from origin and
     reconciles it when the commit is new. Scheduled in the background by
     the machine configuration.
+
+  job <amp-runner-update|paseo-update|npm-cache-clean>
+    Runs scheduled maintenance jobs driven by the machine configuration.
+
+  t3 <command> [args...]
+    Manages the T3 Code background service and provider instances.
 
 Options:
   -h, --help, help    Show this help message.

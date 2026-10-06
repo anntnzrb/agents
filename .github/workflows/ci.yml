@@ -83,14 +83,6 @@ jobs:
       - run: uvx ruff==0.16.10 format --check .github
       - run: uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p .github
       - run: uvx --python 3.14 pytest==9.1.1 .github/tests -q
-      - run: uvx ruff==0.16.10 check --config sync/pyproject.toml tools/cache-gc
-      - run: uvx ruff==0.16.10 format --check --config sync/pyproject.toml tools/cache-gc
-      - run: uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p tools/cache-gc
-      - run: uvx --python 3.14 pytest==9.1.1 tools/cache-gc/tests -q
-      - run: uvx ruff==0.16.10 check --config sync/pyproject.toml tools/paseo
-      - run: uvx ruff==0.16.10 format --check --config sync/pyproject.toml tools/paseo
-      - run: uvx --python 3.14 --with pytest==9.1.1 basedpyright==1.40.1 -p tools/paseo
-      - run: uvx --python 3.14 pytest==9.1.1 tools/paseo/tests -q
       - run: uv run --script .github/scripts/ci.py metadata
 
   sync-gates:
