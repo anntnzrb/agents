@@ -18,7 +18,6 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 - The `PreToolUse` hooks deny every `WebSearch` and `WebFetch` call and name the replacement skill (`parallel` for search, `firecrawl` for fetching). The tools stay advertised on purpose: the model reaching for one is the trigger, and the denial reason routes it deterministically. `permissions.deny` would remove the tools, so the hooks would never fire. Hook denials apply under `bypassPermissions` and inside subagents. The built-in `claude-code-guide` agent is exempt (the hook reads `agent_type` from its input): its only tools are Bash, Read, WebFetch, and WebSearch, so it cannot load a skill.
 - The `PostToolUse` hook does not block. After the built-in `update-config`, `claude-api`, or `keybindings-help` skill or the `claude-code-guide` agent runs, it adds a reminder that their guidance can lag the installed release and should be checked against current docs through the web skills.
 - `skipDangerousModePermissionPrompt` is written by Claude Code itself once the bypass dialog is accepted; tracking it keeps sync from resetting it.
-- `allowedMcpServers` is used instead of `--strict-mcp-config` because wrapper default arguments precede subcommands, so `claude --strict-mcp-config mcp list` would run `mcp list` as a prompt. Built-in servers are exempt, and allowlist entries merge across settings files, so a repository's `.claude/settings.json` can still add to it.
 
 ## Deliberately unset
 
@@ -26,6 +25,7 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 - `DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `DISABLE_GROWTHBOOK`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`: each stops Claude Code fetching feature flags, which turns off reading project `AGENTS.md`, Remote Control, and the advisor tool.
 - `fastMode`: faster output at a higher cost per token.
 - `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`: strips credentials from Bash, which breaks skills that read API keys from the environment.
+- `allowedMcpServers` and `--strict-mcp-config`: hosts such as T3 Code pass their own server with `--mcp-config`, and either lock blocks it with only a startup warning (`MCP server blocked by enterprise policy`), so the host's tools silently disappear.
 
 ## Model and effort
 
@@ -33,7 +33,7 @@ Sync writes `settings.json` verbatim and keeps nothing from the generated one, s
 
 ## Third-party content
 
-Nothing outside this repository should add skills, plugins, or MCP servers; `settings.json` covers what user settings can control. Two stronger locks exist only in machine-wide managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json` on macOS, root-owned) and are not set: `strictKnownMarketplaces: []` blocks adding any plugin marketplace, and `blockedMarketplaces` blocks specific ones.
+Nothing outside this repository should add skills or plugins; `settings.json` covers what user settings can control. Two stronger locks exist only in machine-wide managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json` on macOS, root-owned) and are not set: `strictKnownMarketplaces: []` blocks adding any plugin marketplace, and `blockedMarketplaces` blocks specific ones.
 
 ## Unmanaged state
 
