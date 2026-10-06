@@ -9,7 +9,7 @@
 | `paseo` command | Sync npm launcher (`@getpaseo/cli`, newest release on each launch) | `~/.local/bin/paseo` |
 | Daemon service | Machine configuration | `paseo.service` (systemd user unit) or launchd agent |
 | Nightly update | Machine configuration timer/agent | `sync job paseo-update --service <S>` |
-| Tailnet exposure | Machine configuration | Tailscale Serve on HTTPS port 6767 (NixOS) |
+| Tailnet exposure | Machine configuration | Tailscale Serve on HTTPS port 6767 |
 | Daemon state and settings | The daemon and its clients | `~/.paseo/` (`config.json`, keypair, worktrees, logs) |
 
 The daemon listens on `127.0.0.1:6767`. Tailscale Serve terminates TLS at `https://<host>.<tailnet>.ts.net:6767` and forwards to it, so nothing listens on a public or LAN interface. The service configuration sets these launch overrides, which take precedence over `config.json`:
