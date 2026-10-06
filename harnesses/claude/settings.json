@@ -8,7 +8,6 @@
     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1",
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "gpt-6.1-sol",
     "BASH_DEFAULT_TIMEOUT_MS": "5000"
   },
   "model": "opus[1m]",
@@ -18,9 +17,6 @@
     },
     "claude-sonnet-5-5": {
       "effortLevel": "high"
-    },
-    "gpt-6.1-sol": {
-      "effortLevel": "medium"
     }
   },
   "theme": "dark",
