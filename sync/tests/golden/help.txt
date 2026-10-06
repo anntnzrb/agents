@@ -17,8 +17,8 @@ Commands:
 
   update
     Fast-forwards a clean main checkout of the SSOT from origin and
-    reconciles it when the commit is new. Run in the background by the
-    timer or launch agent that sync installs.
+    reconciles it when the commit is new. Scheduled in the background by
+    the machine configuration.
 
 Options:
   -h, --help, help    Show this help message.

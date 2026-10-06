@@ -22,7 +22,6 @@ from sync.core.services import (
     AMP_RUNNER_LABEL,
     AMP_RUNNER_UPDATE_LABEL,
     CACHE_GC_LABEL,
-    LAUNCHD_LABEL,
     T3_REFRESH_LABEL,
     T3_UPDATE_LABEL,
     UserUnit,
@@ -149,45 +148,23 @@ def test_reconcile_restarts_a_unit_whose_content_changed(
     assert not any("job.timer" in call for call in calls)
 
 
-def _git_checkout(home: Path) -> None:
-    ssot = home / "src" / "agents"
-    ssot.mkdir(parents=True, exist_ok=True)
-    _ = subprocess.run(  # noqa: S603 - fixed git invocation in tests
-        ["git", "init", "-q", str(ssot)],  # noqa: S607 - git from PATH
-        check=True,
-    )
-
-
 def _names(units: Sequence[UserUnit]) -> set[str]:
     return {unit.name for unit in units}
 
 
-def test_updater_units_need_a_git_checkout(home: Path) -> None:
-    """Without a git checkout there is nothing to pull, so no updater."""
-    (home / "src" / "agents").mkdir(parents=True)
-    assert _names(declared_user_units(_linux(home))) == set()
-
-    _git_checkout(home)
-    units = {u.name: u for u in declared_user_units(_linux(home))}
-    assert set(units) == {"agents-update.service", "agents-update.timer"}
-    service = units["agents-update.service"].content
-    assert "sync-current/.venv/bin/python -m sync.cli update" in service
-    assert "Nice=19" in service
-    assert "IOSchedulingClass=idle" in service
-    assert f"PATH={home}/.local/bin:" in service
-    assert "[Install]" not in service
-
-
-def test_services_skip_systemd_on_darwin(home: Path, calls: list[list[str]]) -> None:
-    """On macOS the updater is a launch agent; no systemd units are written."""
-    _git_checkout(home)
+def test_services_skip_systemd_on_darwin(
+    home: Path, calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On macOS services are launch agents; no systemd units are written."""
+    monkeypatch.setattr("socket.gethostname", lambda: "beirut")
+    _declare_runner_hosts(home, ["beirut"])
     asyncio.run(reconcile_services(SyncEnv.from_home(str(home), platform="darwin")))
 
     assert not _unit_dir(home).exists()
-    plist = (home / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist").read_text()
-    assert "<string>update</string>" in plist
-    assert "<key>ProcessType</key><string>Background</string>" in plist
-    assert "<key>LowPriorityIO</key><true/>" in plist
+    plist = (
+        home / "Library" / "LaunchAgents" / f"{AMP_RUNNER_LABEL}.plist"
+    ).read_text()
+    assert "<key>KeepAlive</key><true/>" in plist
     assert "/.nix-profile/bin" in plist
     assert any(call[:2] == ["launchctl", "bootstrap"] for call in calls)
 
@@ -407,18 +384,17 @@ def test_paseo_daemon_serves_the_tailnet_only_on_declared_hosts(
     assert ["systemctl", "--user", "disable", "--now", "paseo.service"] in calls
 
 
-def test_darwin_declares_updater_and_runner_launch_agents(
+def test_darwin_declares_runner_launch_agents(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """MacOS gets the same services as launch agents, keyed by label."""
     monkeypatch.setattr("socket.gethostname", lambda: "beirut.local")
-    _git_checkout(home)
     _declare_runner_hosts(home, ["beirut"])
     darwin = SyncEnv.from_home(str(home), platform="darwin")
 
     agents = {a.name: a.content for a in declared_launch_agents(darwin)}
 
-    assert set(agents) == {LAUNCHD_LABEL, AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL}
+    assert set(agents) == {AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL}
     runner = agents[AMP_RUNNER_LABEL]
     assert "<string>--runner-id</string><string>beirut</string>" in runner
     assert "<key>KeepAlive</key><true/>" in runner
@@ -457,7 +433,6 @@ def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
 ) -> None:
     """Changed agents are reloaded once; dropped owned agents are unloaded."""
     monkeypatch.setattr("socket.gethostname", lambda: "beirut")
-    _git_checkout(home)
     _declare_runner_hosts(home, ["beirut"])
     darwin = SyncEnv.from_home(str(home), platform="darwin")
     agents_dir = home / "Library" / "LaunchAgents"
@@ -468,7 +443,7 @@ def test_darwin_reconcile_reloads_changed_agents_and_prunes_owned_ones(
     bootstrapped = [c[3] for c in calls if c[:2] == ["launchctl", "bootstrap"]]
     assert sorted(
         p.rsplit("/", 1)[1].removesuffix(".plist") for p in bootstrapped
-    ) == sorted([LAUNCHD_LABEL, AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL])
+    ) == sorted([AMP_RUNNER_LABEL, AMP_RUNNER_UPDATE_LABEL])
 
     calls.clear()
     asyncio.run(reconcile_services(darwin))

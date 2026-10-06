@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 __all__ = [
     "AMP_RUNNER_LABEL",
     "CACHE_GC_LABEL",
-    "LAUNCHD_LABEL",
     "UserUnit",
     "declared_launch_agents",
     "declared_user_units",
@@ -37,9 +36,6 @@ __all__ = [
     "reconcile_user_units",
 ]
 
-UPDATE_UNIT = "agents-update"
-LAUNCHD_LABEL = "dev.agents.update"
-UPDATE_INTERVAL_SECONDS = 300
 OWNED_STATE_FILE = "services.json"
 SERVICE_TIMEOUT_MS = 30_000
 # Existing names, so sync adopts the hand-made runner in place instead of
@@ -105,39 +101,6 @@ def _runtime_python(sync_env: SyncEnv) -> str:
     return str(
         Path(sync_env.runtime_home) / "sync-current" / ".venv" / "bin" / "python"
     )
-
-
-def _is_git_checkout(sync_env: SyncEnv) -> bool:
-    return (Path(sync_env.ssot_home) / ".git").exists()
-
-
-def _updater_units(sync_env: SyncEnv) -> list[UserUnit]:
-    service = f"""\
-[Unit]
-Description=Fast-forward the agents SSOT and reconcile it
-
-[Service]
-Type=oneshot
-Environment=PATH={_service_path(sync_env.home)}
-ExecStart={_runtime_python(sync_env)} -m sync.cli update
-Nice=19
-IOSchedulingClass=idle
-"""
-    timer = f"""\
-[Unit]
-Description=Periodic agents SSOT update
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec={UPDATE_INTERVAL_SECONDS}s
-
-[Install]
-WantedBy=timers.target
-"""
-    return [
-        UserUnit(f"{UPDATE_UNIT}.service", service),
-        UserUnit(f"{UPDATE_UNIT}.timer", timer),
-    ]
 
 
 def _short_hostname() -> str:
@@ -378,7 +341,7 @@ WantedBy=timers.target
 
 def declared_user_units(sync_env: SyncEnv) -> list[UserUnit]:
     """Return the systemd user units this host should run."""
-    units = _updater_units(sync_env) if _is_git_checkout(sync_env) else []
+    units: list[UserUnit] = []
     if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         units.append(_amp_runner_unit(sync_env))
         updater = Path(sync_env.ssot_home) / "tools" / "amp-runner" / "update.py"
@@ -499,24 +462,6 @@ def _plist(label: str, body: str) -> str:
 
 def _plist_args(command: Sequence[str]) -> str:
     return "".join(f"<string>{arg}</string>" for arg in command)
-
-
-def _updater_agent(sync_env: SyncEnv) -> UserUnit:
-    home = sync_env.home
-    command = [_runtime_python(sync_env), "-m", "sync.cli", "update"]
-    log = f"{home}/Library/Logs/{UPDATE_UNIT}.log"
-    body = f"""\
-    <key>ProgramArguments</key><array>{_plist_args(command)}</array>
-    <key>EnvironmentVariables</key><dict><key>PATH</key><string>{_service_path(home)}</string></dict>
-    <key>StartInterval</key><integer>{UPDATE_INTERVAL_SECONDS}</integer>
-    <key>RunAtLoad</key><true/>
-    <key>ProcessType</key><string>Background</string>
-    <key>LowPriorityIO</key><true/>
-    <key>Nice</key><integer>19</integer>
-    <key>StandardOutPath</key><string>{log}</string>
-    <key>StandardErrorPath</key><string>{log}</string>
-"""
-    return UserUnit(LAUNCHD_LABEL, _plist(LAUNCHD_LABEL, body))
 
 
 def _amp_runner_agent(sync_env: SyncEnv) -> UserUnit:
