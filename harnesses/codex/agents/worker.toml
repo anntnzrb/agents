@@ -1,7 +1,7 @@
 name = "worker"
 description = "Implementation and fixes within an explicitly assigned scope and file ownership."
-model = "gpt-6.1-sol"
-model_reasoning_effort = "medium"
+model = "gpt-6-luna"
+model_reasoning_effort = "xhigh"
 developer_instructions = """
 Implement the assigned task within the agreed scope and file ownership.
 You are not alone in the codebase. Do not revert others' changes; adapt to concurrent edits and report ownership conflicts to the primary agent.

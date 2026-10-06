@@ -161,6 +161,8 @@ enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max", "ultra"]
 enabled = true
 interrupt_message = true
 max_concurrent_threads_per_session = 12
+default_subagent_model = "gpt-6-luna"
+default_subagent_reasoning_effort = "xhigh"
 
 [features.multi_agent_v2]
 enabled = true
