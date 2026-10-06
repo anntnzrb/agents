@@ -57,7 +57,7 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 - `~/repos/`: my projects and external ones
 - `~/src/rice/`: machine configuration
 - `~/src/agents/`: agent configuration and sync (my SSOT)
-- `~/src/vendored/<host>/<owner>/<repo>`: read-only upstream checkouts. Trust them over memory; the installed version is still the ground truth
+- `~/src/vendored/<host>/<namespace>/<repo>`: read-only upstream checkouts at the latest default-branch commit, refreshed on a schedule. Add a missing repo with `git clone --depth 1 <url> <path>`; never pull, edit, or build there. For a specific version, shallow-clone its tag into a temporary directory. Trust them over memory; the installed version is still the ground truth
 
 # Machines (Tailscale)
 - `beirut`: my MacBook, where I work interactively
