@@ -8,13 +8,15 @@ import json
 import sqlite3
 from typing import TYPE_CHECKING
 
+import pytest
+
 from sync.core.harness import SyncEnv
 from sync.maintenance.t3 import (
     JsonObject,
     busy_threads,
     cmd_auto_update,
-    cmd_pair,
     cmd_refresh_models,
+    run_t3,
     service_restart,
     service_start,
     sync_binary_paths,
@@ -23,8 +25,6 @@ from sync.maintenance.t3 import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
-
-    import pytest
 
 EXPECTED_LIVE_RUNS = 2
 
@@ -155,29 +155,45 @@ def test_sync_binary_paths_points_at_installed_wrappers(tmp_path: Path) -> None:
     assert claude_conf.get("config") == {"binaryPath": str(bin_dir / "claude")}
 
 
-def test_pair_forwards_extra_args_without_automatic_tailscale_flags(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("argv", "forwarded"),
+    [
+        pytest.param(
+            ["pair", "--tailscale", "--tailscale-serve-port", "8443"],
+            ["pair", "--tailscale", "--tailscale-serve-port", "8443"],
+            id="pair-flags-first",
+        ),
+        pytest.param(["pair"], ["pair"], id="pair-bare"),
+        pytest.param(
+            ["connect", "link", "--yes"],
+            ["connect", "link", "--yes"],
+            id="connect-subcommand",
+        ),
+        pytest.param(["connect", "--help"], ["connect", "--help"], id="connect-help"),
+    ],
+)
+def test_forwarding_commands_pass_args_verbatim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    argv: list[str],
+    forwarded: list[str],
 ) -> None:
-    """Pair command passes forwarded args verbatim to ops_cli."""
-    home = tmp_path / "home"
-    env = SyncEnv.from_home(str(home), platform="linux")
-
+    """`pair` and `connect` forward every argument, including leading flags."""
+    env = SyncEnv.from_home(str(tmp_path / "home"), platform="linux")
     ran: list[list[str]] = []
 
     def fake_ops(_env: SyncEnv) -> list[str]:
         return ["/bin/t3"]
 
-    def fake_run(argv: Sequence[str]) -> int:
-        ran.append(list(argv))
+    def fake_run(command: Sequence[str]) -> int:
+        ran.append(list(command))
         return 0
 
     monkeypatch.setattr("sync.maintenance.t3.ops_cli", fake_ops)
     monkeypatch.setattr("sync.maintenance.t3.run_cmd", fake_run)
 
-    args = argparse.Namespace(rest=["--tailscale", "--tailscale-serve-port", "8443"])
-    rc = cmd_pair(args, env)
-    assert rc == 0
-    assert ran == [["/bin/t3", "pair", "--tailscale", "--tailscale-serve-port", "8443"]]
+    assert run_t3(argv, sync_env=env) == 0
+    assert ran == [["/bin/t3", *forwarded]]
 
 
 def test_service_commands_darwin_and_linux(
