@@ -56,19 +56,15 @@ from the installed Codex binary.
 
 ## Service ownership
 
-> **Legacy.** Kept for reference. Do not add a host to `tools/codex-server/deployment.json` without the owner's request.
+Sync does not supervise a Codex app-server daemon. A host that should accept desktop-app SSH connections runs `codex app-server daemon start` itself; Codex then owns the detached daemon, its process records, and its updater. Stop it with `codex app-server daemon stop`.
 
-`tools/codex-server/deployment.json` selects hosts. Sync installs a periodic health check that runs the installed wrapper's `codex app-server daemon start`. It leaves a healthy daemon running and ensures its native updater exists. Linux uses a systemd user timer; macOS uses a launch agent at login. Linux user lingering is required for boot and logout availability; a Mac must be awake with a logged-in user session.
-
-Codex owns the detached daemon, its process records, and its updater. The health check leaves detached children alive when it exits or reloads. It repairs a missing daemon or updater on the next check. Sync reconciliation does not restart the daemon. Removing a host stops future health checks but leaves the detached daemon running; run `codex app-server daemon stop` separately when retiring a host.
-
-The app and daemon use the default control socket under `~/.codex/app-server-control/`. The app's SSH startup may attempt another server; an existing server keeps ownership of that socket. `config.toml` enables the Code Mode host and leaves CLI-triggered daemon auto-start off because sync supplies the health check.
+The app and daemon use the default control socket under `~/.codex/app-server-control/`. The app's SSH startup may attempt another server; an existing server keeps ownership of that socket. `config.toml` enables the Code Mode host and leaves CLI-triggered daemon auto-start off.
 
 ## Updates
 
 Three lifecycles operate independently:
 
-- Sync's background updater publishes repository changes and regenerated configuration. It only pulls a clean checkout.
+- Sync's background update publishes repository changes and regenerated configuration. It only pulls a clean checkout.
 - Launching the `codex` wrapper resolves the current npm release, validates it, and falls back to a working cached package if the network fails.
 - The native daemon updater downloads its own managed package under `~/.codex/packages/app-server-daemon/`, checks releases hourly by default, and replaces the running server when its release changes. It does not depend on relaunching the npm wrapper.
 
@@ -76,28 +72,10 @@ Native updates enter a graceful drain and reject new turns during shutdown. The 
 
 ## Verify the host
 
-Linux:
-
-```sh
-systemctl --user status codex-app-server.timer
-systemctl --user start codex-app-server.service
-loginctl show-user "$USER" -p Linger
-journalctl --user -u codex-app-server.service -n 30 --no-pager
-```
-
-macOS:
-
-```sh
-launchctl print "gui/$(id -u)/dev.agents.codex-server"
-tail -n 30 ~/Library/Logs/codex-app-server-health.log
-```
-
-Both:
-
 ```sh
 codex app-server daemon version
 cat ~/.codex/app-server-daemon/daemon.pid
 cat ~/.codex/app-server-daemon/daemon-updater.pid
 ```
 
-The version command must report a live app-server version. Confirm the recorded processes exist; a successful health check against an unmanaged foreground server does not prove native updater ownership. Native daemon and updater stderr logs live under `~/.codex/app-server-daemon/`.
+The version command must report a live app-server version. Confirm the recorded processes exist; a running foreground server does not prove native updater ownership. Native daemon and updater stderr logs live under `~/.codex/app-server-daemon/`.

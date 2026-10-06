@@ -44,7 +44,6 @@ AMP_RUNNER_UNIT = "amp-runner-agents.service"
 AMP_RUNNER_LABEL = "com.amp.runner.agents"
 AMP_RUNNER_UPDATE_LABEL = "dev.agents.amp-runner-update"
 AMP_RUNNER_DEPLOYMENT = ("tools", "amp-runner", "deployment.json")
-CODEX_SERVER_DEPLOYMENT = ("tools", "codex-server", "deployment.json")
 T3_DEPLOYMENT = ("tools", "t3", "deployment.json")
 CACHE_GC_DEPLOYMENT = ("tools", "cache-gc", "deployment.json")
 PASEO_DEPLOYMENT = ("tools", "paseo", "deployment.json")
@@ -269,41 +268,6 @@ WantedBy=default.target
     return UserUnit(PASEO_UNIT, content)
 
 
-def _codex_server_units(sync_env: SyncEnv) -> list[UserUnit]:
-    # Native Codex owns the detached daemon and its updater. The timer repairs
-    # missing processes; starting an already-running daemon is idempotent.
-    service = f"""\
-[Unit]
-Description=Ensure the native Codex app server and updater are running
-After=network-online.target
-
-[Service]
-Type=oneshot
-WorkingDirectory=%h
-Environment=PATH={_service_path(sync_env.home)}
-ExecStart={sync_env.home}/.local/bin/codex app-server daemon start
-UMask=0077
-# Detached native processes must survive the health-check command exiting.
-KillMode=process
-TimeoutStartSec=5min
-"""
-    timer = """\
-[Unit]
-Description=Periodic native Codex app-server health check
-
-[Timer]
-OnBootSec=10s
-OnUnitActiveSec=300s
-
-[Install]
-WantedBy=timers.target
-"""
-    return [
-        UserUnit("codex-app-server.service", service),
-        UserUnit("codex-app-server.timer", timer),
-    ]
-
-
 def _t3_refresh_units(sync_env: SyncEnv) -> list[UserUnit]:
     """Keep T3's Claude model list in step with the gateway catalog.
 
@@ -350,8 +314,6 @@ def declared_user_units(sync_env: SyncEnv) -> list[UserUnit]:
                 sync_env, "amp-runner-update", "the Amp runner", str(updater)
             )
         )
-    if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
-        units.extend(_codex_server_units(sync_env))
     if _is_deployment_host(sync_env, CACHE_GC_DEPLOYMENT):
         units.extend(_cache_gc_units(sync_env))
     if _is_deployment_host(sync_env, PASEO_DEPLOYMENT):
@@ -505,27 +467,9 @@ def _python_job_agent(
     return UserUnit(label, _plist(label, body))
 
 
-def _codex_server_agent(sync_env: SyncEnv) -> UserUnit:
-    home = sync_env.home
-    label = "dev.agents.codex-server"
-    command = [f"{home}/.local/bin/codex", "app-server", "daemon", "start"]
-    log = f"{home}/Library/Logs/codex-app-server-health.log"
-    body = f"""\
-    <key>ProgramArguments</key><array>{_plist_args(command)}</array>
-    <key>WorkingDirectory</key><string>{home}</string>
-    <key>EnvironmentVariables</key><dict><key>PATH</key><string>{_service_path(home)}</string></dict>
-    <key>StartInterval</key><integer>300</integer>
-    <key>RunAtLoad</key><true/>
-    <key>AbandonProcessGroup</key><true/>
-    <key>StandardOutPath</key><string>{log}</string>
-    <key>StandardErrorPath</key><string>{log}</string>
-"""
-    return UserUnit(label, _plist(label, body))
-
-
 def declared_launch_agents(sync_env: SyncEnv) -> list[UserUnit]:
     """Return the launchd user agents this host should run, keyed by label."""
-    agents = [_updater_agent(sync_env)] if _is_git_checkout(sync_env) else []
+    agents: list[UserUnit] = []
     if _is_deployment_host(sync_env, AMP_RUNNER_DEPLOYMENT):
         agents.append(_amp_runner_agent(sync_env))
         updater = str(Path(sync_env.ssot_home) / "tools" / "amp-runner" / "update.py")
@@ -534,8 +478,6 @@ def declared_launch_agents(sync_env: SyncEnv) -> list[UserUnit]:
                 sync_env, AMP_RUNNER_UPDATE_LABEL, [updater], nightly=True
             )
         )
-    if _is_deployment_host(sync_env, CODEX_SERVER_DEPLOYMENT):
-        agents.append(_codex_server_agent(sync_env))
     if _is_deployment_host(sync_env, CACHE_GC_DEPLOYMENT):
         agents.append(
             _python_job_agent(
