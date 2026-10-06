@@ -12,7 +12,7 @@ Update this section at the end of every run.
 
 ## Sources
 
-Read upstream source, not memory. Vendored checkouts live at `~/src/vendored/<host>/<owner>/<repo>` and are read-only.
+Read upstream source, not memory. Vendored checkouts live at `~/src/vendored/<host>/<namespace>/<repo>`, are read-only, and are refreshed on a schedule.
 
 | Source | Checkout | Read |
 | --- | --- | --- |
@@ -23,14 +23,13 @@ Read upstream source, not memory. Vendored checkouts live at `~/src/vendored/<ho
 | Ruff | `github.com/astral-sh/ruff` | `CHANGELOG.md` (rule renames, removals, new stable rules) |
 | uv | `github.com/astral-sh/uv` | `CHANGELOG.md` (script metadata, `uv_build`, lock behavior) |
 
-Refresh or create a checkout:
+Create a missing checkout:
 
 ```bash
-git -C ~/src/vendored/github.com/python/cpython pull --ff-only
 git clone --depth 1 https://github.com/agronholm/anyio ~/src/vendored/github.com/agronholm/anyio
 ```
 
-A checkout's `main` can be ahead of the latest release. Check `Include/patchlevel.h` (CPython) or tags, and treat unreleased versions as future.
+A checkout's `main` can be ahead of the latest release. Check `Include/patchlevel.h` (CPython) or the changelog, and treat unreleased versions as future.
 
 ## Stack decisions
 
