@@ -160,16 +160,8 @@ def _make_sync_env(
         if src_file.exists() and not dst_file.exists():
             _ = shutil.copyfile(src_file, dst_file)
 
-    deployment_file = agents_root / "tools" / "cliproxyapi" / "deployment.json"
-    deployment_file.parent.mkdir(parents=True, exist_ok=True)
-    _ = deployment_file.write_text(
-        f"{
-            json.dumps(
-                {
-                    'client': {'baseUrl': 'https://gateway.example.test:9443/v1'},
-                }
-            )
-        }\n",
+    _ = (agents_root / "agents.toml").write_text(
+        '[gateway]\nbase_url = "https://gateway.example.test:9443/v1"\n',
         encoding="utf-8",
     )
 

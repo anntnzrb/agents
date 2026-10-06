@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import shutil
 from pathlib import Path
@@ -25,16 +24,13 @@ EXPECTED_TWO_RELEASES_COUNT = 2
 def make_home(tmp_path: Path) -> str:
     """Create a temporary test home directory with required SSOT layout."""
     home = str(tmp_path)
-    tools = Path(home) / "src" / "agents" / "tools"
-    (tools / "cliproxyapi").mkdir(parents=True, exist_ok=True)
+    agents = Path(home) / "src" / "agents"
+    tools = agents / "tools"
     (tools / "mcporter").mkdir(parents=True, exist_ok=True)
     (tools / "summarize").mkdir(parents=True, exist_ok=True)
 
-    deployment = {
-        "client": {"baseUrl": "http://127.0.0.1:9443/v1"},
-    }
-    _ = (tools / "cliproxyapi" / "deployment.json").write_text(
-        f"{json.dumps(deployment)}\n", encoding="utf-8"
+    _ = (agents / "agents.toml").write_text(
+        '[gateway]\nbase_url = "http://127.0.0.1:9443/v1"\n', encoding="utf-8"
     )
     _ = (tools / "mcporter" / "mcporter.jsonc").write_text("{}\n", encoding="utf-8")
     _ = (tools / "summarize" / "config.json").write_text(

@@ -159,14 +159,11 @@ def write_deployment(
     home: Path,
     client_base_url: str = "http://127.0.0.1:1/v1",
 ) -> None:
-    """Write a minimal CLIProxyAPI deployment.json configuration."""
-    tools = home / "src" / "agents" / "tools" / "cliproxyapi"
-    tools.mkdir(parents=True, exist_ok=True)
-    deployment = {
-        "client": {"baseUrl": client_base_url},
-    }
-    _ = (tools / "deployment.json").write_text(
-        f"{json.dumps(deployment)}\n",
+    """Write minimal agents settings pointing at the given gateway."""
+    agents = home / "src" / "agents"
+    agents.mkdir(parents=True, exist_ok=True)
+    _ = (agents / "agents.toml").write_text(
+        f'[gateway]\nbase_url = "{client_base_url}"\n',
         encoding="utf-8",
     )
 
@@ -247,7 +244,6 @@ def make_fixture(root: Path) -> Path:
         home / "src" / "agents" / "harnesses" / "pi" / "agent",
         home / "src" / "agents" / "tools" / "mcporter",
         home / "src" / "agents" / "tools" / "summarize",
-        home / "src" / "agents" / "tools" / "cliproxyapi",
         home / ".pi" / "agent",
         home / ".omp" / "agent" / "logs",
         home / ".codex",
@@ -442,7 +438,6 @@ def test_integration_cli_help_flags_exit_0(
         (["launch"], "sync: usage: launch NAME -- [ARGS...]"),
         (["launch", "codex", "no-separator"], "sync: usage: launch NAME -- [ARGS...]"),
         (["job"], "sync: usage: job"),
-        (["t3"], "sync: usage: t3"),
     ],
 )
 def test_integration_cli_syntax_errors_exit_2(
@@ -470,18 +465,15 @@ def test_integration_missing_runtime_sources_fails_sync_exit_1(
 def test_integration_malformed_config_fails_sync_exit_1(
     tmp_path: Path,
 ) -> None:
-    """Test sync fails with exit code 1 on malformed JSON deployment config."""
+    """Test sync fails with exit code 1 on malformed agents settings."""
     home = make_fixture(tmp_path)
-    _ = (
-        home / "src" / "agents" / "tools" / "cliproxyapi" / "deployment.json"
-    ).write_text("{ invalid json syntax\n", encoding="utf-8")
+    _ = (home / "src" / "agents" / "agents.toml").write_text(
+        "[gateway\n", encoding="utf-8"
+    )
 
     result = run_sync_process(home)
     assert result.exit_code == 1, result.stderr or result.stdout
-    assert (
-        "parse CLIProxyAPI deployment" in result.stderr
-        or "deployment.json" in result.stderr
-    )
+    assert "parse agents settings" in result.stderr
 
 
 def _assert_amp_outputs(home: Path) -> None:

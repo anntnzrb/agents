@@ -4,7 +4,7 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 
 `CLAUDE.md` is deliberate: Claude Code reads `AGENTS.md` only as project instructions (working directory, its ancestors, and subdirectories; v2.1.277+). A user-level `~/.claude/AGENTS.md` is not read, and `AGENTS.local.md` is never read. `~/.claude/CLAUDE.md` is the only documented user-level instruction file.
 
-`settings.json` is the managed user settings file. Sync replaces it on every run, so make durable changes here rather than in the generated home. It is also a CLIProxyAPI endpoint template: sync renders `${CLIPROXY_CLIENT_ORIGIN}` from `tools/cliproxyapi/deployment.json` and publishes the file only while the gateway's `/models` endpoint is ready; otherwise the previous generated file stays in place.
+`settings.json` is the managed user settings file. Sync replaces it on every run, so make durable changes here rather than in the generated home. It is also a gateway endpoint template: sync renders `${CLIPROXY_CLIENT_ORIGIN}` from `agents.toml` and publishes the file only while the gateway's `/models` endpoint is ready; otherwise the previous generated file stays in place.
 
 ## Settings constraints
 

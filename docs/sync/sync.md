@@ -10,8 +10,7 @@ Sync reconciles the repository at `~/src/agents` with harness homes and installe
 | `uv run --project sync sync sync` | Runs the same normal reconciliation |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job <job-name> [options]` | Runs a scheduled maintenance job (`amp-runner-update`, `paseo-update`, `npm-cache-clean`) |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli t3 <command> [arguments]` | Runs T3 Code background service operations and management |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job npm-cache-clean` | Runs the scheduled npm cache cleanup; see [Maintenance jobs](#maintenance-jobs) |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -47,11 +46,11 @@ Most missing source files and directories produce diagnostics but do not fail th
 
 A launch-time sync treats reconciliation failures as warnings so a cached harness package can still start. A first launch without a valid package cache fails.
 
-## CLIProxyAPI endpoints
+## Shared settings and gateway endpoints
 
-Sync validates `tools/cliproxyapi/deployment.json` before reconciliation.
+`agents.toml` holds settings that several harnesses and tools read. Sync validates it before reconciliation and copies it to `~/.local/share/agents/agents.toml` for tools, such as the `autommit` skill, that run outside a sync launch. Unknown keys fail validation.
 
-The readiness job checks `client.baseUrl/models` without authentication. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing harness endpoint files.
+The readiness job checks `gateway.base_url` + `/models` without authentication. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing harness endpoint files.
 
 Endpoint publication replaces the `${CLIPROXY_CLIENT_BASE_URL}` and `${CLIPROXY_CLIENT_ORIGIN}` placeholders in every configured harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
 
@@ -89,16 +88,11 @@ The launcher resolves the adapter's npm dist-tag and installs the resolved versi
 
 A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
 
-## Maintenance jobs and background services
+## Maintenance jobs
 
-The machine configuration ("rice") owns what runs where and when: systemd user services on Linux, launchd agents on macOS, timers, and Tailscale Serve. Sync provides the executable logic as subcommands run with the installed runtime's Python (`$HOME/.local/share/agents/sync-current/.venv/bin/python -m sync.cli ...`):
+The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Sync provides one job, run with the installed runtime's Python:
 
-- `sync job amp-runner-update --service <S> --log-file <PATH>`: restarts the Amp runner onto the newest cached release when behind and idle. `<S>` is a systemd unit name on Linux (`amp-runner.service`) or launchd label on macOS (`org.nix-community.home.amp-runner`).
-- `sync job paseo-update --service <S>`: restarts the Paseo daemon onto the newest release when behind and idle (`paseo.service` or `org.nix-community.home.paseo`).
-- `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed.
-- `sync t3 <command> [args...]`: manages the T3 background service (`install`, `status`, `doctor`, `restart`, `update`, `auto-update`, `apply-settings`, `refresh-models`, `pair`, `connect`, `logs`). `auto-update` automatically installs T3 when it is not yet installed on the host.
-
-All jobs exit with status `0` when there is nothing to do, exit nonzero on real failure, and output a one-line status to stdout.
+- `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed. It exits `0` when there is nothing to do.
 
 ## Background updates
 

@@ -142,7 +142,7 @@ Tool sources live under `tools/<tool>/`. Sync reads them from `~/src/agents` and
 
 - To give an npm CLI a wrapper and a versioned cache, append it to `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py`.
 - To copy a configuration file into the tool's home, add a `FileJob` to `_config_jobs` in `sync/src/sync/core/plan.py`.
-- To implement maintenance jobs or service operations for the machine configuration to schedule, add subcommands under `sync job` or `sync <tool>` in `sync/src/sync/maintenance/`.
+- To schedule cache or state maintenance for the machine configuration, add a subcommand under `sync job` in `sync/src/sync/maintenance/`. Long-running services and their update logic belong to the machine configuration, not here.
 
 Document how to operate the tool on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
 
@@ -203,7 +203,7 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 ### 2. Missing source vs. malformed configuration
 
 - **Missing SSOT source tree**: When `src/agents/sync` (or required source manifests) is absent or unreadable, sync fails fast with exit code `1` and emits a descriptive diagnostic to stderr (`missing or unreadable runtime source`).
-- **Malformed configuration**: When structured configuration files (such as `src/agents/tools/cliproxyapi/deployment.json` or hook manifests) contain invalid JSON/YAML or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
+- **Malformed configuration**: When structured configuration files (such as `agents.toml` or hook manifests) are invalid or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
 
 ### 3. Owned entry cleanup vs. unmanaged file preservation
 

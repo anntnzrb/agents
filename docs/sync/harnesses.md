@@ -49,11 +49,11 @@ Adapters can declare these hooks:
 - `PackageBootstrapHook` prepares packages from the adapter's source manifest and updates runtime settings.
 - `ExtensionDepsHook` installs dependencies for generated extensions and plugins when the hook inputs change. Runtime imports belong in the generated root's committed `package.json`; the hook preserves its generated `node_modules` and lockfile while the source fingerprint is unchanged.
 
-## CLIProxyAPI integration
+## Gateway integration
 
-A harness uses CLIProxyAPI when its committed source defines a `cliproxy` provider or points its API base URL at an endpoint placeholder. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
+A harness uses the model gateway when its committed source defines a `cliproxy` provider or points its API base URL at an endpoint placeholder. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `client.baseUrl` from `tools/cliproxyapi/deployment.json`, and `${CLIPROXY_CLIENT_ORIGIN}` with the same URL without its `/v1` path, for clients that append the version path themselves (Claude Code's `ANTHROPIC_BASE_URL`). A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxy_templates`; sync checks each declared path for either placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxy_preserve_top_levels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserve_json_keys`, which carries JSON dot-paths.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `gateway.base_url` from `agents.toml`, and `${CLIPROXY_CLIENT_ORIGIN}` with the same URL without its `/v1` path, for clients that append the version path themselves (Claude Code's `ANTHROPIC_BASE_URL`). A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxy_templates`; sync checks each declared path for either placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxy_preserve_top_levels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserve_json_keys`, which re-injects JSON dot-paths.
 
 Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers

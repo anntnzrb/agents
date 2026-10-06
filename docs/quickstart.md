@@ -67,13 +67,11 @@ Sync creates the self-hosted runtime link, harness configuration files, tool con
 
 ## Verify gateway connectivity
 
-Sync checks `client.baseUrl` in `tools/cliproxyapi/deployment.json` before publishing endpoint templates to harnesses. Query the model endpoint directly:
+Sync checks `gateway.base_url` in `agents.toml` before publishing endpoint templates to harnesses. Query the model endpoint directly:
 
 ```bash
-CLIPROXY_BASE_URL="$(jq -r '.client.baseUrl' tools/cliproxyapi/deployment.json)"
-curl -fsS "$CLIPROXY_BASE_URL/models" | \
-	jq -e '.data | type == "array" and length > 0'
-unset CLIPROXY_BASE_URL
+base_url="$(python3 -c 'import tomllib; print(tomllib.load(open("agents.toml", "rb"))["gateway"]["base_url"])')"
+curl -fsS "$base_url/models" | jq -e '.data | type == "array" and length > 0'
 ```
 
 `jq` prints `true` when the external gateway is reachable and responding.

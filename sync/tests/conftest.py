@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import atexit
-import json
 import os
 import shutil
 import subprocess
@@ -96,15 +95,10 @@ def _build_shared_release() -> SharedRelease:
         if file_path.is_file():
             _ = shutil.copyfile(file_path, source / filename)
 
-    # Sync aborts on a missing deployment manifest before reaching the
-    # runtime install job, so create a minimal dummy manifest.
-    tools = ssot_root(template_home) / "tools" / "cliproxyapi"
-    tools.mkdir(parents=True, exist_ok=True)
-    deployment = {
-        "client": {"baseUrl": "http://127.0.0.1:1/v1"},
-    }
-    _ = (tools / "deployment.json").write_text(
-        f"{json.dumps(deployment)}\n",
+    # Sync aborts on missing agents settings before reaching the runtime
+    # install job, so write minimal settings.
+    _ = (ssot_root(template_home) / "agents.toml").write_text(
+        '[gateway]\nbase_url = "http://127.0.0.1:1/v1"\n',
         encoding="utf-8",
     )
 

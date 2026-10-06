@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from sync.core.cliproxy_deployment import (
-    CLI_PROXY_SOURCE_DIR,
-    CliProxyDeployment,
+    AGENTS_SETTINGS_FILE,
+    AgentsSettings,
     CliProxyEndpointTarget,
     has_cliproxy_endpoint_placeholder,
-    read_cliproxy_deployment,
+    read_agents_settings,
 )
 from sync.core.harness import (
     DEFAULT_PACKAGE_CACHE_SUBDIR,
@@ -77,7 +77,7 @@ class FileJob:
     src: str
     dst: str
     endpoint_template: bool = False
-    deployment: CliProxyDeployment | None = None
+    deployment: AgentsSettings | None = None
     kind: Literal["File"] = "File"
 
 
@@ -105,7 +105,7 @@ class SecretTemplateJob:
 class CliProxyReadinessJob:
     """CLI proxy readiness probe job."""
 
-    deployment: CliProxyDeployment
+    deployment: AgentsSettings
     kind: Literal["CliProxyReadiness"] = "CliProxyReadiness"
 
 
@@ -114,7 +114,7 @@ class CliProxyEndpointTemplatesJob:
     """CLI proxy endpoint templates publication job."""
 
     targets: tuple[CliProxyEndpointTarget, ...]
-    deployment: CliProxyDeployment
+    deployment: AgentsSettings
     kind: Literal["CliProxyEndpointTemplates"] = "CliProxyEndpointTemplates"
 
 
@@ -191,7 +191,7 @@ class SyncPlan:
     harnesses: tuple[HarnessPlan, ...]
     jobs: tuple[Job, ...]
     hooks: tuple[SyncHookPlan, ...]
-    cli_proxy_deployment: CliProxyDeployment
+    cli_proxy_deployment: AgentsSettings
 
 
 def top_level_entry_names(root: str) -> list[str]:
@@ -336,7 +336,7 @@ def _cli_proxy_template_paths(
 def _config_jobs(
     sync_env: SyncEnv,
     harnesses: Sequence[HarnessPlan],
-    deployment: CliProxyDeployment,
+    deployment: AgentsSettings,
     template_paths_by_id: dict[str, tuple[str, ...]],
 ) -> list[Job]:
     ssot = Path(sync_env.ssot_home)
@@ -355,6 +355,10 @@ def _config_jobs(
     return [
         CliProxyReadinessJob(
             deployment=deployment,
+        ),
+        FileJob(
+            src=str(ssot / AGENTS_SETTINGS_FILE),
+            dst=str(Path(sync_env.runtime_home) / AGENTS_SETTINGS_FILE),
         ),
         FileJob(
             src=str(ssot / "tools" / "mcporter" / "mcporter.jsonc"),
@@ -380,9 +384,7 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
     )
     ssot = Path(sync_env.ssot_home)
     runtime_home = Path(sync_env.runtime_home)
-    cli_proxy_deployment = read_cliproxy_deployment(
-        str(ssot / CLI_PROXY_SOURCE_DIR / "deployment.json")
-    )
+    cli_proxy_deployment = read_agents_settings(ssot / AGENTS_SETTINGS_FILE)
     template_paths_by_id = {
         plan.harness.id: _cli_proxy_template_paths(
             plan.source_root, plan.harness.cliproxy_templates
