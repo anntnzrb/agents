@@ -14,6 +14,7 @@ from sync.maintenance.t3 import (
     busy_threads,
     cmd_auto_update,
     cmd_pair,
+    cmd_refresh_models,
     service_restart,
     service_start,
     sync_binary_paths,
@@ -70,6 +71,29 @@ def test_auto_update_installs_when_t3_absent(
     rc = cmd_auto_update(argparse.Namespace(), env)
     assert rc == 0
     assert installed == [True]
+
+
+def test_refresh_models_waits_for_a_fresh_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before T3 writes settings, the scheduled refresh has nothing to do."""
+    env = SyncEnv.from_home(str(tmp_path / "home"), platform="linux")
+    out_msgs: list[str] = []
+    monkeypatch.setattr("sync.maintenance.t3.out", out_msgs.append)
+
+    assert cmd_refresh_models(argparse.Namespace(), env) == 0
+    assert any("not installed" in m for m in out_msgs)
+
+
+def test_refresh_models_rejects_corrupt_settings(tmp_path: Path) -> None:
+    """Settings that exist but are not a JSON object are a real failure."""
+    home = tmp_path / "home"
+    settings = home / ".t3" / "userdata" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    _ = settings.write_text("[]", encoding="utf-8")
+    env = SyncEnv.from_home(str(home), platform="linux")
+
+    assert cmd_refresh_models(argparse.Namespace(), env) == 1
 
 
 def test_counts_live_v2_runs(tmp_path: Path) -> None:

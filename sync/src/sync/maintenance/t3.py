@@ -551,11 +551,14 @@ def cmd_auto_update(args: argparse.Namespace, sync_env: SyncEnv) -> int:
 
 
 def cmd_refresh_models(_args: argparse.Namespace, sync_env: SyncEnv) -> int:
-    """Refresh Claude gateway models live."""
+    """Refresh Claude gateway models live; a host without T3 settings waits."""
     target = t3_home(sync_env) / "userdata" / "settings.json"
+    if not target.exists():
+        out("t3: not installed yet; no models to refresh")
+        return 0
     live = load_json_object(target)
     if live is None:
-        err(f"{target} missing or not a JSON object")
+        err(f"{target} is not a JSON object")
         return 1
     if sync_claude_models(live, sync_env):
         write_settings(target, live)
