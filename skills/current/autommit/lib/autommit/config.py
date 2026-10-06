@@ -1,18 +1,23 @@
 """Resolve the model endpoint configuration for autommit."""
 
 import os
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from autommit.errors import AutommitError
 
 # owner defaults; flags and environment variables override each one
 DEFAULT_MODEL: Final[str] = "gemini-3.8-flash-high"
-DEFAULT_BASE_URL: Final[str] = "http://solna.trex-gamut.ts.net:8317/v1"
 DEFAULT_API_KEY: Final[str] = "keyless"
 DEFAULT_REASONING_EFFORT: Final[str] = "medium"
 DEFAULT_TIMEOUT: Final[float] = 300.0
+
+# Sync installs the shared agents settings here; its gateway is the default
+# endpoint.
+AGENTS_SETTINGS: Final[Path] = Path.home() / ".local/share/agents/agents.toml"
 
 MODEL_ENV: Final[tuple[str, ...]] = ("AUTOMMIT_MODEL",)
 BASE_URL_ENV: Final[tuple[str, ...]] = ("AUTOMMIT_BASE_URL", "OPENAI_BASE_URL")
@@ -85,12 +90,31 @@ def _first_timeout(candidates: Sequence[object], default: float) -> float:
     return default
 
 
+def gateway_base_url(settings: Path) -> str:
+    """Read the gateway endpoint from the installed agents settings."""
+    try:
+        data = tomllib.loads(settings.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise AutommitError(
+            "invalid_config",
+            f"No base URL: set AUTOMMIT_BASE_URL or run sync to install {settings}.",
+        ) from error
+    gateway = data.get("gateway")
+    base_url = gateway.get("base_url") if isinstance(gateway, dict) else None
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise AutommitError(
+            "invalid_config", f"{settings} has no gateway.base_url string."
+        )
+    return base_url.strip()
+
+
 def load_config(
     *,
     overrides: ConfigOverrides | None = None,
     environ: Mapping[str, str] | None = None,
+    settings: Path = AGENTS_SETTINGS,
 ) -> AutommitConfig:
-    """Resolve settings: explicit overrides beat the environment, which beats defaults."""
+    """Resolve settings: overrides beat the environment, then the defaults."""
     chosen = overrides or ConfigOverrides()
     resolved_env = os.environ if environ is None else environ
 
@@ -98,10 +122,10 @@ def load_config(
         (chosen.model, _first_env(resolved_env, MODEL_ENV)),
         DEFAULT_MODEL,
     )
-    base_url = _first_text(
-        (chosen.base_url, _first_env(resolved_env, BASE_URL_ENV)),
-        DEFAULT_BASE_URL,
-    ).rstrip("/")
+    explicit_base_url = _first_text(
+        (chosen.base_url, _first_env(resolved_env, BASE_URL_ENV)), ""
+    )
+    base_url = (explicit_base_url or gateway_base_url(settings)).rstrip("/")
     api_key = _first_text(
         (chosen.api_key, _first_env(resolved_env, API_KEY_ENV)),
         DEFAULT_API_KEY,
