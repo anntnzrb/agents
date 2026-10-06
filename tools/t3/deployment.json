@@ -1,7 +1,7 @@
 {
   "channel": "nightly",
   "exposure": {
-    "connect": false,
+    "connect": true,
     "publishAgentActivity": false
   }
 }
