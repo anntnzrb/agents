@@ -80,7 +80,7 @@
         "The answer uses the vendored Effect checkout or upstream repository",
         "The answer reads relevant implementation, tests, LLMS.md, and MIGRATION.md",
         "The answer treats the checkout as read-only and never imports from it",
-        "The answer uses a depth-1 blob-filtered clone or clean fast-forward pull and does not switch, reset, clean, or fetch full tag history in the shared checkout",
+        "The answer follows the global vendored-source policy and never pulls, edits, builds, switches, resets, or cleans the shared checkout",
         "The answer states the mismatch and inspects matching installed code or a matching revision instead of trusting main"
       ]
     },
