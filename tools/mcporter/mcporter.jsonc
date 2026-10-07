@@ -30,6 +30,12 @@
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY:-}",
       },
     },
+    "metacritic": {
+      "piSkill": "metacritic",
+      "description": "Metacritic films, shows, and games: Metascores, user scores, and reviews",
+      "command": "bun",
+      "args": ["x", "mcp-metacritic@latest"],
+    },
     "n8n": {
       "piSkill": "n8n",
       "description": "n8n MCP",

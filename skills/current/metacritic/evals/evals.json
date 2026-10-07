@@ -1,0 +1,39 @@
+{
+  "skill_name": "metacritic",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "What did critics and regular users think of The Matrix? Give me both scores.",
+      "expected_output": "Reads the entry with get_title and reports the Metascore out of 100 and the user score out of 10 without comparing the raw numbers.",
+      "files": [],
+      "expectations": [
+        "Calls metacritic.get_title (or browse_titles) to obtain the user score instead of trusting a null search-row user_score",
+        "Reports the Metascore with its /100 scale and the user score with its /10 scale",
+        "Does not compare the two raw numbers as if they shared a scale"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Show me the negative critic reviews of Joker (2019) on Metacritic.",
+      "expected_output": "Calls get_reviews with sentiment=negative, shows the served negative reviews with their publications, and says the breakdown counts more negative reviews than the sample returned, linking the Metacritic page for the rest.",
+      "files": [],
+      "expectations": [
+        "Calls metacritic.get_reviews with slug joker, kind movie, and sentiment negative",
+        "Names the publication for every quoted review",
+        "States that more negative critic reviews exist than were shown (for example 11 counted versus 7 served) instead of presenting the served reviews as the complete set",
+        "Links the Metacritic source_url for the reviews that were not served"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What are the 3 best-reviewed horror movies on Metacritic, with their user scores?",
+      "expected_output": "Calls browse_titles with kind movie, sort score, genre Horror and lists three titles with Metascore and user score.",
+      "files": [],
+      "expectations": [
+        "Calls metacritic.browse_titles with sort score and genre Horror",
+        "Lists three titles, each with a Metascore and a non-null user score",
+        "Labels the user score as out of 10"
+      ]
+    }
+  ]
+}
