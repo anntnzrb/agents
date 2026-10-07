@@ -42,7 +42,6 @@ _LLM_JSON_REQUIRED_FIELDS = [
     "summary",
     "results",
 ]
-_SEARCH_RESULTS_CACHE: dict[tuple[str, int, int, str | None, str | None], list[SearchResult]] = {}
 
 
 class SourcePayload(TypedDict):

@@ -106,11 +106,7 @@ class AmazonSearchClient:
             self._client.close()
 
     def fetch_html(self, url: str) -> str:
-        """Fetch a page body, using the in-memory cache."""
-        cached = _HTML_CACHE.get(url)
-        if cached is not None:
-            return cached
-
+        """Fetch fresh HTML in this client's cookie session."""
         try:
             response = self._client.get(url)
         except httpx2.HTTPError as exc:
