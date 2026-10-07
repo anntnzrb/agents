@@ -88,15 +88,15 @@ For CLI applications, use the v4 CLI modules from `effect/cli`:
 import { Argument, Command, Flag } from "effect/cli"
 
 const searchCommand = Command.make("search", {
-  query: Argument.string("query").pipe(
+  query: Argument.String("query").pipe(
     Argument.withDescription("Search query words"),
     Argument.variadic({ min: 1 })
   ),
-  provider: Flag.string("provider").pipe(
+  provider: Flag.String("provider").pipe(
     Flag.withDescription("Explicit provider name"),
     Flag.optional
   ),
-  limit: Flag.integer("limit").pipe(
+  limit: Flag.Int("limit").pipe(
     Flag.withDescription("Source limit"),
     Flag.withDefault(2)
   )
