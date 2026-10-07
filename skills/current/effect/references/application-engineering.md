@@ -6,6 +6,8 @@ Read this reference when creating or materially changing a user-owned Effect app
 
 Use stable Effect v4 for new applications. Inspect installed metadata or query registry JSON with Bun and `fetch` to verify versions. Do not invoke npm for registry lookup.
 
+Use matching stable v4 releases even if the registry still exposes beta or RC dist-tags. Preserve a prerelease only when maintaining a project that explicitly pins it.
+
 ```text
 bun add effect@4 @effect/platform-bun@4
 bun add --dev @effect/tsgo
