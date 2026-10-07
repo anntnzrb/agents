@@ -49,23 +49,23 @@
     {
       "id": 5,
       "prompt": "This repo pins `effect 4.0.0-beta.35` and `@effect/platform-node 4.0.0-beta.35`. I want guidance for the pinned APIs, but I also need you to call out whether this is safe for production default use.",
-      "expected_output": "Honors the pinned v4 beta, labels the prerelease channel, and does not substitute current-main or stable-v3 APIs.",
+      "expected_output": "Honors the pinned v4 beta, labels the prerelease channel, and does not substitute current-main or stable-v4 APIs.",
       "files": [],
       "expectations": [
         "The answer identifies the repository as an explicit v4 beta project",
-        "The answer labels the API channel as prerelease and calls out the production decision",
-        "The answer does not rewrite the request into stable-channel v3 guidance",
+        "The answer labels the pinned API channel as prerelease and identifies stable v4 as the default for new production applications",
+        "The answer does not silently migrate the pinned beta to stable v4 or rewrite the request into v3 guidance",
         "The answer states any mismatch between the pinned beta and current vendored source"
       ]
     },
     {
       "id": 6,
       "prompt": "Create a new Bun backend with Effect. I need strict TypeScript, configuration, typed errors, one replaceable API service, retries, resource cleanup, tests, and the complete validation commands. Keep the stack minimal.",
-      "expected_output": "Applies the TypeScript Bun application policy and Effect v4 policy with matching RC packages, current idioms, and separate diagnostics.",
+      "expected_output": "Applies the TypeScript Bun application policy and Effect v4 policy with matching stable packages, current idioms, and separate diagnostics.",
       "files": [],
       "expectations": [
         "The answer uses Bun, TypeScript 7 or newer, native ESM, Oxlint, Oxfmt, and bun:test",
-        "The answer detects the current v4 release channel and uses matching packages. While RC is current, it uses effect@rc and @effect/platform-bun@rc",
+        "The answer uses matching stable v4 packages with effect@4 and @effect/platform-bun@4, not alpha, beta, or RC dist-tags",
         "The answer uses Schema.TaggedError, Context.Service, Layer, Config, Schedule, and scoped resource cleanup only where requested",
         "The answer runs TypeScript diagnostics and @effect/tsgo diagnostics separately",
         "The answer does not add an HTTP framework, ORM, Zod, Vitest, Jest, ESLint, or Prettier"
@@ -80,7 +80,7 @@
         "The answer uses the vendored Effect checkout or upstream repository",
         "The answer reads relevant implementation, tests, LLMS.md, and MIGRATION.md",
         "The answer treats the checkout as read-only and never imports from it",
-        "The answer uses a depth-1 blob-filtered clone or clean fast-forward pull and does not switch, reset, clean, or fetch full tag history in the shared checkout",
+        "The answer follows the global vendored-source policy and never pulls, edits, builds, switches, resets, or cleans the shared checkout",
         "The answer states the mismatch and inspects matching installed code or a matching revision instead of trusting main"
       ]
     },
@@ -125,12 +125,12 @@
     },
     {
       "id": 11,
-      "prompt": "Assume Effect v4 stable has now been published and the official dist-tags and installed package metadata confirm it. Start a new application. Should I still install effect@rc and @effect/platform-bun@rc?",
-      "expected_output": "Switches new applications to matching stable v4 packages while preserving RC only for projects that pin it.",
+      "prompt": "Start a new Effect application. The registry exposes latest as a stable v4 release but still has beta and rc dist-tags. Should I install effect@rc and @effect/platform-bun@rc?",
+      "expected_output": "Uses matching stable v4 packages despite lingering prerelease dist-tags, while preserving RC only for existing projects that pin it.",
       "files": [],
       "expectations": [
         "The answer uses stable Effect v4 packages for the new application",
-        "The answer does not keep @rc after official stable v4 is confirmed and does not invoke npm to inspect registry metadata",
+        "The answer rejects alpha, beta, and RC dist-tags for the new application and does not invoke npm to inspect registry metadata",
         "The answer keeps all Effect ecosystem packages on one matching version and channel",
         "The answer preserves RC dependencies only for an existing project that pins them"
       ]

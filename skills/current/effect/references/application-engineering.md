@@ -6,6 +6,8 @@ Read this reference when creating or materially changing a user-owned Effect app
 
 Use stable Effect v4 for new applications. Inspect installed metadata or query registry JSON with Bun and `fetch` to verify versions. Do not invoke npm for registry lookup.
 
+Use matching stable v4 releases even if the registry still exposes beta or RC dist-tags. Preserve a prerelease only when maintaining a project that explicitly pins it.
+
 ```text
 bun add effect@4 @effect/platform-bun@4
 bun add --dev @effect/tsgo
@@ -88,15 +90,15 @@ For CLI applications, use the v4 CLI modules from `effect/cli`:
 import { Argument, Command, Flag } from "effect/cli"
 
 const searchCommand = Command.make("search", {
-  query: Argument.string("query").pipe(
+  query: Argument.String("query").pipe(
     Argument.withDescription("Search query words"),
     Argument.variadic({ min: 1 })
   ),
-  provider: Flag.string("provider").pipe(
+  provider: Flag.String("provider").pipe(
     Flag.withDescription("Explicit provider name"),
     Flag.optional
   ),
-  limit: Flag.integer("limit").pipe(
+  limit: Flag.Int("limit").pipe(
     Flag.withDescription("Source limit"),
     Flag.withDefault(2)
   )

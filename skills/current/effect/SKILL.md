@@ -52,6 +52,7 @@ bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 - Version-sensitive guidance MUST inspect manifests, lockfiles, imports, exports, and declarations.
 - The project version MUST override conflicting vendored `main` or upstream documentation.
 - New applications use stable v4 as described in `references/application-engineering.md`.
+- Do not select alpha, beta, or RC dist-tags for new applications. Registry tags can remain after stable v4 ships.
 - Existing v3 applications receive matching v3 maintenance guidance. Do not silently apply v4 APIs or initiate migration.
 - State every material version or source mismatch. Never guess.
 
