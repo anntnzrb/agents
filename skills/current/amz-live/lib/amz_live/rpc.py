@@ -144,6 +144,7 @@ def _handle_search(request: Mapping[str, object]) -> RpcSuccessResponse:
     pages = _read_int(request, "pages", default=1, minimum=1)
     amazon_sort = _read_optional_string(request, "amazonSort")
     zip_code = _read_optional_string(request, "zipCode")
+    deals = _read_optional_bool(request, "deals") or False
     min_rating = _read_optional_number(request, "minRating")
     max_price = _read_optional_number(request, "maxPrice")
     badge = _read_optional_string(request, "badge")
@@ -163,6 +164,7 @@ def _handle_search(request: Mapping[str, object]) -> RpcSuccessResponse:
         pages=pages,
         amazon_sort=amazon_sort,
         zip_code=zip_code,
+        deals=deals,
         min_rating=min_rating,
         max_price=max_price,
         badge=badge,

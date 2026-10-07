@@ -30,7 +30,15 @@ uv run --script <skill-dir>/scripts/cli.py "wireless mouse"
 
 ## Machine-readable outputs
 
-`--json` stays unchanged: raw array of normalized results.
+`--json` returns a raw array of normalized results. Results include additive deal evidence fields: `reference_price`, `reference_price_label`, `discount_percent`, `prime_exclusive`, `coupon_text`, and `sponsored`. Missing price evidence is null. Deal labels remain in `badges`. See `references/operational-contract.md` for interpretation limits.
+
+For US Prime offers:
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py "wireless earbuds" --zip 33101 --deals --badge "Prime" --llm-json --limit 10
+```
+
+`--zip` establishes a guest delivery session; search and details share it. Deal filters are discovered from the current localized search page, without fixed event IDs. The envelope reports the observed location, applied deal refinement, and UTC observation time. Invalid session/refinement responses and unrecognized empty pages fail explicitly. `AMZ_LIVE_BASE_URL` overrides the HTTP origin for loopback boundary tests. Live responses are not cached across requests.
 
 ### `--llm-json`
 
@@ -122,6 +130,7 @@ printf '%s\n' \
 - `--min-rating 4.5`
 - `--max-price 10`
 - `--badge "Best Seller"`
+- `--deals`
 - `--title-contains "amazon basics"`
 - repeat `--include ...`
 - repeat `--exclude ...`

@@ -41,7 +41,8 @@ def test_parse_search_results_skips_placeholder_title_links_for_sponsored_cards(
 
     sponsored = results[0]
     assert sponsored.title.startswith("Amazon Basics USB-C to USB-C 2.0 Fast Charging Cable")
-    assert sponsored.url.startswith("https://www.amazon.com/sspa/click?")
+    assert sponsored.url == "https://www.amazon.com/dp/B01GGKZ1VA"
+    assert sponsored.sponsored is True
     assert "B01GGKZ1VA" in sponsored.url
     assert sponsored.url not in {
         "https://www.amazon.com/javascript:void(0)",

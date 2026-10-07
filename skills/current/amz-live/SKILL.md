@@ -23,10 +23,12 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 
 - Prefer `--llm-json` unless the user explicitly wants human text
 - Start cheap; avoid `--details` on a broad first pass unless the shortlist is already tiny
-- Add `--zip` early when delivery locality matters
+- Set `--zip` for a US delivery session; check `summary.delivery_location` before comparing prices
 - Add `--details --detail-limit 2` only for finalists
 - Add `--scoring` when the user wants “best”, “good enough”, “not trash”, “value”, or ranking help
 - Answer from envelope fields, not vibes
+- For Prime deals, read `references/operational-contract.md` before reporting discounts or membership requirements
+- For US Prime deals, search product keywords with `--zip` and `--deals`. `--badge "Prime"` keeps event or membership labels; use `prime_exclusive` for membership claims. The CLI discovers the current deal filter. Inspect `query.deal_refinement`; an event name alone is not a deal catalog
 - Do not dump raw JSON unless asked
 
 ## Required follow-up reads
@@ -36,7 +38,7 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 |Maintainer contract|`README.md`|Before changing CLI, parser, tests, or machine-readable behavior|
 |Shortest correct command|`references/cheatsheet.md`|For discovery, shortlist, details, scoring, zip-aware search, fixture parsing, or trusted fields|
 |Multi-step routing|`references/workflows.md`|For recommendations, accessory filtering, finalist validation, locality reruns, enrichment, or answer shape|
-|Operational contract|`references/operational-contract.md`|For output modes, exact controls, locality, enrichment, scoring, accessory heuristics, failures, or evidence fields|
+|Operational contract|`references/operational-contract.md`|For deals, membership prices, output modes, locality, enrichment, scoring, failures, or evidence fields|
 |Process integration|`references/rpc.md`|For `--mode rpc`, request/response schema, `zipCode`, or `query.zip_code`|
 |Recovery|`references/troubleshooting.md`|For blocked fetches, sparse details, locale drift, parser drift, conflicting fields, or fixture debugging|
 

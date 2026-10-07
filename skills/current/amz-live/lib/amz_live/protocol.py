@@ -1,8 +1,10 @@
 """Protocol layer: loading, enrichment, serialization, and schemas."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+from urllib.parse import urljoin
 
 import httpx2
 
@@ -14,13 +16,16 @@ from .client import AmazonSearchClient
 from .detail_parser import parse_product_detail
 from .filters import filter_results
 from .models import (
+    AmazonAntiBotError,
+    AmazonLiveSearchError,
     ProductDetail,
     ProductDetailPayload,
+    SearchPageInfo,
     SearchQuery,
     SearchResult,
     SearchResultPayload,
 )
-from .parser import parse_search_results
+from .parser import parse_search_page
 from .score import ResultScore, ResultScorePayload, score_results
 
 PROTOCOL_VERSION = "1"
@@ -45,6 +50,7 @@ class SourcePayload(TypedDict):
 
     mode: Literal["html", "live"]
     html_path: NotRequired[str]
+    checked_at: NotRequired[str]
 
 
 class QueryPayload(TypedDict):
@@ -55,6 +61,8 @@ class QueryPayload(TypedDict):
     pages: int
     amazon_sort: str | None
     zip_code: str | None
+    deals: bool
+    deal_refinement: str | None
 
 
 class FiltersPayload(TypedDict):
@@ -74,6 +82,7 @@ class SummaryPayload(TypedDict):
 
     raw_result_count: int
     returned_result_count: int
+    delivery_location: str | None
 
 
 class EnrichmentPayload(TypedDict):
@@ -124,6 +133,7 @@ class SearchResultsPayload(TypedDict):
     enrichment: EnrichmentPayload
     results: list[SerializedSearchResultPayload]
     ranking: NotRequired[RankingPayload]
+    warnings: NotRequired[list[str]]
 
 
 def load_results(
@@ -134,23 +144,23 @@ def load_results(
     pages: int,
     amazon_sort: str | None,
     zip_code: str | None = None,
+    deals: bool = False,
+    client: AmazonSearchClient | None = None,
 ) -> list[SearchResult]:
     """Load results from a local HTML file or live search."""
+    search_query = SearchQuery(
+        query, page=page, amazon_sort=amazon_sort, zip_code=zip_code, deals=deals
+    )
     if html_path:
         html = Path(html_path).read_text(encoding="utf-8")
-        return parse_search_results(html)
-
-    cache_key = (query.strip(), page, pages, amazon_sort, zip_code)
-    cached = _SEARCH_RESULTS_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-
-    results: list[SearchResult] = []
-    search_query = SearchQuery(query, page=page, amazon_sort=amazon_sort, zip_code=zip_code)
-    with AmazonSearchClient() as client:
-        results = client.search_pages(search_query, pages=pages)
-    _SEARCH_RESULTS_CACHE[cache_key] = results
-    return results
+        results, info = parse_search_page(html, require_deals=deals)
+        if client is not None:
+            client.page_info = info
+        return results
+    if client is not None:
+        return client.search_pages(search_query, pages=pages)
+    with AmazonSearchClient() as owned_client:
+        return owned_client.search_pages(search_query, pages=pages)
 
 
 def enrich_results(
@@ -158,6 +168,7 @@ def enrich_results(
     *,
     details: bool,
     detail_limit: int | None,
+    client: AmazonSearchClient,
 ) -> tuple[dict[str, ProductDetail], int]:
     """Fetch product details for filtered results."""
     if not details:
@@ -168,24 +179,29 @@ def enrich_results(
         return {}, 0
 
     enriched: dict[str, ProductDetail] = {}
-    with AmazonSearchClient() as client:
-        for result in results[:limit]:
-            try:
-                html = client.fetch_product_page(result.url)
-                enriched[result.asin] = parse_product_detail(html)
-            except httpx2.HTTPError, OSError, ValueError, TypeError:
-                continue
-    return enriched, limit
+    attempted = 0
+    for result in results[:limit]:
+        attempted += 1
+        try:
+            html = client.fetch_product_page(urljoin(client.base_url, f"/dp/{result.asin}"))
+            enriched[result.asin] = parse_product_detail(html)
+        except AmazonAntiBotError:
+            break
+        except AmazonLiveSearchError, httpx2.HTTPError, OSError, ValueError, TypeError:
+            continue
+    return enriched, attempted
 
 
 def search_and_filter(
     *,
+    client: AmazonSearchClient,
     query: str,
     html_path: str | None,
     page: int,
     pages: int,
     amazon_sort: str | None,
     zip_code: str | None = None,
+    deals: bool = False,
     min_rating: float | Decimal | None = None,
     max_price: float | Decimal | None = None,
     badge: str | None = None,
@@ -211,6 +227,8 @@ def search_and_filter(
         pages=pages,
         amazon_sort=amazon_sort,
         zip_code=zip_code,
+        deals=deals,
+        client=client,
     )
     filtered_results = filter_results(
         raw_results,
@@ -226,6 +244,7 @@ def search_and_filter(
         filtered_results,
         details=details,
         detail_limit=detail_limit,
+        client=client,
     )
     scores_by_asin: dict[str, ResultScore] = {}
     if scoring:
@@ -249,6 +268,7 @@ class SearchRequest:
     pages: int = 1
     amazon_sort: str | None = None
     zip_code: str | None = None
+    deals: bool = False
     min_rating: float | Decimal | None = None
     max_price: float | Decimal | None = None
     badge: str | None = None
@@ -262,24 +282,27 @@ class SearchRequest:
 
     def execute(self) -> tuple[SearchResultsPayload, list[SearchResult]]:
         """Search once and serialize the domain envelope using real result data."""
-        raw, filtered, details, attempted, scores = search_and_filter(
-            query=self.query,
-            html_path=self.html_path,
-            page=self.page,
-            pages=self.pages,
-            amazon_sort=self.amazon_sort,
-            zip_code=self.zip_code,
-            min_rating=self.min_rating,
-            max_price=self.max_price,
-            badge=self.badge,
-            title_contains=self.title_contains,
-            include=self.include,
-            exclude=self.exclude,
-            limit=self.limit,
-            details=self.details,
-            detail_limit=self.detail_limit,
-            scoring=self.scoring,
-        )
+        with AmazonSearchClient() as client:
+            raw, filtered, details, attempted, scores = search_and_filter(
+                client=client,
+                query=self.query,
+                html_path=self.html_path,
+                page=self.page,
+                pages=self.pages,
+                amazon_sort=self.amazon_sort,
+                zip_code=self.zip_code,
+                deals=self.deals,
+                min_rating=self.min_rating,
+                max_price=self.max_price,
+                badge=self.badge,
+                title_contains=self.title_contains,
+                include=self.include,
+                exclude=self.exclude,
+                limit=self.limit,
+                details=self.details,
+                detail_limit=self.detail_limit,
+                scoring=self.scoring,
+            )
         payload = build_llm_json(
             query=self.query,
             html_path=self.html_path,
@@ -287,6 +310,9 @@ class SearchRequest:
             pages=self.pages,
             amazon_sort=self.amazon_sort,
             zip_code=self.zip_code,
+            deals=self.deals,
+            page_info=client.page_info,
+            checked_at=client.checked_at,
             min_rating=self.min_rating,
             max_price=self.max_price,
             badge=self.badge,
@@ -314,6 +340,9 @@ def build_llm_json(
     pages: int,
     amazon_sort: str | None,
     zip_code: str | None = None,
+    deals: bool = False,
+    page_info: SearchPageInfo | None = None,
+    checked_at: str | None = None,
     min_rating: float | Decimal | None,
     max_price: float | Decimal | None,
     badge: str | None,
@@ -331,10 +360,13 @@ def build_llm_json(
     scores_by_asin: dict[str, ResultScore] | None = None,
 ) -> SearchResultsPayload:
     """Build the LLM-first JSON envelope for results."""
+    page_info = page_info or SearchPageInfo()
     if html_path is not None:
         source: SourcePayload = {"mode": "html", "html_path": html_path}
     else:
         source = {"mode": "live"}
+        if checked_at is not None:
+            source["checked_at"] = checked_at
 
     details_by_asin = details_by_asin or {}
     scores_by_asin = scores_by_asin or {}
@@ -349,6 +381,8 @@ def build_llm_json(
             "pages": pages,
             "amazon_sort": amazon_sort,
             "zip_code": zip_code,
+            "deals": deals,
+            "deal_refinement": page_info.deal_refinement,
         },
         "filters": {
             "min_rating": _json_number(min_rating),
@@ -362,6 +396,7 @@ def build_llm_json(
         "summary": {
             "raw_result_count": len(raw_results),
             "returned_result_count": len(filtered_results),
+            "delivery_location": page_info.delivery_location,
         },
         "enrichment": {
             "details": details,
@@ -376,6 +411,16 @@ def build_llm_json(
             scores_by_asin=scores_by_asin,
         ),
     }
+    warnings: list[str] = []
+    location = page_info.delivery_location or "unknown"
+    if zip_code is None or re.search(rf"\b{re.escape(zip_code.strip())}\b", location) is None:
+        warnings.append(f"US ZIP not verified; observed delivery location: {location}.")
+    if not raw_results:
+        warnings.append(
+            "Amazon reported no matching products; other searches may still have deals."
+        )
+    if warnings:
+        payload["warnings"] = warnings
     if scoring:
         payload["ranking"] = {
             "mode": "agent_value",
@@ -440,6 +485,7 @@ def get_schema_document() -> dict[str, object]:
                 "--schema": {"output": "schema_document"},
                 "--mode rpc": {"output": "jsonl_rpc"},
                 "--zip": {"query": "delivery_zip_code"},
+                "--deals": {"query": "amazon_deal_refinement"},
                 "--details": {"enrichment": "product_details"},
                 "--detail-limit": {"enrichment_limit": "product_details"},
                 "--scoring": {"ranking": "agent_value"},
@@ -458,11 +504,24 @@ def get_schema_document() -> dict[str, object]:
                     "properties": {
                         "mode": {"type": "string", "enum": ["live", "html"]},
                         "html_path": {"type": ["string", "null"]},
+                        "checked_at": {"type": "string", "format": "date-time"},
                     },
                 },
                 "query": {
                     "type": "object",
-                    "required": ["keywords", "page", "pages", "amazon_sort", "zip_code"],
+                    "required": [
+                        "keywords",
+                        "page",
+                        "pages",
+                        "amazon_sort",
+                        "zip_code",
+                        "deals",
+                        "deal_refinement",
+                    ],
+                    "properties": {
+                        "deals": {"type": "boolean"},
+                        "deal_refinement": {"type": ["string", "null"]},
+                    },
                 },
                 "filters": {
                     "type": "object",
@@ -478,7 +537,8 @@ def get_schema_document() -> dict[str, object]:
                 },
                 "summary": {
                     "type": "object",
-                    "required": ["raw_result_count", "returned_result_count"],
+                    "required": ["raw_result_count", "returned_result_count", "delivery_location"],
+                    "properties": {"delivery_location": {"type": ["string", "null"]}},
                 },
                 "results": {
                     "type": "array",
@@ -492,9 +552,30 @@ def get_schema_document() -> dict[str, object]:
                             "rating",
                             "review_count",
                             "badges",
+                            "reference_price",
+                            "reference_price_label",
+                            "discount_percent",
+                            "prime_exclusive",
+                            "coupon_text",
+                            "sponsored",
                         ],
+                        "properties": {
+                            "reference_price": {"type": ["number", "null"]},
+                            "reference_price_label": {"type": ["string", "null"]},
+                            "discount_percent": {
+                                "type": ["number", "null"],
+                                "description": "Percent below reference price, before coupons.",
+                            },
+                            "prime_exclusive": {
+                                "type": ["boolean", "null"],
+                                "description": "Price requires Prime; null if unknown.",
+                            },
+                            "coupon_text": {"type": ["string", "null"]},
+                            "sponsored": {"type": "boolean"},
+                        },
                     },
                 },
+                "warnings": {"type": "array", "items": {"type": "string"}},
             },
         },
         "rpc": {
@@ -539,6 +620,7 @@ def get_schema_document() -> dict[str, object]:
                             "pages": {"type": "integer", "minimum": 1},
                             "amazonSort": {"type": ["string", "null"]},
                             "zipCode": {"type": ["string", "null"]},
+                            "deals": {"type": ["boolean", "null"]},
                             "minRating": {"type": ["number", "null"]},
                             "maxPrice": {"type": ["number", "null"]},
                             "badge": {"type": ["string", "null"]},

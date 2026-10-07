@@ -67,7 +67,8 @@ Request shape:
   "details": true,
   "detailLimit": 2,
   "scoring": true,
-  "zipCode": "33101"
+  "zipCode": "33101",
+  "deals": false
 }
 ```
 
@@ -96,6 +97,8 @@ Response error:
 ```
 
 ## Good defaults
+
+For US Prime offers, use `zipCode`, `deals: true`, and `badge: "Prime"`. Inspect `data.summary.delivery_location`, `data.query.deal_refinement`, `data.source.checked_at`, and any `data.warnings`. Read `operational-contract.md` for the distinction between an event badge and a membership price. Each request fetches fresh search results.
 
 For agents, prefer:
 

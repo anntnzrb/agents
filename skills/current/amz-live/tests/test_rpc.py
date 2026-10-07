@@ -81,6 +81,8 @@ def test_rpc_search_type_emits_llm_payload() -> None:
         "pages": 1,
         "amazon_sort": None,
         "zip_code": None,
+        "deals": False,
+        "deal_refinement": None,
     }
     assert payload["filters"] == {
         "min_rating": 4.5,
@@ -91,7 +93,11 @@ def test_rpc_search_type_emits_llm_payload() -> None:
         "exclude": [],
         "limit": 2,
     }
-    assert payload["summary"] == {"raw_result_count": 3, "returned_result_count": 2}
+    assert payload["summary"] == {
+        "raw_result_count": 3,
+        "returned_result_count": 2,
+        "delivery_location": None,
+    }
     assert [item["asin"] for item in payload["results"]] == ["B0CG1LGWR6", "B07CWC39TL"]
 
 

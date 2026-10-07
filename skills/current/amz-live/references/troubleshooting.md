@@ -18,6 +18,10 @@ Actions:
 3. narrow query
 4. use fixture/debug mode if parser work only
 
+## Deal filter unavailable or changed
+
+`--deals` discovers Amazon's current deal options rather than reusing an event ID. If no usable option is advertised, try broader product keywords. If the filtered response does not confirm the discovered option, stop reporting deals from that run. Save a current search page and replay it with `--html` to investigate markup drift; update parser selectors only from observed markup and rerun the skill's gates and live probe. Do not replace a missing filter with an unfiltered search.
+
 ## Results look wrong
 
 Common causes:

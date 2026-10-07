@@ -34,17 +34,33 @@ uv run --script <skill-dir>/scripts/cli.py "$QUERY" \
 
 ## Search controls
 
-High-signal flags: `--max-price <n>`, `--min-rating <n>`, `--badge "Best Seller"`, `--title-contains <text>`, repeatable `--include <term>`, repeatable `--exclude <term>`, `--limit <n>`, `--page <n>`, `--pages <n>`, `--amazon-sort <raw-amazon-sort>`, `--zip <zipcode>`.
+High-signal flags: `--max-price <n>`, `--min-rating <n>`, `--badge "Best Seller"`, `--title-contains <text>`, repeatable `--include <term>`, repeatable `--exclude <term>`, `--limit <n>`, `--page <n>`, `--pages <n>`, `--amazon-sort <raw-amazon-sort>`, `--zip <zipcode>`, `--deals`.
 
 ## Delivery location / locale
 
-Use `--zip` for shipping locality, delivery dates, regional stock or price, or “change delivery address” / “assume Miami”. Behavior: `--zip` → Amazon query filter `rh=p_47:<zipcode>`; LLM JSON includes `query.zip_code`; RPC accepts `zipCode` and returns `query.zip_code`; `--zip` affects live search URLs, not local `--html` parsing beyond envelope metadata.
+`--zip` accepts a five-digit US ZIP and sets an anonymous guest delivery session through Amazon's location widget. Search pages and detail enrichment share its cookies. Live searches fail if the page's location does not confirm the requested ZIP. Read `summary.delivery_location`; `query.zip_code` alone is the requested input, not proof. RPC accepts `zipCode`. Local `--html` parsing preserves the captured page location and does not change it.
 
 Final price/delivery may vary by session, account, Prime state, and region. If live results still look wrong, tell the user locale/session effects may remain.
 
+With `--html --details`, search evidence comes from the saved page but details are fetched live in a new default-location session. `--zip` does not change that replay session; do not treat its detail delivery text as ZIP-confirmed.
+
+## Deal evidence
+
+Search product keywords with `--zip <US-ZIP> --deals`. Amazon's deal refinement is applied before fetching result cards; `query.deal_refinement` reports its observed label. The CLI discovers the available deal refinements from the current search page after setting delivery location. It prefers broad options (`All Deals`, `All Discounts`, or `Today's Deals`), otherwise the first advertised deal option. IDs and event names are not fixed in code. The filtered response must confirm the discovered label; missing or changed filters fail explicitly. If no deal filter is advertised for a query, try broader product keywords instead of treating that as proof that Amazon has no deals. A nonempty response with a missing applied filter is an error. Pagination stops at a recognized empty page and keeps earlier verified results. Add `--badge "Prime"` to retain Prime event or membership labels. This searches the main result grid, not every offer on Amazon.
+
+- `reference_price` and `reference_price_label` preserve Amazon's crossed-out comparison price and its label, such as `List Price` or `Typical price`. This is not verified price history.
+- `discount_percent` is calculated from `price` and a higher positive `reference_price`, rounded to two decimal places. It excludes coupons and stays null without a valid comparison.
+- `prime_exclusive: true` means the displayed price has an explicit membership label, such as `Exclusive Prime price`. Null means unknown. `Prime Big Deal` is an event badge and does not establish membership eligibility by itself. Prime shipping, product titles, and discounts are not membership evidence.
+- `coupon_text` preserves the visible coupon offer separately. Do not subtract it from `price` or assume checkout eligibility.
+- `sponsored` identifies ad links or sponsored markers; do not present an ad as an independent recommendation.
+- Live `source.checked_at` records the UTC observation time. Live searches are fetched again on each request; RPC does not reuse prices indefinitely.
+- Search cards do not establish the sale's expiry or account-specific checkout eligibility. Report the time, delivery location, and observed label. Do not claim event participation without a deal badge.
+
+Empty results for an event-name query do not prove that no deals exist. A page without usable cards or an explicit no-results message fails as unrecognized markup. An explicit empty search or a non-confirmed US delivery session adds an envelope warning. Prefer a confirmed US ZIP when searching US Prime offers.
+
 ## Detail enrichment
 
-`--details --detail-limit 2` may add `results[].details.brand`, `availability_text`, `delivery_text`, `ships_from`, `sold_by`, and `bullet_points`. Use for merchant trust, stock checks, brand confirmation, concrete bullet claims, and post-`--zip` delivery text. Detail fields are bonuses, not hard truth, when many are null.
+`--details --detail-limit 2` may add `results[].details.brand`, `availability_text`, `delivery_text`, `ships_from`, `sold_by`, and `bullet_points`. Use for merchant trust, stock checks, brand confirmation, concrete bullet claims, and post-`--zip` delivery text. Enrichment fetches canonical `/dp/<ASIN>` URLs, never ad-click links, and stops on an anti-bot response. Detail fields are bonuses, not hard truth, when many are null.
 
 ## Scoring
 

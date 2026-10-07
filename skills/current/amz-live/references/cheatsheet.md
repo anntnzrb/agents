@@ -42,14 +42,28 @@ uv run --script <skill-dir>/scripts/cli.py "usb c to usb c braided cable" \
 
 - `summary.raw_result_count`
 - `summary.returned_result_count`
+- `summary.delivery_location`, `query.deal_refinement`, and live `source.checked_at`
 - `results[].price`
 - `results[].rating`
 - `results[].review_count`
+- `results[].reference_price` and `reference_price_label`
+- `results[].discount_percent` (before coupons, relative to the displayed reference)
+- `results[].prime_exclusive` (true for an explicit membership-price label, otherwise null)
+- `results[].coupon_text`
+- `results[].sponsored`
 - `results[].details.brand`
 - `results[].details.ships_from`
 - `results[].details.sold_by`
 - `results[].score`
 - `results[].reasons`
+
+## Prime offers
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py "wireless earbuds" --zip 33101 --deals --badge "Prime" --llm-json --limit 10
+```
+
+Read `operational-contract.md` before interpreting deal evidence. Empty output means no matching labels were parsed in this search, not that Amazon has no Prime deals.
 
 ## RPC search request
 

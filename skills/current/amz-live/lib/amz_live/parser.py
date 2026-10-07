@@ -2,17 +2,18 @@
 
 import re
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from .models import SearchResult
+from .models import AmazonClientError, SearchPageInfo, SearchResult
 
 _CARD_SELECTOR = '[data-component-type="s-search-result"][data-asin]'
+_CURRENT_PRICE = '.a-price:not(.a-text-price):not([data-a-strike="true"])'
 _PRICE_SELECTORS = (
-    '[data-cy="price-recipe"] .a-price[data-a-size="xl"] .a-offscreen',
-    '[data-cy="price-recipe"] .a-price .a-offscreen',
-    '.a-price[data-a-size="xl"] .a-offscreen',
+    f'[data-cy="price-recipe"] {_CURRENT_PRICE}[data-a-size="xl"] .a-offscreen',
+    f'[data-cy="price-recipe"] {_CURRENT_PRICE} .a-offscreen',
+    f'{_CURRENT_PRICE}[data-a-size="xl"] .a-offscreen',
 )
 _RATING_SELECTORS = (
     '[data-cy="reviews-block"] .a-icon-alt',
@@ -29,7 +30,70 @@ _BADGE_SELECTORS = (
     ".rio-badge-label [aria-label]",
     ".rio-badge-label",
     '[data-cy="reviews-block"] .puis-bold-weight-text',
+    ".a-badge-text",
 )
+_PRIME_OFFER = re.compile(
+    r"\b(?:prime (?:exclusive|member price)|exclusive prime)\b",
+    re.IGNORECASE,
+)
+_DEAL_LABEL = re.compile(
+    r"\b(?:limited time deal|lightning deal|deal of the day|prime (?:big |day )?deal)\b",
+    re.IGNORECASE,
+)
+
+
+def discover_deal_filter(html: str, *, base_url: str) -> tuple[str, str]:
+    """Discover an advertised deal refinement without following arbitrary links."""
+    tree = LexborHTMLParser(html)
+    candidates: list[tuple[str, str]] = []
+    origin = urlparse(base_url)
+    for link in tree.css("#filter-p_n_deal_type a[href]"):
+        target = urlparse(urljoin(base_url, link.attributes.get("href") or ""))
+        if (target.scheme, target.netloc, target.path) != (origin.scheme, origin.netloc, "/s"):
+            continue
+        label = _clean_text(link.text(separator=" ", strip=True))
+        refinements = parse_qs(target.query).get("rh", [])
+        for refinement in refinements:
+            for term in refinement.split(","):
+                if re.fullmatch(r"p_n_deal_type:[0-9]+", term) and label:
+                    candidates.append((term, label))
+    if not candidates:
+        raise AmazonClientError("Amazon advertised no usable deal filter for this search")
+    for preferred in ("all deals", "all discounts", "today's deals"):
+        for item in candidates:
+            if item[1].casefold().replace("\u2019", "'") == preferred:
+                return item
+    return candidates[0]
+
+
+def parse_search_page(
+    html: str, *, base_url: str = "https://www.amazon.com", require_deals: bool = False
+) -> tuple[list[SearchResult], SearchPageInfo]:
+    """Parse a recognized results page and preserve its observed context."""
+    tree = LexborHTMLParser(html)
+    root = tree.root
+    if root is None:
+        raise AmazonClientError("Unrecognized Amazon search page: empty document")
+    results = parse_search_results(html, base_url=base_url)
+    if not results:
+        for element in tree.css("script, style, noscript"):
+            element.decompose()
+        text = tree.text(separator=" ", strip=True)
+        if tree.css(_CARD_SELECTOR) or not re.search(
+            r"\b(?:no results for|did not match any products|we couldn't find any results)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            raise AmazonClientError(
+                "Unrecognized Amazon search page: missing usable cards or a no-results message"
+            )
+    location = _first_text(root, ("#glow-ingress-line2",)) or None
+    if location:
+        location = location.replace("\u200c", "").strip()
+    refinement = _first_text(root, ('#filter-p_n_deal_type a[aria-current="true"]',)) or None
+    if require_deals and results and refinement is None:
+        raise AmazonClientError("Amazon did not confirm the requested deal refinement")
+    return results, SearchPageInfo(delivery_location=location, deal_refinement=refinement)
 
 
 def parse_search_results(
@@ -51,7 +115,16 @@ def _parse_result_card(node: LexborNode, *, base_url: str) -> SearchResult | Non
     if not asin:
         return None
 
-    title = _first_text(node, ('[data-cy="title-recipe"] h2 span', "h2 span", "h2"))
+    title = _first_text(
+        node,
+        (
+            '[data-cy="title-recipe"] a h2 span',
+            "h2 a span",
+            '[data-cy="title-recipe"] h2 span',
+            "h2 span",
+            "h2",
+        ),
+    )
     href = _first_attr(
         node,
         ('[data-cy="title-recipe"] a', "h2 a", "a.a-link-normal.s-no-outline"),
@@ -60,14 +133,36 @@ def _parse_result_card(node: LexborNode, *, base_url: str) -> SearchResult | Non
     if not title or not href:
         return None
 
+    price = _extract_price(node)
+    reference_price, reference_label = _extract_reference_price(node)
+    discount = None
+    if price is not None and reference_price is not None and 0 <= price < reference_price:
+        discount = ((reference_price - price) / reference_price * 100).quantize(Decimal("0.01"))
+    badges = _extract_badges(node)
+    recipe = node.css_first('[data-cy="price-recipe"]', strict=False)
+    prime_price = recipe is not None and any(
+        _PRIME_OFFER.search(span.text(separator=" ", strip=True))
+        for span in recipe.css("span")
+        if len(span.css("span")) == 1 and _visible_markup(span)
+    )
     return SearchResult(
         asin=asin,
         title=title,
-        url=urljoin(base_url, href),
-        price=_extract_price(node),
+        url=urljoin(base_url, f"/dp/{asin}"),
+        price=price,
         rating=_extract_rating(node),
         review_count=_extract_review_count(node),
-        badges=_extract_badges(node),
+        badges=badges,
+        reference_price=reference_price,
+        reference_price_label=reference_label,
+        discount_percent=discount,
+        prime_exclusive=True
+        if prime_price or any(_PRIME_OFFER.search(badge) for badge in badges)
+        else None,
+        coupon_text=_extract_coupon(node),
+        sponsored="/sspa/click" in href
+        or node.css_first('[data-component-type="s-sponsored-label-marker"]', strict=False)
+        is not None,
     )
 
 
@@ -78,6 +173,36 @@ def _extract_price(node: LexborNode) -> Decimal | None:
             if value is not None:
                 return value
     return None
+
+
+def _extract_reference_price(node: LexborNode) -> tuple[Decimal | None, str | None]:
+    selector = '.a-price[data-a-strike="true"] .a-offscreen'
+    recipe = node.css_first('[data-cy="price-recipe"]', strict=False)
+    reference = (recipe if recipe is not None else node).css_first(selector, strict=False)
+    if reference is None:
+        return None, None
+    price = _parse_decimal(reference.text(separator=" ", strip=True))
+    label = None
+    parent = reference.parent
+    context = parent.parent if parent is not None else None
+    if price is not None and context is not None:
+        match = re.search(
+            r"\b(List Price|List|Typical price|Was|Previously):",
+            context.text(separator=" ", strip=True),
+            re.IGNORECASE,
+        )
+        label = match.group(1) if match else None
+    return price, label
+
+
+def _extract_coupon(node: LexborNode) -> str | None:
+    return _first_text(
+        node,
+        (
+            '[data-component-type="s-coupon-component"] .s-coupon-unclipped:not(.aok-hidden)',
+            '[data-component-type="s-coupon-component"] .s-coupon-clipped:not(.aok-hidden)',
+        ),
+    )
 
 
 def _extract_rating(node: LexborNode) -> Decimal | None:
@@ -110,19 +235,41 @@ def _extract_badges(node: LexborNode) -> tuple[str, ...]:
     seen: set[str] = set()
     badges: list[str] = []
 
-    for selector in _BADGE_SELECTORS:
+    for selector in (*_BADGE_SELECTORS, '[data-cy="price-recipe"] .a-color-price'):
         for badge_node in node.css(selector):
+            if not _visible_markup(badge_node):
+                continue
             raw = badge_node.attributes.get("aria-label") or badge_node.text(
                 separator=" ",
                 strip=True,
             )
             badge = _clean_text(raw)
-            if not badge or badge in seen:
+            if selector.endswith(".a-color-price") and not (
+                _PRIME_OFFER.search(badge) or _DEAL_LABEL.search(badge)
+            ):
+                continue
+            if not badge or badge == "Ends in" or badge in seen:
                 continue
             seen.add(badge)
             badges.append(badge)
 
     return tuple(badges)
+
+
+def _visible_markup(node: LexborNode) -> bool:
+    """Exclude explicit hidden templates, retaining accessibility price text."""
+    current: LexborNode | None = node
+    while current is not None:
+        attrs = current.attributes
+        classes = (attrs.get("class") or "").split()
+        if (
+            "hidden" in attrs
+            or attrs.get("aria-hidden") == "true"
+            or any(name in classes for name in ("aok-hidden", "a-hidden"))
+        ):
+            return False
+        current = current.parent
+    return True
 
 
 def _first_text(node: LexborNode, selectors: tuple[str, ...]) -> str | None:
