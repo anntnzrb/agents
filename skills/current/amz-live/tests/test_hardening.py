@@ -84,12 +84,14 @@ def test_scoring_demotes_usb_a_mismatch_for_usb_c_to_usb_c_query(
     assert payload[0]["score"] > payload[1]["score"]
 
 
-def test_client_fetch_html_reuses_lightweight_cache_for_same_url() -> None:
+def test_client_fetch_html_refetches_instead_of_reusing_stale_prices() -> None:
     calls: list[str] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         calls.append(str(request.url))
-        return httpx2.Response(200, text="<html>cached once</html>", request=request)
+        return httpx2.Response(
+            200, text=f"<html>price revision {len(calls)}</html>", request=request
+        )
 
     with httpx2.Client(transport=httpx2.MockTransport(handler)) as http_client:
         client = AmazonSearchClient(client=http_client)
@@ -98,11 +100,12 @@ def test_client_fetch_html_reuses_lightweight_cache_for_same_url() -> None:
         first = client.fetch_html(url)
         second = client.fetch_html(url)
 
-    assert first == second == "<html>cached once</html>"
-    assert calls == [url]
+    assert first == "<html>price revision 1</html>"
+    assert second == "<html>price revision 2</html>"
+    assert calls == [url, url]
 
 
-def test_protocol_load_results_reuses_cached_search_html(
+def test_protocol_load_results_refetches_each_search(
     monkeypatch: pytest.MonkeyPatch, search_html: str
 ) -> None:
     calls: list[tuple[str, int, int]] = []
@@ -136,7 +139,7 @@ def test_protocol_load_results_reuses_cached_search_html(
     )
 
     assert [result.asin for result in first] == [result.asin for result in second]
-    assert calls == [("usb c to usb c braided cable", 1, 1)]
+    assert calls == [("usb c to usb c braided cable", 1, 1)] * 2
 
 
 def test_scoring_output_includes_merchant_trust_from_detail_page(

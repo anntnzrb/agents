@@ -39,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     _ = parser.add_argument(
         "--zip", help="Set delivery zip code for localized results (e.g. 33101)."
     )
+    _ = parser.add_argument(
+        "--deals",
+        action="store_true",
+        help="Apply Amazon's current deal refinement; inspect the returned label.",
+    )
     _ = parser.add_argument("--min-rating", type=float, help="Minimum rating, e.g. 4.5.")
     _ = parser.add_argument("--max-price", type=float, help="Maximum primary price.")
     _ = parser.add_argument("--badge", help="Require a badge match, e.g. Best Seller.")
@@ -189,6 +194,7 @@ def main(
     pages = _config_int(args, "pages")
     amazon_sort = _optional_str(args, "amazon_sort")
     zip_code = _optional_str(args, "zip")
+    deals = _config_bool(args, "deals")
     min_rating = _optional_float(args, "min_rating")
     max_price = _optional_float(args, "max_price")
     badge = _optional_str(args, "badge")
@@ -224,6 +230,7 @@ def main(
             pages=pages,
             amazon_sort=amazon_sort,
             zip_code=zip_code,
+            deals=deals,
             min_rating=min_rating,
             max_price=max_price,
             badge=badge,
@@ -245,6 +252,8 @@ def main(
         _print_json(payload, stdout=output_stream)
     else:
         _print_human(filtered_results, stdout=output_stream)
+        for warning in payload.get("warnings", []):
+            print(f"warning: {warning}", file=error_stream)
     return 0
 
 
@@ -253,7 +262,22 @@ def _print_human(results: Sequence[SearchResult], *, stdout: TextIO) -> None:
         price = f"${result.price}" if result.price is not None else "-"
         rating = f"{result.rating}★" if result.rating is not None else "-"
         badges = f" [{', '.join(result.badges)}]" if result.badges else ""
-        print(f"{result.asin} | {price} | {rating} | {result.title}{badges}", file=stdout)
+        reference = (
+            f" | {result.reference_price_label or 'Reference price'}: ${result.reference_price}"
+            if result.reference_price is not None
+            else ""
+        )
+        discount = (
+            f" ({result.discount_percent}% below reference)"
+            if result.discount_percent is not None
+            else ""
+        )
+        coupon = f" | {result.coupon_text}" if result.coupon_text else ""
+        row = f"{result.asin} | {price} | {rating} | {result.title}"
+        print(
+            f"{row}{badges}{reference}{discount}{coupon}",
+            file=stdout,
+        )
 
 
 def _print_json(payload: object, *, stdout: TextIO) -> None:

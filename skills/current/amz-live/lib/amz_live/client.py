@@ -1,17 +1,23 @@
 """Sync HTTP client for live Amazon search pages."""
 
-from typing import TYPE_CHECKING, Self
+import json
+import os
+import re
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Literal, Self, TypeIs
+from urllib.parse import urlencode
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from types import TracebackType
 
 import http
 
 import httpx2
+from selectolax.lexbor import LexborHTMLParser
 
-from .models import AmazonAntiBotError, AmazonClientError, SearchQuery, SearchResult
-from .parser import parse_search_results
+from .models import AmazonAntiBotError, AmazonClientError, SearchPageInfo, SearchQuery, SearchResult
+from .parser import discover_deal_filter, parse_search_page
 from .query import AMAZON_BASE_URL, build_search_url
 
 DEFAULT_HEADERS = {
@@ -42,7 +48,15 @@ _ANTI_BOT_URL_MARKERS = (
     "errors/captcha",
     "errors/validatecaptcha",
 )
-_HTML_CACHE: dict[str, str] = {}
+
+
+def _is_mapping(value: object) -> TypeIs[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _load_json(text: str) -> object:
+    load: Callable[..., object] = json.loads
+    return load(text)
 
 
 class AmazonSearchClient:
@@ -51,13 +65,19 @@ class AmazonSearchClient:
     def __init__(
         self,
         *,
-        base_url: str = AMAZON_BASE_URL,
+        base_url: str | None = None,
         timeout: float = 20.0,
         headers: Mapping[str, str] | None = None,
         client: httpx2.Client | None = None,
     ) -> None:
         """Configure base URL, timeout, headers, and transport."""
-        self.base_url: str = base_url.rstrip("/")
+        self.base_url: str = (
+            base_url or os.environ.get("AMZ_LIVE_BASE_URL", AMAZON_BASE_URL)
+        ).rstrip("/")
+        self.delivery_zip: str | None = None
+        self._deal_filters: dict[str, tuple[str, str]] = {}
+        self.page_info: SearchPageInfo = SearchPageInfo()
+        self.checked_at: str | None = None
         self._owns_client: bool = client is None
         merged_headers = {**DEFAULT_HEADERS, **(dict(headers) if headers else {})}
         self._client: httpx2.Client = client or httpx2.Client(
@@ -75,7 +95,7 @@ class AmazonSearchClient:
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         """Close the owned client on context exit."""
         self.close()
         return False
@@ -86,11 +106,7 @@ class AmazonSearchClient:
             self._client.close()
 
     def fetch_html(self, url: str) -> str:
-        """Fetch a page body, using the in-memory cache."""
-        cached = _HTML_CACHE.get(url)
-        if cached is not None:
-            return cached
-
+        """Fetch fresh HTML in this client's cookie session."""
         try:
             response = self._client.get(url)
         except httpx2.HTTPError as exc:
@@ -98,12 +114,82 @@ class AmazonSearchClient:
             raise AmazonClientError(msg) from exc
 
         self._raise_for_bad_response(response)
-        _HTML_CACHE[url] = response.text
         return response.text
+
+    def set_delivery_zip(self, zip_code: str, bootstrap_url: str) -> None:
+        """Set a guest US delivery session through Amazon's location widget."""
+        if self.delivery_zip == zip_code:
+            return
+        initial = LexborHTMLParser(self.fetch_html(bootstrap_url))
+        node = initial.css_first(
+            "#nav-global-location-data-modal-action[data-a-modal]", strict=False
+        )
+        if node is None:
+            raise AmazonClientError("Amazon delivery-location widget was not found")
+        try:
+            config = _load_json(node.attributes.get("data-a-modal") or "")
+        except json.JSONDecodeError as exc:
+            raise AmazonClientError(
+                "Amazon delivery-location widget has invalid configuration"
+            ) from exc
+        if not _is_mapping(config):
+            raise AmazonClientError("Amazon delivery-location widget has invalid configuration")
+        path = config.get("url")
+        headers = config.get("ajaxHeaders")
+        if (
+            not isinstance(path, str)
+            or not path.startswith("/")
+            or path.startswith("//")
+            or not _is_mapping(headers)
+        ):
+            raise AmazonClientError(
+                "Amazon delivery-location widget has invalid endpoint or headers"
+            )
+        token = headers.get("anti-csrftoken-a2z")
+        if not isinstance(token, str):
+            raise AmazonClientError("Amazon delivery-location widget is missing its CSRF token")
+        try:
+            modal = self._client.get(self.base_url + path, headers={"anti-csrftoken-a2z": token})
+            self._raise_for_bad_response(modal)
+            match = re.search(r'CSRF_TOKEN\s*:\s*"([^"]+)"', modal.text)
+            if match is None:
+                raise AmazonClientError("Amazon delivery-location modal is missing its CSRF token")
+            response = self._client.post(
+                self.base_url + "/portal-migration/hz/glow/address-change?actionSource=glow",
+                headers={
+                    "anti-csrftoken-a2z": match.group(1),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                json={
+                    "locationType": "LOCATION_INPUT",
+                    "zipCode": zip_code,
+                    "deviceType": "web",
+                    "storeContext": "generic",
+                    "pageType": "Search",
+                    "actionSource": "glow",
+                },
+            )
+            self._raise_for_bad_response(response)
+            updated = _load_json(response.text)
+        except (httpx2.HTTPError, json.JSONDecodeError) as exc:
+            raise AmazonClientError("Amazon delivery-location request failed") from exc
+        if not _is_mapping(updated) or updated.get("isAddressUpdated") != 1:
+            raise AmazonClientError(f"Amazon rejected delivery ZIP {zip_code}")
+        self.delivery_zip = zip_code
 
     def fetch_search_page(self, query: SearchQuery) -> str:
         """Fetch the search-results page for a query."""
         url = build_search_url(query, base_url=self.base_url)
+        if query.zip_code:
+            self.set_delivery_zip(query.zip_code, url)
+        if query.deals:
+            key = query.keywords
+            if key not in self._deal_filters:
+                self._deal_filters[key] = discover_deal_filter(
+                    self.fetch_html(url), base_url=self.base_url
+                )
+            term, _label = self._deal_filters[key]
+            url = f"{self.base_url}/s?{urlencode({**query.to_params(), 'rh': term})}"
         return self.fetch_html(url)
 
     def fetch_product_page(self, url: str) -> str:
@@ -113,7 +199,26 @@ class AmazonSearchClient:
     def search(self, query: SearchQuery) -> list[SearchResult]:
         """Search one page and parse the results."""
         html = self.fetch_search_page(query)
-        return parse_search_results(html, base_url=self.base_url)
+        results, self.page_info = parse_search_page(
+            html, base_url=self.base_url, require_deals=query.deals
+        )
+        if (
+            results
+            and query.deals
+            and self.page_info.deal_refinement != self._deal_filters[query.keywords][1]
+        ):
+            raise AmazonClientError(
+                "Amazon applied a different deal filter than the discovered one"
+            )
+        self.checked_at = datetime.now(UTC).isoformat()
+        if query.zip_code and not re.search(
+            rf"\b{query.zip_code}\b", self.page_info.delivery_location or ""
+        ):
+            location = self.page_info.delivery_location or "location missing"
+            raise AmazonClientError(
+                f"Amazon did not confirm delivery ZIP {query.zip_code}: {location}"
+            )
+        return results
 
     def search_pages(self, query: SearchQuery, *, pages: int = 1) -> list[SearchResult]:
         """Search multiple pages and deduplicate by ASIN."""
@@ -128,8 +233,15 @@ class AmazonSearchClient:
                 page=page_number,
                 amazon_sort=query.amazon_sort,
                 zip_code=query.zip_code,
+                deals=query.deals,
             )
-            for result in self.search(page_query):
+            previous_info = self.page_info
+            page_results = self.search(page_query)
+            if not page_results:
+                if deduped:
+                    self.page_info = previous_info
+                break
+            for result in page_results:
                 _ = deduped.setdefault(result.asin, result)
         return list(deduped.values())
 

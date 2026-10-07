@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pytest
 
-    from amz_live.models import SearchResult
 
 from urllib.parse import parse_qs, urlparse
 
 from amz_live.client import AmazonSearchClient
+from amz_live.models import SearchResult
 from amz_live.query import SearchQuery, build_search_url
 
 
@@ -35,7 +35,7 @@ def test_search_pages_preserves_zip_code_across_pages(monkeypatch: pytest.Monkey
 
     def fake_search(_self: AmazonSearchClient, query: SearchQuery) -> list[SearchResult]:
         seen_zip_codes.append(query.zip_code)
-        return []
+        return [SearchResult(asin="ASIN", title="Cable", url="https://www.amazon.com/dp/ASIN")]
 
     monkeypatch.setattr(AmazonSearchClient, "search", fake_search)
 
@@ -45,22 +45,21 @@ def test_search_pages_preserves_zip_code_across_pages(monkeypatch: pytest.Monkey
     assert seen_zip_codes == ["33101", "33101"]
 
 
-def test_search_query_to_params_adds_zip_filter_when_present() -> None:
+def test_search_query_to_params_keeps_zip_in_session_not_in_url() -> None:
     query = SearchQuery("usb c pd charger", page=1, zip_code="33101")
 
     assert query.to_params() == {
         "k": "usb c pd charger",
         "page": "1",
-        "rh": "p_47:33101",
     }
+    assert query.zip_code == "33101"
 
 
-def test_build_search_url_encodes_zip_filter_when_present() -> None:
-    url = build_search_url(SearchQuery("usb c pd charger", zip_code="33101"))
+def test_build_search_url_leaves_deal_discovery_to_live_client() -> None:
+    url = build_search_url(SearchQuery("usb c pd charger", zip_code="33101", deals=True))
     parsed = urlparse(url)
 
     assert parse_qs(parsed.query) == {
         "k": ["usb c pd charger"],
         "page": ["1"],
-        "rh": ["p_47:33101"],
     }

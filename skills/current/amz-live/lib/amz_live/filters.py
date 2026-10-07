@@ -24,6 +24,8 @@ def filter_results(
     if limit is not None and limit < 0:
         msg = "limit must be >= 0"
         raise ValueError(msg)
+    if limit == 0:
+        return []
     min_rating_value = _coerce_decimal(min_rating)
     max_price_value = _coerce_decimal(max_price)
     badge_value = _normalize_term(badge)

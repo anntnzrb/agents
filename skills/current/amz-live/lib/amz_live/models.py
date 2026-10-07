@@ -1,5 +1,6 @@
 """Typed domain models for Amazon live search."""
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
@@ -17,6 +18,14 @@ class AmazonAntiBotError(AmazonLiveSearchError):
 
 class AmazonClientError(AmazonLiveSearchError):
     """Raised for network and non-bot HTTP failures."""
+
+
+@dataclass(frozen=True, slots=True)
+class SearchPageInfo:
+    """Observed search-page context, not inferred account state."""
+
+    delivery_location: str | None = None
+    deal_refinement: str | None = None
 
 
 class ProductDetailPayload(TypedDict):
@@ -40,6 +49,12 @@ class SearchResultPayload(TypedDict):
     rating: float | None
     review_count: int | None
     badges: list[str]
+    reference_price: float | None
+    reference_price_label: str | None
+    discount_percent: float | None
+    prime_exclusive: bool | None
+    coupon_text: str | None
+    sponsored: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +65,7 @@ class SearchQuery:
     page: int = 1
     amazon_sort: str | None = None
     zip_code: str | None = None
+    deals: bool = False
 
     def __post_init__(self) -> None:
         """Validate and normalize query fields."""
@@ -63,6 +79,8 @@ class SearchQuery:
         if self.page < 1:
             msg = "page must be >= 1"
             raise ValueError(msg)
+        if zip_code is not None and re.fullmatch(r"[0-9]{5}", zip_code) is None:
+            raise ValueError("zip_code must be a five-digit US ZIP code")
 
         object.__setattr__(self, "keywords", keywords)
         object.__setattr__(self, "amazon_sort", amazon_sort)
@@ -73,8 +91,6 @@ class SearchQuery:
         params = {"k": self.keywords, "page": str(self.page)}
         if self.amazon_sort:
             params["s"] = self.amazon_sort
-        if self.zip_code:
-            params["rh"] = f"p_47:{self.zip_code}"
         return params
 
 
@@ -112,6 +128,12 @@ class SearchResult:
     rating: Decimal | None = None
     review_count: int | None = None
     badges: tuple[str, ...] = field(default_factory=tuple)
+    reference_price: Decimal | None = None
+    reference_price_label: str | None = None
+    discount_percent: Decimal | None = None
+    prime_exclusive: bool | None = None
+    coupon_text: str | None = None
+    sponsored: bool = False
 
     def to_dict(self) -> SearchResultPayload:
         """Serialize to a plain payload dict."""
@@ -123,4 +145,14 @@ class SearchResult:
             "rating": float(self.rating) if self.rating is not None else None,
             "review_count": self.review_count,
             "badges": list(self.badges),
+            "reference_price": float(self.reference_price)
+            if self.reference_price is not None
+            else None,
+            "reference_price_label": self.reference_price_label,
+            "discount_percent": float(self.discount_percent)
+            if self.discount_percent is not None
+            else None,
+            "prime_exclusive": self.prime_exclusive,
+            "coupon_text": self.coupon_text,
+            "sponsored": self.sponsored,
         }

@@ -148,6 +148,8 @@ def test_cli_emits_llm_json_envelope(
         "pages": 1,
         "amazon_sort": None,
         "zip_code": None,
+        "deals": False,
+        "deal_refinement": None,
     }
     assert payload["filters"] == {
         "min_rating": 4.5,
@@ -158,7 +160,11 @@ def test_cli_emits_llm_json_envelope(
         "exclude": [],
         "limit": 2,
     }
-    assert payload["summary"] == {"raw_result_count": 3, "returned_result_count": 2}
+    assert payload["summary"] == {
+        "raw_result_count": 3,
+        "returned_result_count": 2,
+        "delivery_location": None,
+    }
     assert [item["asin"] for item in payload["results"]] == ["B0CG1LGWR6", "B07CWC39TL"]
 
 
