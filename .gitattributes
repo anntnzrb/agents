@@ -3,6 +3,7 @@
 # Verbatim fixtures, data, code, and upstream bytes: git diff --check and the
 # skill lint (skill-creator `cli.py lint`) skip whitespace rules here.
 skills/current/amz-live/tests/fixtures/** -whitespace
+skills/current/ebay-live/tests/fixtures/** -whitespace
 skills/current/mneme/evals/fixtures/** -whitespace
 skills/current/nix-clan-2605/references/NOTICE.md -whitespace
 skills/current/nix-clan-2605/references/embeds/** -whitespace
