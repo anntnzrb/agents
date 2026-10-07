@@ -12,7 +12,7 @@ _KEYWORDS = st.text(
     max_size=60,
 ).filter(lambda value: value.strip() != "")
 _OPTIONAL_SORT = st.one_of(st.none(), _KEYWORDS)
-_OPTIONAL_ZIP = st.one_of(st.none(), st.from_regex(r"\d{5}", fullmatch=True))
+_OPTIONAL_ZIP = st.one_of(st.none(), st.from_regex(r"[0-9]{5}", fullmatch=True))
 
 
 @given(
@@ -43,10 +43,8 @@ def test_search_query_to_params_normalizes_boundary_inputs(
     else:
         assert params["s"] == amazon_sort.strip()
 
-    if zip_code is None:
-        assert "rh" not in params
-    else:
-        assert params["rh"] == f"p_47:{zip_code}"
+    assert "rh" not in params
+    assert query.zip_code == (zip_code.strip() if zip_code is not None else None)
 
 
 @given(
@@ -70,7 +68,5 @@ def test_build_search_url_round_trips_query_params(
     assert params["k"] == [query.keywords]
     assert params["page"] == [str(page)]
 
-    if zip_code is None:
-        assert "rh" not in params
-    else:
-        assert params["rh"] == [f"p_47:{zip_code}"]
+    assert "rh" not in params
+    assert query.zip_code == zip_code

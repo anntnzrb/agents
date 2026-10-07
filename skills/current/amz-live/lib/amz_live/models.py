@@ -1,5 +1,6 @@
 """Typed domain models for Amazon live search."""
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypedDict
 
@@ -17,6 +18,14 @@ class AmazonAntiBotError(AmazonLiveSearchError):
 
 class AmazonClientError(AmazonLiveSearchError):
     """Raised for network and non-bot HTTP failures."""
+
+
+@dataclass(frozen=True, slots=True)
+class SearchPageInfo:
+    """Observed search-page context, not inferred account state."""
+
+    delivery_location: str | None = None
+    deal_refinement: str | None = None
 
 
 class ProductDetailPayload(TypedDict):
@@ -63,6 +72,8 @@ class SearchQuery:
         if self.page < 1:
             msg = "page must be >= 1"
             raise ValueError(msg)
+        if zip_code is not None and re.fullmatch(r"[0-9]{5}", zip_code) is None:
+            raise ValueError("zip_code must be a five-digit US ZIP code")
 
         object.__setattr__(self, "keywords", keywords)
         object.__setattr__(self, "amazon_sort", amazon_sort)
@@ -73,8 +84,6 @@ class SearchQuery:
         params = {"k": self.keywords, "page": str(self.page)}
         if self.amazon_sort:
             params["s"] = self.amazon_sort
-        if self.zip_code:
-            params["rh"] = f"p_47:{self.zip_code}"
         return params
 
 
