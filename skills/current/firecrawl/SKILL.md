@@ -60,4 +60,5 @@ Match the intent to a command listed by live `--help`:
 - Let the CLI wait on async jobs with its own wait options; do not write polling loops.
 - When live page state matters, disable cached snapshots with the CLI's max-age option.
 - Cap PDF parsing with the scrape page-limit option; each parsed page costs a credit.
+- When an `agent` run stops on a pending approval, ask the user before approving the paid provider call. Accept a provider's data terms only after the user explicitly agrees to the terms shown by the CLI. Approving a call does not accept terms.
 - The developer command takes a free-form query. For strict filters (repositories, artifact types, doc sources, language, stars), call the REST developer search endpoint; read its current fields in the Firecrawl API reference before building the request.
