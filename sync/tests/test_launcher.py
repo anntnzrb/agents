@@ -393,8 +393,10 @@ def test_npm_launcher_separates_cache_versions_when_a_harness_changes_package(
 
 def test_harness_launch_plans_exec_of_cached_binary_with_arguments(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Harness launch plans an exec of the prepared binary with forwarded args."""
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     home = str(tmp_path)
     (tmp_path / "src" / "agents" / "harnesses" / "codex").mkdir(
         parents=True, exist_ok=True

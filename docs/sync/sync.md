@@ -25,7 +25,7 @@ A manual sync runs these stages in order:
 5. Record managed harness entries.
 6. Run package-bootstrap and extension-dependency hooks.
 
-The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes, allows up to 30 seconds for process-group cleanup and stage `finally` blocks, then exits with status `124` (forced termination cannot promise Python-level cleanup). Pre-launch sync is similarly bounded and falls back to the cached package with a warning on expiry; the launched harness session is never killed by an expired sync timer.
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes, allows up to 30 seconds for process-group cleanup and stage `finally` blocks, then exits with status `124` (forced termination cannot promise Python-level cleanup). Pre-launch sync runs only without a valid package cache and uses the same 15-minute budget; a timeout warns and continues to package preparation. The launched harness session is never killed by an expired sync timer.
 
 ## File reconciliation
 
@@ -44,7 +44,7 @@ Recorded ownership limits cleanup to safe top-level names. Sync preserves unmana
 
 Most missing source files and directories produce diagnostics but do not fail the run. Invalid committed configuration and hook failures are fatal.
 
-A launch-time sync treats reconciliation failures as warnings so a cached harness package can still start. A first launch without a valid package cache fails.
+Cold-launch sync treats reconciliation failures as warnings and continues to package preparation. A first launch without a valid package cache fails if preparation cannot install the package.
 
 ## Shared settings and gateway endpoints
 
@@ -114,6 +114,6 @@ A host stuck behind `origin/main` repeats the same warning on every run. Commit 
 
 ## Tool launchers
 
-`TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and a best-effort sync before launch. Tools have no harness home, instruction file, or skills.
+`TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and immediate cached launch with best-effort sync only on a cold launch. Tools have no harness home, instruction file, or skills.
 
 Sync copies `tools/mcporter/mcporter.jsonc` to `~/.mcporter/mcporter.json` and `tools/summarize/config.json` to `~/.summarize/config.json`, replacing the endpoint placeholders in the second file. `_config_jobs` in `sync/src/sync/core/plan.py` declares these jobs.

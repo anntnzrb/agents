@@ -723,7 +723,7 @@ def test_integration_cached_launch_fallback_when_offline(
         env=OFFLINE_NPM_ENV,
     )
     assert launch_result.exit_code == 0, launch_result.stderr or launch_result.stdout
-    assert "using cached codex@0.1.0" in launch_result.stderr
+    assert "using cached" not in launch_result.stderr
     assert "mock-codex-0.1.0:mode=cached args=--hello world" in launch_result.stdout
 
 

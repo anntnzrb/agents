@@ -37,9 +37,9 @@ This is the isolated sync application.
 
 - A manual sync creates or reconciles wrappers before returning.
 - Sync installs its runtime under `~/.local/share/agents/sync-releases/<releaseId>/` with a `sync-current` symlink to the latest release.
-- Generated wrappers call `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <harness> -- ...`; launch performs a best-effort sync when the SSOT is available, prepares the cached npm package or static release, then replaces itself with the harness through `execve`, so the harness keeps the terminal and receives signals directly.
+- Generated wrappers call `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <harness> -- ...`; launch executes a valid cached npm package or static release immediately without reconciliation, network requests, or cache locks; only a cold launch performs best-effort sync and blocking package preparation before replacing itself with the harness through `execve`, so the harness keeps the terminal and receives signals directly.
 - Runtime consumers must read installed state under `~/.local/share/agents/`, not files under the SSOT.
-- Launch-time sync failures are warnings; cached harness launch remains available.
+- Cold-launch sync failures are warnings; package preparation still runs. Cached launches skip sync, so managed SSOT edits require manual sync or a scheduled update reconciliation.
 - Wrapper ownership is marker- and state-based. Stale generated wrappers are removed only when still owned; unmanaged conflicts are preserved.
 - npm launch cache layout is `~/.cache/npm-tools/<tool>/packages/<package-key>/`, with version installs under `versions/<version>/` and package-local `current`/`previous` links.
 

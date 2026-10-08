@@ -334,16 +334,21 @@ async def launch_npm_package(
     runtime: LauncherRuntime | None = None,
 ) -> ExecPlan:
     """Prepare an npm tool package and plan its exec with forwarded arguments."""
-    prepared = await prepare_npm_package(
-        spec,
-        PreparePackageOptions(
-            home=sync_env.home,
-            timeout_ms=sync_env.install_timeout_ms,
-            runtime=runtime,
-        ),
-    )
+    cached = current_cached_package(npm_cache_layout(sync_env.home, spec), spec)
+    if cached is None:
+        prepared = await prepare_npm_package(
+            spec,
+            PreparePackageOptions(
+                home=sync_env.home,
+                timeout_ms=sync_env.install_timeout_ms,
+                runtime=runtime,
+            ),
+        )
+        executable = prepared.current_bin
+    else:
+        _, executable = cached
     return ExecPlan(
-        executable=prepared.current_bin,
+        executable=executable,
         args=tuple(args),
         env=build_process_env(spec.env),
     )
@@ -490,10 +495,11 @@ def _sync_release_man_pages(
             warn(f"man page conflict at {link_path}: {panic_message(error)}")
 
 
-def _current_prepared_release(
+def current_cached_release(
     release: StaticRelease,
     home: str,
 ) -> PreparedStaticRelease | None:
+    """Return the current release only when its executable is healthy and contained."""
     versions_dir = Path(home).joinpath(
         *release.install_segments, RELEASE_VERSIONS_SUBDIR
     )
@@ -526,7 +532,7 @@ async def prepare_static_release(
     try:
         return await _prepare_static_release_locked(release, home, timeout_ms, runtime)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
-        cached = await asyncio.to_thread(_current_prepared_release, release, home)
+        cached = await asyncio.to_thread(current_cached_release, release, home)
         if cached is None:
             raise
         detail = panic_message(error)
@@ -593,9 +599,11 @@ async def launch_static_release(
     runtime: ReleaseRuntime | None = None,
 ) -> ExecPlan:
     """Prepare a static release harness and plan its exec with forwarded arguments."""
-    prepared = await prepare_static_release(
-        launcher.release, sync_env.home, sync_env.install_timeout_ms, runtime
-    )
+    prepared = current_cached_release(launcher.release, sync_env.home)
+    if prepared is None:
+        prepared = await prepare_static_release(
+            launcher.release, sync_env.home, sync_env.install_timeout_ms, runtime
+        )
     return ExecPlan(
         executable=prepared.executable,
         args=tuple(args),
@@ -622,15 +630,34 @@ async def launch_harness(
             sync_env, launcher, args, merged or None, release_runtime
         )
 
-    spec = NpmPackageSpec(
+    spec = harness_package_spec(harness, merged or None)
+    return await launch_npm_package(sync_env, spec, args, runtime)
+
+
+def harness_package_spec(
+    harness: Harness, env: dict[str, str] | None = None
+) -> NpmPackageSpec:
+    """Resolve the npm specification shared by launch and maintenance."""
+    launcher = harness.launcher
+    if isinstance(launcher, StaticReleaseLauncher):
+        message = "static release has no npm specification"
+        raise TypeError(message)
+    return NpmPackageSpec(
         tool=harness.source_name,
         package=launcher.package,
         bin=launcher.bin,
         dist_tag=launcher.dist_tag,
         smoke_check=launcher.smoke_check,
-        env=merged or None,
+        env=env,
     )
-    return await launch_npm_package(sync_env, spec, args, runtime)
+
+
+def harness_has_cache(home: str, harness: Harness) -> bool:
+    """Check the installed cache without taking locks or contacting the network."""
+    if isinstance(harness.launcher, StaticReleaseLauncher):
+        return current_cached_release(harness.launcher.release, home) is not None
+    spec = harness_package_spec(harness)
+    return current_cached_package(npm_cache_layout(home, spec), spec) is not None
 
 
 async def resolve_version(
@@ -851,13 +878,16 @@ def current_cached_package(
         return None
     if not target:
         return None
-    current_bin = package_bin_path(layout.current_link, spec.bin)
+    # Snapshot the link once: a concurrent promotion must not mix one version's
+    # name with another version's manifest and spuriously force a cold launch.
+    version_root = str(Path(layout.current_link).parent / target)
+    current_bin = package_bin_path(version_root, spec.bin)
     if not is_executable(current_bin):
         return None
     version = Path(target).name
-    if not installed_package_matches(layout.current_link, spec, version):
+    if not installed_package_matches(version_root, spec, version):
         return None
-    return version, current_bin
+    return version, package_bin_path(layout.current_link, spec.bin)
 
 
 def installed_package_matches(
