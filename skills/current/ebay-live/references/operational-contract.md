@@ -32,6 +32,10 @@ Saved HTML can contain older prices.
 An auction amount is a current bid. A ranged amount is a minimum variation price.
 `total_cost` adds that amount to known shipping and excludes taxes and import fees.
 Unknown shipping remains null rather than zero.
+`sponsored` is null: captured obfuscated labels and SVG text occur on every card,
+and raw HTML does not reliably establish their rendered visibility.
+Condition comes from recognized eBay condition labels, excluding store taglines.
+Leading "New Listing" badges are removed from titles.
 A seller's percentage and feedback count describe observed feedback,
 not an independent assessment of the seller.
 
@@ -75,7 +79,7 @@ A total below 40% of that median gets no price credit and a 40-point penalty
 with a likely accessory or part reason. Missing relevant totals give no price
 credit. Partial query coverage also receives a proportional penalty.
 Seller percentage and feedback count, condition, and free shipping add credit.
-Sponsored listings receive a small penalty.
+Unknown sponsorship does not affect scoring.
 Explicit accessory terms such as shell, board, touchpad, or "case only" get a
 40-point penalty unless the query requests them. A bundled case alone does not
 trigger that penalty. Damage terms retain their penalty unless requested.

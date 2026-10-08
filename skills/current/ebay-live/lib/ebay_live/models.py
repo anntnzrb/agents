@@ -92,7 +92,7 @@ class Listing:
     seller_feedback_pct: float | None = None
     seller_feedback_count: int | None = None
     location: str | None = None
-    sponsored: bool = False
+    sponsored: bool | None = None
 
     @property
     def total_cost(self) -> float | None:

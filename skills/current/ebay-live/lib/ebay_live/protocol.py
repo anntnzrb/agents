@@ -317,7 +317,7 @@ def get_schema_document() -> dict[str, object]:
         },
         "bid_count": nullable_int,
         "seller_feedback_count": nullable_int,
-        "sponsored": boolean,
+        "sponsored": {"type": ["boolean", "null"]},
         "query_match": {"type": "number", "minimum": 0, "maximum": 1},
         "score": {"type": "number", "minimum": 0, "maximum": 100},
         "reasons": strings,

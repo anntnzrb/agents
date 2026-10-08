@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_captured_cards() -> None:
-    """Observe IDs, auction, delivery, feedback, and reversed sponsored text."""
+    """Observe IDs, auction, delivery, feedback, and unknown sponsorship."""
     results = parse_search_results(
         (FIXTURES / "search.html").read_text(encoding="utf-8")
     )
@@ -38,7 +38,7 @@ def test_captured_cards() -> None:
     assert first.seller_name == "crislomcam"
     assert first.seller_feedback_pct == 100
     assert first.seller_feedback_count == 132
-    assert first.sponsored is True
+    assert first.sponsored is None
     assert second.seller_feedback_count == 6500
     assert accessory.shipping_cost == 0
     assert accessory.buying_format == ("buy_it_now",)
@@ -60,7 +60,7 @@ def test_range_and_unknown_shipping() -> None:
         result.shipping_cost,
         result.total_cost,
     ) == (90, 120, None, None)
-    assert result.sponsored is False
+    assert result.sponsored is None
     with pytest.raises(EbayBlockedError):
         _ = parse_search_results("<html>Loading</html>")
     assert parse_search_results("<h1>No exact matches found</h1>") == []
@@ -272,3 +272,53 @@ def test_captured_shell_above_outlier_cutoff() -> None:
     console = next(r for r in listings if r.title == "Valve OLED Steam Deck 512 GB")
     ranked = rank_results([shell, console], "steam deck oled", buy_now=False)
     assert [r["item_id"] for r in ranked] == [console.item_id, shell.item_id]
+
+
+def test_captured_sponsored_is_unknown() -> None:
+    """Obfuscated labels in every captured card do not prove sponsorship."""
+    listings = parse_search_results(
+        (FIXTURES / "search.html").read_text(encoding="utf-8")
+    )
+    assert all(r.sponsored is None for r in listings)
+    ranked = rank_results(listings, "sony", buy_now=False)
+    assert all("sponsored listing" not in str(r["reasons"]) for r in ranked)
+
+
+def test_store_subtitle_and_new_listing_badge() -> None:
+    """A minimally edited real card separates badges and store copy from evidence."""
+    listing = parse_search_results(
+        (FIXTURES / "store-badge.html").read_text(encoding="utf-8")
+    )[0]
+    assert listing.condition == "Brand New"
+    assert listing.title == (
+        "Sony WH-1000XM5 Wireless Noise Canceling Headphones - Black, needs repair"
+    )
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        "New (Other)",
+        "Open Box",
+        "Pre-Owned",
+        "Used",
+        "Excellent - Refurbished",
+        "Certified - Refurbished",
+        "Seller Refurbished",
+        "For parts or not working",
+        None,
+    ],
+)
+def test_known_conditions_after_store_copy(condition: str | None) -> None:
+    """Known condition labels survive a preceding tagline; absent labels stay null."""
+    html = (FIXTURES / "store-badge.html").read_text(encoding="utf-8")
+    listing = parse_search_results(html.replace("Brand New", condition or "Sale"))[0]
+    assert listing.condition == condition
+
+
+def test_new_listing_badge_is_not_title_text() -> None:
+    """The leading badge on a minimally edited captured title is stripped."""
+    html = (FIXTURES / "store-badge.html").read_text(encoding="utf-8")
+    listing = parse_search_results(html)[0]
+    assert listing.title.startswith("Sony WH-1000XM5")
+    assert "New Listing" not in listing.title

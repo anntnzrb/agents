@@ -89,7 +89,8 @@ Missing shipping fails a free-shipping filter.
 `--schema` publishes the result schema and RPC request fields.
 
 A listing includes identity, price, shipping, condition, buying formats,
-auction state, seller feedback, location, and a sponsored marker.
+auction state, seller feedback, location, and `sponsored` (currently null).
+Raw markup does not reliably establish sponsored-label visibility.
 `query_match` is the fraction of normalized query tokens present in the title.
 Unknown observations remain null.
 `total_cost` is present only when price and shipping are both known.

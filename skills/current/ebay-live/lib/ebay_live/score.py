@@ -78,9 +78,6 @@ def rank_results(  # noqa: C901 - independent ranking factors.
         if result.shipping_cost == 0:
             value += 5
             reasons.append("free shipping")
-        if result.sponsored:
-            value -= 2
-            reasons.append("sponsored listing")
         title = result.title.casefold()
         if match < 1:
             value -= 30 * (1 - match)

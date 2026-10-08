@@ -12,6 +12,16 @@ if TYPE_CHECKING:
     from selectolax.lexbor import LexborNode
 
 MONEY = re.compile(r"(?:US\s*)?\$\s*([\d,]+(?:\.\d{1,2})?)")
+CONDITION = re.compile(
+    r"""
+    Brand[ ]New | New(?:[ ]\(Other\)(?::?[ ]see[ ]details)?)? |
+    Open[ ]Box | Pre-Owned | Used |
+    (?:Certified|Excellent|Very[ ]Good|Good|Seller|Manufacturer)
+    (?:[ ]-[ ]|[ ])Refurbished |
+    Refurbished | For[ ]parts[ ]or[ ]not[ ]working | Parts[ ]Only
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 SELLER = re.compile(r"(.+?)\s+([\d.]+)%\s+positive\s*\(([\d,.]+[KMkm]?)\)")
 
 
@@ -54,6 +64,7 @@ def parse_card(card: LexborNode) -> Listing | None:
     ):
         return None
     title = title.replace("Opens in a new window or tab", "").strip()
+    title = re.sub(r"^New Listing\s+", "", title, flags=re.IGNORECASE)
     rows = [
         n.text(separator=" ", strip=True)
         for n in card.css(".s-card__attribute-row, .s-item__details")
@@ -92,7 +103,16 @@ def parse_card(card: LexborNode) -> Listing | None:
         (r.removeprefix("Located in ") for r in rows if r.startswith("Located in ")),
         None,
     )
-    footer = text(card, ".s-card__footer .s-card__sep, .s-item__sep") or ""
+    condition = next(
+        (
+            value
+            for node in card.css(".s-card__subtitle, .SECONDARY_INFO")
+            if CONDITION.fullmatch(
+                value := " ".join(node.text(separator=" ", strip=True).split())
+            )
+        ),
+        None,
+    )
     return Listing(
         item_id=match[1],
         title=title,
@@ -101,7 +121,7 @@ def parse_card(card: LexborNode) -> Listing | None:
         price_max=price_max,
         currency="USD" if prices else None,
         shipping_cost=shipping_cost,
-        condition=text(card, ".s-card__subtitle, .SECONDARY_INFO"),
+        condition=condition,
         buying_format=tuple(formats),
         bid_count=int(bids[1].replace(",", "")) if bids else None,
         time_left=text(card, ".s-card__time-left, .s-item__time-left"),
@@ -110,7 +130,6 @@ def parse_card(card: LexborNode) -> Listing | None:
         seller_feedback_pct=float(seller[2]) if seller else None,
         seller_feedback_count=count(seller[3]) if seller else None,
         location=location,
-        sponsored=bool(re.search(r"sponsored|derosnops", footer, re.IGNORECASE)),
     )
 
 
