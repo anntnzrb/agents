@@ -5,6 +5,7 @@ import base64
 import configparser
 import contextlib
 import email.message
+import gzip
 import hashlib
 import io
 import json
@@ -755,6 +756,97 @@ class TestDbReplicaMaintenance:
             pytest.raises(odooctl.CliError, match="already exists"),
         ):
             _ = odooctl.cmd_db_restore(args)
+
+    @pytest.mark.parametrize("compressed", [True, False])
+    @pytest.mark.parametrize(
+        "acl",
+        [
+            b"GRANT SELECT ON TABLE public.sample TO missing_role;\n",
+            b'GRANT SELECT ON TABLE public."sample;\ntable" TO "missing"";\nrole";\n',
+        ],
+    )
+    def test_cmd_db_restore_skips_acl_and_regenerates_uuid(
+        self, tmp_path: Path, compressed: bool, acl: bytes
+    ) -> None:
+        """Restore COPY data unchanged, omit production ACLs, and reset identity."""
+        ctx = make_workspace_context(tmp_path)
+        dump = tmp_path / ("replica.sql.gz" if compressed else "replica.sql")
+        data = (
+            b"CREATE TABLE public.sample (value text);\n"
+            b"COPY public.sample (value) FROM stdin;\n"
+            b"GRANT this is a data row\n"
+            b"REVOKE this is also data\n"
+            b"ALTER DEFAULT PRIVILEGES this is data too\n"
+            b"\\.\n"
+        )
+        tail = b"SELECT 1;\n"
+        sql = (
+            data
+            + acl
+            + b"REVOKE ALL ON TABLE public.sample FROM missing_role;\n"
+            + b"ALTER DEFAULT PRIVILEGES FOR ROLE owner "
+            + b"GRANT SELECT ON TABLES TO missing_role;\n"
+            + tail
+        )
+        _ = dump.write_bytes(gzip.compress(sql) if compressed else sql)
+        args = argparse.Namespace(
+            dump=str(dump), target="work", force=False, json=False
+        )
+        sent = bytearray()
+        proc = MagicMock(
+            stdin=MagicMock(write=MagicMock(side_effect=sent.extend)),
+            wait=MagicMock(return_value=0),
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_exec_sql_json", return_value=[]),
+            patch.object(odooctl, "_exec_sql") as exec_sql,
+            patch(
+                "subprocess.Popen",
+                return_value=MagicMock(__enter__=MagicMock(return_value=proc)),
+            ) as popen,
+        ):
+            assert odooctl.cmd_db_restore(args) == 0
+        assert bytes(sent) == data + tail
+        assert "ON_ERROR_STOP=1" in to_str_list(mock_call_args(popen.call_args)[0])
+        assert mock_call_args(exec_sql.call_args)[0] == (
+            "DELETE FROM ir_config_parameter WHERE key = 'database.uuid';"
+        )
+        assert mock_call_kwargs(exec_sql.call_args)["db"] == "work"
+
+    def test_cmd_db_restore_keeps_psql_errors_fatal(self, tmp_path: Path) -> None:
+        """A real restore error must fail before resetting the database UUID."""
+        ctx = make_workspace_context(tmp_path)
+        dump = tmp_path / "broken.sql.gz"
+        sql = b"CREATE TABLE broken;\n"
+        _ = dump.write_bytes(gzip.compress(sql))
+        args = argparse.Namespace(
+            dump=str(dump), target="work", force=False, json=False
+        )
+        sent = bytearray()
+        proc = MagicMock(
+            stdin=MagicMock(write=MagicMock(side_effect=sent.extend)),
+            wait=MagicMock(return_value=1),
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_exec_sql_json", return_value=[]),
+            patch.object(odooctl, "_exec_sql") as exec_sql,
+            patch(
+                "subprocess.Popen",
+                return_value=MagicMock(__enter__=MagicMock(return_value=proc)),
+            ),
+            pytest.raises(odooctl.CliError, match="psql restore failed"),
+        ):
+            _ = odooctl.cmd_db_restore(args)
+        assert bytes(sent) == sql
+        assert mock_call_args(exec_sql.call_args)[0] == (
+            f'CREATE DATABASE "work" OWNER "{odooctl.DEFAULT_DB_USER}";'
+        )
 
     def test_cmd_db_restore_rejects_unknown_dump_format(self, tmp_path: Path) -> None:
         """Verify Odoo backup archives are rejected with actionable guidance."""
