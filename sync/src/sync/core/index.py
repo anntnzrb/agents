@@ -27,8 +27,11 @@ from sync.core.jobs import (
 )
 from sync.core.launcher import (
     NpmPackageSpec,
+    current_cached_package,
+    harness_has_cache,
     launch_harness,
     launch_npm_package,
+    npm_cache_layout,
 )
 from sync.core.managed_state import (
     clean_managed_entries,
@@ -378,8 +381,12 @@ def _resolve_launch_target(
         (c for c in sync_env.harnesses if c.source_name == source_name),
         None,
     )
-    if harness is None and not ssot_available:
-        harness = supported_harness(sync_env.home, source_name, sync_env.platform)
+    if harness is None:
+        installed = supported_harness(sync_env.home, source_name, sync_env.platform)
+        if installed is not None and (
+            not ssot_available or harness_has_cache(sync_env.home, installed)
+        ):
+            harness = installed
     tool = None if harness is not None else tool_launcher(source_name)
     return harness, tool
 
@@ -403,16 +410,8 @@ async def _async_launch_main(
         err(f"unsupported launch target: {source_name}")
         return EXIT_UNSUPPORTED
 
-    if ssot_available:
-        await _sync_before_launch(sync_env)
-    else:
-        message = (
-            "agent configuration source is unavailable; "
-            "continuing with installed runtime"
-        )
-        warn(message)
-
     try:
+        spec = None
         if tool is not None:
             spec = NpmPackageSpec(
                 tool=tool.id,
@@ -421,6 +420,22 @@ async def _async_launch_main(
                 dist_tag=tool.dist_tag,
                 smoke_check=tool.smoke_check,
             )
+        has_cache = (
+            current_cached_package(npm_cache_layout(sync_env.home, spec), spec)
+            is not None
+            if spec is not None
+            else harness is not None and harness_has_cache(sync_env.home, harness)
+        )
+        if not has_cache:
+            if ssot_available:
+                await _sync_before_launch(sync_env)
+            else:
+                message = (
+                    "agent configuration source is unavailable; "
+                    "continuing with installed runtime"
+                )
+                warn(message)
+        if spec is not None:
             return await launch_npm_package(sync_env, spec, args)
         if harness is not None:
             return await launch_harness(sync_env, harness, args)

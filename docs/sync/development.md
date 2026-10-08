@@ -229,10 +229,10 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 - If another sync process currently holds the lock, incoming runs exit cleanly with code `0` and write `another sync is already running; skipping` to stderr.
 - When the lock holder exits or terminates, the lock is immediately released and available for subsequent processes.
 
-### 7. Cached launch fallback and offline resilience
+### 7. Cached launch and offline resilience
 
-- When invoking `sync launch <tool> [-- <args...>]`, the launcher attempts to resolve and stage packages from the registry.
-- If the remote package registry is unreachable or offline, the launcher falls back to the locally cached package (`~/.cache/npm-tools/<tool>/packages/<key>/current`), emits a diagnostic warning to stderr (`using cached <tool>@<version>`), and executes the cached executable with all forwarded arguments.
+- `sync launch <tool> [-- <args...>]` executes a valid locally cached package immediately, forwarding all arguments without reconciliation, network requests, or waiting on package locks.
+- Without a valid cache, launch reconciles and installs synchronously. `sync job refresh-packages` performs later updates independently; see [Launch behavior](sync.md#launch-behavior).
 
 ### 8. Wrapper runtime isolation and diagnostic hints
 
