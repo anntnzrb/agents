@@ -95,7 +95,7 @@ class SearchRequest:
     transport: Transport = "auto"
     html_path: str | None = None
     details: bool = False
-    detail_limit: int | None = None
+    detail_limit: int = 2
     scoring: bool = False
 
     @classmethod
@@ -118,6 +118,7 @@ class SearchRequest:
         html_path = read_string(data, "htmlPath")
         if html_path and pages != 1:
             raise ValueError("--html accepts exactly one page")
+        detail_limit = read_int(data, "detailLimit", 2)
         return cls(
             query=SearchQuery(
                 keywords,
@@ -143,7 +144,7 @@ class SearchRequest:
             transport=transport,
             html_path=html_path,
             details=read_bool(data, "details"),
-            detail_limit=read_int(data, "detailLimit"),
+            detail_limit=2 if detail_limit is None else detail_limit,
             scoring=read_bool(data, "scoring"),
         )
 
@@ -410,7 +411,7 @@ def get_schema_document() -> dict[str, object]:
             "enrichment": object_schema(
                 {
                     "requested": boolean,
-                    "detail_limit": nullable_int,
+                    "detail_limit": {"type": "integer", "minimum": 0, "default": 2},
                     "attempted": integer,
                     "succeeded": integer,
                 }

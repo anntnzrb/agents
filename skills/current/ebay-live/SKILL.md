@@ -104,6 +104,7 @@ The score is a shortlist heuristic, not a seller guarantee or market valuation.
 Read the reasons before presenting the first result as the best deal.
 
 `--details` adds item-page evidence under each enriched result's `details` key.
+It fetches at most two items by default; override with `--detail-limit`.
 The search snapshot stays intact, including the search price.
 An item fetch failure retains the result and adds a warning.
 The `enrichment` object reports attempts and successful detail parses.

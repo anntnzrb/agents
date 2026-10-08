@@ -1,6 +1,8 @@
 """Shared-cookie direct transport with one Firecrawl fallback per blocked page."""
 
 import os
+import re
+import time
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Self
@@ -8,6 +10,9 @@ from urllib.parse import urlparse
 
 from curl_cffi import requests
 from firecrawl import Firecrawl  # pyright: ignore[reportMissingTypeStubs]
+from firecrawl.v2.utils.error_handler import (  # pyright: ignore[reportMissingTypeStubs]
+    RateLimitError,
+)
 from selectolax.lexbor import LexborHTMLParser
 
 from .models import EbayBlockedError, EbayLiveError
@@ -119,21 +124,38 @@ class EbayClient:
             timeout=20,
             max_retries=0,
         )
-        try:
-            document = app.scrape(
-                url,
-                formats=["rawHtml"],
-                only_main_content=False,
-                timeout=20000,
-                max_age=0,
-                store_in_cache=False,
-                auto_resume=False,
-            )
-        except Exception as exc:
-            self.log.append(
-                {"url": url, "final_url": url, "transport": "firecrawl", "ok": False}
-            )
-            raise EbayLiveError(f"Firecrawl request failed: {exc}") from exc
+        retried = False
+        while True:
+            try:
+                document = app.scrape(
+                    url,
+                    formats=["rawHtml"],
+                    only_main_content=False,
+                    timeout=20000,
+                    max_age=0,
+                    store_in_cache=False,
+                    auto_resume=False,
+                )
+                break
+            except Exception as exc:
+                self.log.append(
+                    {
+                        "url": url,
+                        "final_url": url,
+                        "transport": "firecrawl",
+                        "ok": False,
+                    }
+                )
+                if not retried and isinstance(exc, RateLimitError):
+                    wait = re.search(
+                        r"retry after\s+(\d+(?:\.\d+)?)\s*(?:s\b|seconds?\b)",
+                        str(exc),
+                        re.IGNORECASE,
+                    )
+                    time.sleep(min(float(wait[1]), 30.0) if wait else 2.0)
+                    retried = True
+                    continue
+                raise EbayLiveError(f"Firecrawl request failed: {exc}") from exc
         html: object = getattr(document, "raw_html", None)
         if not isinstance(html, str) or not html.strip():
             self.log.append(

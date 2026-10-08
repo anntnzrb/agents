@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping, Sequence
 
 import pytest
+from ebay_live.client import EbayClient
 from ebay_live.detail_parser import load_json
 from ebay_live.protocol import get_schema_document
 from jsonschema import validate
@@ -30,6 +31,7 @@ def server(
     detail_failure: bool = False,
     fallback: str = "search.html",
     proxy_error: bool = False,
+    rate_limit: tuple[int, str] = (0, "Rate Limit Exceeded. Please retry after 0.01s"),
 ) -> Generator[tuple[str, list[dict[str, object]]]]:
     """Serve captured HTML and the Firecrawl v2 scrape response shape."""
     requests: list[dict[str, object]] = []
@@ -40,6 +42,7 @@ def server(
         def do_GET(self) -> None:
             """Return a real search, block page, or item response."""
             if self.path.startswith("/itm/"):
+                requests.append({"item_url": self.path})
                 filename = "item.html"
                 status = 404 if detail_failure else 200
             else:
@@ -74,7 +77,13 @@ def server(
             }
             if proxy_error:
                 body = {"success": False, "error": "Fixture scrape failed"}
-            self.send_response(500 if proxy_error else 200)
+            limited = len(requests) <= rate_limit[0]
+            if limited:
+                body = {
+                    "success": False,
+                    "error": rate_limit[1],
+                }
+            self.send_response(429 if limited else 500 if proxy_error else 200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             _ = self.wfile.write(json.dumps(body).encode())
@@ -402,3 +411,85 @@ def test_zero_exact_matches_warns(tmp_path: Path) -> None:
     assert "Zero exact matches" in str(data["warnings"])
     validate_json: Callable[..., None] = validate
     validate_json(data, get_schema_document()["llm_json"])
+
+
+@pytest.mark.parametrize("rpc", [False, True])
+def test_default_details_fetch_only_two(tmp_path: Path, *, rpc: bool) -> None:
+    """CLI and RPC bound omitted detail limits at the real item HTTP boundary."""
+    with server() as (url, calls):
+        result = run_cli(
+            tmp_path,
+            ["--mode", "rpc"] if rpc else ["sony", "--llm-json", "--details"],
+            {"EBAY_LIVE_BASE_URL": url},
+            stdin=json.dumps({"type": "search", "query": "sony", "details": True})
+            + "\n"
+            if rpc
+            else None,
+        )
+    assert result.returncode == 0, result.stderr
+    data = payload(result.stdout)
+    if rpc:
+        assert data["success"] is True
+        data = cast("dict[str, object]", data["data"])
+    assert len(calls) == 2
+    assert all("item_url" in call for call in calls)
+    assert data["enrichment"] == {
+        "requested": True,
+        "detail_limit": 2,
+        "attempted": 2,
+        "succeeded": 2,
+    }
+    validate_json: Callable[..., None] = validate
+    validate_json(data, get_schema_document()["llm_json"])
+
+
+@pytest.mark.parametrize("rate_limits", [1, 2])
+def test_firecrawl_rate_limit_retries_once(tmp_path: Path, rate_limits: int) -> None:
+    """The real SDK retries one 429, succeeds after it, and stops after a second."""
+    with server(
+        blocked=True,
+        rate_limit=(rate_limits, "Rate Limit Exceeded. Please retry after 0.01s"),
+    ) as (url, calls):
+        result = run_cli(
+            tmp_path,
+            ["sony", "--llm-json", "--limit", "1"],
+            {
+                "EBAY_LIVE_BASE_URL": url,
+                "FIRECRAWL_API_KEY": "fixture-key",
+                "FIRECRAWL_API_URL": url,
+            },
+        )
+    assert len(calls) == 2
+    if rate_limits == 1:
+        assert result.returncode == 0, result.stderr
+        validate_json: Callable[..., None] = validate
+        validate_json(payload(result.stdout), get_schema_document()["llm_json"])
+    else:
+        assert result.returncode == 1
+        assert "Rate Limit Exceeded" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_wait"),
+    [
+        ("Rate Limit Exceeded. Please retry after 8s", 8.0),
+        ("Rate Limit Exceeded. Please retry after 90 seconds", 30.0),
+        ("Rate Limit Exceeded", 2.0),
+    ],
+)
+def test_rate_limit_wait(
+    monkeypatch: pytest.MonkeyPatch,
+    message: str,
+    expected_wait: float,
+) -> None:
+    """Real SDK errors honor the advertised wait, cap, and missing-wait fallback."""
+    waits: list[float] = []
+    monkeypatch.setattr("ebay_live.client.time.sleep", waits.append)
+    with server(rate_limit=(1, message)) as (url, calls):
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "fixture-key")
+        monkeypatch.setenv("FIRECRAWL_API_URL", url)
+        with EbayClient("firecrawl") as client:
+            fetched = client.fetch(f"{url}/sch/i.html", search=True)
+        assert fetched.transport == "firecrawl"
+        assert len(calls) == 2
+    assert waits == [expected_wait]

@@ -13,6 +13,14 @@ If Firecrawl also returns a challenge, report the failure.
 An HTTP 200 response alone does not establish usable catalog content.
 A successful empty response needs explicit no-match text.
 
+## Firecrawl rate limits
+
+A Firecrawl HTTP 429 rate-limit error gets exactly one retry.
+The client waits the advertised "retry after" seconds, capped at 30 seconds;
+when the message lacks a wait, it waits two seconds.
+A second rate-limit error fails the fetch. Other proxy errors are not retried.
+Detail enrichment defaults to two item fetches; reduce `--detail-limit` if needed.
+
 ## Inspect saved markup
 
 Save the response HTML to a file, then run:

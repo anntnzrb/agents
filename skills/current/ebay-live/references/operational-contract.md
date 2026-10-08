@@ -43,6 +43,8 @@ Details remain under `details` so a later item price cannot overwrite the search
 snapshot. Details include Product JSON-LD identity and DOM shipping, returns,
 seller, auction, condition, and item specifics where present.
 A failed detail fetch adds a warning and does not remove the listing.
+Detail enrichment defaults to at most two item fetches in CLI and RPC.
+Set `--detail-limit` or RPC `detailLimit` to override it, including zero.
 
 ## Transport behavior
 
@@ -53,6 +55,7 @@ Forced direct mode never invokes Firecrawl.
 Forced Firecrawl mode requires `FIRECRAWL_API_KEY`.
 Firecrawl uses raw HTML, disables cache storage, and requests fresh content.
 SDK retries and scrape auto-resume are disabled.
+The client retries a Firecrawl rate-limit error once after a bounded wait.
 There is no local result cache or background retry loop.
 
 Blocking includes challenge and captcha redirects, sign-in URLs, HTTP 403,

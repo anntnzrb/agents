@@ -47,7 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
     _ = parser.add_argument("--free-shipping", dest="freeShipping", action="store_true")
     _ = parser.add_argument("--limit", type=int)
     _ = parser.add_argument("--details", action="store_true")
-    _ = parser.add_argument("--detail-limit", dest="detailLimit", type=int)
+    _ = parser.add_argument(
+        "--detail-limit",
+        dest="detailLimit",
+        type=int,
+        default=2,
+        help="Maximum item detail fetches (default: 2).",
+    )
     _ = parser.add_argument("--scoring", action="store_true")
     _ = parser.add_argument(
         "--transport", choices=("auto", "direct", "firecrawl"), default="auto"
