@@ -4,7 +4,7 @@ Usage:
   sync [sync]
   sync launch <name> [-- <args...>]
   sync update
-  sync job npm-cache-clean
+  sync job <npm-cache-clean|refresh-packages>
   sync -h | --help | help
 
 Commands:
@@ -13,15 +13,15 @@ Commands:
     skills, tools, secrets, and generated launch wrappers (~/.local/bin).
 
   launch <name> [-- <args...>]
-    Runs best-effort reconciliation, prepares the harness or tool package,
-    and executes it with any forwarded arguments.
+    Executes the cached harness or tool immediately; without a cache,
+    runs best-effort reconciliation and installs the package first.
 
   update
     Fast-forwards a clean main checkout of the SSOT from origin and
     reconciles it when the commit is new. Scheduled in the background by
     the machine configuration.
 
-  job npm-cache-clean
+  job <npm-cache-clean|refresh-packages>
     Runs scheduled maintenance jobs driven by the machine configuration.
 
 Options:

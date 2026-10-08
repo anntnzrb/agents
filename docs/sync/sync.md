@@ -8,8 +8,9 @@ Sync reconciles the repository at `~/src/agents` with harness homes and installe
 | --- | --- |
 | `uv run --project sync sync` | Runs a normal reconciliation |
 | `uv run --project sync sync sync` | Runs the same normal reconciliation |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Syncs when the source is available, prepares the harness or tool package, and launches it |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Executes the valid cached package immediately; syncs and installs only when no valid cache exists |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
+| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job refresh-packages` | Refreshes harness and tool packages; see [Maintenance jobs](#maintenance-jobs) |
 | `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job npm-cache-clean` | Runs the scheduled npm cache cleanup; see [Maintenance jobs](#maintenance-jobs) |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
@@ -80,18 +81,23 @@ Extension dependency hooks compute a content fingerprint (`fingerprint_tree` in 
 - Ignored entries: skips `node_modules`, `.git`, hidden entries (names starting with `.`), and Python bytecode/caches (`__pycache__`, `*.pyc`, `*.pyo`).
 ## Launch behavior
 
-Harness wrappers run a best-effort sync before launch. A failed sync, an active sync lock, or an unavailable repository does not block a cached harness package.
+Harness and tool wrappers execute a valid `current` cache immediately. Cached launches do not reconcile the SSOT, resolve npm versions, fetch static release manifests, install packages, prune caches, or acquire package locks. An installer holding the package lock does not delay them.
+
+Local SSOT edits to managed configuration, skills, and instructions take effect after an explicit `uv run --project sync sync` from the repository or a scheduled `sync update` reconciliation, rather than on the next cached launch. `sync update` reconciles new commits; uncommitted local edits require manual sync. Host-local `.env` defaults are still read at launch. Package updates run through `sync job refresh-packages`.
+
+When no valid cache exists, launch runs best-effort sync if the SSOT is available, then resolves and installs the package synchronously under its cache lock. A failed sync, a busy sync lock, or an unavailable repository does not prevent package preparation. If preparation cannot produce a valid executable, launch fails.
 
 After preparing the harness, the wrapper process is replaced by the harness executable (`execve`). The harness keeps the wrapper's PID, session, process group, and controlling terminal, so terminal resizes, `^C`, job control, and a service manager's `SIGTERM` reach the harness directly, and its exit status is the wrapper's exit status. Captured subprocesses that sync runs itself (npm installs, smoke checks, hooks) still run in their own session so timeouts can kill the whole process group.
 
-The launcher resolves the adapter's npm dist-tag and installs the resolved version into a versioned cache. The launcher keeps the current and previous known-good versions, plus any older version whose executable a running process still uses: a long-lived process such as the Amp runner keeps running the version it started from until it restarts, so an update never deletes it underneath that process. Running executables come from `/proc` on Linux and `lsof` on macOS; when they cannot be determined, pruning is skipped for that launch. Each install stages into `versions/.stage-<pid>-<token>` and removes it on exit; a stage survives only when its installer was killed, and the next prune removes it once that PID is no longer alive. If version resolution or a new package installation fails, the launcher uses the current valid cache. A first launch without a valid cache fails.
+Cold launches and package refreshes resolve the adapter's npm dist-tag and install the resolved version into a versioned cache. The cache keeps the current and previous known-good versions, plus any older version whose executable a running process still uses: a long-lived process such as the Amp runner keeps running the version it started from until it restarts, so an update never deletes it underneath that process. Running executables come from `/proc` on Linux and `lsof` on macOS; when they cannot be determined, pruning is skipped for that preparation. Each install stages into `versions/.stage-<pid>-<token>` and removes it on exit; a stage survives only when its installer was killed, and the next prune removes it once that PID is no longer alive. Failed resolution, installation, or smoke checks leave the current known-good cache available.
 
-A static release launcher resolves the adapter's manifest, verifies the archive SHA-256, and installs the version under the adapter's home-relative install root. It keeps the current and previous versions and reuses an installed version without re-downloading. When manifest resolution or installation fails, the launcher reuses the current cached install.
+Cold launches and package refreshes for static releases resolve the adapter's manifest, verify the archive SHA-256, and install the version under the adapter's home-relative install root. The cache keeps the current and previous versions and reuses an installed version without re-downloading. Failed preparation leaves the current cached install available.
 
 ## Maintenance jobs
 
-The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Sync provides one job, run with the installed runtime's Python:
+The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Run jobs with the installed runtime's Python:
 
+- `sync job refresh-packages`: refreshes npm and static release packages for host-supported harnesses enabled in the SSOT or represented by installed managed wrappers, plus every registered tool launcher. It respects configured npm dist-tags and version pins, verifies and smoke-checks npm installs, verifies static archive checksums and executables, rotates `current`/`previous`, and prunes using the same preparation functions as cold launch. Each package holds its existing cache lock across resolution and installation; a busy lock logs a skip without waiting or making a network request. Per-package failures log and continue, keeping the cached version available. The job exits `0` for a successful or skipped round, including no work and partial failures; it exits nonzero only when every package fails or the job itself breaks. The machine configuration owns its schedule.
 - `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed. It exits `0` when there is nothing to do.
 
 ## Background updates

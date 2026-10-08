@@ -31,7 +31,11 @@ from sync.core.managed_tools import (
 from sync.core.release_manifest import fetch_static_release_manifest
 from sync.runtime.errors import panic_message, warn
 from sync.runtime.fs import is_executable, rm_entry
-from sync.runtime.lock import acquire_cache_lock, release_sync_lock
+from sync.runtime.lock import (
+    acquire_cache_lock,
+    release_sync_lock,
+    try_acquire_sync_lock,
+)
 from sync.runtime.process import (
     ExecPlan,
     ProcessResult,
@@ -263,45 +267,26 @@ async def _prepare_locked_package(
         else resolve_version
     )
     dist_tag = spec.dist_tag or "latest"
-    try:
-        resolved_version = validate_resolved_version(
-            await resolver(spec.package, dist_tag, timeout_ms)
-        )
-        await _ensure_version_installed(
-            layout, spec, resolved_version, options, timeout_ms
-        )
-        update_current_and_previous(layout, resolved_version)
-        detect_running = (
-            runtime.running_executables
-            if runtime and runtime.running_executables
-            else running_executables
-        )
-        prune_versions(layout, await detect_running())
+    resolved_version = validate_resolved_version(
+        await resolver(spec.package, dist_tag, timeout_ms)
+    )
+    await _ensure_version_installed(layout, spec, resolved_version, options, timeout_ms)
+    update_current_and_previous(layout, resolved_version)
+    detect_running = (
+        runtime.running_executables
+        if runtime and runtime.running_executables
+        else running_executables
+    )
+    prune_versions(layout, await detect_running())
 
-        current_bin = package_bin_path(layout.current_link, spec.bin)
-        _validate_current_bin(current_bin, spec.bin)
+    current_bin = package_bin_path(layout.current_link, spec.bin)
+    _validate_current_bin(current_bin, spec.bin)
 
-        return PreparedNpmPackage(
-            layout=layout,
-            resolved_version=resolved_version,
-            current_bin=current_bin,
-        )
-    except Exception as error:
-        fallback = current_cached_package(layout, spec)
-        if fallback is None:
-            raise
-        version, current_bin = fallback
-        detail = str(error) or error.__class__.__name__
-        message = (
-            f"latest {spec.package}@{dist_tag} unavailable ({detail}); "
-            f"using cached {spec.tool}@{version}"
-        )
-        warn(message)
-        return PreparedNpmPackage(
-            layout=layout,
-            resolved_version=version,
-            current_bin=current_bin,
-        )
+    return PreparedNpmPackage(
+        layout=layout,
+        resolved_version=resolved_version,
+        current_bin=current_bin,
+    )
 
 
 async def prepare_npm_package(
@@ -322,7 +307,50 @@ async def prepare_npm_package(
 
     lock = await acquire_cache_lock(layout.tool_cache, layout.lock_file, timeout_ms)
     try:
-        return await _prepare_locked_package(layout, spec, options, timeout_ms)
+        try:
+            return await _prepare_locked_package(layout, spec, options, timeout_ms)
+        except (OSError, RuntimeError, ValueError, TypeError) as error:
+            cached = current_cached_package(layout, spec)
+            if cached is None:
+                raise
+            version, current_bin = cached
+            message = (
+                f"{spec.package} unavailable ({panic_message(error)}); "
+                f"using cached {spec.tool}@{version}"
+            )
+            warn(message)
+            return PreparedNpmPackage(layout, version, current_bin)
+    finally:
+        release_sync_lock(lock)
+
+
+async def refresh_npm_package(
+    spec: NpmPackageSpec,
+    options: PreparePackageOptions,
+) -> bool:
+    """Refresh under the existing cache lock; return False when it is busy.
+
+    Unlike launch preparation, failures propagate even when a cache exists.
+    """
+    validate_spec(spec)
+    layout = npm_cache_layout(options.home, spec, options.cache_home)
+    lock = try_acquire_sync_lock(layout.tool_cache, layout.lock_file)
+    if lock is None:
+        warn(f"refresh-packages: {spec.tool}: cache lock busy; skipping")
+        return False
+    try:
+        await asyncio.to_thread(
+            Path(layout.versions_dir).mkdir, parents=True, exist_ok=True
+        )
+        _ = await _prepare_locked_package(
+            layout,
+            spec,
+            options,
+            options.timeout_ms
+            if options.timeout_ms is not None
+            else DEFAULT_LAUNCH_TIMEOUT_MS,
+        )
+        return True
     finally:
         release_sync_lock(lock)
 
@@ -546,6 +574,47 @@ async def _prepare_static_release_locked(
     timeout_ms: int,
     runtime: ReleaseRuntime | None,
 ) -> PreparedStaticRelease:
+    install_root = Path(home).joinpath(*release.install_segments)
+    lock = await acquire_cache_lock(
+        str(install_root), str(install_root / RELEASE_LOCK_FILE), timeout_ms
+    )
+    try:
+        await asyncio.to_thread(
+            (install_root / RELEASE_VERSIONS_SUBDIR).mkdir, parents=True, exist_ok=True
+        )
+        return await _prepare_locked_release(release, home, timeout_ms, runtime)
+    finally:
+        release_sync_lock(lock)
+
+
+async def refresh_static_release(
+    release: StaticRelease,
+    home: str,
+    timeout_ms: int,
+    runtime: ReleaseRuntime | None = None,
+) -> bool:
+    """Refresh a release without waiting on another installer or hiding failures."""
+    install_root = Path(home).joinpath(*release.install_segments)
+    lock = try_acquire_sync_lock(install_root, install_root / RELEASE_LOCK_FILE)
+    if lock is None:
+        warn(f"refresh-packages: {release.manifest_url}: cache lock busy; skipping")
+        return False
+    try:
+        await asyncio.to_thread(
+            (install_root / RELEASE_VERSIONS_SUBDIR).mkdir, parents=True, exist_ok=True
+        )
+        _ = await _prepare_locked_release(release, home, timeout_ms, runtime)
+        return True
+    finally:
+        release_sync_lock(lock)
+
+
+async def _prepare_locked_release(
+    release: StaticRelease,
+    home: str,
+    timeout_ms: int,
+    runtime: ReleaseRuntime | None,
+) -> PreparedStaticRelease:
     fetch = runtime.fetch_manifest if runtime is not None else None
     manifest = await asyncio.to_thread(
         fetch_static_release_manifest, release.manifest_url, timeout_ms, fetch
@@ -565,29 +634,19 @@ async def _prepare_static_release_locked(
     versions_dir = install_root / RELEASE_VERSIONS_SUBDIR
     version_dir = versions_dir / manifest.version
     executable = version_dir.joinpath(*release.executable_segments)
-    await asyncio.to_thread(versions_dir.mkdir, parents=True, exist_ok=True)
 
-    lock = await acquire_cache_lock(
-        str(install_root), str(install_root / RELEASE_LOCK_FILE), timeout_ms
-    )
-    try:
-        if not is_executable(str(executable)):
-            await _install_static_release(
-                manifest.version, asset, version_dir, timeout_ms, runtime
-            )
-        _update_release_links(versions_dir, version_dir)
-        _prune_release_versions(versions_dir)
-        await asyncio.to_thread(
-            _sync_release_man_pages, release, home, version_dir, install_root
+    if not is_executable(str(executable)):
+        await _install_static_release(
+            manifest.version, asset, version_dir, timeout_ms, runtime
         )
-        if not is_executable(str(executable)):
-            message = (
-                f"static release {manifest.version} has no executable {executable}"
-            )
-            raise RuntimeError(message)
-    finally:
-        release_sync_lock(lock)
-
+    if not is_executable(str(executable)):
+        message = f"static release {manifest.version} has no executable {executable}"
+        raise RuntimeError(message)
+    _update_release_links(versions_dir, version_dir)
+    _prune_release_versions(versions_dir)
+    await asyncio.to_thread(
+        _sync_release_man_pages, release, home, version_dir, install_root
+    )
     return PreparedStaticRelease(version=manifest.version, executable=str(executable))
 
 

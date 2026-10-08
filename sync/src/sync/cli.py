@@ -31,7 +31,7 @@ _HELP_LINES = (
     "  sync [sync]",
     "  sync launch <name> [-- <args...>]",
     "  sync update",
-    "  sync job npm-cache-clean",
+    "  sync job <npm-cache-clean|refresh-packages>",
     "  sync -h | --help | help",
     "",
     "Commands:",
@@ -40,15 +40,15 @@ _HELP_LINES = (
     "    skills, tools, secrets, and generated launch wrappers (~/.local/bin).",
     "",
     "  launch <name> [-- <args...>]",
-    "    Runs best-effort reconciliation, prepares the harness or tool package,",
-    "    and executes it with any forwarded arguments.",
+    "    Executes the cached harness or tool immediately; without a cache,",
+    "    runs best-effort reconciliation and installs the package first.",
     "",
     "  update",
     "    Fast-forwards a clean main checkout of the SSOT from origin and",
     "    reconciles it when the commit is new. Scheduled in the background by",
     "    the machine configuration.",
     "",
-    "  job npm-cache-clean",
+    "  job <npm-cache-clean|refresh-packages>",
     "    Runs scheduled maintenance jobs driven by the machine configuration.",
     "",
     "Options:",
@@ -66,7 +66,7 @@ LAUNCH_HELP_TEXT = "\n".join(_LAUNCH_HELP_LINES)
 
 _LAUNCH_USAGE_ERROR = "sync: usage: launch NAME -- [ARGS...]"
 _SYNC_USAGE_ERROR = "sync: usage: sync\nRun 'sync --help' for available commands."
-_JOB_USAGE_ERROR = "sync: usage: job npm-cache-clean"
+_JOB_USAGE_ERROR = "sync: usage: job <npm-cache-clean|refresh-packages>"
 
 
 def _is_help_flag(arg: str | None) -> bool:

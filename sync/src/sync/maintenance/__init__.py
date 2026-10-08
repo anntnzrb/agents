@@ -7,6 +7,7 @@ import argparse
 from typing import TYPE_CHECKING
 
 from sync.maintenance.npm_cache import clean_npm_cache
+from sync.maintenance.refresh_packages import refresh_packages
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -27,6 +28,10 @@ def build_job_parser() -> argparse.ArgumentParser:
         "npm-cache-clean",
         help="Empty npm cache while respecting npm-tools locks.",
     )
+    _ = sub.add_parser(
+        "refresh-packages",
+        help="Refresh cached harness and tool packages without waiting on busy locks.",
+    )
     return parser
 
 
@@ -42,5 +47,7 @@ def run_job(argv: Sequence[str]) -> int:
     match job:
         case "npm-cache-clean":
             return clean_npm_cache()
+        case "refresh-packages":
+            return refresh_packages()
         case _:
             return 2
