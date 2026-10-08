@@ -8,6 +8,7 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 - Model name to SQL table name mapping replaces dots with underscores (e.g. `crm.espol.periodo` maps to `crm_espol_periodo`). Special exceptions exist: `ir.actions.server` maps to table `ir_act_server`. Cron triggers use `ir_cron_trigger` and automation triggers use `base_automation_trigger`.
 - Inside containerized PostgreSQL, `\copy ... FROM` executes inside the container namespace and cannot access host file paths. Feed data through stdin (e.g. `cat file.csv | db-query ...`).
 - Restoring a replica from a database dump without its accompanying filestore causes missing binary attachments and broken spreadsheet dashboards. This is an expected artifact of SQL-only dumps, not a code defect.
+- `db-restore` skips production `GRANT`, `REVOKE`, and `ALTER DEFAULT PRIVILEGES` statements in SQL dumps for local replicas, preserving COPY data.
 
 ## Models, ORM, and Fields
 

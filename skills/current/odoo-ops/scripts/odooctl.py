@@ -2572,7 +2572,7 @@ def _copy_filestore(ctx: WorkspaceContext, source: str, target: str) -> bool:
 
 
 def _pipe_stream_to_psql(stream: BufferedIOBase, db_name: str, dump_path: Path) -> None:
-    """Pipe an open dump stream into psql inside the database container."""
+    """Pipe a pg_dump stream into psql, omitting production privileges."""
     _ensure_podman()
     cmd = [
         "podman",
@@ -2592,7 +2592,30 @@ def _pipe_stream_to_psql(stream: BufferedIOBase, db_name: str, dump_path: Path) 
         if proc.stdin is None:
             msg = "psql stdin is not available"
             raise CliError(msg)
-        _ = shutil.copyfileobj(stream, proc.stdin)
+        in_copy = False
+        in_acl = False
+        quoted_identifier = False
+        for line in stream:
+            if in_copy:
+                _ = proc.stdin.write(line)
+                if line.rstrip(b"\r\n") == b"\\.":
+                    in_copy = False
+                continue
+            if line.startswith((b"GRANT ", b"REVOKE ", b"ALTER DEFAULT PRIVILEGES")):
+                in_acl = True
+            if in_acl:
+                # pg_dump ACLs end with ;, but quoted identifiers can span lines.
+                for match in re.finditer(rb'[";]', line):
+                    token = match[0]
+                    if token == b'"':
+                        quoted_identifier = not quoted_identifier
+                    elif not quoted_identifier:
+                        in_acl = False
+                        break
+                continue
+            # Plain pg_dump emits COPY only for FROM stdin data blocks.
+            in_copy = line.startswith(b"COPY ")
+            _ = proc.stdin.write(line)
         proc.stdin.close()
         if proc.wait() != 0:
             msg = f"psql restore failed for {dump_path}"
