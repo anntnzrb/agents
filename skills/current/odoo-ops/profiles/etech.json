@@ -1,7 +1,7 @@
 {
   "workflows": {
     "crm": {
-      "database": "espoltecherp_work_20260908",
+      "database": "espoltecherp_work_20261002",
       "modules": [
         "budget",
         "budget_hr",
