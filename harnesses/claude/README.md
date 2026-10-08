@@ -31,6 +31,17 @@ Sync publishes the children of this directory into `~/.claude/`, publishes `HARN
 
 Sync writes `settings.json` verbatim and keeps nothing from the generated one, so a `/model` or `/effort` choice lasts only until the next sync; change `model` or `modelSettings` here to make it stick.
 
+Delegation runs on a cheaper model than the main session through two native mechanisms, without adding custom agent types:
+
+- `env.CLAUDE_CODE_SUBAGENT_MODEL` sets the default for subagents with no model of their own: the built-in `general-purpose` and `claude` agents, agent-team teammates, and workflow agents. It is a default, not a cap: the main agent can still pass `model` on an Agent call for work that needs a stronger model. Do not set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which removes that escape hatch.
+- `agents/explore.md` overrides the built-in `Explore` agent, which ignores `CLAUDE_CODE_SUBAGENT_MODEL` and otherwise runs on the main session's model. An override replaces the built-in's prompt and description outright, and loses the built-in's skipping of CLAUDE.md, so the file sets `omitClaudeMd`. `general-purpose` is deliberately not overridden, so it keeps its native prompt.
+
+These still run on the main session's model: forks, which share its prompt cache, and the built-in `Plan` agent. The built-in `statusline-setup` and `claude-code-guide` agents keep their own Sonnet and Haiku models.
+
+The model settings alone do not make the main agent delegate: without instructions it tends to do searches and test runs inline. `rules/delegation.md` publishes as a user-level rule (`~/.claude/rules/`), so it reaches Claude Code only and stays out of the harness-agnostic `HARNESS.md`. Rules also load into subagents that read CLAUDE.md, so the rule tells subagents to ignore it.
+
+Subagents with no `effort` frontmatter run at the session's effort level. Every model a subagent names must be in the gateway's `/models` catalog; otherwise the subagent fails with `unknown provider for model`.
+
 ## Third-party content
 
 Nothing outside this repository should add skills or plugins; `settings.json` covers what user settings can control. Two stronger locks exist only in machine-wide managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json` on macOS, root-owned) and are not set: `strictKnownMarketplaces: []` blocks adding any plugin marketplace, and `blockedMarketplaces` blocks specific ones.
