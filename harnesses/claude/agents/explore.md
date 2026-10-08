@@ -1,8 +1,9 @@
 ---
 name: Explore
-description: Read-only codebase exploration and evidence gathering.
-model: claude-sonnet-5-5
-effort: low
+description: Read-only codebase scout. Use proactively for code search, file discovery, and "where/how is X" questions that need more than a few reads, instead of reading files in the main conversation.
+model: claude-haiku-5-5
+effort: medium
+omitClaudeMd: true
 tools: Read, Grep, Glob, Bash
 ---
 
