@@ -9,6 +9,7 @@
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20",
     "BASH_DEFAULT_TIMEOUT_MS": "5000",
+    "BASH_MAX_TIMEOUT_MS": "5000",
     "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-5-5"
   },
   "model": "opus[1m]",
@@ -41,6 +42,15 @@
           {
             "type": "command",
             "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebFetch is disabled. Use the firecrawl skill to fetch, scrape, or crawl URLs.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.run_in_background != true and ((.tool_input.command // \"\") | test(\"^\\\\s*sleep(\\\\s|$)\"))' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"A Bash command that starts with sleep is never moved to the background: it blocks the session and is stopped at the Bash timeout, so nothing after the sleep runs. To wait for a condition, use the Monitor tool if you have it; otherwise run Bash with run_in_background: true and a loop that exits when the condition holds, for example: until <check>; do sleep 5; done. Background results arrive on their own; do not poll them.\"}}'"
           }
         ]
       }
