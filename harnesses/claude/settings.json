@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -e '.tool_input.run_in_background != true and ((.tool_input.command // \"\") | test(\"^\\\\s*sleep\\\\s+(?![0-4](\\\\.[0-9]+)?s?\\\\s*($|[;&|\\\\n]))\"))' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"A Bash command that starts with sleep blocks the session: Claude Code never moves it to the background. To wait for a condition, use the Monitor tool, or Bash with run_in_background: true and a loop that exits when the condition holds. Background results arrive on their own; do not poll them.\"}}'"
+            "command": "jq -e '.tool_input.run_in_background != true and ((.tool_input.command // \"\") | test(\"^\\\\s*sleep(\\\\s|$)\"))' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"A Bash command that starts with sleep is never moved to the background: it blocks the session and is stopped at the Bash timeout, so nothing after the sleep runs. To wait for a condition, use the Monitor tool if you have it; otherwise run Bash with run_in_background: true and a loop that exits when the condition holds, for example: until <check>; do sleep 5; done. Background results arrive on their own; do not poll them.\"}}'"
           }
         ]
       }
