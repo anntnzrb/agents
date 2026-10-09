@@ -44,6 +44,15 @@
             "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebFetch is disabled. Use the firecrawl skill to fetch, scrape, or crawl URLs.\"}}'"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.run_in_background != true and ((.tool_input.command // \"\") | test(\"^\\\\s*sleep\\\\s+(?![0-4](\\\\.[0-9]+)?s?\\\\s*($|[;&|\\\\n]))\"))' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"A Bash command that starts with sleep blocks the session: Claude Code never moves it to the background. To wait for a condition, use the Monitor tool, or Bash with run_in_background: true and a loop that exits when the condition holds. Background results arrive on their own; do not poll them.\"}}'"
+          }
+        ]
       }
     ],
     "PostToolUse": [
