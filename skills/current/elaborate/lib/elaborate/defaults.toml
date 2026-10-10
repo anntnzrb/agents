@@ -1,0 +1,306 @@
+# Bundled defaults. Overrides are closed except new lang codes, which use the en schema.
+[ingest]
+toc_depth = 1                 # TOC nesting level that defines units (1 = top level)
+max_unit_words = 4000         # split longer body units into parts
+min_unit_words = 50           # merge shorter body units into a body neighbour; supplementary units stay separate
+strip_gutenberg = true        # drop Project Gutenberg header/footer boilerplate
+matter_patterns = [           # case-insensitive regexes on unit titles => kind "matter"
+  "^contents$", "^table of contents$", "^copyright", "^dedication$", "^acknowledg",
+  "^index$", "^bibliography$", "^about the author", "^also by", "^title page$", "^cover$",
+  "^colophon$", "project gutenberg",
+]
+
+[protect]
+min_quote_words = 6           # inline quotations shorter than this are not protected
+rare_zipf = 3.0               # wordfreq Zipf below this marks author vocabulary to keep and gloss
+rare_min_length = 4
+
+[voice]                       # rendered into the rewrite brief; never hardcode personal values
+style = "Clear, warm, and lightly playful. Short sentences. Reacts to the story like a sharp friend."
+code_switch = ""              # e.g. "Sprinkle short Spanish interjections into English text"
+slang = ""                    # e.g. "Gen Z slang in asides"
+analogy_domains = []          # e.g. ["software teams", "football"]
+banned = []                   # words or phrases that must never appear
+aside_examples = []           # sample asides for tone
+
+[build]
+title_template = "{title}"
+words_per_minute = 200
+aside_style = "italic"        # "plain" or "italic"
+include_matter = false
+
+[lang.en]
+stem_length = 6              # Optional prefix length; frequency gates need exact wordfreq support, not a lang table.
+aside_absolutes = ["literally", "always", "never", "every", "everyone", "everything",
+  "nobody", "nothing", "whole", "entire", "only", "all"]
+hedges = ["might", "may", "perhaps", "maybe", "seem", "seems", "seemed", "apparently",
+  "possibly", "probably", "likely", "could", "often", "sometimes", "usually", "generally",
+  "almost", "nearly", "suggest", "suggests"]
+nominal_suffixes = ["tion", "sion", "ment", "ness", "ity", "ance", "ence"]
+readability = "flesch_kincaid_grade"
+[lang.en.labels]
+idea = "The idea in one line"
+question = "Keep this question in mind"
+why = "Why it matters to you"
+recap = "Recap"
+quiz = "Quick check"
+answers = "Answers"
+glossary = "Glossary"
+progress = "{index}/{total} · {percent}% · ~{minutes} min"
+
+[lang.es]
+stem_length = 5              # Prefix length overrides gates.F-coverage.stem_length.
+aside_absolutes = ["literalmente", "siempre", "nunca", "todo", "todos", "toda", "todas",
+  "nadie", "nada", "entero", "entera", "solo", "sólo"]
+hedges = ["quizá", "quizás", "tal vez", "acaso", "parece", "parecía", "posiblemente",
+  "probablemente", "podría", "podrían", "puede", "pueden", "a menudo", "a veces",
+  "generalmente", "casi", "sugiere"]
+nominal_suffixes = ["ción", "sión", "miento", "dad", "ncia", "eza"]
+readability = "fernandez_huerta"
+[lang.es.labels]
+idea = "La idea en una línea"
+question = "Ten presente esta pregunta"
+why = "Por qué te importa"
+recap = "Repaso"
+quiz = "Comprueba"
+answers = "Respuestas"
+glossary = "Glosario"
+progress = "{index}/{total} · {percent}% · ~{minutes} min"
+
+# K-format: measurable check; enabled toggles it and severity controls failure or warning.
+# adapted file parses (always enabled)
+[gates.K-format]
+enabled = true
+severity = "error"
+
+# K-no-h1: measurable check; enabled toggles it and severity controls failure or warning.
+# no `# ` heading in adapted (title comes from manifest)
+[gates.K-no-h1]
+enabled = true
+severity = "error"
+
+# K-no-emoji: measurable check; enabled toggles it and severity controls failure or warning.
+# Reject new Extended_Pictographic characters with emoji presentation; source symbols are exempt.
+[gates.K-no-emoji]
+enabled = true
+severity = "error"
+
+# K-no-tables: measurable check; enabled toggles it and severity controls failure or warning.
+[gates.K-no-tables]
+enabled = true
+severity = "error"
+
+# F-quotes: measurable check; enabled toggles it and severity controls failure or warning.
+# every protected quote appears verbatim in body_text (normalize whitespace and typographic quote/apostrophe variants; ignore surrounding quote marks)
+[gates.F-quotes]
+enabled = true
+severity = "error"
+
+# F-numbers: measurable check; enabled toggles it and severity controls failure or warning.
+# Every protected number keeps its source occurrence count in rendered body text.
+[gates.F-numbers]
+enabled = true
+severity = "error"
+
+# F-names: measurable check; enabled toggles it and severity controls failure or warning.
+# Preserve case-sensitive name occurrences in rendered body text, excluding headings.
+[gates.F-names]
+enabled = true
+severity = "error"
+min_coverage = 1.0  # Minimum retained fraction, from 0 to 1.
+
+# F-hedges: measurable check; enabled toggles it and severity controls failure or warning.
+# total hedge count in body_text >= source total * `min_ratio` (1.0); details list per-hedge deficits
+[gates.F-hedges]
+enabled = true
+severity = "error"
+min_ratio = 1.0  # Minimum ratio relative to the source.
+
+# Preserve each protected hedge's count independently of total retention.
+[gates.F-hedges-each]
+enabled = true
+severity = "warn"
+
+# F-length: measurable check; enabled toggles it and severity controls failure or warning.
+# Body words, excluding gloss definitions, must meet the source word-count ratio.
+[gates.F-length]
+enabled = true
+severity = "error"
+min_ratio = 0.9  # Minimum ratio relative to the source.
+
+# Preserve each substantive source paragraph's vocabulary in the body, excluding gloss definitions.
+[gates.F-paragraphs]
+enabled = true
+severity = "error"
+min_words = 12  # Minimum number of content words in a protected paragraph.
+min = 0.6  # Minimum retained content-stem share per paragraph.
+
+# Preserve image resource references in reading order, including repeated uses.
+[gates.F-images]
+enabled = true
+severity = "error"
+
+# F-coverage: measurable check; enabled toggles it and severity controls failure or warning.
+# Compare source content stems to the rendered body, excluding gloss definitions.
+# Run for exact wordfreq language codes, even without a lang table.
+# Language stem_length overrides the gate fallback; language lists govern only their own gates.
+[gates.F-coverage]
+enabled = true
+severity = "error"
+min = 0.85  # Minimum content-word coverage fraction or quiz item count.
+stop_zipf = 5.5  # Ignore content words with Zipf frequency at or above this value.
+stem_length = 6  # Number of leading characters used as each content-word stem.
+
+# F-aside-facts: measurable check; enabled toggles it and severity controls failure or warning.
+# no aside contains a digit, and no aside contains a capitalized token (not at aside/sentence start) that is absent from the source
+[gates.F-aside-facts]
+enabled = true
+severity = "error"
+
+# L-rare-kept: measurable check; enabled toggles it and severity controls failure or warning.
+# share of protected rare_words present in body_text >= `min_coverage` (1.0)
+[gates.L-rare-kept]
+enabled = true
+severity = "error"
+min_coverage = 1.0  # Minimum retained fraction, from 0 to 1.
+
+# L-gloss: measurable check; enabled toggles it and severity controls failure or warning.
+# share of kept rare words whose FIRST occurrence in the body carries a gloss marker >= `min_coverage` (1.0)
+[gates.L-gloss]
+enabled = true
+severity = "error"
+min_coverage = 1.0  # Minimum retained fraction, from 0 to 1.
+
+# R-sentence-avg: measurable check; enabled toggles it and severity controls failure or warning.
+# average words per sentence in body_text <= `max` (14); quotes excluded
+[gates.R-sentence-avg]
+enabled = true
+severity = "error"
+max = 14  # Maximum allowed sentence words, quiz items, or analogy paragraphs.
+
+# R-sentence-max: measurable check; enabled toggles it and severity controls failure or warning.
+# no sentence longer than `max` (30) words; quotes excluded
+[gates.R-sentence-max]
+enabled = true
+severity = "error"
+max = 30  # Maximum allowed sentence words, quiz items, or analogy paragraphs.
+
+# R-paragraph: measurable check; enabled toggles it and severity controls failure or warning.
+# every body paragraph <= `max_sentences` (4) and <= `max_words` (80); quotes and lists excluded
+[gates.R-paragraph]
+enabled = true
+severity = "error"
+max_sentences = 4  # Maximum sentences in one prose paragraph.
+max_words = 80  # Maximum words in this gate's paragraph, aside, or heading-free stretch.
+
+# R-grade: measurable check; enabled toggles it and severity controls failure or warning.
+# `flesch_kincaid_grade` <= `max_grade` (8.0) for en; `fernandez_huerta` ease >= `min_ease` (70.0) for es; skip otherwise
+[gates.R-grade]
+enabled = true
+severity = "error"
+max_grade = 8.0  # Maximum English Flesch-Kincaid grade.
+min_ease = 70.0  # Minimum Spanish Fernández Huerta ease.
+
+# R-nominal: measurable check; enabled toggles it and severity controls failure or warning.
+# nominalization ratio (tokens ending with a language suffix, length >= 6) in body_text <= source ratio * `max_ratio` (1.0)
+[gates.R-nominal]
+enabled = true
+severity = "error"
+max_ratio = 1.0  # Maximum ratio relative to the source.
+
+# S-idea: measurable check; enabled toggles it and severity controls failure or warning.
+# directive present and non-empty
+[gates.S-idea]
+enabled = true
+severity = "error"
+
+# S-question: measurable check; enabled toggles it and severity controls failure or warning.
+# directive present and non-empty
+[gates.S-question]
+enabled = true
+severity = "error"
+
+# S-why: measurable check; enabled toggles it and severity controls failure or warning.
+# directive present and non-empty
+[gates.S-why]
+enabled = true
+severity = "error"
+
+# S-recap: measurable check; enabled toggles it and severity controls failure or warning.
+# exactly `count` (3) items
+[gates.S-recap]
+enabled = true
+severity = "error"
+count = 3  # Exact required list item count.
+
+# S-quiz: measurable check; enabled toggles it and severity controls failure or warning.
+# between `min` (2) and `max` (3) items; S-answers: same count as quiz
+[gates.S-quiz]
+enabled = true
+severity = "error"
+min = 2  # Minimum content-word coverage fraction or quiz item count.
+max = 3  # Maximum allowed sentence words, quiz items, or analogy paragraphs.
+
+# S-answers: measurable check; enabled toggles it and severity controls failure or warning.
+[gates.S-answers]
+enabled = true
+severity = "error"
+
+# S-headings: measurable check; enabled toggles it and severity controls failure or warning.
+# no stretch of more than `max_words` (400) body words without a heading
+[gates.S-headings]
+enabled = true
+severity = "error"
+max_words = 400  # Maximum words in this gate's paragraph, aside, or heading-free stretch.
+
+# Ground each recap, answer, and idea in source stems using F-coverage parameters.
+[gates.S-grounded]
+enabled = true
+severity = "error"
+min = 0.8  # Minimum source-grounded stem share for each recap and answer.
+idea_min = 0.7  # Minimum source-grounded stem share for the idea.
+
+# Asides may repeat absolutes only when their associated body block uses them.
+[gates.V-aside-absolutes]
+enabled = true
+severity = "warn"
+
+# V-aside-length: measurable check; enabled toggles it and severity controls failure or warning.
+# every aside <= `max_words` (12)
+[gates.V-aside-length]
+enabled = true
+severity = "error"
+max_words = 12  # Maximum words in this gate's paragraph, aside, or heading-free stretch.
+
+# V-aside-cadence: measurable check; enabled toggles it and severity controls failure or warning.
+# asides count >= floor(body words / `per_words` (250)) and no gap longer than `max_gap` (350) body words between asides (including start and end)
+[gates.V-aside-cadence]
+enabled = true
+severity = "error"
+per_words = 250  # One required aside per this many body words, rounded down.
+max_gap = 350  # Maximum body words between asides, including the start and end.
+
+# V-analogy: measurable check; enabled toggles it and severity controls failure or warning.
+# analogy paragraphs <= `max` (1)
+[gates.V-analogy]
+enabled = true
+severity = "error"
+max = 1  # Maximum allowed sentence words, quiz items, or analogy paragraphs.
+
+# V-banned: measurable check; enabled toggles it and severity controls failure or warning.
+# no `voice.banned` term (case-insensitive, word boundary) in full_text
+[gates.V-banned]
+enabled = true
+severity = "error"
+
+# B-aside-unique: measurable check; enabled toggles it and severity controls failure or warning.
+# no two asides in the book are identical after normalization (lowercase, collapse whitespace, strip punctuation)
+[gates.B-aside-unique]
+enabled = true
+severity = "error"
+
+# B-gloss-consistent: measurable check; enabled toggles it and severity controls failure or warning.
+# the same glossed term carries the same gloss everywhere (warn by default)
+[gates.B-gloss-consistent]
+enabled = true
+severity = "warn"

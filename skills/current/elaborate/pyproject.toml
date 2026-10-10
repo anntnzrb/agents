@@ -1,0 +1,20 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["A002", "COM812", "D203", "D213", "EM101", "EM102", "ERA001", "PERF401", "PLR0911", "PLR0912", "S101", "S603", "S607", "SLF001", "TRY003", "TRY301"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["T201"]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+include = ["scripts", "lib", "tests"]
+pythonVersion = "3.14"
+pythonPlatform = "All"

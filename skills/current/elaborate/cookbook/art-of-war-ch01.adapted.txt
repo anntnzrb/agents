@@ -1,0 +1,223 @@
+@idea: Many calculations before battle lead to victory and few lead to defeat: compare both sides on five constant factors, adapt to circumstances, and deceive.
+@question: Why does Sun Tzŭ say the general who makes many calculations in his temple wins, and the one who makes few loses?
+
+## About the title
+
+**Commentary.** Ts’ao Kung explains the Chinese title of this chapter. He says it refers to the deliberations{= careful consideration before deciding} in the temple selected by the general for his temporary use.
+
+Or, as we should say, in his tent. See § 26.
+
+{~ So: planning in the general's temple. In our terms, his tent. ~}
+
+## War is life and death
+
+**1.** Sun Tzŭ said: The art of war is of vital importance to the State.
+
+**2.** It is a matter of life and death, a road either to safety or to ruin. Hence it is a subject of inquiry which can on no account be neglected.
+
+{~ No pressure, then. ~}
+
+## The five constant factors
+
+**3.** The art of war, then, is governed by five constant factors. They are to be taken into account in one’s deliberations, when seeking to determine the conditions obtaining in the field.
+
+**4.** These are:
+
+- (1) The Moral Law
+- (2) Heaven
+- (3) Earth
+- (4) The Commander
+- (5) Method and discipline
+
+**Commentary.** It appears from what follows that Sun Tzŭ means by "Moral Law" a principle of harmony. It is not unlike the Tao of Lao Tzŭ in its moral aspect. One might be tempted to render it by "morale," were it not considered as an attribute of the *ruler* in § 13.
+
+### The Moral Law
+
+**5, 6.** *The Moral Law* causes the people to be in complete accord with their ruler. So they will follow him regardless of their lives, undismayed{= not frightened or discouraged} by any danger.
+
+{~ Regardless of their lives. That is how deep the accord goes. ~}
+
+**Commentary.** Tu Yu quotes Wang Tzŭ as saying: "Without constant practice, the officers will be nervous and undecided when mustering{= gathering troops} for battle; without constant practice, the general will be wavering{= hesitating} and irresolute{= unable to decide} when the crisis is at hand."
+
+### Heaven
+
+**7.** *Heaven* signifies night and day, cold and heat, times and seasons.
+
+**Commentary.** The commentators, I think, make an unnecessary mystery of two words here. Meng Shih refers to "the hard and the soft, waxing and waning" of Heaven. Wang Hsi, however, may be right in saying that what is meant is "the general economy of Heaven."
+
+That includes the five elements, the four seasons, wind and clouds, and other phenomena.
+
+{~ Two words, several readings, and a translator who hedges. ~}
+
+### Earth
+
+**8.** *Earth* comprises:
+
+- distances, great and small
+- danger and security
+- open ground and narrow passes
+- the chances of life and death
+
+### The Commander
+
+**9.** *The Commander* stands for the virtues of wisdom, sincerity, benevolence{= kindness toward others}, courage and strictness{= being severe about rules}.
+
+**Commentary.** The five cardinal virtues of the Chinese are:
+
+- (1) humanity or benevolence
+- (2) uprightness{= honesty and moral correctness} of mind
+- (3) self-respect, self-control, or "proper feeling"
+- (4) wisdom
+- (5) sincerity or good faith
+
+Here "wisdom" and "sincerity" are put before "humanity or benevolence." And the two military virtues of "courage" and "strictness" are substituted for "uprightness of mind" and "self-respect, self-control, or ‘proper feeling.’"
+
+{~ The army edition swaps two virtues for courage and strictness. ~}
+
+### Method and discipline
+
+**10.** By *Method and discipline* are to be understood four things:
+
+- the marshalling{= arranging in order} of the army in its proper subdivisions
+- the gradations{= steps in a scale} of rank among the officers
+- the maintenance of roads by which supplies may reach the army
+- the control of military expenditure
+
+**11.** These five heads should be familiar to every general. He who knows them will be victorious. He who knows them not will fail.
+
+{~ Five factors. Know them or lose. Simple, brutal. ~}
+
+## Seven questions that compare two sides
+
+**12.** Therefore, in your deliberations, when seeking to determine the military conditions, let them be made the basis of a comparison, in this wise:
+
+**13.** (1) Which of the two sovereigns{= kings or supreme rulers} is imbued{= filled or inspired} with the Moral law?
+
+**Commentary.** I.e., "is in harmony with his subjects." Cf. § 5.
+
+(2) Which of the two generals has most ability?
+
+(3) With whom lie the advantages derived from Heaven and Earth?
+
+**Commentary.** See §§ 7, 8.
+
+(4) On which side is discipline most rigorously enforced?
+
+**Commentary.** Tu Mu alludes{= refers indirectly} to the remarkable story of Ts’ao Ts’ao (A.D. 155-220). He was such a strict disciplinarian{= person who enforces rules strictly} that once he condemned himself to death.
+
+He did so in accordance with his own severe regulations against injury to standing crops: he had allowed his horse to shy into a field of corn!
+
+However, in lieu of losing his head, he was persuaded to satisfy his sense of justice by cutting off his hair.
+
+{~ Sentenced himself to death, settled for a haircut. ~}
+
+Ts’ao Ts’ao’s own comment on the present passage is characteristically{= typically for him} curt: "when you lay down a law, see that it is not disobeyed{= not obeyed}; if it is disobeyed the offender must be put to death."
+
+(5) Which army is the stronger?
+
+**Commentary.** Morally as well as physically. As Mei Yao-ch’en puts it, freely rendered, "{*esprit de corps*}{= the shared fighting spirit of a group} and ‘big battalions.’"
+
+(6) On which side are officers and men more highly trained?
+
+**Commentary.** Tu Yu quotes Wang Tzŭ again on this point: "Without constant practice, the officers will be nervous and undecided when mustering for battle; without constant practice, the general will be wavering and irresolute when the crisis is at hand."
+
+(7) In which army is there the greater constancy{= steadiness, reliability} both in reward and punishment?
+
+**Commentary.** On which side is there the most absolute certainty that merit will be properly rewarded and misdeeds{= wrong acts} summarily{= promptly, without lengthy formalities} punished?
+
+{~ Seven questions in, a forecast out. ~}
+
+**14.** By means of these seven considerations I can forecast victory or defeat.
+
+## Keep the general who listens
+
+**15.** The general that hearkens{= listens attentively} to my counsel and acts upon it, will conquer: let such a one be retained in command! The general that hearkens not to my counsel nor acts upon it, will suffer defeat: let such a one be dismissed!
+
+**Commentary.** The form of this paragraph reminds us that Sun Tzŭ’s treatise was composed expressly for the benefit of his patron Ho Lu, king of the Wu State.
+
+{~ Written for a king, and the form shows it. ~}
+
+## Rules bend to circumstances
+
+**16.** While heeding{= paying attention to} the profit of my counsel, avail yourself also of any helpful circumstances over and beyond the ordinary rules.
+
+**17.** According as circumstances are favourable, one should modify one’s plans.
+
+**Commentary.** Sun Tzŭ, as a practical soldier, will have none of the "bookish{= learned only from books} theoric{= theory}." He cautions{= warns} us here not to pin our faith to abstract principles. "For," as Chang Yu puts it, "while the main laws of strategy can be stated clearly enough for the benefit of all and sundry{= of every sort; "all and sundry" means everyone}, you must be guided by the actions of the enemy in attempting to secure a favourable position in actual warfare."
+
+### Wellington before Waterloo
+
+**Commentary, continued.** On the eve of the battle of Waterloo, Lord Uxbridge, commanding the cavalry, went to the Duke of Wellington. He went in order to learn what his plans and calculations were for the morrow, because, as he explained, he might suddenly find himself Commander-in-chief.
+
+Then he would be unable to frame new plans in a critical moment.
+
+The Duke listened quietly and then said: "Who will attack the first tomorrow—I or Bonaparte?"
+
+"Bonaparte," replied Lord Uxbridge.
+
+"Well," continued the Duke, "Bonaparte has not given me any idea of his projects; and as my plans will depend upon his, how can you expect me to tell you what mine are?" [1]
+
+{~ His plans hang on Bonaparte's, so he cannot share them. ~}
+
+## All warfare is deception
+
+**18.** All warfare is based on deception.
+
+**Commentary.** The truth of this pithy{= short and full of meaning} and profound saying will be admitted by every soldier. Col. Henderson tells us that Wellington, great in so many military qualities, was especially distinguished by "the extraordinary skill with which he concealed his movements and deceived both friend and foe."
+
+**19.** Hence:
+
+- when able to attack, we must seem unable
+- when using our forces, we must seem inactive
+- when we are near, we must make the enemy believe we are far away
+- when far away, we must make him believe we are near
+
+{~ Four cases, one pattern: show the opposite. ~}
+
+**20.** Hold out baits{= lures, things that tempt} to entice the enemy. Feign{= pretend} disorder, and crush him.
+
+**Commentary.** All commentators, except Chang Yu, say, "When he is in disorder, crush him." It is more natural to suppose that Sun Tzŭ is still illustrating the uses of deception in war.
+
+**21.** If he is secure at all points, be prepared for him. If he is in superior strength, evade him.
+
+**22.** If your opponent is of choleric{= quick to anger} temper, seek to irritate him. Pretend to be weak, that he may grow arrogant.
+
+**Commentary.** Wang Tzŭ, quoted by Tu Yu, says the good tactician{= expert in tactics} plays with his adversary as a cat plays with a mouse. He plays by first feigning weakness and immobility{= not moving at all}, and then suddenly pouncing{= jumping on suddenly} upon him.
+
+{~ Cat and mouse. Feign, then pounce. ~}
+
+**23.** If he is taking his ease, give him no rest.
+
+**Commentary.** This is probably the meaning, though Mei Yao-ch’en has the note: "while we are taking our ease, wait for the enemy to tire himself out." The *Yu Lan* has "Lure him on and tire him out."
+
+If his forces are united, separate them.
+
+**Commentary.** Less plausible is the interpretation favoured by most of the commentators: "If sovereign and subject are in accord, put division between them."
+
+**24.** Attack him where he is unprepared, appear where you are not expected.
+
+**25.** These military devices, leading to victory, must not be divulged{= revealed} beforehand.
+
+{~ The playbook stays closed until the battle. ~}
+
+## Calculate before you fight
+
+**26.** Now the general who wins a battle makes many calculations in his temple ere{= before} the battle is fought.
+
+**Commentary.** Chang Yu tells us of a custom in ancient times. A temple was set apart for the use of a general who was about to take the field. It was set apart in order that he might there elaborate his plan of campaign.
+
+The general who loses a battle makes but few calculations beforehand. Thus do many calculations lead to victory, and few calculations to defeat: how much more no calculation at all! It is by attention to this point that I can foresee who is likely to win or lose.
+
+[1] "Words on Wellington," by Sir. W. Fraser.
+
+@why: Think of a time you went into a decision without comparing your position to the other side's. What would the seven questions have shown you?
+@recap:
+- War decides life and death, so it must be studied: compare both sides on five constant factors, the Moral Law, Heaven, Earth, the Commander, and Method and discipline.
+- Seven comparison questions let a general forecast victory or defeat, but plans must also bend to helpful circumstances.
+- All warfare is based on deception. Many calculations beforehand lead to victory and few to defeat, so Sun Tzŭ can foresee who is likely to win or lose.
+@quiz:
+1. What are the five constant factors that govern the art of war?
+2. What did Ts’ao Ts’ao do after condemning himself to death for allowing his horse to shy into a field of corn?
+@answers:
+1. The Moral Law, Heaven, Earth, the Commander, and Method and discipline.
+2. He was persuaded to satisfy his sense of justice by cutting off his hair instead of losing his head.
