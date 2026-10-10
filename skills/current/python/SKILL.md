@@ -67,15 +67,17 @@ Policy defaults for new code. Inherited project configs override defaults.
 
 ## uv Essentials
 
-Prefer `uv` over raw `python`, `pip`, `poetry`, and `python -m venv` when uv is the intended workflow.
+Prefer `uv` over raw `python`, `pip`, `poetry`, and `python -m venv` when uv is the intended workflow. Check `uv --version` before relying on implicit Python defaults.
+
+uv 0.13.0 sets Python 3.15 as the default stable release. For a project targeting 3.14, `uv python pin 3.14` writes `.python-version`. Set `requires-python` to the supported version range, not the interpreter pin. Request prerelease interpreters explicitly for compatibility testing.
 
 ```bash
-uv run python script.py
+uv run --script example.py
 uv run pytest
 uv run basedpyright
 uv run ruff check .
 uv run ruff format --check .
-uv run --with httpx2 python script.py
+uv run --with httpx2 --script example.py
 uv add httpx2
 uv add --dev pytest anyio basedpyright ruff
 uv venv
@@ -83,6 +85,8 @@ uv init --script example.py --python 3.14
 uv add --script example.py httpx2 rich
 uv lock --script example.py
 ```
+
+Run `uv lock` and commit `uv.lock` for reproducible project environments. Use `uv sync --locked` or `uv run --locked pytest` in CI to fail on stale locks. `--frozen` skips freshness checks. For standalone scripts, `uv lock --script example.py` creates `example.py.lock` beside the script. Commit it and use `uv run --script example.py`.
 
 Use inline script metadata for standalone scripts that need dependencies:
 
@@ -110,11 +114,11 @@ Use inline script metadata for standalone scripts that need dependencies:
 
 ## Build Note
 
-Use `uv_build` for pure Python packages. For extension modules, prefer an appropriate backend such as `hatchling`.
+Use `uv_build` for pure Python packages. Use `maturin` for Rust extensions and `scikit-build-core` for C or C++ extensions built with CMake. Use `hatchling` for pure Python packages that need custom build logic.
 
 ```toml
 [build-system]
-requires = ["uv_build>=0.9.28,<0.10.0"]
+requires = ["uv_build>=0.13.0,<0.14"]
 build-backend = "uv_build"
 ```
 
