@@ -7,7 +7,9 @@ configuration, prompts, aliases, completion, help, and exit handling.
 credentials supplied only by the user's already-configured auth environment.
 
 **Write boundary:** any remote mutation, account change, push, merge, extension
-install, or credential change needs explicit user authorization immediately before it.
+install, or credential change needs user authorization covering that operation.
+Honor existing scoped authorization, including Ship's destination. Ask again only
+for scope expansion or required approvals; installation needs setup authorization.
 After an authorized write, re-read the affected resource.
 
 **Adjacent handoff:** route command-family details to the family references from
@@ -54,7 +56,8 @@ logout, token refresh, protocol change, or account switch part of an unrequested
 - Never put tokens in `--header`, `--raw-field`, URLs, shell history, prompts, logs,
   eval fixtures, saved transcripts, or generated artifacts.
 - `GH_PROMPT_DISABLED=1` makes missing prompts fail instead of blocking. Use it for
-  automation and verification. It does not authorize a write or make a command safe.
+  host CLI automation. Extensions may use their own TTY detection; use their
+  explicit noninteractive flags. Prompt control does not authorize writes.
 
 ## Interaction controls
 
@@ -124,7 +127,8 @@ to another command family without evidence and authorization.
 
 Before a remote write, capture enough read-only state to identify the target, current
 revision/status, permissions, and relevant parent object. State the exact mutation,
-its target, and expected effect; obtain authorization at that boundary. Afterward,
+its target, and expected effect; check existing authorization and ask only if it
+does not cover the operation. Afterward,
 re-read the resource with structured fields and report the resulting URL/number/state.
 If the write fails or is interrupted, preserve the response and do not assume it was
 rolled back.

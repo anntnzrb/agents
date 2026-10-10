@@ -83,12 +83,12 @@ secret; still avoid exposing its value in logs.
 
 ## Stack-aware CI
 
-For a stacked PR, check each layer's PR and its base/head relationship. A green lower
-layer can become stale after an upstack rebase; refresh `gh stack view --json` and
-PR checks after synchronization. A queued merge, required check, merge queue, or
-asynchronous status belongs to the stack lifecycle; do not bypass it with a direct
-`gh pr merge`. Read `stack-commands.md` before stack-aware dispatch, merge, or
-recovery.
+For dependent PRs, check each layer's base/head relationship and current checks.
+Ordinary chains need no stack extension. For native stacks, refresh remote
+membership and PR checks after synchronization; use local `view --json` only when
+the extension and tracking are available. Queued or asynchronous native merging
+belongs to the stack lifecycle; do not bypass it with `gh pr merge`. Read
+`stack-commands.md` before native-stack dispatch, merge, or recovery.
 
 ## Failure handling
 

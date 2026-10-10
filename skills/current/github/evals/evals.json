@@ -66,7 +66,7 @@
         "The response provides a layer owner map ordered database schema, API endpoint, then UI, with each base pointing to the layer below.",
         "The response states same-repository, strictly linear dependency constraints and refuses cross-fork or unrelated work in one stack.",
         "The response includes explicit noninteractive gh stack commands including init/add, view --json, and submit --auto, with remote selection where needed.",
-        "The response routes staging/history and worktree lifecycle to commit and git-worktrees rather than silently replacing those authorities."
+        "The response routes staging/history and worktree lifecycle to autommit and git-worktrees rather than silently replacing those authorities."
       ]
     },
     {
@@ -76,19 +76,75 @@
       "files": [],
       "expectations": [
         "The response starts on the owning lower-layer branch and plans an upstack rebase with explicit conflict continue/abort handling.",
-        "The response uses force-with-lease-safe stack push/sync semantics, refreshes view --json and checks/reviews for affected layers, and never uses --force.",
-        "The response uses a contiguous bottom-up stack merge path with --yes, accounts for merge queues/asynchronous polling, and explicitly refuses gh pr merge."
+        "The response accounts for remote-only commits before rewriting, verifies remote tips even after sync exits 0, refreshes checks/reviews for affected layers, and never uses --force.",
+        "The response uses a contiguous bottom-up stack merge path with --yes, verifies authorization for every included layer, accounts for one merge-queue group/asynchronous completion, and explicitly refuses gh pr merge."
       ]
     },
     {
       "id": 8,
-      "prompt": "Planning-only request: Assess installing or invoking github/gh-stack, gh skill, or another GitHub CLI extension. Do not install, upgrade, remove, authenticate, or execute the preview tool. Explain the safe discovery and authorization sequence.",
-      "expected_output": "A preview/extension safety plan that checks installed extensions and skills, reviews publisher/version/pin and permissions, labels preview surfaces, and requires explicit authorization before installation or execution.",
+      "prompt": "Planning-only request: Assess installing or invoking github/gh-stack, gh skill, or another GitHub CLI extension. Do not install, upgrade, remove, authenticate, or execute the focused tool. Explain the safe discovery and authorization sequence.",
+      "expected_output": "An extension setup plan that discovers the requested capabilities, reviews publisher/version/pin and permissions, distinguishes GA native stacks from preview tools, and requires setup authorization before installation.",
       "files": [],
       "expectations": [
         "The response checks gh extension list and gh skill list before invoking or installing a focused/third-party capability.",
-        "The response requires publisher/repository review, an immutable tag or commit pin where applicable, preview labeling, and explicit authorization.",
+        "The response requires publisher/repository review, an immutable tag or commit pin where applicable, accurate availability labeling, and setup authorization.",
         "The response refuses automatic install, upgrade, removal, authentication changes, and use of a missing command's help as a harmless probe."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Planning-only request: Ship already has authorization to prepare a normal single PR, but gh-stack is not installed. Stacks are optional. Explain how GitHub operations proceed without setup or repeated approval questions. Do not execute any commands.",
+      "expected_output": "The ordinary PR workflow remains extension-free and uses existing scoped Prepare authorization. It stops before merging and does not require gh skill or native association.",
+      "files": [],
+      "expectations": [
+        "The response keeps ordinary PR preparation available without installing gh-stack or invoking gh skill.",
+        "The response honors existing Prepare authorization for necessary commits, pushes, and PR writes without asking again at each command.",
+        "The response does not merge, create native membership, or turn a stack recommendation into a prerequisite."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Planning-only request: A Ship target PR already belongs to a native GitHub stack with an unmerged lower PR, and only the target PR was authorized for delivery. gh-stack is missing. Explain the handoff and setup recommendation without installing, merging, unstacking, or changing files.",
+      "expected_output": "A scoped native-stack handoff that identifies the additional lower-layer merge scope, avoids ship land and ordinary gh pr merge, recommends official extension setup without installing its agent skill, and allows independent ordinary work to continue.",
+      "files": [],
+      "expectations": [
+        "The response identifies that native merging can include unmerged lower PRs and requires authorization for that additional scope.",
+        "The response routes native mechanics to GitHub, does not run ship land on the native stack, and preserves existing membership.",
+        "The response proactively recommends official github/gh-stack with setup authorization, does not install its upstream skill into generated homes, and does not block independent ordinary PR work."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Planning-only request: Ship has authorization to deliver all my work from this long chat: an independent parser bug fix, independent README corrections, and a schema change with a dependent API feature that benefits from separate review. None is published, and gh-stack is absent. Choose PR boundaries and merge order without executing commands or asking me to pick a PR count.",
+      "expected_output": "A Ship-owned partition with independent parser and README PRs targeting trunk, plus a schema/API dependent chain. Native stacks are optional, existing delivery authorization is honored, and every authorized unit is tracked to confirmed merge.",
+      "files": [],
+      "expectations": [
+        "The response assigns PR grouping to Ship and proposes separate trunk-based PRs for the independent parser and README outcomes.",
+        "The response gives the schema and API PRs an actual dependency relationship and bottom-up landing order without stacking the unrelated outcomes.",
+        "The response keeps delivery possible without gh-stack installation or native association and does not ask again for already authorized scoped publication or merge.",
+        "The response continues independent work if another PR is blocked and does not report full delivery while any authorized unit remains unmerged."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Planning-only request: One authorized feature touches 25 files across implementation, tests, and documentation after a long chat. Those changes implement one coherent behavior and cannot usefully be reviewed or reverted separately. Prepare it for review, with no merge authorization. Should Ship split it or require gh-stack? Do not execute commands.",
+      "expected_output": "One coherent PR with atomic commits as useful, no arbitrary split by file count or chat length, no required extension, and a Prepare stop before merge.",
+      "files": [],
+      "expectations": [
+        "The response keeps the coherent feature in one PR rather than splitting by file count, chat turns, or commit count.",
+        "The response distinguishes autommit's atomic commits from Ship's PR boundaries and does not require gh-stack.",
+        "The response honors Prepare authorization and stops before merge."
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Planning-only request: Ship was asked to deliver only PR 42. The same checkout contains my unrelated uncommitted experiment and another person's staged fix, including edits in a file touched by PR 42. A small fix and its test are tightly coupled within PR 42. Explain the scope and grouping without commands, file edits, or publication.",
+      "expected_output": "One scoped PR for the tightly coupled fix and test, with unrelated and foreign work preserved. The target PR's delivery authorization does not sweep in accumulated work sharing its files.",
+      "files": [],
+      "expectations": [
+        "The response preserves unrelated uncommitted and foreign staged changes, including overlapping-file work.",
+        "The response does not expand PR 42 delivery authorization to other accumulated outcomes.",
+        "The response keeps the small tightly coupled fix and test together without inventing extra PRs or a stack."
       ]
     }
   ]

@@ -11,6 +11,8 @@ metadata:
 
 Use when a task names `gh`, GitHub CLI, a GitHub remote surface, or stacked pull requests. Route to the smallest owning reference.
 
+This skill supplies command recipes and operating rules. `ship` owns task scope, destination, PR grouping, verification, and delivery sequencing.
+
 ## Preflight live operations
 
 1. Run `gh --version` before relying on installed capabilities.
@@ -21,7 +23,7 @@ Use when a task names `gh`, GitHub CLI, a GitHub remote surface, or stacked pull
 ## Safety gates
 
 - Treat `--web`, `browse`, browser/editor/pager launches, prompts, and TUI commands as interactive side effects. Prefer noninteractive flags and state user actions.
-- Require explicit user authorization immediately before external writes to issues, pull requests, projects, repositories, secrets, variables, releases, API mutations, pushes, merges, extension installs, or account changes.
+- Before external writes, confirm that the user's request authorizes the target and operation. Honor scoped authorization already established by `ship`; do not ask again for each necessary command. Ask for writes beyond that scope, required project approvals, and tool installation or upgrades not already authorized.
 - NEVER print, persist, or echo tokens, credentials, key material, or auth headers.
 - After every authorized write, re-read the resulting resource and report failures.
 - Route `gh api` through `references/api.md`. Parameters can change its default GET to POST; make method and mutation intent explicit.
@@ -47,6 +49,8 @@ Read the listed reference whenever its trigger applies. Use `references/core.md`
 
 ## Stacked PR boundary
 
-For explicit stack intent, read all three stack references (`references/stack-design.md`, `references/stacked-pr-workflow.md`, and `references/stack-commands.md`) before branch or PR mutation; use local references. Check `gh extension list`; NEVER auto-install extensions. Missing capability, 404, or stack exit 9 means availability/rollout failure, not permission to silently use ordinary PR commands.
+Stacks are optional. Ordinary PRs and ordinary dependent PR chains do not require `gh-stack`, `gh skill`, or native stack association. Suggest native stacks when dependent concerns would benefit from separate reviews. If the extension is absent, recommend official `github/gh-stack` and follow `references/agent-platform.md` for authorized installation; continue ordinary work when stack adoption is not required. Do not install the upstream agent skill into sync-managed homes.
+
+For requested native stacks or known native membership, read `references/stack-design.md`, `references/stacked-pr-workflow.md`, and `references/stack-commands.md` before mutation. Check `gh extension list` before invoking the extension. Missing capability, 404, or stack exit 9 limits that stack operation; it does not block unrelated ordinary PR work. Preserve existing membership and report the unavailable operation instead of silently unstacking or using an ordinary merge.
 
 Ownership: `git-worktrees` owns worktree lifecycle; `autommit` owns staging and history. This skill owns GitHub CLI routing and stack-specific remote state only.

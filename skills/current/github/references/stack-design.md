@@ -4,7 +4,9 @@ Scope: dependency invariants, layer planning, branch ownership, same-repository 
 
 Safe default: one strictly linear stack in one repository; plan bottom→top; one reviewable concern and clear owner per layer. Before creating or mutating a stack, make its graph and local lifecycle authority explicit.
 
-Write boundaries: branch creation/rewrites, staging/commits, pushes, PR creation, stack linking, and stack restructuring are separate local/remote writes. Obtain authorization for each applicable boundary; afterward re-read local `view --json` and remote PR/stack state.
+Native association is optional. Recommend it when separate dependent reviews help; ordinary dependent PRs remain valid without the extension. Do not turn a recommendation into required setup or silently create a stack.
+
+Write boundaries: branch creation/rewrites, staging/commits, pushes, PR creation, stack linking, and stack restructuring are separate local/remote writes. Check that existing authorization covers each boundary and affected layer; ask only for missing scope. Afterward re-read local `view --json` and remote PR/stack state.
 
 Ownership handoff: `git-worktrees` owns worktree lifecycle; `autommit` owns staging, commit segmentation, and message policy; external branch managers own their local state. Return to `stack-commands.md` only after this design is sound.
 
@@ -26,7 +28,7 @@ trunk (usually main)
 
 ## Split or refuse
 
-Create a layer when the concern or ownership changes, review can proceed independently, or a branch is large enough to obscure a smaller diff. Keep unrelated features in separate stacks even when they touch nearby files. Do not stack merely to avoid deciding a clean commit boundary.
+Split dependent work into layers when focused concerns benefit from separate review or ownership handoffs. Keep tightly coupled changes together when splitting adds no review or verification value. Publish unrelated features as independent PRs against trunk, even when they touch nearby files. Do not stack merely to avoid deciding a clean commit boundary.
 
 Refuse or redesign when:
 
@@ -36,7 +38,7 @@ Refuse or redesign when:
 - branch ownership or local manager is ambiguous;
 - an uninspected merge queue, protection rule, or release policy requires a different sequence.
 
-Use separate stacks for independent work. A stack is not a general project plan, deployment order, or substitute for issue/project tracking.
+Use separate stacks only when each independent outcome needs its own dependent layers. A stack is not a general project plan, deployment order, or substitute for issue/project tracking.
 
 ## Branch and PR conventions
 
@@ -57,19 +59,19 @@ Where repository policy allows, every PR title/body should state its layer and d
 1. Inspect existing worktrees and native manager ownership. `git-worktrees` is authoritative for create/assign/remove; never create a second manager beside it.
 2. Determine which tool owns history: `autommit` for raw-Git staging and commit segmentation. Do not mix an external manager's writes with raw `git add/commit/rebase`.
 3. If `gh stack` owns the local stack, use its branch/navigation/rebase commands. If Jujutsu, Sapling, git-town, or another manager owns local branches, keep that manager authoritative; use `gh stack link` only for remote stack association.
-4. Do not let a stack operation silently adopt a consumer/foreign worktree. Preserve state when manager or worktree identity is uncertain.
+4. Local tracking is shared across linked worktrees. `rebase`, `sync`, and `modify` can rewrite branches in other clean checkouts. Verify ownership and authorization for every affected worktree; clean state alone grants no authority. Do not let a stack operation silently adopt a consumer/foreign worktree.
 5. Hand each layer’s exact staged/commit state to `autommit`; do not use `gh stack add -A/-u/-m` as an unreviewed substitute for repository staging policy.
 
 ## Before stack commands
 
 Complete read-only checks:
 
-- `gh --version`, `gh auth status`, and installed `gh extension list`/`gh skill list`;
+- `gh --version`, `gh auth status`, and installed `gh extension list`;
 - verified repository/host, remotes, default/trunk branch, and worktree/manager state;
 - current branch, clean/dirty status, in-progress rebase/merge, and existing stack membership via `gh stack view --json` when capability is available;
 - branch protection, required checks, merge queue, and contribution rules relevant to the target repository.
 
-If the extension/feature is missing, preview-only, disabled, or returns stack exit 9, report availability/rollout rather than silently creating ordinary PRs.
+If the requested stack capability is missing, disabled, or returns stack exit 9, report the unavailable operation and preserve existing membership. Continue independent ordinary PR work; extension discovery is not a gate on that work.
 
 ## Official references
 

@@ -17,7 +17,7 @@ gh extension list
 gh skill list
 ```
 
-These commands are read-only. MUST NOT auto-install, upgrade, remove, or select a publisher from a command name alone. Check repository owner, release/tag or commit pin, version, permissions, and preview status. If `gh skill list` is unavailable, use `gh help skill`; report capability unverifiable and do not invent output.
+These commands are read-only. Check repository owner, release/tag or commit pin, version, permissions, and availability. Do not install, upgrade, remove, or select a publisher from a command name alone. If `gh skill list` is unavailable, report that capability without making it a prerequisite for ordinary PR work.
 
 A missing-command help request may auto-install an extension. NEVER use `gh stack --help` as a harmless probe; check `gh extension list` first and follow explicit installation policy.
 
@@ -30,6 +30,8 @@ gh extension install OWNER/REPO [--pin TAG_OR_COMMIT]
 ```
 
 Prefer a reviewed immutable tag/commit pin. Authorization must consider publisher/repository ownership, requested permissions, release provenance, and local installation path. Before authorized `gh extension upgrade`, `remove`, or `uninstall`, inspect current version and dependents; afterward rerun `gh extension list` and report installed version.
+
+When dependent reviews or an existing native stack make `gh-stack` useful, proactively recommend official `github/gh-stack` if absent. Installation is optional for ordinary PR work. Honor existing setup authorization; otherwise present the concrete installation command for approval. Installing the extension does not authorize installing its upstream agent skill or changing sync-managed homes.
 
 Extensions can execute arbitrary local code and perform remote writes. NEVER pipe credentials or secrets to one. Read installed `gh <extension> --help` only after discovery and authorization when setup could trigger; do not assume missing-command help is side-effect-free.
 
