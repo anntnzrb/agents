@@ -11,7 +11,7 @@ Functional-first building blocks: higher-order functions, purity, comprehensions
 **Solution**:
 
 ```python
-from typing import Callable
+from collections.abc import Callable
 
 def apply_twice(f: Callable[[int], int], x: int) -> int:
     return f(f(x))

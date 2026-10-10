@@ -6,18 +6,18 @@ The canonical "super strict but sane" config for modern Python projects. Copy-pa
 
 ```bash
 # Application
-uv init --app myproject
+uv init --app myproject --python 3.14
 cd myproject
 
 # Library (publishable to PyPI)
-uv init --lib mylibrary
+uv init --lib mylibrary --python 3.14
 cd mylibrary
 
 # Add dev tools
 uv add --dev basedpyright ruff pytest
 ```
 
-`uv init` creates `pyproject.toml`, `.python-version`, and `src/` layout. Replace its `pyproject.toml` `[tool.*]` sections with the block below.
+Both templates create a packaged `src/` layout, `pyproject.toml`, and `.python-version`. The library template also creates a `py.typed` marker. `--python 3.14` writes a `3.14` runtime pin and sets `requires-python` to `>=3.14`, matching the config below. Replace the generated `pyproject.toml` `[tool.*]` sections with the block below.
 
 ## The full pyproject.toml
 
