@@ -10,7 +10,8 @@
     "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20",
     "BASH_DEFAULT_TIMEOUT_MS": "5000",
     "BASH_MAX_TIMEOUT_MS": "5000",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-5-5"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-5-5",
+    "ENABLE_TOOL_SEARCH": "true"
   },
   "model": "opus[1m]",
   "modelSettings": {
