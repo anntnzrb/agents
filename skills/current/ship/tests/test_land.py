@@ -29,6 +29,9 @@ if args[:2] == ["repo", "view"]:
 elif args[:2] == ["pr", "checks"] and config["scenario"] == "unreported":
     sys.exit("no required checks reported on the 'topic' branch")
 elif args[:2] == ["pr", "checks"]:
+    if config["scenario"] == "stack_during_checks":
+        state["stacked"] = True
+        statefile.write_text(json.dumps(state))
     failed = config["scenario"] == "failed"
     print(json.dumps([{{"name": "CI required",
         "bucket": "fail" if failed else "pass",
@@ -39,6 +42,16 @@ elif args[:2] == ["pr", "merge"]:
     if config["scenario"] == "uncertain":
         statefile.write_text(json.dumps(state))
         sys.exit(1)
+elif args[:3] == ["api", "--method", "GET"]:
+    if config["scenario"] == "stacks_unavailable":
+        print(json.dumps({{"message": "Not Found", "status": "404"}}))
+        sys.exit("gh: Not Found (HTTP 404)")
+    if config["scenario"] == "stacks_forbidden":
+        print(json.dumps({{"message": "Resource not accessible", "status": "403"}}))
+        sys.exit("gh: Resource not accessible (HTTP 403)")
+    print(json.dumps([{{"number": 9, "pull_requests": [{{"number": 5}},
+        {{"number": 7}}]}}] if config["scenario"] == "native_stack"
+        or state.get("stacked") else []))
 elif args[:2] == ["api", "-X"]:
     state["updated"] = True
     state["queued"] = False
@@ -178,6 +191,39 @@ def test_failed_check_preserves_branch_and_worktree(repository: Repository) -> N
     repository.assert_preserved()
     assert "CI required" in result.stderr
     assert "https://example.test/run/42" in result.stderr
+
+
+@pytest.mark.parametrize("scenario", ["native_stack", "stack_during_checks"])
+def test_native_stack_does_not_merge_or_clean_up(
+    repository: Repository, scenario: str
+) -> None:
+    """An isolated-PR landing must never merge layers of a native stack."""
+    result = repository.land(scenario)
+    assert result.returncode == 1
+    assert "native stack" in result.stderr
+    repository.assert_preserved()
+    assert not any(
+        c[:2] == ["pr", "merge"] or c[:2] == ["api", "-X"]
+        for c in repository.commands()
+    )
+
+
+def test_stack_capability_is_optional(repository: Repository) -> None:
+    """An unavailable stacks API does not prevent ordinary PR delivery."""
+    result = repository.land("stacks_unavailable")
+    assert result.returncode == 0, result.stderr
+    assert not repository.worktree.exists()
+    assert repository.git("branch", "--list", "topic") == ""
+    assert not any(c[0] in {"extension", "stack"} for c in repository.commands())
+
+
+def test_unknown_stack_membership_preserves_state(repository: Repository) -> None:
+    """An access failure is not evidence that the target has no stack."""
+    result = repository.land("stacks_forbidden")
+    assert result.returncode == 1
+    assert "Resource not accessible" in result.stderr
+    repository.assert_preserved()
+    assert not any(c[:2] == ["pr", "merge"] for c in repository.commands())
 
 
 @pytest.mark.parametrize("scenario", ["closed", "mismatch", "timeout"])

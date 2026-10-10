@@ -4,7 +4,7 @@ Covers `issue`, `pr`, `discussion`, `project`, `label`; JSON selection, checks, 
 
 ## Defaults and boundaries
 - Safe default: identify explicit host/repository/object; read current state; use structured output.
-- External writes: create, edit, comment, close, reopen, merge, request review, resolve threads, change labels/projects/milestones. MUST obtain explicit authorization at mutation boundary; re-read resulting object. NEVER put secrets in issue/PR bodies or comments.
+- External writes: create, edit, comment, close, reopen, merge, request review, resolve threads, change labels/projects/milestones. Verify existing authorization at the mutation boundary; ask only for missing scope and re-read the resulting object. NEVER put secrets in issue/PR bodies or comments.
 - Shared rules → `core.md`; Actions checks/logs → `automation.md`; dependent PRs → `stack-design.md`, `stack-commands.md`.
 
 ## Common reads
@@ -30,7 +30,7 @@ Discover fields with `--json` without a field list when installed options drift.
 - `gh pr diff --patch` remains a read.
 - `gh pr checkout` changes local branch/worktree state; route lifecycle decisions to `git-worktrees` and inspect current worktree ownership first.
 - Writes: `gh pr create`, `edit`, `close`, `reopen`, `comment`, `review`, `ready`, `lock`, `unlock`, `update-branch`, `merge`. Before execution, confirm base/head/repository, draft state, body, reviewers, and requested authorization.
-- `gh pr merge` is an ordinary PR path, NOT a stacked-PR merge path. Explicit stack intent → `stack-commands.md`, which owns merge order and queue state.
+- `gh pr merge` is an ordinary PR path. Ordinary dependent chains need no extension and land bottom-up after their parents. Requested native stacks or known membership route to `stack-commands.md`, which owns merge scope and queue state.
 
 ## Discussions
 - `gh discussion list`, `view`, and category reads are remote reads when available in installed CLI.

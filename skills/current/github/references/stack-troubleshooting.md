@@ -1,11 +1,11 @@
 # Stacked pull request troubleshooting
 
 ## Scope and safety
-Covers dirty trees, conflicts, divergence/rollback, locks/interrupted sessions, merge ancestry, pruning/unstacking, external managers, signatures, partial writes, and preview/document drift.
+Covers dirty trees, conflicts, divergence/rollback, locks/interrupted sessions, merge ancestry, pruning/unstacking, external managers, signatures, partial writes, and version drift.
 
-Safe default: stop at uncertainty; preserve evidence/current state; re-read local/remote JSON before recovery. NEVER auto-repair, force, prune, break locks, choose local/remote truth, or silently fall back to ordinary PRs.
+Safe default: preserve uncertain stack state and re-read local/remote JSON before recovery. NEVER auto-repair, force, prune, break locks, choose local/remote truth, or silently merge a native stack as an ordinary PR. Continue independent ordinary work when an optional stack capability is unavailable.
 
-Writes: conflict resolution; rebase continue/abort; force-with-lease push; stack unstack/prune; branch deletion; PR retarget/merge; API recovery. Require explicit authorization and owning manager at every write boundary.
+Writes: conflict resolution; rebase continue/abort; force-with-lease push; stack unstack/prune; branch deletion; PR retarget/merge; API recovery. Check existing authorization and the owning manager at each write boundary; ask only for missing scope.
 
 Handoffs: `stack-commands.md` command/version/exit semantics; `stack-design.md` graph/manager ownership; `git-worktrees` worktree lifecycle; `autommit` staging/history; `api.md` custom endpoint recovery.
 
@@ -23,12 +23,14 @@ For `gh stack rebase`, `sync`, or cascading operations:
 1. Preserve conflict markers and operation metadata; inspect conflicted files and `git status`; do not run an unrelated rebase.
 2. The layer owner resolves intended content, stages exactly that resolution under `autommit` policy, then runs `gh stack rebase --continue` or the installed command's documented continue form.
 3. Run `gh stack rebase --abort` only when abandonment, authorization, and ownership are clear; afterward re-read every branch tip and `gh stack view --json`.
-4. Post-rebase push uses force-with-lease, NEVER `--force`. Lease failure means stop, fetch/read remote, and resolve divergence without overwriting.
+4. Post-rebase push uses force-with-lease, NEVER `--force`. Account for remote-only commits before rewriting; `gh stack push` refreshes leases through its own fetch and may overwrite those commits. Lease failure means preserve state and resolve divergence without overwriting.
 
 Squash/rebase merges may change ancestry; the old bottom tip may no longer be a simple ancestor. After a merged lower layer, use documented stack rebase/`--onto` behavior, never manual branch reset to make the graph linear. Refresh base/head and checks for every upstack PR.
 
 ## Sync divergence/rollback
 `sync` may adopt clean remote-ahead additions, but true local/remote divergence never authorizes choosing a source of truth. In noninteractive mode, documented behavior is abort/no-op without pushing or updating PRs; successful exit can mean “nothing changed,” not “synced.”
+
+A push failure can also leave `sync` at exit `0` with a success message. Compare intended local tips against `git ls-remote --heads <remote> <branch>` and each PR's live head. Do not rerun `push` until remote-only commits and rewrite ownership are accounted for.
 
 Re-read local/remote stack composition, branch tips, and uncommitted state. Present competing layer maps; ask the owning user/manager to choose remote, local recreation, or cancellation. NEVER delete the remote stack automatically. After a sync rebase conflict, expect branch restoration to original state and verify it. `--prune` deletes local branches for merged PRs; NEVER use it while diagnosing divergence, unknown ownership, or a dirty worktree. Re-read local refs after authorized prune.
 
@@ -41,7 +43,7 @@ Interrupted `modify` or exit `10` requires documented recovery. Preserve session
 A branch may occur in multiple stacks; exit `6` requires explicit disambiguation. A bare number may be a stack or PR number. Use an explicit stack/PR URL or read-only `view`, never positional guessing. If a branch is not in a stack (exit `2`), inspect local tracking and remote PR stack membership before adding it. Missing local metadata is not grounds to create a new stack.
 
 ## External managers/worktrees
-Jujutsu, Sapling, git-town, GitButler, native harness managers, and linked worktrees may own branch movement/history. Determine ownership before `checkout`, `rebase`, `push`, `link`, or `unstack`.
+Jujutsu, Sapling, git-town, GitButler, native harness managers, and linked worktrees may own branch movement/history. Linked worktrees share the extension's catalog; cross-worktree rebase/sync can update every affected checkout. Determine ownership before `checkout`, `rebase`, `push`, `link`, or `unstack`. Clean state does not authorize rewriting a foreign checkout.
 
 - Use `gh stack link` for remote association when another local manager owns branches; it does not create local tracking and may still push/create/retarget PRs.
 - Do not mix `gh stack` local rewrites with GitButler or raw-Git writes. Delegate staging/commits to `autommit` and lifecycle to `git-worktrees`.
@@ -54,15 +56,15 @@ Remote operations are not uniformly atomic:
 - `submit` pushes, creates/updates PRs, then links the stack; failure may leave branches/PRs without complete stack association.
 - `push` may update earlier branches before a later force-with-lease failure.
 - `link` may push and create/retarget multiple PRs before later validation fails.
-- `merge --yes` is all-or-nothing for direct stack merging; merge queues are asynchronous and may process selected PRs in groups.
+- `merge --yes` is all-or-nothing for direct stack merging; merge queues land the selected stack asynchronously as one merge group.
 
 After any partial result, inventory every branch, PR, and stack object; resume only from explicit remaining state. NEVER rerun the whole operation blindly.
 
 ## Signatures/provenance
 Rebases, cherry-picks, squash merges, and GitHub-generated merge commits may alter commit IDs, committer identity, or signature verification. Preserve repository-policy author/committer and signed-state requirements. Do not claim a rebased commit retains its original signature without checking the new object. Use `gh api` or the repository's documented verification command only for deliberate read.
 
-## Preview/document drift
-Stacked PRs and `gh stack` are public preview. Installed `gh stack <command> --help` and current official docs outrank this reference; flags, exit codes, API fields, and TUI behavior may change. Missing/404/exit-`9` capability is rollout failure, NOT permission to silently use ordinary PRs. Record installed version and exact unsupported surface in the report.
+## Version and availability drift
+Native stacks are generally available on github.com; Enterprise Server support depends on its release. Installed help and current docs outrank this reference for version-sensitive flags and API fields. Discover the extension before invoking help. Missing/404/exit-`9` capability limits the stack operation, not unrelated ordinary PR work. Preserve known native membership and record the unavailable surface.
 
 ## Official references
 - [Troubleshooting stacked pull requests](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-stacked-pull-requests)

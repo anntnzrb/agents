@@ -8,7 +8,8 @@ explicit HTTP method, minimal fields, and `--jq`/`--template` at the boundary.
 
 **Write boundary:** `gh api` is an external mutation surface. Require explicit user
 authorization before any non-GET request or request whose parameters/body can change
-state; re-read the affected resource afterward. Never put tokens or secrets in an
+state. Existing scoped authorization satisfies this boundary; ask only for missing
+scope and re-read the affected resource afterward. Never put tokens or secrets in an
 endpoint, field, input file, example, transcript, or output.
 
 **Adjacent handoff:** use `core.md` for target/auth/output/exit behavior,

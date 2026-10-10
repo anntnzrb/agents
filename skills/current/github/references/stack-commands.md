@@ -1,8 +1,8 @@
 # `gh stack` commands and lifecycle
 
-Public preview; version-sensitive. Safe default: verify capability, target, remotes, auth, worktree/manager, and stack state read-only; use explicit arguments, `GH_PROMPT_DISABLED=1`, `--json`, and `--remote` when needed.
+Native stacks are generally available on github.com. Enterprise Server availability depends on its release. The extension remains version-sensitive; verify installed help, target, remotes, auth, worktree ownership, and stack state before use.
 
-Writes: `add` staging/commit, checkout/rebase/navigation, submit, sync, push, link, unstack, and merge change local or remote state. Require explicit authorization for each external write, plus local authorization when an assigned worktree changes; afterward re-read local `view --json`, branches, PRs, and stack state.
+Writes: `add` staging/commit, checkout/rebase/navigation, submit, sync, push, link, unstack, and merge change local or remote state. Honor existing authorization for the operation and every affected layer/worktree; ask only for missing scope. Afterward re-read local `view --json`, remote branch tips, PRs, and stack state.
 
 Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees` and `autommit` remain authorities for local lifecycle and staging/history.
 
@@ -13,21 +13,28 @@ Before any stack command:
 ```text
 gh --version
 gh extension list
-gh skill list
 gh auth status
 git remote -v
 gh repo view [HOST/]OWNER/REPO --json nameWithOwner,defaultBranchRef,url
 ```
 
-Do not probe a missing `gh stack` with `gh stack --help`: the installed environment may auto-install `github/gh-stack`. If the extension is absent, review publisher, version, permissions, and current official docs; obtain explicit authorization before:
+If absent and useful for the requested work, recommend official `github/gh-stack`. Review publisher, release, and current docs before authorized installation. Do not probe a missing command with `gh stack --help`, which may trigger installation:
 
 ```text
 gh extension install github/gh-stack --pin TAG_OR_COMMIT
 ```
 
-A missing command, 404, disabled feature, or stack exit `9` means availability/rollout failure; do not silently use ordinary PR commands. With multiple remotes, name the intended remote on every remote-aware command and verify its host/repository.
+A missing command, 404, disabled feature, or stack exit `9` limits the requested stack operation, not ordinary PR work. Preserve known native membership instead of silently merging or unstacking it. With multiple remotes, set verified `GH_REPO=<host/owner/repo>` for the API target as well as `--remote` for pushes; `--remote` alone does not bind both targets.
 
-Set `GH_PROMPT_DISABLED=1` for automation and verification. It prevents prompts; it does not authorize writes. Prefer explicit branch/stack/PR arguments and avoid the interactive `modify`, `switch`, or picker forms in agent execution. These examples are planning forms; exact flags are version-sensitive, so after capability discovery check `gh stack <command> --help`.
+Use explicit arguments, `view --json`, `submit --auto`, `merge --yes`, and a non-TTY stdout. `GH_PROMPT_DISABLED=1` is not sufficient to suppress the extension's prompts under a PTY. Avoid interactive `modify`, `switch`, and picker forms in agent execution. Examples below also set the host CLI's prompt control; it does not authorize writes. Check installed `gh stack <command> --help` after discovery.
+
+Read native membership without the extension:
+
+```text
+gh api --method GET 'repos/OWNER/REPO/stacks?pull_request=PR_NUMBER'
+```
+
+An empty array means no native membership. Do not infer that result from an auth or network failure. `view --json` describes locally tracked layers but omits the remote stack number; resolve that number through the remote read.
 
 ## Local lifecycle
 
@@ -58,6 +65,12 @@ GH_PROMPT_DISABLED=1 gh stack trunk
 - `checkout` may fetch a remote stack and change the active worktree. Route lifecycle and ownership through `git-worktrees`; never adopt a foreign/consumer worktree.
 - Navigation changes local branch state. `switch` is interactive and is not an agent default.
 
+Git 2.36+ is required. From extension v0.2.0, linked worktrees share `<common-dir>/gh-stack` and recovery journals. Nonconflicting legacy catalogs migrate automatically with backups; conflicting definitions stop. Do not mix old and new writers in one clone or edit recovery journals.
+
+`rebase`, `sync`, and `modify` operate in the checkout that owns each affected branch. Check ownership and authorization for all affected checkouts before invocation. The extension checks clean/busy state and never creates, removes, steals, or auto-stashes worktrees. Its clone-wide locks coordinate extension processes, not other Git commands or editors.
+
+Navigation and explicit-target `checkout` accept `--print-path`. For a branch occupied elsewhere, successful stdout identifies its checkout without switching it. An unoccupied branch is checked out here before its path is printed. Parse only successful stdout and retain the owning manager's lifecycle authority.
+
 ## Remote operations
 
 ```text
@@ -84,9 +97,9 @@ GH_PROMPT_DISABLED=1 gh stack link --remote <remote> <bottom> <middle> <top>
 ```
 
 - `submit` pushes branches, creates/updates PRs, and creates/updates the remote stack. With `--auto`, new PRs are drafts unless `--open` is authorized. It can partially land before a later failure; re-read each branch/PR/stack instead of retrying.
-- `sync` fetches, reconciles, fast-forwards trunk when possible, cascades rebases, pushes with force-with-lease when needed, refreshes PR/stack state, and optionally prunes local merged branches. It does not open PRs. A clean remote-ahead update may be adopted; true divergence is a no-op in noninteractive mode and exits without pushing/updating. Do not select a local/remote truth automatically.
+- `sync` fetches, reconciles, fast-forwards trunk when possible, cascades rebases, pushes, refreshes PR/stack state, and optionally prunes local merged branches. It does not open PRs. It can exit `0` after a failed push or an aborted divergence. Verify intended remote branch tips and PR heads, not the exit code or success message. Do not select a local/remote truth automatically.
 - `rebase` changes local commit ancestry and may require `git add` plus `--continue`; `--abort` restores the pre-rebase state when supported. A rebase can make pushes non-fast-forward; verify leases and branch ownership.
-- `push` uses force-with-lease checks but is not atomic: earlier branches can update when a later lease fails. Report per-branch state.
+- `push` fetches before building its leases and can overwrite remote-only commits that local branches never incorporated. Inspect remote tips and account for those commits before any rewrite; a refreshed lease is not that proof. Updates are not atomic, so report per-branch state after partial failures.
 - `link` is remote-affecting and can push branches, create or adjust PR bases, and adjust the stack. Supply arguments bottom-to-top, verify the same repository, and re-read all PRs. It does not create local tracking; this is the handoff for Jujutsu, Sapling, git-town, or another external branch manager.
 
 ## Unstack and merge
@@ -103,7 +116,9 @@ GH_PROMPT_DISABLED=1 gh stack merge --yes --squash <stack-number|pr-number>
 
 `unstack` may leave merged/merging/queued PRs stacked and can dissolve the remote stack only after its remaining PRs are removed. `--local` skips the remote operation. Do not confuse unstacking with deleting branches or PRs; inspect the exact boundary.
 
-`merge --yes` is the stack merge path. It merges through the selected PR in one all-or-nothing request when direct merge is possible; repository rules still apply. If a merge queue is configured, GitHub queues the selected PRs and may process them in separate groups asynchronously, ignoring the requested merge method. Poll each PR and the queue until a terminal state, or report pending/failed state. **Never use `gh pr merge` for an explicit stack merge.**
+`merge --yes` merges through the selected PR, including every unmerged PR below it. Verify that all selected layers are reviewed and authorized; naming one PR does not authorize extra lower layers. Direct merging is all-or-nothing. With a merge queue, the selected stack lands as one merge group and the queue determines the method. Confirm each PR reaches MERGED; a queued request is pending delivery. **Never use `gh pr merge` for a native stack merge.**
+
+The extension does not expose `--match-head-commit`; do not claim that it preserves `ship land`'s reviewed-head condition. Ship's CLI handles ordinary PRs and refuses known native membership. Native automation must establish its head conditions and merge scope through the documented API before replacing that guarantee. After partial merges, refresh every remaining layer's base/head and checks before cleanup or further landing.
 
 ## CI, review, and API boundaries
 
@@ -119,7 +134,7 @@ The extension documents these stack-specific codes; installed help wins if drift
 
 |Code|Meaning|Safe handling|
 |---:|---|---|
-|`0`|Success|Refresh JSON state|
+|`0`|Command completed|Verify intended local and remote state; sync may have failed to push|
 |`1`|Generic error|Preserve state; inspect stderr|
 |`2`|Not in/found stack|Verify target/membership; no fallback mutation|
 |`3`|Rebase conflict|Resolve or abort explicitly|
@@ -141,3 +156,7 @@ The extension documents these stack-specific codes; installed help wins if drift
 - [Merging stacks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-stacked-pull-requests)
 - [Stack troubleshooting](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-stacked-pull-requests)
 - [REST pull request merge](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request-asynchronously)
+- [Native stack availability and merge behavior](https://github.blog/changelog/2026-10-06-stacked-pull-requests-generally-available/)
+- [Worktree support](https://github.com/github/gh-stack/releases/tag/v0.2.0)
+- [Push lease limitation](https://github.com/github/gh-stack/issues/380)
+- [Sync exit status limitation](https://github.com/github/gh-stack/issues/472)

@@ -57,6 +57,7 @@ class Runner:
 
     def write(self, repo: str, target: str, head: str, *args: str) -> None:
         """Dispatch once and reconcile a failed response, never replay it."""
+        self.guard_stack(target, repo)
         try:
             _ = self.run("gh", *args)
         except RuntimeError:
@@ -67,6 +68,30 @@ class Runner:
                 and state["headRefOid"] == head
             ):
                 raise
+
+    def guard_stack(self, target: str, repo: str) -> None:
+        """Keep native stack writes out of the single-PR landing path."""
+        membership = self.data(
+            "gh",
+            "api",
+            "--method",
+            "GET",
+            f"repos/{repo}/stacks?pull_request={target}",
+            allowed=(0, 1),
+        )
+        if isinstance(membership, list):
+            if membership:
+                message = f"PR #{target} belongs to a native stack"
+                raise RuntimeError(
+                    f"{message}; use the github stack workflow for authorized layers"
+                )
+            return
+        error = object_data(membership)
+        if error.get("status") == "404":
+            return  # Stacks unavailable; ordinary PR landing needs no extension.
+        raise RuntimeError(
+            "Cannot inspect native stack membership: " + text(error.get("message"))
+        )
 
 
 def object_data(value: Json) -> dict[str, Json]:
@@ -182,6 +207,7 @@ def land(args: argparse.Namespace, steps: list[str]) -> str:  # noqa: C901, PLR0
     if initial["isCrossRepository"]:
         raise RuntimeError("Fork PRs require separate head-remote ownership; stopped")
     number = str(initial["number"])
+    runner.guard_stack(number, repo)
     branch = text(initial["headRefName"])
     base = text(initial["baseRefName"])
     head = text(initial["headRefOid"])
@@ -245,6 +271,7 @@ def land(args: argparse.Namespace, steps: list[str]) -> str:  # noqa: C901, PLR0
             steps.append(f"Re-pinned rebased head {head}")
         if state["state"] == "MERGED":
             steps.append(f"PR #{number} is MERGED")
+            runner.guard_stack(number, repo)
             cleanup(runner, branch, head, base, worktree=worktree, steps=steps)
             return "MERGED"
         if runner.run("git", "rev-parse", f"refs/heads/{branch}") != head:

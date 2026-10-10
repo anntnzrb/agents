@@ -6,7 +6,7 @@ license: AGPL-3.0-or-later
 
 # Ship
 
-Move one scoped task to the requested outcome. Reconstruct the current state before choosing the next action. Keep the starting state separate from the destination: an existing issue does not grant permission to implement or merge.
+Move authorized work to the requested outcome in coherent delivery units. Reconstruct the current state before choosing the next action. Keep the starting state separate from the destination: an existing issue does not grant permission to implement or merge.
 
 ## Public entrypoint
 
@@ -20,6 +20,7 @@ For authorized landing, run `uv run --script <skill-dir>/scripts/cli.py land <nu
 - `--timeout` bounds the total wait in seconds (default 1800). `--interval` sets the polling interval (default 10).
 - `--json` emits one result. Exit codes are 0 for merged and cleaned up, 1 for a stopped operation, and 2 for usage errors.
 - A failure reports completed steps and preserves unfinished cleanup. Rerun from a surviving checkout to reconcile live state.
+- `land` handles ordinary PRs. It checks remote native-stack membership without requiring `gh-stack`; an unavailable stacks API does not block ordinary landing. Known native stacks use the GitHub skill's stack merge workflow instead.
 
 ## Choose the destination
 
@@ -29,7 +30,7 @@ Read the user's request and relevant conversation before any mutation. Explicit 
 | --- | --- | --- |
 | File an issue, save for later, hand to another agent, or an incidental problem outside the active task | Capture | A useful issue exists and its contents are verified |
 | Implement without a request to publish | Implement | The scoped local change is verified |
-| Open a PR, get it green, or make it merge-ready without a request to ship or merge | Prepare | The scoped PR is verified and merge-ready |
+| Open PRs, get them green, or make them merge-ready without a request to ship or merge | Prepare | The scoped PRs are verified and merge-ready |
 | Ship, land, or merge when ready, with a clear target | Deliver | The merge is confirmed and linked issues reflect the actual resolution |
 | Clean up merged local branches | Cleanup | Eligible local branches are deleted or reported as skipped |
 | Check status, consider filing, or discuss a possible change | Inspect | Findings only, with no writes |
@@ -44,6 +45,14 @@ When the target, repository, or destination remains ambiguous after read-only in
 
 State the target and destination briefly, then proceed. Ask only for missing information or permission that changes correctness, safety, cost, or scope. Do authorized work before an approval stop. Keep branch cleanup within the rules below. Do not expand the task into deployment, releases, repository settings, or unrelated cleanup.
 
+## Optional GitHub stacks
+
+Stacks complement Ship; they are not a prerequisite. Keep ordinary PR work on its normal path without installing an extension or creating a native stack. Suggest stacks when several dependent changes would benefit from separate review, but do not make adoption a condition of delivery.
+
+Ship owns the destination, authorized scope, readiness, and confirmation. The `github` skill owns stack discovery, setup, commands, and remote state. Read its stack references when native stacks are requested or the target already belongs to one. Ordinary dependent PRs do not imply native-stack membership.
+
+For native landing, identify every layer the merge would include and verify that delivery authorizes them all. A request to ship one PR does not authorize extra lower layers. Route native merge and subsequent cleanup through the GitHub workflow; do not invoke `land` on a native stack or dissolve the stack to bypass its guard. Recommend a missing official extension when useful, then continue independent ordinary work. Install only with authorization that covers setup.
+
 ## Reconstruct and reconcile
 
 1. Resolve the repository and tracker from explicit links, context, and verified remotes. A bare issue number is local to a resolved repository. Use its contribution rules, templates, branch rules, and default branch. Do not assume the default branch is named `main`.
@@ -54,6 +63,17 @@ State the target and destination briefly, then proceed. Ask only for missing inf
 
 Use `git` for local state and an available tracker client for remote state. On GitHub, verify `gh` capabilities and authentication before use. Prefer explicit repository targets. Read source from an existing checkout or an authorized shallow clone rather than fetching files individually over HTTP. Never install missing tools or alter credentials to complete this workflow without authorization.
 
+## Choose PR boundaries
+
+Before creating branches or publishing, inventory accumulated authorized changes and choose the smallest sensible set of coherent PRs. Preserve work outside that scope, even when it shares files. Reuse existing PRs when their intended scope matches.
+
+- Keep one coherent outcome in one PR. Split by concerns that can be understood, verified, and reverted independently, not by file count, chat turns, commit count, or an arbitrary diff limit.
+- Publish independent outcomes as separate PRs against the intended integration branch. Do not stack unrelated work or serialize it behind a blocked independent PR.
+- Use dependent PRs when actual dependencies benefit from separate review. Keep small, tightly coupled changes together when splitting adds no review or verification value. Native stacks remain optional.
+- Choose and briefly explain the grouping within existing authorization. Ask only for unresolved scope, ownership, or required approvals. Permission to ship one specific PR does not authorize other accumulated work.
+
+`autommit` owns atomic commits, not PR grouping. Squashing is per PR and does not justify combining unrelated outcomes. Apply the chosen destination to every authorized PR. Report blockers per unit and continue independent work; do not report complete delivery until every authorized unit is confirmed merged.
+
 ## Capture a problem for later
 
 1. Investigate enough to identify the affected project and distinguish a defect, requested behavior, configuration problem, or unresolved question. Do not implement or require a complete root cause during capture.
@@ -62,14 +82,14 @@ Use `git` for local state and an available tracker client for remote state. On G
 4. Remove secrets and private session details before publishing. Preserve useful paths and versions where safe. Do not rely on a private transcript as the only explanation.
 5. Create or narrowly update the issue as authorized. Preserve unrelated fields, labels, assignments, and discussion. Re-read the issue and return its link. Stop without a code change, branch, or PR.
 
-## Implement and prepare the PR
+## Implement and prepare the PRs
 
 1. Define the smallest change that satisfies the acceptance criteria. If the task is already solved, verify the existing resolution instead of recreating it. When shipping an issue with a partial merged fix, continue implementing its unmet criteria in a follow-up PR. Partial completion alone is not a blocker. When shipping only the PR, report remaining issue scope without expanding the task. Create an issue only when requested or required by project policy.
 2. Trace the cause before fixing a defect. Add a failing behavioral regression test when practical, then fix the cause. Follow project workflows for features and other changes.
 3. Keep the implementation isolated and scoped. Delegate only independent, bounded work when available and useful. Keep one owner for the branch, publication, and merge. Instructions alone are not concurrency control.
 4. Run the relevant checks and exercise the changed behavior. Use available review capabilities and inspect their actual findings. Fix real defects without weakening tests or bypassing hooks. Record any verification that cannot run and why.
-5. For Implement, stop with the verified local change. For Prepare or Deliver, use the applicable commit workflow. Check the actual diff for unrelated work before committing or pushing. Open or update the existing PR against the intended base. Follow its template and describe intent, scope, tradeoffs when relevant, and observed verification. Link the issue using the tracker's supported mechanism.
-6. Re-read the PR after publication. Confirm its repository, base, head, scope, and issue links before entering the feedback loop.
+5. For Implement, stop with the verified local change. For Prepare or Deliver, use the applicable commit workflow for each chosen delivery unit. Check the actual diff for unrelated work before committing or pushing. Open or update each PR against its intended base. Follow its template and describe intent, scope, tradeoffs when relevant, and observed verification. Link the issue using the tracker's supported mechanism.
+6. Re-read each PR after publication. Confirm its repository, base, head, scope, and issue links before entering its feedback loop.
 
 ## Resolve feedback until merge-ready
 
@@ -85,11 +105,11 @@ Merge-ready means the current patch satisfies acceptance criteria, relevant veri
 ## Deliver and confirm
 
 1. Run the `autoreview` skill before landing and resolve verified findings. Re-read the PR's current head, base, checks, review state, and mergeability. If the patch changed since verification, verify the affected behavior again.
-2. Once the reviewed PR is open and delivery is authorized, route GitHub landing to `land` with the repository's allowed merge method. It pins the local head, queues auto-merge, polls live state, rebases a behind branch, and cleans up only after MERGED. Do not replace it with a shell merge or cleanup loop. Dependent PRs retain their parent's branch as base and land bottom-up after each parent reaches the intended branch.
+2. Once the reviewed PR is open and delivery is authorized, route ordinary GitHub landing to `land` with the repository's allowed merge method. It pins the local head, queues auto-merge, polls live state, rebases a behind branch, and cleans up only after MERGED. Do not replace it with a shell merge or cleanup loop. Ordinary dependent PRs land bottom-up after each parent reaches the intended branch; verify the child's live base before landing. Native stacks follow the GitHub skill's stack merge workflow within the authorized layers.
 3. Treat a failed check, closed unmerged PR, head mismatch, or timeout as a stop. Report the command's blocker without deleting branches or worktrees. A queued request is not completed delivery.
 4. Confirm the remote PR is merged and its change reached the intended branch. Inspect applicable post-merge checks. Report a post-merge failure as a delivery problem rather than concealing it behind a successful merge.
 5. Verify automatic issue closure. Close the linked issue only when its acceptance criteria are fully resolved and closure is authorized by the request. Keep partially resolved issues open with an accurate note. Never claim a closed PR without a merge solved the issue.
-6. `land` owns its target branch and optional worktree cleanup. Use the rules below for other merged local branches, including branches merged before this invocation.
+6. `land` owns its ordinary target branch and optional worktree cleanup. Native-stack cleanup must account for remaining layers and server-side rebases. Use the rules below for other merged local branches, including branches merged before this invocation.
 
 ## Clean up merged local branches
 
@@ -105,7 +125,7 @@ Run this phase only for Deliver or Cleanup. Honor user and project approval requ
 
 ## Report the result
 
-Report the destination reached, issue and PR links when present, observed verification, and any blocker or remaining scope. For delivery, include the merged commit, target branch, and local branch cleanup result. Distinguish captured, locally verified, merge-ready, queued, merged, and blocked. Keep the report concise and cite actual artifacts rather than intention or worker summaries.
+Report the destination reached, all scoped issue and PR links when present, observed verification, and any blocker or remaining scope. For each delivered PR, include the merged commit, target branch, and local branch cleanup result. Distinguish captured, locally verified, merge-ready, queued, merged, and blocked. Keep the report concise and cite actual artifacts rather than intention or worker summaries.
 
 ## Common calls
 
