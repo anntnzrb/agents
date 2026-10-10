@@ -243,7 +243,7 @@ Tip: Generic protocols make repository interfaces reusable; the pattern isolates
 Problem: Notify multiple objects of state changes or events without tight component coupling.
 
 ```python
-from typing import Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 @dataclass

@@ -65,7 +65,7 @@ report = "\n".join(f"{row.name}: {row.total:,.2f}" for row in rows)
 - Money and other exact decimals use `decimal.Decimal` or integer minor units, never `float` (`faq/design.rst`); decode JSON with `json.loads(raw, parse_float=Decimal)`
 - Timestamps are timezone-aware: `datetime.now(UTC)` (3.11+; `timezone.utc` below)
 - Parse TOML with stdlib `tomllib` in binary mode (3.11+)
-- Constant lookup tables are `frozendict` (3.15+, `builtins/functions.rst`): `Final` only blocks rebinding the name, while `frozendict` rejects item assignment, is hashable, and serializes with `json`. Below 3.15, wrap the dict in `types.MappingProxyType`
+- Use `frozendict` for constant lookup tables (3.15+, `whatsnew/3.15.rst`): it blocks item assignment, supports JSON, and is hashable only when every key and value is hashable. Its immutability is shallow, so mutable values remain mutable. `Final` only blocks rebinding the name. Below 3.15, `types.MappingProxyType` gives a live read-only view, not the same hash or JSON behavior; wrap a copy when you need a stable snapshot
 - Missing-argument markers are `MISSING = sentinel("MISSING")` (3.15+, PEP 661): it has a readable repr, keeps its identity through `copy` and through `pickle` when defined at module scope under its own name, and types as `int | MISSING`. Below 3.15, `MISSING = object()`
 
 ```python
@@ -86,7 +86,7 @@ secure = replace(endpoint, port=8443)
 - Mark every overriding method with `@override` (3.12+) so a renamed base method becomes a type error
 - Narrowing predicates return `TypeIs[T]` (3.13+), which also narrows the negative branch; `TypeGuard` does not
 - Dispatch on closed unions with `match`, ending in `case _ as unreachable: assert_never(unreachable)` (3.11+). Match constants with dotted names (`case Color.RED:`); a bare name is a capture pattern that always matches (`reference/compound_stmts.rst`)
-- Declare `TypedDict` payloads `closed=True` when an unknown key is a bug, or `extra_items=T` when extra keys are allowed but typed (3.15+, PEP 728, `library/typing.rst`)
+- Declare `TypedDict` payloads `closed=True` when an unknown key is a static schema error, or `extra_items=T` when extra keys are allowed but typed (3.15+, PEP 728, `library/typing.rst`). These options guide type checkers; they do not validate raw JSON at runtime. Validate data at the input boundary. For earlier targets, use `typing_extensions.TypedDict` only if the project needs these options
 - Make parameters keyword-only with `*` when positional order is not self-evident; use `/` only for parameters whose names carry no meaning
 - Deprecate APIs with `@warnings.deprecated` (3.13+) so type checkers flag callers too
 - On 3.14+, write forward references unquoted and drop `from __future__ import annotations` (deprecated in 3.14, `whatsnew/3.14.rst`). Below 3.14, keep it where annotations need deferral. Read runtime annotations with `annotationlib.get_annotations` (3.14+)
@@ -138,7 +138,7 @@ except Exception as err:  # noqa: BLE001 - boundary catch to map error
 - Pass `encoding="utf-8"` to every text-mode open. Before 3.15 the default is the locale encoding (`library/io.rst`, PEP 597 `EncodingWarning`); 3.15 defaults to UTF-8, but `whatsnew/3.15.rst` still recommends an explicit `encoding` for code that runs on several versions
 - Run commands as argument lists with `check=True`: `subprocess.run(["git", "log", ref], check=True, capture_output=True, text=True)`
 - Log with lazy `%` arguments, `logger.info("sent %s in %d ms", msg_id, ms)`: formatting is deferred until a handler emits the record (`howto/logging.rst` Optimization)
-- Defer heavy imports with module-level `lazy import x` / `lazy from x import y` (3.15+, PEP 810) instead of imports inside function bodies. A failed lazy import raises at first use, so keep an import eager when its failure must be caught at startup. `lazy` is a `SyntaxError` inside functions, classes, and `try` blocks, and with `*` or `__future__` imports (`whatsnew/3.15.rst`)
+- Use module-level `lazy import x` / `lazy from x import y` (3.15+, PEP 810) only when measurement shows a startup benefit. Keep imports eager when they must run side effects or registration, or when startup must catch `ImportError`; a failed lazy import raises at first use. `lazy` is a `SyntaxError` inside functions, classes, and `try` blocks, and with `*` or `__future__` imports (`whatsnew/3.15.rst`)
 
 ```python
 with (
@@ -205,10 +205,13 @@ anyio.run(main)
 | `global` for shared state | Pass arguments or own state in an object | Hidden coupling, untestable |
 | `from module import *` | Explicit imports | Shadows names, blinds type checkers |
 | Python 2 compatibility: `six`, `u""`, `class X(object)`, `super(Cls, self)`, coding cookies, `__future__` imports other than `annotations` | Python 3 forms | Dead since 3.0 |
-| `typing.Optional`/`Union`/`List`/`Dict`/`Tuple`/`Callable`/`Sequence`, `TypeAlias`, module-level `TypeVar` on 3.12+ | `X \| None`, builtins, `collections.abc`, PEP 695 | Deprecated aliases (`library/typing.rst`) |
-| In inherited asyncio code: `asyncio.get_event_loop()` outside a running loop, `asyncio.iscoroutinefunction`, event loop policies | `asyncio.run`, `get_running_loop()`, `inspect.iscoroutinefunction`, `asyncio.run(..., loop_factory=)` | Deprecated; removed in 3.16 (`deprecations/`) |
+| `typing.Optional`/`Union`/`List`/`Dict`/`Tuple`/`Callable`/`Sequence`, `TypeAlias`, module-level `TypeVar` on 3.12+ | `X \| None`, builtins, `collections.abc`, PEP 695 | Prefer modern syntax in new code. `Optional`, `Union`, and `TypeVar` remain supported; `TypeAlias` and legacy generic aliases are deprecated (`library/typing.rst`) |
+| Call `asyncio.get_event_loop()` outside a running loop expecting it to create one (3.14+) | `asyncio.run()` at the program boundary; `get_running_loop()` inside a coroutine or callback | Since 3.14, it raises `RuntimeError` when no loop is set instead of creating one (`whatsnew/3.14.rst`, `library/asyncio-eventloop.rst`) |
+| `asyncio.iscoroutinefunction` or asyncio event loop policy APIs on 3.14+ | `inspect.iscoroutinefunction`; `asyncio.run(..., loop_factory=...)` | Deprecated in 3.14 and scheduled for removal in 3.16 (`whatsnew/3.14.rst`, `deprecations/pending-removal-in-3.16.rst`) |
 | `Any` in annotations | Contain third-party `Any` at the boundary; narrow immediately with `isinstance` or `match` | Disables checking for everything it touches |
 | `object` where the shape is known | `Protocol`, a PEP 695 type parameter, a union, or `TypedDict`; keep `object` for genuinely unknown values | `object` exposes no attributes, so callers must narrow what the type could have stated |
 | Invented noqa codes (`BROAD_EXCEPT_OK`, `OBJECT_OK`) | Real Ruff codes with a reason: `# noqa: BLE001 - <reason>` | Ruff does not recognize them, so they suppress nothing and document nothing |
 | `requests`, `aiohttp`, or `httpx` in new code | `httpx2` | Stack policy (`SKILL.md` Stack); inherited code keeps its client until migrated |
-| `shutil.rmtree(onerror=)`, `tarfile` extraction without `filter="data"`, `os.path.commonprefix` for paths | `onexc=`, `filter="data"`, `os.path.commonpath` | Deprecated or unsafe (`deprecations/`) |
+| `shutil.rmtree(onerror=)` on 3.12+ | `onexc=` on 3.12+; use `onerror=` on 3.10-3.11 | `onexc` was added and `onerror` deprecated in 3.12 (`library/shutil.rst`) |
+| Extract untrusted tar archives without a safe filter | Use `filter="data"` when `tarfile.data_filter` is available; otherwise upgrade to an interpreter with extraction filters | Filters were added in 3.12 and may be backported, so feature-detect with `hasattr(tarfile, "data_filter")` (`library/tarfile.rst`) |
+| `os.path.commonprefix` for paths | `os.path.commonpath` | `commonprefix` compares characters and can return invalid path prefixes (`library/os.path.rst`) |
