@@ -71,6 +71,7 @@
   },
   "skipDangerousModePermissionPrompt": true,
   "autoMemoryEnabled": false,
+  "cleanupPeriodDays": 365,
   "attribution": {
     "commit": "",
     "pr": "",
