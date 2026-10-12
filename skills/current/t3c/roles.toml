@@ -1,0 +1,40 @@
+# Per-instance role map for t3c. Edit this file to change roles and routing.
+# role: the delegate_task role value.
+# use_for and not_for: when the orchestrator picks this role.
+# provider: T3 providerInstanceId from orchestrator_capabilities.
+# options: passed verbatim as delegate_task target.options.
+# retry_options: replaces options on the single escalation retry.
+# Tables are ordered by importance, most important first.
+
+[implementer]
+role = "implementation"
+use_for = "Logic changes and debugging, checked with one targeted command for its own slice, and any slice the scout failed"
+not_for = "Edits the scout can do, full test suites, and CI gates"
+provider = "codex"
+model = "gpt-6.1-sol"
+options = { reasoningEffort = "medium" }
+retry_options = { reasoningEffort = "xhigh" }
+
+[reviewer]
+role = "review"
+use_for = "A code diff that changes behavior, before the orchestrator reports it done"
+not_for = "Prose-only, mechanical, or typo-sized diffs"
+provider = "codex"
+model = "gpt-6.1-sol"
+options = { reasoningEffort = "high" }
+
+[runner]
+role = "test"
+use_for = "Running the verification commands the orchestrator names, such as test suites, builds, linters, and CI gates, then reporting pass or fail with trimmed failure output"
+not_for = "Editing files, fixing failures, choosing which checks to run"
+provider = "opencode"
+model = "cliproxy/gemini-3.8-flash-high"
+options = { variant = "high" }
+
+[scout]
+role = "research"
+use_for = "Read-only recon, code search, summaries, web research, mechanical or prose edits in named files such as renames, find-and-replace, or rewording, and review of prose-only or mechanical diffs when the user asks for one"
+not_for = "Debugging, logic changes, long command chains"
+provider = "opencode"
+model = "cliproxy/gemini-3.8-flash-high"
+options = { variant = "high" }
