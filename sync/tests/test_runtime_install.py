@@ -6,7 +6,12 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
 
 from sync.core.harness import SyncEnv
 from sync.core.index import run_sync
@@ -16,6 +21,7 @@ from sync.core.jobs import (
     run_jobs_with_preserve,
 )
 from sync.core.plan import SyncRuntimeInstallJob, build_sync_plan
+from sync.runtime.process import run_process
 
 TEST_TIMEOUT_MS = 60_000
 EXPECTED_TWO_RELEASES_COUNT = 2
@@ -124,6 +130,24 @@ def test_publishes_current_link_and_installs_dependencies(
     marker = release_dir / ".release-complete"
     venv_dir = release_dir / ".venv"
     assert marker.exists() or venv_dir.exists()
+
+
+def test_runtime_install_uses_the_running_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Publish a runtime even when uv's default interpreter is unavailable."""
+    monkeypatch.setenv("UV_PYTHON", str(tmp_path / "missing-python"))
+    home = make_home(tmp_path)
+    _ = seed_source_root(home)
+    _, job = get_runtime_install_job(home)
+
+    assert asyncio.run(run_jobs_with_preserve([job])) is True
+    python = Path(job.current_link) / ".venv" / "bin" / "python"
+    result = asyncio.run(
+        run_process([str(python), "-c", "import sys; print(sys.version_info[:2])"])
+    )
+    assert result.exit_code == 0
+    assert result.stdout.strip() == str(sys.version_info[:2])
 
 
 def test_fails_and_leaves_current_link_untouched_when_lockfile_is_missing(
