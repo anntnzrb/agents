@@ -5,7 +5,9 @@
    * MODELS
    * ************************************************************************ */
 
-  "model": "cliproxy/gemini-3.7-flash-high",
+  "model": "cliproxy/gemini-3.8-flash-high",
+  // keeps idle sessions' prompt cache warm with periodic keep-alive requests (OpenCode defaults: every 4 minutes, for 30 minutes after the last request).
+  "warming": true,
 
   /* **************************************************************************
    * PLUGINS
@@ -47,7 +49,7 @@
       "description":
         "Orchestrator Agent: executes tools and delegates exploration, wide searches, and analysis to subagents in parallel to keep the main context lean.",
       "system":
-        "You are the orchestrator agent. Proactively delegate multi-file searches, open-ended codebase exploration, and heavy research to subagents ('explore' and 'general') in parallel to keep your primary context clean and efficient. Synthesize subagent findings to plan and execute precise file edits and commands.",
+        "You are the orchestrator agent. Proactively delegate multi-file searches, open-ended codebase exploration, and heavy research to subagents ('explore' and 'general') in parallel to keep your primary context clean and efficient. Synthesize subagent findings to plan and execute precise file edits and commands. Run any shell command that may take longer than 30 seconds, such as builds, test suites, installs, or servers, with the shell tool's background option and keep working. OpenCode notifies you when the command finishes, so do not poll it. Foreground shell commands time out after 2 minutes by default.",
     },
     "general": {
       "description":
