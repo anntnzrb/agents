@@ -15,60 +15,47 @@ Two modes:
 
 Adapted from pstack (Lauren Tan, MIT): model-pinned Cursor subagents replaced with plain read-only subagents.
 
-## Explain Mode
+## Explain mode
 
-### Step 1. Assess Complexity
+### 1. Assess complexity
 
 If the scope is ambiguous, state your interpretation and explore. The user can redirect.
 
-- **Simple** (a single module, a small utility, a narrow question such as "how does function X work"): no explorers. Explore and explain in a single pass. Go to Step 2b.
-- **Complex** (a subsystem spanning multiple files or services, a cross-cutting feature, a full architectural overview): spawn parallel explorers first, then synthesize. Go to Step 2a.
+- **Simple** (a single module, a small utility, or a narrow function question): explore and explain in one pass. Use a dedicated read-only subagent when supported, or work directly. Go to step 4.
+- **Complex** (a subsystem spanning files or services, a cross-cutting feature, or an architectural overview): go to step 2.
 
 When in doubt, take the simple path.
 
-### Step 2a. Explore (complex questions only)
+### 2. Explore (complex only)
 
-Decompose the question into 2 to 4 exploration angles, each a distinct slice of the subsystem.
+Decompose the question into 2 to 4 angles, each a distinct slice of the subsystem. Spawn read-only explorers in parallel when supported; otherwise run the passes sequentially. Give each explorer its angle and these instructions:
 
-Spawn read-only explorer subagents in parallel when the harness supports them; otherwise do the passes sequentially yourself. Each explorer gets the same base instructions plus a specific angle naming its slice. Each explorer should:
+- Use `rg --files` to find relevant files and `rg` to locate types, interfaces, and entry points.
+- Trace callers, callees, data flow, and type definitions from an entry point.
+- Read the actual code. Do not guess from file names.
+- Stop when you can describe every step from input to output, or trigger to effect.
+- Return the components, flow, files read, and facts a newcomer could miss.
 
-- Start broad: Glob for relevant directories, Grep for key types/interfaces/class names
-- Follow the thread: from an entry point, trace the call chain (callers, callees, data flow, type definitions)
-- Read the actual code, don't guess from file names
-- Stop when it can describe the full path from input to output (or trigger to effect) without hand-waving any step
-- Note things that are surprising, non-obvious, or that a newcomer would get wrong
+### 3. Synthesize (complex only)
 
-Each explorer returns structured findings: components found, flow traced, files read, anything non-obvious. Overlap between explorers is fine; you reconcile it.
+Once all explorers return, reconcile overlaps and contradictions into one explanation. Keep summaries in the main thread, not raw payloads.
 
-Then proceed to Step 3.
+### 4. Present
 
-### Step 2b. Direct Explain (simple questions)
+Present the explanation using the sections below. Drop any section that does not help answer the question.
 
-Explore and explain in one pass, either in a dedicated read-only subagent when supported or directly. Run exploration (Glob, Grep, Read) and write the explanation directly in the output format below. Same structure, just no explorer findings as input.
+### Output format
 
-Proceed to Step 4.
+**Overview.** 1-2 paragraphs on what the subsystem does and why it exists.
 
-### Step 3. Synthesize (complex questions only)
+**Key concepts.** Define the types, services, or abstractions needed to understand the flow.
 
-Once all explorers have returned, write one coherent explanation from their findings (output format below). Reconcile overlapping findings, resolve contradictions, and weave the slices into a unified picture. Keep summaries in the main thread, not raw payloads.
+**How it works.** Explain the trigger, each step, data movement, and decision points. Cite files and functions. Include code only when a snippet is essential.
 
-### Step 4. Present
+**Where things live.** Map the files and directories a reader needs to start exploring.
 
-Present the explanation to the user. The explanation is the product.
+**Gotchas.** Explain surprising behavior, relevant historical context, and known pitfalls.
 
-### Output Format
-
-Follow this structure, adapted to the question. Not every section is needed for every question.
-
-**Overview.** 1-2 paragraphs. What it is, what it does, why it exists. Enough to decide whether to keep reading.
-
-**Key Concepts.** The important types, services, or abstractions. Brief definition of each. Not exhaustive, just the ones needed to understand the rest.
-
-**How It Works.** The core of the explanation. Walk through the flow: what triggers it, what happens step by step, where data goes, the decision points. Prose, not pseudocode. Reference specific files and functions so the reader can go look, but don't dump code blocks unless a snippet is essential to a point.
-
-**Where Things Live.** A brief map of the relevant files/directories. Not every file, just the ones needed to start working in this area.
-
-**Gotchas.** Non-obvious or surprising things that would trip someone up. Historical context that explains why something looks weird. Known pitfalls.
 
 ## Critique Mode
 
@@ -76,7 +63,7 @@ Triggered when the user asks for architectural issues, problems, or improvements
 
 ### Step 1. Explain First
 
-Run the full explain flow above. You must understand the architecture before critiquing it.
+Run the explain flow above. You must understand the architecture before critiquing it.
 
 ### Step 2. Spawn Critics
 
