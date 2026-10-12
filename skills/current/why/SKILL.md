@@ -6,15 +6,15 @@ license: AGPL-3.0-or-later
 
 # Why
 
-Investigate the motivation and intent behind code. Why was it built this way? What edge cases were considered? What constraints shaped the design? What alternatives were rejected, and why?
-
-Companion to the `how` skill. `how` answers what the code does and how it works. `why` answers what forces led to its shape.
+Investigate the motivation and intent behind code. The companion `how` skill explains what the code does and how it works. `why` explains what forces led to its shape.
 
 Adapted from pstack (Lauren Tan, MIT): MCP discovery replaced with the sources actually available here: git, `gh`, and repo-local documents.
 
 ## Operating posture
 
-Operate as a careful, precise investigator piecing together a historical case from fragmentary records. When the record is thin, say so.
+Investigate precisely. When the record is thin, say so.
+
+Classify each claim as **Direct** (an author states the reason), **Supported** (several indirect records converge), **Inferred** (your interpretation), **Speculative** (one of several plausible explanations), or **Unknown** (searched without an answer). Match the phrasing to the tier and cite the records behind it.
 
 - **Evidence before narrative.** Collect the pieces first, then see what story they support. Never pick a story and recruit the evidence that fits it.
 - **Cite everything.** Every claim about intent references a commit hash, PR number, issue id, doc path, or code comment with `file:line`. If you can't cite it, it is inference and gets labeled as such.
@@ -43,7 +43,7 @@ git log -1 --format=%B <commit>
 gh pr view <number> --json title,body,author,createdAt,mergedAt,labels,closingIssuesReferences,comments,reviews
 ```
 
-Capture file paths, symbols, commits, PR numbers, and linked issue ids. Every investigator needs this seed.
+Capture file paths and line ranges, symbols, commits, PR numbers, and linked issue ids. Give this context to every investigator and use it during synthesis.
 
 ## Step 3. Spawn parallel investigators
 
@@ -58,11 +58,13 @@ Available sources in this environment:
 
 Sources with no available tooling (team chat, infra observability, error tracking, analytics warehouse) are recorded as gaps in Sources Consulted, never silently skipped. A null result from a searched source is a finding; a skipped search is a blind spot.
 
-Each investigator gets: the code anchor, the user's original question, and its source's query vocabulary (for `gh`: `gh search issues`, `gh pr view`, `gh api`; for git: blame, log with `--follow`, `-S` pickaxe search; for docs: glob the tree, then read and `git log --follow` the hits). Each returns: findings with exact citations, and what it searched when it found nothing.
+Give each investigator the code anchor, the user's question, and its source's queries. For `gh`, use issue search, PR views, and API reads. For git, use blame, log with `--follow`, and `-S` pickaxe search. For documents, find files with `rg --files`, read them, and follow their history.
+
+Each investigator reads complete records, follows links within its own source, and records cross-source leads for the owning investigator. Return exact quotes or accurate paraphrases with citations, contradictions, and the queries that found nothing. Keep findings separate from conclusions. For defensive code, search for incidents using exception names, error strings, symbols, and the dates around the change.
 
 ## Step 4. Synthesize
 
-Synthesize the findings into the final output. Spot-verify citations against the code anchor before trusting them.
+Weigh the findings, merge duplicate citations, and preserve contradictions. Spot-check citations against the original records. Verify an uncertain citation before using it. Keep this step read-only.
 
 ## Output format
 
@@ -72,7 +74,7 @@ Adapt as needed, but keep the confidence separation intact.
 
 **The Code in Question.** File paths, line ranges, and key symbols.
 
-**What We Found (direct evidence).** Claims with explicit citations (PR #, issue id, commit hash, doc path, code comment with `file:line`). Present tense, quote or paraphrase the source.
+**What We Found.** Label claims as Direct or Supported. Cite each source (PR #, issue id, commit hash, doc path, or code comment with `file:line`). A Direct claim quotes or paraphrases an explicit rationale. A Supported claim names the converging records without claiming an author stated the reason.
 
 **What We Can Reasonably Infer.** Claims supported by indirect evidence or signal combinations. Each bullet explains the inference chain: "Given A and B, it's likely that C." Hedged language.
 
@@ -81,6 +83,8 @@ Adapt as needed, but keep the confidence separation intact.
 **What We Don't Know.** Explicit gaps: unanswered questions, sources that came up empty. Be specific.
 
 **Sources Consulted.** One line per source: what was searched, what was found or "no relevant results", or "unavailable. gap".
+
+End with a brief confidence summary separating the established rationale from inferred details and unanswered questions.
 
 Example lines:
 
