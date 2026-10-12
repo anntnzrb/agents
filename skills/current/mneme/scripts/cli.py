@@ -5,34 +5,12 @@
 """CLI entrypoint for Mneme meeting intelligence skill."""
 
 import argparse
-import datetime
-import json
 import re
 import shutil
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
-from typing import TypedDict
-
-
-class ActionTask(TypedDict):
-    """Individual action item or engineering task."""
-
-    id: str
-    title: str
-    owner: str
-    priority: str
-    context: str
-    scope: list[str]
-    completion_criteria: list[str]
-
-
-class ActionItemsReport(TypedDict):
-    """Report containing synthesized meeting action items."""
-
-    meeting_id: str
-    generated_at: str
-    tasks: list[ActionTask]
 
 
 class MnemeArgs(argparse.Namespace):
@@ -48,24 +26,37 @@ class MnemeArgs(argparse.Namespace):
     target: str = ""
     input_file: str = ""
     output: str | None = None
-    summary: str | None = None
-    tasks: str | None = None
+    raw_file: str = ""
+    clean_file: str = ""
 
-
-_MIN_DECISION_LEN = 20
-_MIN_TASK_LEN = 25
-_MAX_DECISIONS = 5
-_MAX_TASKS = 10
-_HIGH_PRIO_CUTOFF = 2
 
 # Regular expressions for lossless transcript denoising
-_STUTTER_RE = re.compile(r"\b(\w+)(?:[,\s]+\1\b)+", re.IGNORECASE)
-_FILLER_EN_RE = re.compile(
-    r"\b(?:um|uh|er|ah|like,\s*you know|you know what i mean)\b", re.IGNORECASE
+# Letters only: repeated numbers such as "10, 10" can be real data.
+_STUTTER_RE = re.compile(r"\b([^\W\d_]+)(?:[,\s]+\1\b)+", re.IGNORECASE)
+# Cut-off word fragment followed by the full word: "escri- escribir".
+_FALSE_START_RE = re.compile(r"\b([^\W\d_]{1,10})-\s*(?=\1)", re.IGNORECASE)
+# Hyphen guards keep acknowledgements such as "Mm-hmm" intact.
+_FILLERS = (
+    "um",
+    "uh",
+    "er",
+    "ah",
+    "eh",
+    "hmm",
+    r"like,\s*you know",
+    "you know what i mean",
+    r"este\.\.\.",
+    r"o sea,\s*o sea",
+    r"tipo,\s*tipo",
 )
-_FILLER_ES_RE = re.compile(
-    r"\b(?:este\.\.\.|o sea,\s*o sea|tipo,\s*tipo|eh\.\.\.)\b", re.IGNORECASE
+_FILLER_RE = re.compile(
+    rf"(?<![\w-])(?:{'|'.join(_FILLERS)})(?:\.\.\.)?(?![\w-]),?\s*",
+    re.IGNORECASE,
 )
+_SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,.;:?!])")
+_REPEATED_COMMA_RE = re.compile(r",(?:\s*,)+")
+_NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
+_CLEAN_LABEL_RE = re.compile(r"^\*\*[^*\n]+:\*\*\s*$")
 _SPEAKER_RE = re.compile(r"^(?:\[?([^:\n]+?)\]?|\*\*([^:\n]+?)\*\*):\s*(.*)$")
 
 
@@ -128,10 +119,14 @@ def handle_get(args: MnemeArgs) -> int:
 
 def denoise_line_text(line: str) -> str:
     """Remove repetitive stutter loops and verbal fillers from a line."""
-    denoised = _STUTTER_RE.sub(r"\1", line)
-    denoised = _FILLER_EN_RE.sub("", denoised)
-    denoised = _FILLER_ES_RE.sub("", denoised)
-    return re.sub(r"[ \t]+", " ", denoised).strip()
+    denoised = line
+    while (step := _FALSE_START_RE.sub("", denoised)) != denoised:
+        denoised = step
+    denoised = _STUTTER_RE.sub(r"\1", denoised)
+    denoised = _FILLER_RE.sub("", denoised)
+    denoised = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", denoised)
+    denoised = _REPEATED_COMMA_RE.sub(",", denoised)
+    return re.sub(r"[ \t]+", " ", denoised).strip().lstrip(",;: ")
 
 
 def clean_text_lossless(raw_text: str) -> str:
@@ -200,164 +195,49 @@ def handle_denoise(args: MnemeArgs) -> int:
     return 0
 
 
-def extract_executive_summary(transcript_text: str, title: str) -> str:
-    """Generate structured markdown executive summary."""
-    lines: list[str] = [
-        f"# Executive Summary: {title}",
-        "",
-        "### Context and Objective",
-        f"Synthesized review of technical items and agreements from {title}.",
-        "",
-        "### Key Decisions Agreed",
-    ]
-
-    # Extract sentences with decision keywords
-    decision_keywords = (
-        "agree",
-        "decid",
-        "acord",
-        "defin",
-        "rule",
-        "aprob",
-        "estándar",
-        "standard",
-    )
-    decisions_found: list[str] = []
-
-    for line in transcript_text.splitlines():
-        trimmed = line.strip()
-        if (
-            any(kw in trimmed.lower() for kw in decision_keywords)
-            and len(trimmed) > _MIN_DECISION_LEN
-        ):
-            decisions_found.append(trimmed)
-
-    if decisions_found:
-        lines.extend(f"- **Agreement**: {d}" for d in decisions_found[:_MAX_DECISIONS])
-    else:
-        lines.append(
-            "- **General Alignment**: Core discussion points reviewed and verified."
-        )
-
-    lines.extend(
-        [
-            "",
-            "### Commitments and Next Steps",
-            "- **Next Action**: Execute deliverables according to project timelines.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
+def count_numbers(text: str, *, clean: bool) -> Counter[str]:
+    """Count number tokens in dialogue text, ignoring speaker labels."""
+    counts: Counter[str] = Counter()
+    for line in text.splitlines():
+        if clean:
+            if _CLEAN_LABEL_RE.match(line.strip()):
+                continue
+            body = line
+        else:
+            match = _SPEAKER_RE.match(line.strip())
+            body = match.group(3) if match else line
+        counts.update(_NUMBER_RE.findall(body))
+    return counts
 
 
-def extract_action_items(transcript_text: str, meeting_id: str) -> ActionItemsReport:
-    """Extract structured JSON action items and engineering tasks."""
-    now_utc = datetime.datetime.now(datetime.UTC).isoformat()
-    tasks: list[ActionTask] = []
-
-    task_keywords = (
-        "need to",
-        "should",
-        "will",
-        "coordinat",
-        "implement",
-        "debe",
-        "revisar",
-        "tarea",
-        "desplegar",
-    )
-    task_idx = 1
-
-    for line in transcript_text.splitlines():
-        trimmed = line.strip()
-        if (
-            any(kw in trimmed.lower() for kw in task_keywords)
-            and len(trimmed) > _MIN_TASK_LEN
-        ):
-            tasks.append(
-                {
-                    "id": f"ACTION-{task_idx:02d}",
-                    "title": trimmed[:120],
-                    "owner": "Team",
-                    "priority": "high" if task_idx <= _HIGH_PRIO_CUTOFF else "medium",
-                    "context": trimmed,
-                    "scope": [f"Execute item: {trimmed[:100]}"],
-                    "completion_criteria": [f"Verified and completed: {trimmed[:100]}"],
-                }
-            )
-            task_idx += 1
-            if task_idx > _MAX_TASKS:
-                break
-
-    if not tasks:
-        tasks.append(
-            {
-                "id": "ACTION-01",
-                "title": f"Follow up on {meeting_id} meeting outcomes",
-                "owner": "Team",
-                "priority": "medium",
-                "context": "General meeting follow-up and tracking.",
-                "scope": ["Review meeting notes and verify upcoming deliverables."],
-                "completion_criteria": ["All action items logged in tracker."],
-            }
-        )
-
-    return {
-        "meeting_id": meeting_id,
-        "generated_at": now_utc,
-        "tasks": tasks,
-    }
-
-
-def handle_synthesize(args: MnemeArgs) -> int:
-    """Synthesize executive summary and structured tasks from cleaned transcript."""
-    input_path = Path(args.input_file)
-    if not input_path.exists():
-        _ = sys.stderr.write(f"Error: Input file not found: {input_path}\n")
-        return 2
-
-    try:
-        transcript_text = input_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        _ = sys.stderr.write(f"Error reading '{input_path}': {exc}\n")
-        return 1
-
-    title = input_path.stem
-    meeting_id = title
-
-    if args.summary:
-        summary_md = extract_executive_summary(transcript_text, title)
-        summary_path = Path(args.summary)
+def handle_verify(args: MnemeArgs) -> int:
+    """Report numbers present in the raw transcript but missing from the clean one."""
+    texts: list[str] = []
+    for name in (args.raw_file, args.clean_file):
+        path = Path(name)
         try:
-            summary_path.parent.mkdir(parents=True, exist_ok=True)
-            _ = summary_path.write_text(summary_md, encoding="utf-8")
+            texts.append(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            _ = sys.stderr.write(f"Error: Input file not found: {path}\n")
+            return 2
         except OSError as exc:
-            _ = sys.stderr.write(f"Error writing summary '{summary_path}': {exc}\n")
+            _ = sys.stderr.write(f"Error reading '{path}': {exc}\n")
             return 1
-
-    if args.tasks:
-        tasks_data = extract_action_items(transcript_text, meeting_id)
-        tasks_path = Path(args.tasks)
-        try:
-            tasks_path.parent.mkdir(parents=True, exist_ok=True)
-            _ = tasks_path.write_text(
-                json.dumps(tasks_data, indent=2) + "\n", encoding="utf-8"
-            )
-        except OSError as exc:
-            _ = sys.stderr.write(f"Error writing tasks '{tasks_path}': {exc}\n")
-            return 1
-
-    if not args.summary and not args.tasks:
-        summary_md = extract_executive_summary(transcript_text, title)
-        _ = sys.stdout.write(summary_md)
-
-    return 0
+    missing = count_numbers(texts[0], clean=False) - count_numbers(texts[1], clean=True)
+    if not missing:
+        _ = sys.stdout.write("OK: every number in the raw transcript is preserved.\n")
+        return 0
+    _ = sys.stdout.write("MISSING numbers (token: count):\n")
+    for token, count in sorted(missing.items()):
+        _ = sys.stdout.write(f"  {token}: {count}\n")
+    return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Construct command-line parser."""
     parser = argparse.ArgumentParser(
         prog="mneme",
-        description="Mneme: meeting intelligence and QMD search.",
+        description="Mneme: lossless transcript cleaning and QMD search.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -395,12 +275,11 @@ def build_parser() -> argparse.ArgumentParser:
     _ = denoise_p.add_argument("input_file", help="Path to raw transcript file")
     _ = denoise_p.add_argument("-o", "--output", help="Path for cleaned output file")
 
-    synth_p = subparsers.add_parser(
-        "synthesize", help="Synthesize executive summary and engineering tasks"
+    verify_p = subparsers.add_parser(
+        "verify", help="Check that a clean transcript kept every raw number"
     )
-    _ = synth_p.add_argument("input_file", help="Path to cleaned transcript file")
-    _ = synth_p.add_argument("--summary", help="Path to save summary markdown")
-    _ = synth_p.add_argument("--tasks", help="Path to save tasks JSON")
+    _ = verify_p.add_argument("raw_file", help="Path to raw transcript file")
+    _ = verify_p.add_argument("clean_file", help="Path to cleaned transcript file")
     return parser
 
 
@@ -414,8 +293,8 @@ def main() -> int:
         return handle_get(args)
     if args.command == "denoise":
         return handle_denoise(args)
-    if args.command == "synthesize":
-        return handle_synthesize(args)
+    if args.command == "verify":
+        return handle_verify(args)
     return 0
 
 

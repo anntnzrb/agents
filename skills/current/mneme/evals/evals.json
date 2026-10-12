@@ -26,10 +26,10 @@
         "evals/fixtures/ES2004b_raw.txt"
       ],
       "prompt": "Synthesize an executive summary and structured action items from 'ES2004b_raw.txt'.",
-      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expected_output": "Produces an executive summary covering all discussed topics and a commitments table with concrete tasks per owner.",
       "expectations": [
         "Summary captures core discussion themes including: A brief review of the last meeting, Battery issue and flip top design, Market research and adjustments due to new project requirements",
-        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Minutes follow the layout in references/spec-synthesis.md, with a commitments table per owner",
         "Each action item specifies owner, context, scope, and completion criteria",
         "No vague stakeholder language is retained without concrete actionable scope"
       ]
@@ -90,10 +90,10 @@
         "evals/fixtures/Bed003_raw.txt"
       ],
       "prompt": "Synthesize an executive summary and structured action items from 'Bed003_raw.txt'.",
-      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expected_output": "Produces an executive summary covering all discussed topics and a commitments table with concrete tasks per owner.",
       "expectations": [
         "Summary captures core discussion themes including: Meeting preliminaries, Belief net Intentions, Belief net structure",
-        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Minutes follow the layout in references/spec-synthesis.md, with a commitments table per owner",
         "Each action item specifies owner, context, scope, and completion criteria",
         "No vague stakeholder language is retained without concrete actionable scope"
       ]
@@ -154,10 +154,10 @@
         "evals/fixtures/ES2004a_raw.txt"
       ],
       "prompt": "Synthesize an executive summary and structured action items from 'ES2004a_raw.txt'.",
-      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expected_output": "Produces an executive summary covering all discussed topics and a commitments table with concrete tasks per owner.",
       "expectations": [
         "Summary captures core discussion themes including: Agenda announcement and team ice breaking, Price issue and target groups of remote control, Remote control style and design optimization",
-        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Minutes follow the layout in references/spec-synthesis.md, with a commitments table per owner",
         "Each action item specifies owner, context, scope, and completion criteria",
         "No vague stakeholder language is retained without concrete actionable scope"
       ]
@@ -218,10 +218,10 @@
         "evals/fixtures/Bed008_raw.txt"
       ],
       "prompt": "Synthesize an executive summary and structured action items from 'Bed008_raw.txt'.",
-      "expected_output": "Produces an executive summary covering all discussed topics and JSON tasks with clear scope and completion criteria.",
+      "expected_output": "Produces an executive summary covering all discussed topics and a commitments table with concrete tasks per owner.",
       "expectations": [
         "Summary captures core discussion themes including: value for user and situation models, endpoint decision, Go-there decision",
-        "Extracted action items follow the JSON schema in references/spec-synthesis.md",
+        "Minutes follow the layout in references/spec-synthesis.md, with a commitments table per owner",
         "Each action item specifies owner, context, scope, and completion criteria",
         "No vague stakeholder language is retained without concrete actionable scope"
       ]

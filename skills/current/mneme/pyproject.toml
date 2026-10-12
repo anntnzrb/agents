@@ -1,7 +1,7 @@
 [project]
 name = "mneme"
 version = "0.1.0"
-description = "Process transcripts losslessly, synthesize specs, and query meeting history"
+description = "Clean transcripts losslessly, verify cleaning, and query meeting history"
 readme = "SKILL.md"
 requires-python = ">=3.14"
 dependencies = []
