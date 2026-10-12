@@ -11,6 +11,7 @@ import re
 import secrets
 import shutil
 import stat
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -232,7 +233,15 @@ async def _run_job(  # noqa: C901
 async def _execute_uv_sync(stage: str, release_id: str, timeout_ms: int) -> None:
     uv_bin = shutil.which("uv") or "uv"
     install = await run_process(
-        [uv_bin, "sync", "--frozen", "--no-dev", "--no-editable"],
+        [
+            uv_bin,
+            "sync",
+            "--frozen",
+            "--no-dev",
+            "--no-editable",
+            "--python",
+            sys.executable,
+        ],
         RunProcessOptions(
             cwd=stage,
             timeout_ms=float(max(timeout_ms, MIN_INSTALL_TIMEOUT_MS)),
