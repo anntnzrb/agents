@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@opencode/plugin": "2.0.25",
-    "@opencode/schema": "2.0.25"
+    "@opencode/plugin": "2.0.28",
+    "@opencode/schema": "2.0.28"
   },
   "devDependencies": {
-    "@types/node": "26.6.4"
+    "@types/node": "26.6.5",
+    "effect": "4.0.1"
   }
 }

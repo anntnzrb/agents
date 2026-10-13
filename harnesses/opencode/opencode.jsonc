@@ -1,45 +1,25 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  /* **************************************************************************
-   * MODELS
-   * ************************************************************************ */
-
   "model": "cliproxy/gemini-3.8-flash-high",
-  // keeps idle sessions' prompt cache warm with periodic keep-alive requests (OpenCode defaults: every 4 minutes, for 30 minutes after the last request).
   "warming": true,
-
-  /* **************************************************************************
-   * PLUGINS
-   * ************************************************************************ */
 
   "plugins": [
     {
       "package": "./plugins/cliproxy",
       "options": { "baseURL": "${CLIPROXY_CLIENT_BASE_URL}" },
     },
-    "./plugins/tmap",
   ],
-
-  /* **************************************************************************
-   * PROVIDERS
-   * ************************************************************************ */
 
   "providers": {
     "cliproxy": {
       "name": "CLIProxyAPI",
-      "package": "aisdk:@ai-sdk/openai",
+      "package": "@opencode/ai/providers/openai",
       "settings": {
         "apiKey": "keyless",
       },
     },
   },
-
-  /* **************************************************************************
-   * AGENTS
-   * ************************************************************************ */
-
-  "default_agent": "build",
 
   "agents": {
     "plan": {
@@ -49,52 +29,35 @@
       "description":
         "Orchestrator Agent: executes tools and delegates exploration, wide searches, and analysis to subagents in parallel to keep the main context lean.",
       "system":
-        "You are the orchestrator agent. Proactively delegate multi-file searches, open-ended codebase exploration, and heavy research to subagents ('explore' and 'general') in parallel to keep your primary context clean and efficient. Synthesize subagent findings to plan and execute precise file edits and commands. Run any shell command that may take longer than 30 seconds, such as builds, test suites, installs, or servers, with the shell tool's background option and keep working. OpenCode notifies you when the command finishes, so do not poll it. Foreground shell commands time out after 2 minutes by default.",
+        "You are the orchestrator agent. Never block on long work: stay available to the user while work runs in the background. Delegate multi-file searches, open-ended exploration, and heavy research to subagents in parallel, and run any shell command that is not near-instant in the background. Keep working or answer the user meanwhile; completion notifications arrive automatically, so do not poll or sleep. Synthesize subagent findings to plan and execute precise file edits and commands.",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "allow" },
+        { "action": "webfetch", "resource": "*", "effect": "deny" },
+      ],
     },
     "general": {
       "description":
         "Use proactively for researching complex questions, isolated investigations, and multi-step tasks in parallel. Returns only a concise final summary to keep the main session context clean.",
       "permissions": [
-        { "action": "subagent", "resource": "*", "effect": "deny" },
         { "action": "subagent", "resource": "explore", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "allow" },
       ],
     },
     "explore": {
       "description":
-        "Use proactively for exploring codebases: pattern matching, structural search, keyword search, finding usages, and multi-file analysis. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
+        "Read-only scout. Use proactively for exploring codebases (pattern matching, structural search, finding usages, multi-file analysis) and for web research through skills. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permissions": [
-        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "skill", "resource": "*", "effect": "allow" },
       ],
     },
   },
 
-  /* **************************************************************************
-   * PERMISSIONS
-   * ************************************************************************ */
-
   "permissions": [
-    { "action": "*", "resource": "*", "effect": "allow" },
     { "action": "webfetch", "resource": "*", "effect": "deny" },
   ],
 
-  /* **************************************************************************
-   * SERVER
-   * ************************************************************************ */
-
-  // "server": {
-  //   "hostname": "0.0.0.0",
-  //   "port": 4096,
-  //   "mdns": false,
-  // },
-
-  /* **************************************************************************
-   * MISC
-   * ************************************************************************ */
-
   "update": "disable",
-  "share": "manual",
-  "formatter": false,
-  "lsp": false,
+  "websearch": false,
   "experimental": {
     "subagent_depth": 2,
   },
