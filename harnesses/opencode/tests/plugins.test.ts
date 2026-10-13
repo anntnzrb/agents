@@ -147,3 +147,58 @@ test("continuation rewrites only the latest text-only dot in model context", asy
     expect(unchanged).toEqual(snapshot);
   }
 });
+
+test("autobg backgrounds an open session whose tool call outlives the threshold", async () => {
+  jest.useFakeTimers();
+  const handlers = new Map<string, (event: any) => void>();
+  const backgrounded: string[] = [];
+  let tabs = [{ sessionID: "tab" }, { sessionID: "unknown" }];
+  let route = "open";
+  const cleanup = await autobg.setup({
+    data: {
+      on: (type: string, handler: (event: any) => void) => {
+        handlers.set(type, handler);
+        return () => handlers.delete(type);
+      },
+      session: {
+        get: (id: string) => id === "unknown" ? undefined : id === "child" ? { parentID: "open" } : {},
+        root: (id: string) => id === "child" ? "open" : id,
+      },
+    },
+    ui: { router: { current: () => ({ type: "session", sessionID: route }) }, tabs: { list: () => tabs } },
+    client: { session: { background: async ({ sessionID }: { sessionID: string }) => { backgrounded.push(sessionID); } } },
+  } as never);
+  const call = (sessionID: string, id: string, executed = false) =>
+    handlers.get("session.tool.called")!({ data: { sessionID, id, executed } });
+  try {
+    call("open", "fast");
+    handlers.get("session.tool.success")!({ data: { sessionID: "open", id: "fast" } });
+    call("open", "failed");
+    handlers.get("session.tool.failed")!({ data: { sessionID: "open", id: "failed" } });
+    call("headless", "slow");
+    call("unknown", "slow");
+    call("open", "hosted", true);
+    call("open", "slow");
+    call("tab", "slow");
+    jest.advanceTimersByTime(4999);
+    expect(backgrounded).toEqual([]);
+    jest.advanceTimersByTime(1);
+    expect(backgrounded).toEqual(["open", "tab"]);
+    tabs = [];
+    route = "child";
+    call("tab", "later");
+    call("child", "slow");
+    jest.advanceTimersByTime(5000);
+    expect(backgrounded).toEqual(["open", "tab"]);
+    call("open", "viewing-child");
+    jest.advanceTimersByTime(5000);
+    expect(backgrounded).toEqual(["open", "tab", "open"]);
+    call("open", "disposed");
+  } finally {
+    (cleanup as () => void)();
+    jest.advanceTimersByTime(5000);
+    jest.useRealTimers();
+  }
+  expect(backgrounded).toEqual(["open", "tab", "open"]);
+  expect(handlers.size).toBe(0);
+});
