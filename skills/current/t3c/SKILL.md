@@ -33,7 +33,7 @@ Waiting for results is expected. Blocking the turn is not.
 
 ## Write the brief
 
-T3 gives a child no brief of its own. It prefixes the task with `Act as the <role> sub-agent for this task.` and wraps it in the same orchestration instructions this thread gets. The child sees nothing of this conversation, so state everything it needs.
+T3 gives a child no brief of its own. It prefixes the task with `Act as the <role> sub-agent for this task.` and gives the child the same orchestration instructions this thread gets. The child sees nothing of this conversation, so state everything it needs.
 
 ```text
 An orchestrator dispatched you. Do not talk to the user, delegate, or commit.
@@ -72,6 +72,8 @@ Keep the first line. T3's orchestration instructions encourage every agent to ca
 ```
 
 - Always pass `options`. A cross-provider target does not inherit options and falls back to the model's default effort, which can be lower.
+- Pass only the option IDs `roles.toml` lists. The `opencode` driver accepts only `variant`; `agent`, `reasoningEffort`, and any other ID fail with `invalid_request`. An `opencode` child always runs OpenCode's `build` agent.
+- A child inherits this thread's runtime mode. Outside full access, an `opencode` child asks before shell and edit commands, and the request waits on the child thread for the user. When a child is stuck there, tell the user which `childThreadId` needs approval.
 - Use a distinct `clientRequestId` per slice and round. Reuse a `clientRequestId` only to retry the same call.
 - Keep each returned `taskId` and `childThreadId`.
 
