@@ -1,69 +1,29 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
 import { Model, Plugin, Provider } from "@opencode/plugin";
-import { Money } from "@opencode/schema/money";
+import type { ProviderRecord } from "@opencode/plugin/promise/provider";
 
+const PROVIDER_ID = Provider.ID.make("cliproxy");
 const GATEWAY_TIMEOUT_MS = 5000;
-
-// models.dev supplies limits, pricing, and modalities the gateway does not report.
-const CATALOG_URL = "https://models.dev/api.json";
-const CATALOG_TIMEOUT_MS = 10000;
-const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
-const CATALOG_VERSION = 2;
-
-// OpenCode disables context compaction when a model reports no context limit,
-// so unknown ids inherit one conservative fallback.
-const FALLBACK_LIMIT = { context: 200000, output: 32000 };
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 // Gateway ids may carry a thinking-level qualifier the catalog does not use.
 const QUALIFIER_PATTERN = /-(minimal|low|medium|high|xhigh|max|thinking)$/i;
 
-const INPUT_MODALITIES = ["text", "audio", "image", "video", "pdf"] as const;
-type InputModality = (typeof INPUT_MODALITIES)[number];
+// Default effort ladder for the Responses route (matches upstream
+// Variant.resolve openaiResponses: none/minimal + low/medium/high + xhigh).
+// The cliproxy provider runs @opencode/ai/providers/openai, so variants carry
+// Responses-style settings.
+const DEFAULT_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
+const EFFORTS: ReadonlySet<string> = new Set([...DEFAULT_EFFORTS, "max"]);
 
-interface GatewayModelsResponse {
-	data?: Array<{ id?: unknown; owned_by?: unknown }>;
+interface GatewayModel {
+	id: string;
+	ownedBy: string | undefined;
 }
 
-interface ReasoningOption {
-	type?: string;
-	values?: Array<string | null>;
-}
-
-interface CatalogModel {
-	name?: string;
-	family?: string;
-	release_date?: string;
-	reasoning?: boolean;
-	reasoning_options?: ReasoningOption[];
-	attachment?: boolean;
-	tool_call?: boolean;
-	temperature?: boolean;
-	limit?: { context?: number; output?: number };
-	modalities?: { input?: string[] };
-	cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number } | null;
-}
-
-interface CatalogCache {
-	version: number;
-	fetchedAt: number;
-	models: Record<string, CatalogModel>;
-	suffixes: Record<string, CatalogModel>;
-	stripped: Record<string, CatalogModel>;
-}
-
-let memoryCatalog: CatalogCache | undefined;
-
-function catalogPath(): string {
-	const cacheHome = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
-	return join(cacheHome, "agents", "models-dev-opencode.json");
-}
-
-function widest(current: CatalogModel | undefined, candidate: CatalogModel): CatalogModel {
-	if (!current) return candidate;
-	return (candidate.limit?.context ?? 0) > (current.limit?.context ?? 0) ? candidate : current;
+interface Catalog {
+	exact: Map<string, Model.Info>;
+	suffix: Map<string, Model.Info>;
+	stripped: Map<string, Model.Info>;
 }
 
 function segment(id: string): string {
@@ -74,97 +34,47 @@ function stripQualifier(id: string): string {
 	return id.replace(QUALIFIER_PATTERN, "");
 }
 
-async function readCachedCatalog(): Promise<CatalogCache | undefined> {
-	if (memoryCatalog) return memoryCatalog;
-	try {
-		const parsed = JSON.parse(await readFile(catalogPath(), "utf8")) as CatalogCache;
-		if (parsed?.version === CATALOG_VERSION && typeof parsed.fetchedAt === "number" && parsed.models) {
-			memoryCatalog = parsed;
-		}
-	} catch {
-		// No usable cache.
-	}
-	return memoryCatalog;
+function keepWidest(map: Map<string, Model.Info>, key: string, model: Model.Info): void {
+	const current = map.get(key);
+	if (!current || model.limit.context > current.limit.context) map.set(key, model);
 }
 
-async function loadCatalog(): Promise<CatalogCache | undefined> {
-	const cached = await readCachedCatalog();
-	if (cached && Date.now() - cached.fetchedAt < CATALOG_TTL_MS) return cached;
-	try {
-		const response = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) });
-		if (!response.ok) return cached;
-		const providers = (await response.json()) as Record<string, { models?: Record<string, CatalogModel> }>;
-		const next: CatalogCache = {
-			version: CATALOG_VERSION,
-			fetchedAt: Date.now(),
-			models: {},
-			suffixes: {},
-			stripped: {},
-		};
-		for (const provider of Object.values(providers)) {
-			for (const [id, model] of Object.entries(provider.models ?? {})) {
-				const suffix = segment(id);
-				next.models[id] = widest(next.models[id], model);
-				next.suffixes[suffix] = widest(next.suffixes[suffix], model);
-				const stripped = stripQualifier(suffix);
-				next.stripped[stripped] = widest(next.stripped[stripped], model);
-			}
+// OpenCode's models.dev plugin contributes every catalog provider before this transform runs.
+function catalog(records: readonly ProviderRecord[]): Catalog {
+	const index: Catalog = { exact: new Map(), suffix: new Map(), stripped: new Map() };
+	for (const record of records) {
+		if (record.provider.id === PROVIDER_ID) continue;
+		for (const [id, model] of record.models) {
+			const suffix = segment(id);
+			keepWidest(index.exact, id, model);
+			keepWidest(index.suffix, suffix, model);
+			keepWidest(index.stripped, stripQualifier(suffix), model);
 		}
-		memoryCatalog = next;
-		const path = catalogPath();
-		const temporary = `${path}.${randomUUID()}.tmp`;
-		try {
-			await mkdir(dirname(path), { recursive: true });
-			await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
-			await rename(temporary, path);
-		} catch {
-			// Cache writes are best effort.
-		} finally {
-			await rm(temporary, { force: true }).catch(() => {});
-		}
-		return next;
-	} catch {
-		return cached;
 	}
+	return index;
 }
 
-function catalogModel(catalog: CatalogCache | undefined, id: string): CatalogModel | undefined {
-	if (!catalog) return undefined;
+function lookup(index: Catalog, id: string): Model.Info | undefined {
 	return (
-		catalog.models[id] ??
-		catalog.suffixes[id] ??
-		catalog.stripped[stripQualifier(id)] ??
-		catalog.stripped[stripQualifier(segment(id))]
+		index.exact.get(id) ??
+		index.suffix.get(id) ??
+		index.stripped.get(stripQualifier(id)) ??
+		index.stripped.get(stripQualifier(segment(id)))
 	);
 }
 
-function inputModalities(entry: CatalogModel | undefined): InputModality[] {
-	const values = entry?.modalities?.input ?? ["text"];
-	const filtered = values.filter((value): value is InputModality =>
-		(INPUT_MODALITIES as readonly string[]).includes(value),
-	);
-	return filtered.length > 0 ? filtered : ["text"];
+// Catalog variants are spelled for the source package and mix effort levels with thinking toggles
+// and token budgets. An effort variant names its own id in its settings, such as
+// reasoningEffort, effort, or thinkingLevel; only those ids carry over to the Responses route.
+function isEffort(variant: Model.Info["variants"][number]): boolean {
+	if (!EFFORTS.has(variant.id)) return false;
+	const settings = JSON.stringify(variant.settings ?? {});
+	return settings === "{}" ? variant.id !== "none" : settings.includes(`"${variant.id}"`);
 }
 
-// Default effort ladder for the Responses route (matches upstream
-// Variant.resolve openaiResponses: none/minimal + low/medium/high + xhigh).
-// The cliproxy provider runs aisdk:@ai-sdk/openai, rewritten to
-// @opencode/ai/providers/openai, so variants carry Responses-style settings.
-const DEFAULT_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
-
-function effortValues(entry: CatalogModel | undefined): string[] {
-	const values = entry?.reasoning_options?.find((option) => option.type === "effort")?.values;
-	const seen = new Map<string, true>();
-	for (const value of values ?? []) {
-		const effort = value ?? "none";
-		if (effort.length > 0 && !seen.has(effort)) seen.set(effort, true);
-	}
-	if (seen.size > 0) return [...seen.keys()];
-	return [...DEFAULT_EFFORTS];
-}
-
-function toVariants(entry: CatalogModel | undefined): Model.Info["variants"] {
-	return effortValues(entry).map((effort) => ({
+function toVariants(entry: Model.Info | undefined): Model.Info["variants"] {
+	const efforts = (entry?.variants ?? []).filter(isEffort).map((variant) => variant.id);
+	return (efforts.length > 0 ? efforts : DEFAULT_EFFORTS).map((effort) => ({
 		id: Model.VariantID.make(effort),
 		settings: {
 			reasoningEffort: effort,
@@ -174,73 +84,76 @@ function toVariants(entry: CatalogModel | undefined): Model.Info["variants"] {
 	}));
 }
 
-function toModelConfig(id: string, ownedBy: string | undefined, catalog: CatalogCache | undefined): Model.Info {
-	const entry = catalogModel(catalog, id);
-	const input = inputModalities(entry);
+function toModel(model: GatewayModel, entry: Model.Info | undefined): Model.Info {
 	// Multi-segment gateway ids are <pool>/<vendor>/<model>; the pool
 	// distinguishes upstreams that vend the same model. Single-segment ids
 	// come from OAuth pools, so fall back to the gateway-reported owner.
-	const pool = id.includes("/") ? id.slice(0, id.indexOf("/")) : ownedBy;
-	const name = entry?.name ?? id;
+	const pool = model.id.includes("/") ? model.id.slice(0, model.id.indexOf("/")) : model.ownedBy;
+	const name = entry?.name ?? model.id;
+	const base = Model.Info.default(PROVIDER_ID, Model.ID.make(model.id));
 	return {
-		...Model.Info.default(Provider.ID.make("cliproxy"), Model.ID.make(id)),
+		...base,
 		name: pool ? `${name} (${pool})` : name,
-		time: { released: Date.parse(entry?.release_date ?? "") || 0 },
-		capabilities: { tools: entry?.tool_call ?? true, input, output: ["text"] },
-		variants: toVariants(entry),
-		limit: {
-			context: entry?.limit?.context ?? FALLBACK_LIMIT.context,
-			output: entry?.limit?.output ?? FALLBACK_LIMIT.output,
+		time: { released: entry?.time.released ?? 0 },
+		capabilities: {
+			tools: entry?.capabilities.tools ?? true,
+			input: entry ? [...entry.capabilities.input] : ["text"],
+			output: ["text"],
 		},
-		cost: [{
-			input: Money.USDPerMillionTokens.make(entry?.cost?.input ?? 0),
-			output: Money.USDPerMillionTokens.make(entry?.cost?.output ?? 0),
-			cache: {
-				read: Money.USDPerMillionTokens.make(entry?.cost?.cache_read ?? 0),
-				write: Money.USDPerMillionTokens.make(entry?.cost?.cache_write ?? 0),
-			},
-		}],
+		variants: toVariants(entry),
+		limit: entry ? { ...entry.limit } : base.limit,
+		cost: entry ? structuredClone([...entry.cost]) : base.cost,
 	};
 }
 
-function gatewayModels(payload: GatewayModelsResponse): Array<{ id: string; ownedBy?: string }> {
-	return (payload.data ?? [])
-		.map((model) => ({
-			id: model.id,
-			ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined,
-		}))
-		.filter((entry): entry is { id: string; ownedBy: string | undefined } => typeof entry.id === "string" && entry.id.length > 0);
+async function fetchGatewayModels(baseURL: string): Promise<GatewayModel[] | undefined> {
+	const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
+		signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
+	});
+	if (!response.ok) return undefined;
+	const payload = (await response.json()) as { data?: Array<{ id?: unknown; owned_by?: unknown }> };
+	return (payload.data ?? []).flatMap((model) =>
+		typeof model.id === "string" && model.id.length > 0
+			? [{ id: model.id, ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined }]
+			: [],
+	);
 }
 
 export default Plugin.define({
 	id: "cliproxy",
 	async setup(ctx) {
-		try {
-			const baseURL = ctx.options.baseURL;
-			if (typeof baseURL !== "string") throw new Error("cliproxy requires the baseURL plugin option");
-			const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
-				signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
-			});
-			if (!response.ok) return;
-			const [payload, catalog] = await Promise.all([
-				response.json() as Promise<GatewayModelsResponse>,
-				loadCatalog(),
-			]);
-			const models = gatewayModels(payload).map((entry) => toModelConfig(entry.id, entry.ownedBy, catalog));
-			if (models.length > 0) {
-				await ctx.provider.transform((editor) => {
-					editor.add({
-						info: {
-							...Provider.Info.empty(Provider.ID.make("cliproxy")),
-							activation: "enabled",
-							settings: { baseURL },
-						},
-						models,
-					});
-				});
-			}
-		} catch (error) {
-			console.warn("cliproxy model discovery failed", error);
+		const baseURL = ctx.options.baseURL;
+		if (typeof baseURL !== "string") {
+			console.warn("cliproxy requires the baseURL plugin option");
+			return;
 		}
+		let inventory: readonly GatewayModel[] = [];
+		const refresh = async () => {
+			const next = await fetchGatewayModels(baseURL).catch((error: unknown) => {
+				console.warn("cliproxy model discovery failed", error);
+				return undefined;
+			});
+			// A failed or empty response keeps the last known inventory.
+			if (!next?.length || JSON.stringify(next) === JSON.stringify(inventory)) return false;
+			inventory = next;
+			return true;
+		};
+
+		await refresh();
+		await ctx.provider.transform((editor) => {
+			if (inventory.length === 0) return;
+			const index = catalog(editor.list());
+			editor.add({
+				info: { ...Provider.Info.empty(PROVIDER_ID), activation: "enabled", settings: { baseURL } },
+				models: inventory.map((model) => toModel(model, lookup(index, model.id))),
+			});
+		});
+
+		const timer = setInterval(() => {
+			void refresh()
+				.then((changed) => (changed ? ctx.provider.reload() : undefined))
+				.catch((error: unknown) => console.warn("cliproxy provider reload failed", error));
+		}, REFRESH_INTERVAL_MS);
+		return () => clearInterval(timer);
 	},
 });

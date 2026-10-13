@@ -1,107 +1,91 @@
-import { afterAll, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, jest, test } from "bun:test";
 import { Model } from "@opencode/plugin";
 import { Schema } from "effect";
 import discovery from "../plugins/cliproxy";
 import tmap from "../plugins/tmap";
+import autobg from "../plugins/autobg/tui";
 
-const cache = await mkdtemp(join(tmpdir(), "opencode-test-"));
-const originalCache = process.env.XDG_CACHE_HOME;
-process.env.XDG_CACHE_HOME = cache;
-afterAll(async () => {
-  if (originalCache === undefined) delete process.env.XDG_CACHE_HOME;
-  else process.env.XDG_CACHE_HOME = originalCache;
-  await rm(cache, { recursive: true, force: true });
+const flush = async () => {
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+};
+
+const catalogModel = (id: string, fields: Partial<Model.Info>): Model.Info => ({
+  ...Model.Info.default("google" as never, id as never),
+  ...fields,
 });
 
-test("OpenCode owns an atomic catalog cache and example-xhigh maps to example", async () => {
-  const directory = join(cache, "agents");
-  await mkdir(directory, { recursive: true });
-  const shared = join(directory, "models-dev.json");
-  const owned = join(directory, "models-dev-opencode.json");
-  await writeFile(shared, "untouched");
-  await writeFile(owned, "{}");
-  const inode = (await stat(owned)).ino;
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (url: string) => Response.json(url.endsWith("/models")
-    ? { data: [{ id: "example" }] }
-    : { vendor: { models: { "example-xhigh": { limit: { context: 123456 } } } } })) as typeof fetch;
-  try {
-    const { default: plugin } = await import("../plugins/cliproxy/index.ts?private-cache");
-    let models: readonly Model.Info[] = [];
-    await plugin.setup({ options: { baseURL: "http://gateway/v1" }, provider: {
-      transform: async (callback: (editor: unknown) => void) => callback({
-        add: (value: { models: readonly Model.Info[] }) => { models = value.models; },
-      }),
-    } } as never);
-    expect(models[0]?.limit.context).toBe(123456);
-    expect(await readFile(shared, "utf8")).toBe("untouched");
-    expect((await stat(owned)).ino).not.toBe(inode);
-    expect(JSON.parse(await readFile(owned, "utf8")).stripped.example.limit.context).toBe(123456);
-    expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
-    // Leave the next independent plugin load without a fresh snapshot.
-    await writeFile(owned, "{}");
-  } finally {
-    globalThis.fetch = originalFetch;
-    await writeFile(owned, "{}");
-    await writeFile(shared, "untouched");
-  }
-});
-
-test("discovery publishes v2 models and preserves inventory on gateway failure", async () => {
-  let fail = false;
+test("discovery enriches gateway models from the models.dev provider records", async () => {
+  jest.useFakeTimers();
+  let down = true;
+  let gateway: Array<{ id: unknown; owned_by?: string }> = [
+    { id: "gemini-3.8-flash-high", owned_by: "antigravity" },
+    { id: "pool/vendor/unknown" },
+    { id: null },
+  ];
   const requests: string[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string) => {
     requests.push(url);
-    if (url === "http://gateway/v1/models") {
-      return fail ? new Response(null, { status: 503 }) : Response.json({ data: [
-        { id: "gemini-3.8-flash-high", owned_by: "antigravity" },
-        { id: "pool/vendor/unknown" },
-        { id: null },
-      ] });
-    }
-    if (url === "https://models.dev/api.json") return Response.json({ google: { models: {
-      "gemini-3.8-flash": {
-        name: "Gemini Flash", limit: { context: 1000000, output: 64000 },
-        modalities: { input: ["text", "image"] }, cost: { input: 1, output: 2, cache_read: 0.1 },
-        reasoning_options: [{ type: "effort", values: ["minimal", "low", "medium", "high"] }],
-      },
-    } } });
-    throw new Error(`Unexpected URL: ${url}`);
+    if (url !== "http://gateway/v1/models") throw new Error(`Unexpected URL: ${url}`);
+    return down ? new Response(null, { status: 503 }) : Response.json({ data: gateway });
   }) as typeof fetch;
+  const flash = catalogModel("gemini-3.8-flash", {
+    name: "Gemini Flash",
+    limit: { context: 1000000, output: 64000 },
+    capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
+    cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }] as never,
+    variants: ["minimal", "low", "medium", "high"].map((id) => ({ id: id as never, settings: { thinkingLevel: id } })),
+  });
+  const narrow = catalogModel("gemini-3.8-flash", { name: "Narrow", limit: { context: 1000, output: 100 } });
+  const records = [
+    { provider: { id: "google" }, models: new Map([["gemini-3.8-flash", flash]]) },
+    { provider: { id: "other" }, models: new Map([["vendor/gemini-3.8-flash", narrow]]) },
+  ];
   let models: readonly Model.Info[] = [];
+  let adds = 0;
   const transforms: Array<(editor: unknown) => void> = [];
-  const editor = { add({ info, models: value }: { info: { id: string; settings?: { baseURL?: string } }; models: readonly Model.Info[] }) {
-    expect(info.id).toBe("cliproxy");
-    expect(info.settings?.baseURL).toBe("http://gateway/v1/");
-    models = value;
-  } };
-  // Configured providers do not exist yet when external plugins set up in v2.0.7.
+  const editor = {
+    list: () => records,
+    add({ info, models: value }: { info: { id: string; settings?: { baseURL?: string } }; models: readonly Model.Info[] }) {
+      expect(info.id).toBe("cliproxy");
+      expect(info.settings?.baseURL).toBe("http://gateway/v1/");
+      adds++;
+      models = value;
+    },
+  };
+  let reloads = 0;
   const ctx = { options: { baseURL: "http://gateway/v1/" }, provider: {
     transform: async (callback: (editor: unknown) => void) => {
       transforms.push(callback);
       callback(editor);
     },
+    reload: async () => {
+      reloads++;
+      for (const transform of transforms) transform(editor);
+    },
   } };
+  const cleanup = await discovery.setup(ctx as never);
   try {
-    await discovery.setup(ctx as never);
+    expect(adds).toBe(0); // A gateway outage at boot publishes nothing.
+    down = false;
+    jest.advanceTimersByTime(5 * 60 * 1000);
+    await flush();
+    expect(reloads).toBe(1);
     expect(models).toHaveLength(2);
     for (const model of models) Schema.decodeUnknownSync(Model.Info)(model);
     expect(models[0]).toMatchObject({
       id: "gemini-3.8-flash-high", modelID: "gemini-3.8-flash-high", providerID: "cliproxy",
       name: "Gemini Flash (antigravity)", limit: { context: 1000000, output: 64000 },
-      capabilities: { tools: true, input: ["text", "image"] },
+      capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
       cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }],
       variants: [
-        { id: "minimal", settings: { reasoningEffort: "minimal" } },
+        { id: "minimal", settings: { reasoningEffort: "minimal", reasoningSummary: "auto" } },
         { id: "low", settings: { reasoningEffort: "low" } },
         { id: "medium", settings: { reasoningEffort: "medium" } },
         { id: "high", settings: { reasoningEffort: "high" } },
       ],
     });
+    expect(models[0].variants[0].settings).not.toHaveProperty("thinkingLevel");
     expect(models[1]).toMatchObject({ name: "pool/vendor/unknown (pool)", limit: { context: 200000, output: 32000 } });
     // Unknown ids without catalog data fall back to the Responses effort ladder so cycling works.
     expect(models[1].variants.map((variant) => variant.id)).toEqual(
@@ -112,11 +96,29 @@ test("discovery publishes v2 models and preserves inventory on gateway failure",
     transforms[0](editor);
     expect(models).toEqual(before);
     expect(requests).toHaveLength(requestCount); // Replaying transforms never performs I/O.
-    fail = true;
-    await discovery.setup(ctx as never);
+    jest.advanceTimersByTime(5 * 60 * 1000);
+    await flush();
+    expect(reloads).toBe(1); // An unchanged inventory does not reload providers.
+    down = true;
+    jest.advanceTimersByTime(5 * 60 * 1000);
+    await flush();
+    expect(reloads).toBe(1); // A failed refresh keeps the last inventory.
     expect(models).toEqual(before);
+    down = false;
+    gateway = [{ id: "gemini-3.8-flash-high", owned_by: "antigravity" }];
+    jest.advanceTimersByTime(5 * 60 * 1000);
+    await flush();
+    expect(reloads).toBe(2);
+    expect(models.map((model) => model.id)).toEqual(["gemini-3.8-flash-high"]);
     expect(transforms).toHaveLength(1);
+    (cleanup as () => void)();
+    const count = requests.length;
+    jest.advanceTimersByTime(5 * 60 * 1000);
+    await flush();
+    expect(requests).toHaveLength(count); // Cleanup stops the refresh timer.
   } finally {
+    (cleanup as () => void)();
+    jest.useRealTimers();
     globalThis.fetch = originalFetch;
   }
 });
