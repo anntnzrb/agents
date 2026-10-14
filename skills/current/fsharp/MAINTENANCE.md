@@ -24,7 +24,7 @@ Write original prose. Do not copy book passages or upstream wording.
 
 Add content only when an executable baseline evaluation exposes a failure, or a verified ecosystem fact can become stale or cannot be inferred from the project.
 
-The initial strong-model baseline solved all ten fixtures without a skill. The only observed hygiene slip was an untracked scratch verification folder. Keep the core workflow short and require probe cleanup.
+The initial strong-model baseline passed 11 of 12 fixtures without the skill. It failed fixture 12 by selecting unlisted NuGet versions and overriding the SDK `VSTest` target, which the listing-aware resolution rules address. The only observed hygiene slip was an untracked scratch verification folder. Keep the core workflow short and require probe cleanup.
 
 Do not add generic style, design, syntax lessons, compile-order explanations, signature-file lessons, nullable-boundary recipes, DU exhaustiveness advice, or FsCheck API tutorials. The baseline already handled those. Keep brief operational reminders only where they route detection or verification.
 
