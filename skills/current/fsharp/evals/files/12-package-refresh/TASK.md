@@ -1,1 +1,0 @@
-Update every package in Directory.Packages.props to its latest stable version available on NuGet. Keep Central Package Management, migrate the existing FsCheck property to the current API as needed, and keep the existing tests and library behavior passing. Our CI runs `dotnet test` from the repository root; it must execute the tests and fail on test failures.

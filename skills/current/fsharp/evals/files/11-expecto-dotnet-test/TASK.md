@@ -1,1 +1,0 @@
-Add an Expecto test project for the supplied Ledger library with at least two example tests and one FsCheck property. Use current stable Expecto and FsCheck packages. Our CI runs `dotnet test` from the repository root, so wire the project into that command, make all added tests discoverable, and make failures fail CI. Keep the library behavior unchanged.

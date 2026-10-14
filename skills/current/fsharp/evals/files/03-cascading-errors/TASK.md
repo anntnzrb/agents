@@ -1,1 +1,0 @@
-This project stopped compiling after a small edit. Fix the root causes without changing its API or behavior: labels trim and uppercase text, customer codes stay integers, and shipment codes stay strings. Keep the fix small; do not introduce object types, downcasts, warning suppression, or rewrite the pipeline. Build and verify the existing behavior.

@@ -1,1 +1,0 @@
-Implement Reader.readBoth so its two independent asynchronous reads start concurrently and return their results in left/right order. Keep the public function signature and propagate read failures. This service must stay on net8.0 with its existing F# language and FSharp.Core pins; do not upgrade the toolchain or packages. Build the project and verify the concurrency behavior.
