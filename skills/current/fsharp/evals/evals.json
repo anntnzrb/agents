@@ -1,0 +1,169 @@
+{
+  "skill_name": "fsharp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Implement Reader.readBoth so its two independent asynchronous reads start concurrently and return their results in left/right order. Keep the public function signature and propagate read failures. This service must stay on net8.0 with its existing F# language and FSharp.Core pins; do not upgrade the toolchain or packages. Build the project and verify the concurrency behavior.",
+      "expected_output": "Concurrent reads compile and run under the original F# 8 constraints.",
+      "files": [
+        "evals/files/01-pinned-toolchain/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/01.fsx <solved-dir>` exits 0",
+        "Original net8.0, LangVersion 8.0, and FSharp.Core 8.0.403 settings are retained.",
+        "Hidden reads must both start before either can finish, and return results in argument order."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add ContactValidation.Email with an opaque Email type, create : string -> Result<Email, string>, and value : Email -> string. A valid address is non-null, trimmed, contains exactly one @ with nonempty parts, and contains no whitespace after trimming. Reject everything else. Hide the raw constructor with an .fsi signature. Update Report.render to return \"Contact: <normalized-address>\" for valid input and \"Invalid contact\" otherwise. Preserve the conditional compile group and central package versions, and keep compile items explicit. Build Debug and Release.",
+      "expected_output": "Opaque validated email is compiled before its consumers, with central versions and conditions preserved.",
+      "files": [
+        "evals/files/02-fsproj-signature/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/02.fsx <solved-dir>` exits 0",
+        "The opaque Email signature precedes its implementation, and both precede Report.fs in explicit Compile items.",
+        "Debug and Release build; central package versions and the conditional compile group are unchanged.",
+        "Validation rejects malformed input and the raw Email constructor is inaccessible."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "This project stopped compiling after a small edit. Fix the root causes without changing its API or behavior: labels trim and uppercase text, customer codes stay integers, and shipment codes stay strings. Keep the fix small; do not introduce object types, downcasts, warning suppression, or rewrite the pipeline. Build and verify the existing behavior.",
+      "expected_output": "Two local type-inference fixes restore the original pipeline behavior.",
+      "files": [
+        "evals/files/03-cascading-errors/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/03.fsx <solved-dir>` exits 0",
+        "The project builds and hidden Customer/Shipment behavior checks pass.",
+        "At most eight source-line edits are made, with no added object types, downcasts or warning suppression."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "The documented command dotnet test returns success, but nobody seems to be executing our three existing Expecto checks. Make that command discover and run all three, and prove it fails when a test fails. Keep Expecto and preserve the existing test cases and assertions.",
+      "expected_output": "dotnet test executes the three Expecto cases and fails on an injected failing case.",
+      "files": [
+        "evals/files/04-expecto-zero-tests/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/04.fsx <solved-dir>` exits 0",
+        "The original three named tests execute and pass under dotnet test.",
+        "An injected fourth failing Expecto test executes and makes dotnet test fail."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Invoice.total should round subtotal * (1 + taxRate) to two decimal places, with midpoint values rounded away from zero, including credits. The FSI probe reports the right answer, but the application disagrees. Investigate the real library from FSI, fix the bug, and integrate the result. Keep the library API and leave a working probe.fsx that exercises current library code through dotnet fsi --exec; remove any stale snapshot dependency from the probe.",
+      "expected_output": "Correct invoice rounding and an executable FSI probe using current code.",
+      "files": [
+        "evals/files/05-fsi-probe/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/05.fsx <solved-dir>` exits 0",
+        "The library rounds positive and negative midpoint values away from zero.",
+        "probe.fsx runs via dotnet fsi --exec and exercises the current library implementation."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Implement Ownership.runBoth in Ownership.fs without changing its signature. Run both resource-owning operations concurrently, pass a cancellation token linked to the caller's token to each, and return their results in argument order. If either fails, cancel the sibling, wait for both operations to finish their cleanup, then propagate the original failure. Caller cancellation must cancel both operations and surface as cancellation. Neither operation may still be running when runBoth completes. Keep the implementation in this library and add any tests you need.",
+      "expected_output": "Concurrent structured lifetime management with cancellation and original failure propagation.",
+      "files": [
+        "evals/files/06-async-ownership/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/06.fsx <solved-dir>` exits 0",
+        "Both operations start concurrently and receive linked cancellation.",
+        "Failure and caller cancellation await disposal of both resources and leave no work running.",
+        "Original failures and ordered successful results propagate."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Implement Boundary.decode in Boundary.fs using the supplied C# JsonApi.Deserialize API. Return a validated Person with readable Name and Age properties. A trimmed nonempty name and an age from 0 through 130 are valid. Return Error \"Invalid JSON\" for malformed JSON, a JSON null root, or incompatible field types; Error \"Name required\" for a missing, null, or whitespace-only name; Error \"Age required\" for missing or null age; and Error \"Age out of range\" for other ages. Validate name before age. Prevent other files and assemblies from creating invalid Person values. Keep nullable analysis enabled in both projects, fix all warnings without suppressions, and retain the public decode signature.",
+      "expected_output": "A nullable-safe JSON boundary returning validated, non-forgeable domain values.",
+      "files": [
+        "evals/files/07-nullable-boundary/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/07.fsx <solved-dir>` exits 0",
+        "Missing, null, malformed, out-of-range and valid JSON produce the specified Result.",
+        "Nullable-enabled builds succeed without warning suppressions.",
+        "Public consumers cannot bypass Person validation."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Add Retry of key: string * attempt: int to Job in Domain.fs and update Dispatch.run. For positive attempts, fetch the key exactly once and return the fetched text followed by \"#\" and the decimal attempt. For zero or negative attempts return \"ignored\" without fetching. Preserve all existing Cached, Remote, and Ignored behavior. Fetching must remain lazy, since it performs expensive side effects. Make the dispatcher exhaustive so a future Job case produces a compiler error under the existing warnings-as-errors policy instead of silently using a fallback.",
+      "expected_output": "Explicit exhaustive Retry dispatch preserving existing lazy behavior.",
+      "files": [
+        "evals/files/08-du-extension/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/08.fsx <solved-dir>` exits 0",
+        "Retry has explicit behavior and existing cases retain their results.",
+        "Fetch side effects happen only for Remote and positive Retry cases.",
+        "A hidden future case fails compilation with FS0025."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Add an idiomatic C# facade named Inventory.Codes to this F# library and its .fsi signature. Expose static bool TryNormalize(string input, out string normalized), which returns false with an empty output for invalid input, and static IReadOnlyList<string> NormalizeAll(IEnumerable<string> inputs), which preserves order and throws ArgumentException for any invalid item. Use the existing ProductCode validation rules: trim, uppercase invariantly, then accept exactly three ASCII letters. Keep invalid ProductCode construction inaccessible. The facade must not expose FSharp.Core collection, function, option, or result types. The .fsi must expose only the existing ProductCode API and the two requested facade methods; keep implementation helpers private. Support consumption from a nullable-enabled C# application.",
+      "expected_output": "A signature-restricted facade usable by nullable-enabled C# without FSharp.Core surface types.",
+      "files": [
+        "evals/files/09-csharp-facade/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/09.fsx <solved-dir>` exits 0",
+        "A hidden C# consumer builds and validates both facade methods.",
+        "The facade surface contains no FSharp.Core types and is restricted by the .fsi.",
+        "ProductCode construction remains inaccessible."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Add an FsCheck 3 property test to the existing executable Expecto test project for Transform.rotateLeft. Valid inputs are nonempty integer lists and a rotation count from zero through length minus one. Use generated valid inputs with useful coverage of nonzero counts and different list sizes, rather than discarding most cases. Assert observable rotation behavior without copying the implementation into the test. The suite must pass on the supplied implementation and detect an implementation that forgets to rotate or rotates by the wrong count. Keep the implementation unchanged, keep the pinned FsCheck 3.x version, and make property failures fail the executable test run. Use a fixed replay seed for repeatable runs. Run at least 100 generated cases per property check.",
+      "expected_output": "A deterministic FsCheck 3 property that generates valid rotations and detects seeded defects.",
+      "files": [
+        "evals/files/10-fscheck-property/"
+      ],
+      "expectations": [
+        "`dotnet fsi evals/graders/10.fsx <solved-dir>` exits 0",
+        "Pinned FsCheck 3 properties run successfully and use generated valid inputs.",
+        "Hidden identity and off-by-one mutants fail the property independently of example tests.",
+        "The property observes rotation without copying its implementation and avoids excessive discards."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Add an Expecto test project for the supplied Ledger library with at least two example tests and one FsCheck property. Use current stable Expecto and FsCheck packages. Our CI runs `dotnet test` from the repository root, so wire the project into that command, make all added tests discoverable, and make failures fail CI. Keep the library behavior unchanged.",
+      "expected_output": "A current Expecto and FsCheck test project whose examples and property execute under the existing root dotnet test command.",
+      "files": [
+        "evals/files/11-expecto-dotnet-test/"
+      ],
+      "expectations": [
+        "Root dotnet test executes at least three tests and a hidden failing sentinel fails the command.",
+        "Expecto major is at least 11 and FsCheck major is at least 3; every declared package version is listed on NuGet.",
+        "The Ledger library remains unchanged.",
+        "`dotnet fsi evals/graders/11.fsx <solved-dir>` exits 0"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Update every package in Directory.Packages.props to its latest stable version available on NuGet. Keep Central Package Management, migrate the existing FsCheck property to the current API as needed, and keep the existing tests and library behavior passing. Our CI runs `dotnet test` from the repository root; it must execute the tests and fail on test failures.",
+      "expected_output": "Latest listed stable centrally managed packages with migrated FsCheck 3 properties and working root test discovery.",
+      "files": [
+        "evals/files/12-package-refresh/"
+      ],
+      "expectations": [
+        "Every centrally declared package is the latest listed stable version at grading time.",
+        "PackageReference items remain versionless and Central Package Management remains enabled.",
+        "Build and root dotnet test succeed with at least three executed tests; the existing FsCheck property compiles against 3.x.",
+        "`dotnet fsi evals/graders/12.fsx <solved-dir>` exits 0"
+      ]
+    }
+  ]
+}

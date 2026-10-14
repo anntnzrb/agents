@@ -1,0 +1,4 @@
+<Project>
+  <PropertyGroup><DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference></PropertyGroup>
+  <ItemGroup><PackageReference Include="FSharp.Core" /></ItemGroup>
+</Project>

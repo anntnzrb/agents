@@ -1,0 +1,1 @@
+The documented command dotnet test returns success, but nobody seems to be executing our three existing Expecto checks. Make that command discover and run all three, and prove it fails when a test fails. Keep Expecto and preserve the existing test cases and assertions.
