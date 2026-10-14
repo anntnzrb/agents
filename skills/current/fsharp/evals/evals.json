@@ -1,0 +1,198 @@
+{
+  "skill_name": "fsharp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Project: Reader.fsproj targets net8.0 (GenerateDocumentationFile true) and has one PackageReference, FSharp.Core 8.0.403. Directory.Build.props sets LangVersion 8.0 and DisableImplicitFSharpCoreReference true. Reader.fs, namespace PinnedReads, module Reader, defines readBoth (left: unit -> Async<string>) (right: unit -> Async<string>) : Async<string * string>, currently written as async { let! first = left (); let! second = right (); return first, second }, so the two reads run one after another. Implement Reader.readBoth so its two independent asynchronous reads start concurrently and return their results in left/right order. Keep the public function signature and propagate read failures. This service must stay on net8.0 with its existing F# language and FSharp.Core pins; do not upgrade the toolchain or packages. Build the project and verify the concurrency behavior.",
+      "expected_output": "Concurrent reads compile and run under the original F# 8 constraints.",
+      "files": [],
+      "expectations": [
+        "Reader.fsproj still targets net8.0 with the FSharp.Core 8.0.403 PackageReference, and the diff does not modify it.",
+        "Directory.Build.props still sets LangVersion 8.0 and DisableImplicitFSharpCoreReference true, and the diff does not modify it.",
+        "readBoth keeps its original public signature.",
+        "readBoth starts both reads before awaiting either one, for example with Async.StartChild or Async.Parallel.",
+        "The verification shows both reads in flight at the same time, such as a probe where each read waits for the other to start and would time out under sequential execution.",
+        "The result is returned as (left, right) even when the right read finishes first.",
+        "An exception raised by either read propagates to the caller.",
+        "dotnet build of Reader.fsproj in Debug succeeds on net8.0."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Project: Contacts.fsproj targets net10.0 with DisableImplicitFSharpCoreReference true and a versionless PackageReference to FSharp.Core. Directory.Packages.props sets ManagePackageVersionsCentrally true and pins FSharp.Core 10.1.401. Compile items are explicit and in this order: Seed.fs; then a separate ItemGroup with Condition \"'$(Configuration)' == 'Debug'\" containing only Diagnostics.fs; then Report.fs. All files use namespace ContactValidation. Seed.fs defines module Seed with label = \"Contact: \". Diagnostics.fs defines module Diagnostics with describe. Report.fs defines module Report with render (raw: string) = Seed.label + raw. Add ContactValidation.Email, a module Email containing an opaque type Email, with create : string -> Result<Email, string> and value : Email -> string. A valid address is non-null, trimmed, contains exactly one @ with nonempty parts, and contains no whitespace after trimming. Reject everything else. Hide the raw constructor with an .fsi signature. Update Report.render to return \"Contact: <normalized-address>\" for valid input and \"Invalid contact\" otherwise. Preserve the conditional compile group and central package versions, and keep compile items explicit. Build Debug and Release.",
+      "expected_output": "Opaque validated email is compiled before its consumers, with central versions and conditions preserved.",
+      "files": [],
+      "expectations": [
+        "Directory.Packages.props still enables central management and pins FSharp.Core 10.1.401, and the diff does not modify it.",
+        "PackageReference items carry no Version or VersionOverride attributes.",
+        "The Debug-only ItemGroup in Contacts.fsproj is unchanged and still contains only Diagnostics.fs.",
+        "Compile items stay explicit with no wildcards.",
+        "The Email .fsi is listed before its .fs implementation, and both are listed before Report.fs.",
+        "The .fsi declares Email as an abstract type, so the raw constructor cannot be used from another assembly.",
+        "Email.create returns Error for null, empty, whitespace-only, and malformed inputs such as \"a\", \"@b\", \"a@\", \"a@@b\", \"a b@c\", and \"a@b c\".",
+        "Email.create trims valid input, so \"  x@y  \" normalizes to \"x@y\".",
+        "Report.render returns \"Contact: \" followed by the normalized address for valid input and \"Invalid contact\" otherwise.",
+        "Debug and Release builds both succeed on net10.0."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Project: Pipeline.fsproj targets net10.0 (GenerateDocumentationFile true) with a single explicit compile item, Pipeline.fs. Pipeline.fs, namespace Cascades, defines type Customer = { Name: string; Code: int } and type Shipment = { Name: string; Code: string }. Module Pipeline contains normalize text = text.Trim().ToUpperInvariant() with text unannotated; customerCode entry = entry.Code + 100 with entry unannotated, where the later Shipment record also has a Code field; labels (customers: Customer list), which maps each customer to (normalize customer.Name, customerCode customer); shipmentLabels; and summarize customers shipments. This project stopped compiling after a small edit. Fix the root causes without changing its API or behavior: labels trim and uppercase text, customer codes stay integers, and shipment codes stay strings. Keep the fix small; do not introduce object types, downcasts, warning suppression, or rewrite the pipeline. Build and verify the existing behavior.",
+      "expected_output": "Two local type-inference fixes restore the original pipeline behavior.",
+      "files": [],
+      "expectations": [
+        "Pipeline.fsproj still targets net10.0 with GenerateDocumentationFile true and the single Pipeline.fs compile item.",
+        "The fix annotates the inference points, text as string and entry as Customer, rather than adding object types or downcasts.",
+        "The fix adds no warning suppression such as #nowarn, NoWarn, or a pragma.",
+        "At most eight source lines differ from the original Pipeline.fs.",
+        "The project builds in Debug on net10.0.",
+        "summarize keeps its original outputs, so a customer named \" Ana \" with code 7 yields (\"ANA\", 107).",
+        "summarize keeps shipment codes as strings, so a shipment code \"007\" stays \"007\" in the output."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Project: Checks.fsproj targets net10.0 with IsTestProject true and compiles Checks.fs, module ArithmeticChecks. Checks.fs has a top-level value tests = testList \"arithmetic\" [...] with three testCase entries named addition, multiplication, and negative. Packages: Expecto 9.0.4, YoloDev.Expecto.TestSdk 1.0.0, and Microsoft.NET.Test.Sdk 18.11.0. There is no global.json, so the default VSTest runner applies. The documented command dotnet test, run from the project directory, returns success, but nobody seems to be executing our three existing Expecto checks. Make that command discover and run all three, and prove it fails when a test fails. Keep Expecto and preserve the existing test cases and assertions.",
+      "expected_output": "dotnet test executes the three Expecto cases and fails on an injected failing case.",
+      "files": [],
+      "expectations": [
+        "The three test bodies and their assertions in Checks.fs are unchanged from the original.",
+        "Checks.fsproj keeps the Expecto 9.0.4 PackageReference.",
+        "dotnet test runs addition, multiplication, and negative, and reports all three as passed.",
+        "An injected fourth failing Expecto test is executed by dotnet test, which exits nonzero and reports one failure.",
+        "The injected failing test is not left in the final Checks.fs."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Project: Billing.fsproj targets net10.0 (GenerateDocumentationFile true) with compile items Amounts.fs then Invoice.fs, both in namespace Billing. Amounts.withTax subtotal taxRate = subtotal * (1M + taxRate). Invoice.total subtotal taxRate = Math.Round(Amounts.withTax subtotal taxRate, 2), which uses the default banker's rounding. Invoice.total should round subtotal * (1 + taxRate) to two decimal places, with midpoint values rounded away from zero, including credits. A probe.fsx at the project root #loads tools/CachedModel.fsx, a snapshot module CachedInvoice whose total rounds with MidpointRounding.ToPositiveInfinity; the probe reports the right answer for 1.005, but the application disagrees. Investigate the real library from FSI, fix the bug, and integrate the result. Keep the library API and leave a working probe.fsx that exercises current library code through dotnet fsi --exec; remove any stale snapshot dependency from the probe.",
+      "expected_output": "Correct invoice rounding and an executable FSI probe using current code.",
+      "files": [],
+      "expectations": [
+        "Invoice.total rounds midpoints away from zero, for example with MidpointRounding.AwayFromZero, and keeps its public signature.",
+        "Invoice.total returns 1.01 for 1.005 and -1.01 for -1.005.",
+        "Invoice.total returns 2.35 for 2.345 and -2.35 for -2.345.",
+        "probe.fsx no longer #loads tools/CachedModel.fsx or any other snapshot copy of the library.",
+        "probe.fsx reaches the current library code, through a reference to the built Billing assembly or a #load of the current sources.",
+        "dotnet fsi --exec probe.fsx succeeds against the fixed library.",
+        "The agent shows the probe would fail if the current library changed, rather than relying on a snapshot."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Project: Ownership.fsproj targets net10.0 as a Library with Nullable enable, TreatWarningsAsErrors true, and NuGetAudit false, and compiles only Ownership.fs, module Ownership. Ownership.fs defines runBoth (first: CancellationToken -> Task<int>) (second: CancellationToken -> Task<int>) (token: CancellationToken) : Task<int * int>, currently written as a task that awaits first token and then second token, so the operations run sequentially. Implement Ownership.runBoth in Ownership.fs without changing its signature. Run both resource-owning operations concurrently, pass a cancellation token linked to the caller's token to each, and return their results in argument order. If either fails, cancel the sibling, wait for both operations to finish their cleanup, then propagate the original failure. Caller cancellation must cancel both operations and surface as cancellation. Neither operation may still be running when runBoth completes. Keep the implementation in this library and add any tests you need.",
+      "expected_output": "Concurrent structured lifetime management with cancellation and original failure propagation.",
+      "files": [],
+      "expectations": [
+        "runBoth keeps its exact original signature and starts both operations before awaiting either one.",
+        "Each operation receives a cancellable token linked to the caller's token.",
+        "When one operation fails, the sibling's token is cancelled.",
+        "When one operation fails, runBoth waits for both operations' cleanup, such as finally or use disposal, before it completes.",
+        "The original exception surfaces unwrapped, not as an AggregateException or a cancellation.",
+        "When the caller cancels, both operations are cancelled, both cleanups finish before runBoth completes, and the caller observes OperationCanceledException.",
+        "Successful runs return (first, second) results in argument order, and both resources are disposed before runBoth completes.",
+        "Ownership.fsproj still builds with Nullable and TreatWarningsAsErrors enabled."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Project: Boundary.fsproj targets net10.0 as a Library with Nullable enable, TreatWarningsAsErrors true, and NuGetAudit false. It compiles Boundary.fs and references Interop/Interop.csproj, a net10.0 C# project with Nullable enable and TreatWarningsAsErrors true. Interop's JsonApi.cs, namespace Interop, defines PersonDto with string? Name and int? Age properties, and public static PersonDto? Deserialize(string json) using System.Text.Json. Boundary.fs, namespace People, defines the record type Person = { Name: string; Age: int } and module Boundary with decode (_json: string) : Result<Person, string>, currently returning Error \"Not implemented\". Implement Boundary.decode in Boundary.fs using the supplied C# JsonApi.Deserialize API. Return a validated Person with readable Name and Age properties. A trimmed nonempty name and an age from 0 through 130 are valid. Return Error \"Invalid JSON\" for malformed JSON, a JSON null root, or incompatible field types; Error \"Name required\" for a missing, null, or whitespace-only name; Error \"Age required\" for missing or null age; and Error \"Age out of range\" for other ages. Validate name before age. Prevent other files and assemblies from creating invalid Person values. Keep nullable analysis enabled in both projects, fix all warnings without suppressions, and retain the public decode signature.",
+      "expected_output": "A nullable-safe JSON boundary returning validated, non-forgeable domain values.",
+      "files": [],
+      "expectations": [
+        "Boundary.decode calls JsonApi.Deserialize and handles the nullable PersonDto fields explicitly.",
+        "Malformed JSON, a JSON null root, and incompatible field types all return Error \"Invalid JSON\".",
+        "A missing, null, or whitespace-only name returns Error \"Name required\", and that check runs before the age check.",
+        "A missing or null age returns Error \"Age required\".",
+        "An age outside 0 through 130 returns Error \"Age out of range\".",
+        "Valid input such as {\"Name\":\"  Ada  \",\"Age\":42} returns a Person with Name \"Ada\" and Age 42, and ages 0 and 130 are accepted.",
+        "Person cannot be constructed or record-literal initialized from another file in Boundary.fsproj.",
+        "Person cannot be constructed from an external assembly, and its Name and Age remain readable.",
+        "Nullable stays enabled in both projects, with no #nowarn, #pragma warning, NoWarn, or WarningsNotAsErrors added, and both projects build cleanly."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Project: Dispatch.fsproj targets net10.0 as a Library with Nullable enable, TreatWarningsAsErrors true, and NuGetAudit false. It compiles Domain.fs then Dispatch.fs, both in namespace Jobs. Domain.fs defines type Job = | Cached of int | Remote of string | Ignored. Dispatch.fs defines module Dispatch with run (fetch: string -> string) job, which matches Cached value when value >= 0 to string value, Remote key to fetch key, and uses a wildcard branch that returns \"ignored\" for everything else. Add Retry of key: string * attempt: int to Job in Domain.fs and update Dispatch.run. For positive attempts, fetch the key exactly once and return the fetched text followed by \"#\" and the decimal attempt. For zero or negative attempts return \"ignored\" without fetching. Preserve all existing Cached, Remote, and Ignored behavior. Fetching must remain lazy, since it performs expensive side effects. Make the dispatcher exhaustive so a future Job case produces a compiler error under the existing warnings-as-errors policy instead of silently using a fallback.",
+      "expected_output": "Explicit exhaustive Retry dispatch preserving existing lazy behavior.",
+      "files": [],
+      "expectations": [
+        "Domain.fs adds the Retry of key: string * attempt: int case and keeps the existing Cached, Remote, and Ignored cases.",
+        "Dispatch.run has no wildcard branch, and every Job case is matched explicitly.",
+        "A positive Retry calls fetch exactly once and returns the fetched text, then \"#\", then the attempt number.",
+        "A zero or negative Retry returns \"ignored\" without calling fetch.",
+        "Cached 9 still returns \"9\", and a negative Cached value still returns \"ignored\".",
+        "Remote still fetches its key once and returns the fetched text.",
+        "Ignored still returns \"ignored\" without calling fetch, and Cached never calls fetch.",
+        "Under WarningsAsErrors=FS0025, a hypothetical new Job case added before Ignored fails compilation with FS0025."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Project: Inventory.fsproj targets net10.0 as a Library with Nullable enable, TreatWarningsAsErrors true, and NuGetAudit false. It compiles Inventory.fsi then Inventory.fs, both in namespace Inventory. The .fsi declares type ProductCode = private ProductCode of string, plus module ProductCode with val tryCreate: string | null -> Result<ProductCode, string> and val value: ProductCode -> string. The .fs trims and uppercases input invariantly, then accepts exactly three ASCII letters A to Z. Add an idiomatic C# facade named Inventory.Codes to this F# library and its .fsi signature. Expose static bool TryNormalize(string input, out string normalized), which returns false with an empty output for invalid input, and static IReadOnlyList<string> NormalizeAll(IEnumerable<string> inputs), which preserves order and throws ArgumentException for any invalid item. Use the existing ProductCode validation rules: trim, uppercase invariantly, then accept exactly three ASCII letters. Keep invalid ProductCode construction inaccessible. The facade must not expose FSharp.Core collection, function, option, or result types. The .fsi must expose only the existing ProductCode API and the two requested facade methods; keep implementation helpers private. Support consumption from a nullable-enabled C# application.",
+      "expected_output": "A signature-restricted facade usable by nullable-enabled C# without FSharp.Core surface types.",
+      "files": [],
+      "expectations": [
+        "Inventory.fsi exposes Codes with exactly TryNormalize and NormalizeAll as public static members.",
+        "Inventory.fsi adds no other public types or members beyond the existing ProductCode API and the Codes facade.",
+        "TryNormalize returns false with an empty output for null, empty, wrong-length, and non-ASCII-letter input.",
+        "TryNormalize returns true with the trimmed, uppercased code for valid input.",
+        "NormalizeAll preserves input order and throws ArgumentException when any item is invalid.",
+        "Facade signatures use only BCL types, with no FSharp.Core types in parameters or return values.",
+        "The TryNormalize input is annotated string | null so nullable-enabled C# can pass null without a warning.",
+        "ProductCode still cannot be constructed from outside the assembly, and Codes has no public constructor.",
+        "A nullable-enabled C# consumer with TreatWarningsAsErrors builds against Inventory.fsproj and successfully calls both facade methods."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Project: Tests.fsproj targets net10.0 as an Exe with Nullable enable, TreatWarningsAsErrors true, and NuGetAudit false. Compile items are Transform.fs, Examples.fs, Tests.fs. PackageReferences are Expecto 11.1.1 and FsCheck 3.4.0. Transform.fs, module Transform, defines the supplied rotateLeft count values = List.skip count values @ List.take count values. Examples.fs, module Examples, defines suite = testCase \"example\" checking rotateLeft 1 [1; 2; 3] = [2; 3; 1]. Tests.fs, module Tests, defines [<Tests>] suite = testList \"rotation\" [Examples.suite] and an [<EntryPoint>] that calls runTestsWithCLIArgs [] argv suite. Add an FsCheck 3 property test to the existing executable Expecto test project for Transform.rotateLeft. Valid inputs are nonempty integer lists and a rotation count from zero through length minus one. Use generated valid inputs with useful coverage of nonzero counts and different list sizes, rather than discarding most cases. Assert observable rotation behavior without copying the implementation into the test. The suite must pass on the supplied implementation and detect an implementation that forgets to rotate or rotates by the wrong count. Keep the implementation unchanged, keep the pinned FsCheck 3.x version, and make property failures fail the executable test run. Use a fixed replay seed for repeatable runs. Run at least 100 generated cases per property check.",
+      "expected_output": "A deterministic FsCheck 3 property that generates valid rotations and detects seeded defects.",
+      "files": [],
+      "expectations": [
+        "Transform.fs is unchanged, and the test project keeps FsCheck 3.4.0 alongside Expecto.",
+        "The property generates nonempty integer lists and counts from 0 to length minus one using Gen or Arb.",
+        "The property uses no Prop.filter or ==> discards.",
+        "The test asserts the rotated sequence from observable behavior without calling List.skip or List.take.",
+        "Each property runs at least 100 generated cases, with several list sizes and many nonzero counts.",
+        "A fixed replay seed makes repeated dotnet run executions generate identical inputs.",
+        "The supplied implementation passes the property suite with exit code 0.",
+        "An implementation that forgets to rotate fails through an FsCheck falsification at runtime, not a compile error.",
+        "An implementation that rotates by the wrong count fails through an FsCheck falsification at runtime, not a compile error."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Project at the repository root: Ledger.slnx currently includes only Library/Library.fsproj. A README states that CI runs dotnet test from the repository root on .NET SDK 10. Library/Library.fsproj targets net10.0 and compiles Ledger.fs, module Ledger, which defines total (entries: int list) = List.sum entries and credit amount balance = balance + amount. Add an Expecto test project for the supplied Ledger library with at least two example tests and one FsCheck property. Use current stable Expecto and FsCheck packages. Our CI runs `dotnet test` from the repository root, so wire the project into that command, make all added tests discoverable, and make failures fail CI. Keep the library behavior unchanged.",
+      "expected_output": "A current Expecto and FsCheck test project whose examples and property execute under the existing root dotnet test command.",
+      "files": [],
+      "expectations": [
+        "Library/Ledger.fs and Library/Library.fsproj are unchanged.",
+        "The new test project references Expecto 11 or newer and FsCheck 3 or newer.",
+        "Every declared package version is listed on NuGet.",
+        "The root wiring, such as Ledger.slnx, makes a bare dotnet test from the repository root run the new test project.",
+        "The test project defines at least two Expecto example tests and one FsCheck property that the runner discovers.",
+        "A bare dotnet test from the repository root executes at least three tests and passes on the unmodified library.",
+        "A temporarily mutated Ledger, such as total plus one, makes root dotnet test fail at runtime through the FsCheck property, not a compile error.",
+        "A temporarily added failing Expecto test makes root dotnet test exit nonzero, and that test is removed afterward."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Project at the repository root: Ledger.slnx includes Library/Library.fsproj and Tests/Tests.fsproj. Directory.Build.props sets DisableImplicitFSharpCoreReference true and carries a versionless FSharp.Core PackageReference. Directory.Packages.props sets ManagePackageVersionsCentrally true and pins FSharp.Core 8.0.403, Expecto 10.2.3, Expecto.FsCheck 10.2.3, FsCheck 2.16.6, and YoloDev.Expecto.TestSdk 0.14.0. Tests/Tests.fsproj targets net10.0 as an Exe with IsTestProject true, references ../Library/Library.fsproj, and has versionless Expecto, Expecto.FsCheck, FsCheck, and YoloDev.Expecto.TestSdk PackageReferences. Tests/Checks.fs contains testList \"ledger\" with testCase \"empty total\", testCase \"credit\", and testProperty \"singleton total\", which uses Prop.forAll (Arb.from<int>). Tests/Program.fs calls runTestsInAssemblyWithCLIArgs. Library/Ledger.fs defines total and credit. Update every package in Directory.Packages.props to its latest stable version available on NuGet. Keep Central Package Management, migrate the existing FsCheck property to the current API as needed, and keep the existing tests and library behavior passing. Our CI runs `dotnet test` from the repository root; it must execute the tests and fail on test failures.",
+      "expected_output": "Latest listed stable centrally managed packages with migrated FsCheck 3 properties and working root test discovery.",
+      "files": [],
+      "expectations": [
+        "Every PackageVersion in Directory.Packages.props is the latest listed stable NuGet version of its package at grading time, checked against NuGet rather than memory.",
+        "Central Package Management stays enabled.",
+        "Every PackageReference stays versionless with no VersionOverride.",
+        "The tests named empty total, credit, and singleton total are kept by name.",
+        "The singleton total property is migrated to the current FsCheck API and remains a testProperty.",
+        "Library/Ledger.fs is unchanged.",
+        "dotnet build and a bare root dotnet test succeed, with at least three tests executed and FsCheck resolving to major 3 or newer.",
+        "A temporarily mutated Ledger makes all three named tests fail under root dotnet test, and the mutation is reverted.",
+        "A temporarily added failing Expecto test makes root dotnet test exit nonzero, and that test is removed afterward."
+      ]
+    }
+  ]
+}
