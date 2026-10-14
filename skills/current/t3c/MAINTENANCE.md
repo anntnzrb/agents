@@ -32,6 +32,7 @@ Recheck each fact against its anchor after a T3 update. If one no longer holds, 
 | A child receives only the task string. `role` adds one prefix line | `function taskPrompt` |
 | A child gets T3's orchestration instructions: as system or developer instructions on most drivers, prepended to the first prompt on Cursor | `T3_CODE_ORCHESTRATION_INSTRUCTIONS`, then its callers `t3OrchestrationSystemPrompt` and `t3OrchestrationPromptForFirstRun` |
 | The `opencode` driver offers only the `variant` option, and an unknown option ID fails | `optionDescriptors` in the `provider-opencode/src/server/status.ts` region, then `rejected options` |
+| The `opencode` driver offers the `variant` and `agent` options, and an unknown option ID fails | `optionDescriptors` in the `provider-opencode/src/server/status.ts` region, then `rejected options` |
 | An `opencode` child runs the `build` agent, or `plan` in plan mode | `agentFor = ` |
 | A child inherits the parent's runtime mode, and outside full access an `opencode` session asks before shell and edit | `function resolveRuntimeMode`, then `sessionRules = (` |
 | A child runs in the parent's worktree | `function makeSubagentChildThread`, then `cwd` in `RuntimePolicyV2` |
