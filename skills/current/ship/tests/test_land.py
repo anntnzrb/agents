@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import cast, final
 
@@ -65,7 +66,7 @@ elif args[:2] == ["pr", "view"]:
     state["polls"] += int(state["queued"])
     scenario = config["scenario"]
     merged = (state["queued"] and state["polls"] >= 2
-        and scenario not in ["failed", "timeout", "closed"]
+        and scenario not in ["failed", "timeout", "closed", "dirty"]
         and (scenario != "behind" or state["updated"]))
     head = state.get("head", config["head"])
     if merged:
@@ -77,7 +78,8 @@ elif args[:2] == ["pr", "view"]:
         "headRefOid": "0" * 40 if scenario == "mismatch" else head,
         "baseRefName": config.get("base", "main"),
         "state": "MERGED" if merged else "CLOSED" if scenario == "closed" else "OPEN",
-        "mergeStateStatus": "BEHIND" if scenario == "behind"
+        "mergeStateStatus": "DIRTY" if scenario == "dirty"
+            else "BEHIND" if scenario == "behind"
             and not state["updated"] else "CLEAN",
         "autoMergeRequest": {{"mergeMethod": "MERGE"}} if state["queued"] else None,
         "statusCheckRollup": [], "isCrossRepository": False}}))
@@ -190,6 +192,18 @@ def test_failed_check_preserves_branch_and_worktree(repository: Repository) -> N
     repository.assert_preserved()
     assert "CI required" in result.stderr
     assert "https://example.test/run/42" in result.stderr
+
+
+def test_merge_conflicts_stop_without_cleanup(repository: Repository) -> None:
+    """Conflicting PRs fail promptly instead of polling until the deadline."""
+    timeout = 5
+    started = time.monotonic()
+    result = repository.land("dirty", "--timeout", str(timeout))
+    elapsed = time.monotonic() - started
+    assert result.returncode == 1
+    assert "merge conflicts" in result.stderr.lower()
+    repository.assert_preserved()
+    assert elapsed < timeout
 
 
 @pytest.mark.parametrize("scenario", ["native_stack", "stack_during_checks"])

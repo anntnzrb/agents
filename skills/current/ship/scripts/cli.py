@@ -304,6 +304,8 @@ def land(args: argparse.Namespace, steps: list[str]) -> str:  # noqa: C901, PLR0
             continue
         if failures:
             raise RuntimeError("Required checks failed: " + "; ".join(failures))
+        if state["mergeStateStatus"] == "DIRTY":
+            raise RuntimeError("Merge conflicts with base; resolve them and rerun")
         if not state["autoMergeRequest"] and head not in queued:
             queued.add(head)
             merge_args = ("pr", "merge", number, "--repo", repo, "--auto")
