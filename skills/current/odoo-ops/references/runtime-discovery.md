@@ -5,7 +5,7 @@ Read before local development or database operations. Discovery identifies paths
 ## Local Paths
 
 - Runtime: existing `ODOO_RUNTIME_PATH`, then `/opt/odoo17`, then `~/.local/share/odoo17`. If none exists, the resolver returns `/opt/odoo17` as fallback path.
-- Custom addons: existing `ODOO_ADDONS_PATH`, then `./addons`, then the current repository root directory.
+- Custom addons: existing `ODOO_ADDONS_PATH`, then `~/repos/etech/odoo/addons`, then `./addons`, then the current working directory. Run the CLI from the repository root.
 - Config: `<runtime>/config/odoo.conf`.
 - Source addons: matching directories under `<runtime>/source` (resolved via `addons_paths`).
 
@@ -17,15 +17,7 @@ Use absolute environment paths when configuring overrides. The CLI does not prov
 uv run --script <skill-dir>/scripts/cli.py env --json
 ```
 
-`env --json` outputs key environment and database facts:
-- `runtime_path`: location of installed Odoo core source.
-- `addons_paths`: array of all active addon directories (core and enterprise).
-- `custom_addons_path`: repository addons directory.
-- `config_path`: path to active `odoo.conf`.
-- `effective_database`: database resolved via precedence: `--db` CLI flag > `POSTGRES_DB` environment variable > profile default workflow database > `db_name` in `odoo.conf`.
-- `database_source`: configuration source that resolved `effective_database` (`flag`, `env`, `profile`, or `odoo.conf`).
-- `database_exists`: boolean indicating whether the effective database exists in PostgreSQL.
-- `available_databases`: list of local databases present in PostgreSQL.
+`env --json` reports `runtime_path` (installed Odoo core source), `addons_paths` (all active addon directories), the custom addons directory, the config path, and the effective database with its source. [Output contracts](output-contracts.md#environment) defines every field and the database precedence.
 
 Always check `runtime_path` and `addons_paths` before designing new models or methods. Inspecting the installed source ensures your code builds upon native Odoo 17 conventions and primitives.
 
