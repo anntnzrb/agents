@@ -75,8 +75,8 @@ The CLI strictly refuses the following operations on production endpoints. If as
 4. Immediate background actions: invoking `run` on `ir.actions.server` or `method_direct_trigger` on `ir.cron`. Creating and executing Server Actions in production is done by the user in the Odoo web UI.
 5. Outbound communications: sending email, WhatsApp messages, SMS, creating messages (`message_post` / notifications), or launching mass mailings.
 6. Partner reconciliation: `res.partner` automated or manual merging.
-7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, and setting payslips to `done`.
-8. System credentials: modifying `set_param` values or changing user passwords.
+7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, setting payslips to `done`, and payment state changes (`action_paid`).
+8. System credentials: modifying `set_param` values, changing user passwords, or sending password resets (`action_reset_password`).
 
 Server Action templates remain valid as the user's manual UI path. Keep their `WRITE_APPROVED = False` safety by default, setting it to `True` only after explicit user review.
 
