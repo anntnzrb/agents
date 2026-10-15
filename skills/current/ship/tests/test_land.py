@@ -141,7 +141,6 @@ class Repository:
             [
                 sys.executable,
                 str(CLI),
-                "land",
                 "7",
                 "--repo",
                 "owner/repo",
@@ -306,7 +305,6 @@ def test_repeat_merged_cleanup(repository: Repository) -> None:
         [
             sys.executable,
             str(CLI),
-            "land",
             "7",
             "--repo",
             "owner/repo",
@@ -332,7 +330,7 @@ def test_current_branch_and_default_repo(repository: Repository) -> None:
         json.dumps({"scenario": "clean", "head": repository.head}), encoding="utf-8"
     )
     result = subprocess.run(
-        [sys.executable, str(CLI), "land", "--worktree", str(repository.worktree)],
+        [sys.executable, str(CLI), "--worktree", str(repository.worktree)],
         cwd=repository.worktree,
         env=repository.env,
         capture_output=True,
@@ -350,7 +348,7 @@ def test_no_worktree_option_retains_checkout(repository: Repository) -> None:
         json.dumps({"scenario": "clean", "head": repository.head}), encoding="utf-8"
     )
     result = subprocess.run(
-        [sys.executable, str(CLI), "land", "7", "--repo", "owner/repo"],
+        [sys.executable, str(CLI), "7", "--repo", "owner/repo"],
         cwd=repository.worktree,
         env=repository.env,
         capture_output=True,

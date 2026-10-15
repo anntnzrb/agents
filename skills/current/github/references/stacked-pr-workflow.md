@@ -2,7 +2,7 @@
 
 Scope: Publishing dependent branches and PRs, with optional native stack association. Use the ordinary PR path unless native association is requested or already exists.
 
-When work depends on an unmerged PR, open the new PR with that PR's branch as its base. For an ordinary chain, use `ship land` bottom-up after the parent reaches the intended trunk and verify the child's live base. Native stacks use the merge workflow in `stack-commands.md`; `ship land` refuses them before merge or cleanup.
+When work depends on an unmerged PR, open the new PR with that PR's branch as its base. For an ordinary chain, use the `ship` skill's merge command bottom-up after the parent reaches the intended trunk and verify the child's live base. Native stacks use the merge workflow in `stack-commands.md`; the merge command refuses them before merge or cleanup.
 
 ## Audit before writing
 

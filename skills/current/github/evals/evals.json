@@ -105,11 +105,11 @@
     {
       "id": 10,
       "prompt": "Planning-only request: A Ship target PR already belongs to a native GitHub stack with an unmerged lower PR, and only the target PR was authorized for delivery. gh-stack is missing. Explain the handoff and setup recommendation without installing, merging, unstacking, or changing files.",
-      "expected_output": "A scoped native-stack handoff that identifies the additional lower-layer merge scope, avoids ship land and ordinary gh pr merge, recommends official extension setup without installing its agent skill, and allows independent ordinary work to continue.",
+      "expected_output": "A scoped native-stack handoff that identifies the additional lower-layer merge scope, avoids the ship merge command and ordinary gh pr merge, recommends official extension setup without installing its agent skill, and allows independent ordinary work to continue.",
       "files": [],
       "expectations": [
         "The response identifies that native merging can include unmerged lower PRs and requires authorization for that additional scope.",
-        "The response routes native mechanics to GitHub, does not run ship land on the native stack, and preserves existing membership.",
+        "The response routes native mechanics to GitHub, does not run the ship merge command on the native stack, and preserves existing membership.",
         "The response proactively recommends official github/gh-stack with setup authorization, does not install its upstream skill into generated homes, and does not block independent ordinary PR work."
       ]
     },

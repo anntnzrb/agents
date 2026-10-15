@@ -2,7 +2,7 @@
 # requires-python = ">=3.14"
 # dependencies = []
 # ///
-"""Land one head-pinned PR, then clean up only its merged branch."""
+"""Merge one head-pinned PR, then clean up only its merged branch."""
 
 import argparse
 import json
@@ -348,26 +348,24 @@ def land(args: argparse.Namespace, steps: list[str]) -> str:  # noqa: C901, PLR0
 def main() -> int:
     """Parse arguments and emit one final result."""
     parser = argparse.ArgumentParser(description=__doc__)
-    commands = parser.add_subparsers(dest="command", required=True)
-    command = commands.add_parser("land", help="Land a reviewed open PR")
-    _ = command.add_argument(
+    _ = parser.add_argument(
         "pr", nargs="?", help="PR number; defaults to current branch"
     )
-    _ = command.add_argument("--repo", help="owner/name; defaults to gh repo view")
-    _ = command.add_argument("--base", help="Assert expected base, never retarget")
-    _ = command.add_argument(
+    _ = parser.add_argument("--repo", help="owner/name; defaults to gh repo view")
+    _ = parser.add_argument("--base", help="Assert expected base, never retarget")
+    _ = parser.add_argument(
         "--worktree", type=Path, help="Task checkout to remove after merge"
     )
-    _ = command.add_argument(
+    _ = parser.add_argument(
         "--method", choices=("merge", "squash", "rebase"), default="merge"
     )
-    _ = command.add_argument(
+    _ = parser.add_argument(
         "--timeout", type=positive, default=1800, help="Total seconds (default 1800)"
     )
-    _ = command.add_argument(
+    _ = parser.add_argument(
         "--interval", type=positive, default=10, help="Polling seconds (default 10)"
     )
-    _ = command.add_argument("--json", action="store_true", help="Emit one JSON result")
+    _ = parser.add_argument("--json", action="store_true", help="Emit one JSON result")
     args = parser.parse_args()
     steps: list[str] = []
     error = ""

@@ -73,7 +73,7 @@ For a local comparison, use fresh `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, and `
 
 The repository requires `CI required` and a strict up-to-date ruleset before merging. Use merge commits titled from the PR. CI has no push trigger because the merged tree has already passed CI; the weekly scheduled run catches dependency drift.
 
-Land with `uv run --script skills/current/ship/scripts/cli.py land <number>`.
+Merge with `uv run --script skills/current/ship/scripts/cli.py <number>`.
 
 ## Update dependencies
 
