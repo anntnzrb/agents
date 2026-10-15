@@ -10,7 +10,7 @@ Read the installed T3 build, not memory. The live tool schemas in the harness ar
 | --- | --- | --- |
 | T3 orchestration tools | `<T3 home>/runtime/versions/<active version>/t3`, a bundled JavaScript file with `//#region src/...` markers | Tool definitions and the anchors below |
 | Active T3 version | `<T3 home>/runtime/service-state.json` | `activeVersion` |
-| Live tool schemas | The harness tool list, for example `ToolSearch` with `select:mcp__t3-code__delegate_task` | Input schemas for the six tools in `SKILL.md` |
+| Live tool schemas | The harness tool list, for example `ToolSearch` with `select:mcp__t3-code__delegate_task` | Input schemas for the tools in the `SKILL.md` Tools table |
 | Model catalog | `orchestrator_capabilities` | Provider instance IDs, model IDs, and option IDs for each `roles.toml` target |
 | Model benchmarks | The `artificial-analysis-live` skill | Intelligence Index, `costPerTask`, and Terminal-Bench for candidate models |
 | Current evidence | The newest `references/model-snapshot-<date>.md` | The dated numbers and reasons behind each `roles.toml` target |
@@ -20,7 +20,7 @@ Read the installed T3 build, not memory. The live tool schemas in the harness ar
 The bundle is large and partly binary. Search it with `grep -an` and cut long lines. Bundler suffixes such as `make$16` change between builds, so match tool definitions with a pattern:
 
 ```bash
-grep -anE 'make\$[0-9]+\("(delegate_task|task_status|task_cancel|t3_thread_read|t3_worktree_status|orchestrator_capabilities)"' <bundle>
+grep -anE 'make\$[0-9]+\("(delegate_task|task_status|task_cancel|t3_thread_launch|t3_thread_send|t3_thread_read|t3_thread_interrupt|t3_thread_organize|t3_worktree_status|orchestrator_capabilities)"' <bundle>
 ```
 
 ## Facts the skill relies on
@@ -41,10 +41,14 @@ Recheck each fact against its anchor after a T3 update. If one no longer holds, 
 | Nothing stops a child from calling `delegate_task` | the `delegateTask` handler, which checks only for an active parent run |
 | Reading a terminal result through `t3_thread_read` acknowledges the wake | the `t3_thread_read` tool description |
 | `orchestrator_capabilities` output is very large | Call it once and measure the result size |
+| A message from the parent to a finished app-owned child creates a fresh task with `completionWake: "always"`, and `t3_thread_send` returns its `taskId`. A message to a running child creates no task | `recordSubagentFollowup`, then `OrchestratorMcpThreadSendResult` |
+| `t3_thread_launch` without `workspaceStrategy` selects the project root, not the caller's worktree, and has no idempotency key | the `t3_thread_launch` tool description |
+| `t3_thread_launch` accepts `modelSelection` with `instanceId`, `model`, and `options` as an object | `ModelSelectionSource`, then `ProviderOptionSelectionsFromLegacyObject` |
+| `t3_thread_organize` archives a thread with `action: "archive"` | `ThreadOrganizeTool` |
 
 ## Settled decisions
 
-The user settled these on 2026-10-11. A refresh MUST NOT silently reverse them. If evidence argues against one, report it and ask.
+The user settled decisions 1 to 11 on 2026-10-11 and 12 to 15 on 2026-10-15. A refresh MUST NOT silently reverse them. If evidence argues against one, report it and ask.
 
 1. The orchestrator is the thread the user chats with: Claude Opus 5.5 at medium effort, the only effort the user has for Opus. It never appears in `roles.toml`.
 2. No role uses `max` effort.
@@ -57,6 +61,8 @@ The user settled these on 2026-10-11. A refresh MUST NOT silently reverse them. 
 9. The orchestrator never blocks a turn. Waiting for a child's result through its completion wake is allowed.
 10. Children share the orchestrator's worktree. Parallel slices need disjoint owned files.
 11. Delegation uses T3 tools only.
+12. The orchestrator may steer or follow up a child through `t3_thread_send` on its `childThreadId`. Independent review rounds still start with a new `delegate_task`.
+13. Delegated threads from `t3_thread_launch` serve multi-round dialogues. Each round ends with a result file, a `t3_thread_send` in `queue` mode to the orchestrator, no running processes, and an idle thread. The orchestrator archives the thread when the dialogue ends.
 
 ## Refresh procedure
 
