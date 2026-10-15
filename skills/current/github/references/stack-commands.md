@@ -118,7 +118,7 @@ GH_PROMPT_DISABLED=1 gh stack merge --yes --squash <stack-number|pr-number>
 
 `merge --yes` merges through the selected PR, including every unmerged PR below it. Verify that all selected layers are reviewed and authorized; naming one PR does not authorize extra lower layers. Direct merging is all-or-nothing. With a merge queue, the selected stack lands as one merge group and the queue determines the method. Confirm each PR reaches MERGED; a queued request is pending delivery. **Never use `gh pr merge` for a native stack merge.**
 
-The extension does not expose `--match-head-commit`; do not claim that it preserves `ship land`'s reviewed-head condition. Ship's CLI handles ordinary PRs and refuses known native membership. Native automation must establish its head conditions and merge scope through the documented API before replacing that guarantee. After partial merges, refresh every remaining layer's base/head and checks before cleanup or further landing.
+The extension does not expose `--match-head-commit`; do not claim that it preserves the `ship` merge command's reviewed-head condition. Ship's CLI handles ordinary PRs and refuses known native membership. Native automation must establish its head conditions and merge scope through the documented API before replacing that guarantee. After partial merges, refresh every remaining layer's base/head and checks before cleanup or further landing.
 
 ## CI, review, and API boundaries
 

@@ -8,11 +8,15 @@ license: AGPL-3.0-or-later
 
 Move authorized work to the requested outcome in coherent delivery units. Reconstruct the current state before choosing the next action. Keep the starting state separate from the destination: an existing issue does not grant permission to implement or merge.
 
-## Public entrypoint
+A ship request runs unattended. Treat the user as unavailable for decisions and not watching. Run the gates, resolve problems, make the decisions yourself, and merge. Report only after the merge is confirmed and follow-ups are done, or a hard blocker remains. Never ask the user during a ship request.
+
+## Entrypoints
 
 Invoke this skill in natural language with a problem, issue, PR, or current change. Use available tools and applicable skills for repository access, commits, review, verification, and tracker operations.
 
-For authorized landing, run `uv run --script <skill-dir>/scripts/cli.py land <number>`. Omit the number for the current branch.
+For authorized delivery, run the merge command: `uv run --script <skill-dir>/scripts/cli.py <number>`. Omit the number for the current branch.
+
+The command blocks until merge or stop, with a default timeout of 1800 seconds. Wait for it to exit within the same task. If the harness runs it in the background, use its wait or completion-notification mechanism and resume when it exits. Do not hand back to the user while it runs. Never end with a promise such as "the merge command is waiting on CI; once it merges I'll close the issues". Stop only after a confirmed merge with follow-ups done, or a hard blocker.
 
 - Use `--repo owner/name` to select the repository. The checkout's `origin` must match; fork PRs stop without writes.
 - Use `--base` only to assert the expected base and `--method` for the allowed merge method (default `merge`).
@@ -20,7 +24,7 @@ For authorized landing, run `uv run --script <skill-dir>/scripts/cli.py land <nu
 - `--timeout` bounds the total wait in seconds (default 1800). `--interval` sets the polling interval (default 10).
 - `--json` emits one result. Exit codes are 0 for merged and cleaned up, 1 for a stopped operation, and 2 for usage errors.
 - A failure reports completed steps and preserves unfinished cleanup. Rerun from a surviving checkout to reconcile live state.
-- `land` handles ordinary PRs. It checks remote native-stack membership without requiring `gh-stack`; an unavailable stacks API does not block ordinary landing. Known native stacks use the GitHub skill's stack merge workflow instead.
+- The merge command handles ordinary PRs. It checks remote native-stack membership without requiring `gh-stack`; an unavailable stacks API does not block ordinary merges. Known native stacks use the GitHub skill's stack merge workflow instead.
 
 ## Choose the destination
 
@@ -31,7 +35,7 @@ Read the user's request and relevant conversation before any mutation. Explicit 
 | File an issue, save for later, hand to another agent, or an incidental problem outside the active task | Capture | A useful issue exists and its contents are verified |
 | Implement without a request to publish | Implement | The scoped local change is verified |
 | Open PRs, get them green, or make them merge-ready without a request to ship or merge | Prepare | The scoped PRs are verified and merge-ready |
-| Ship, land, or merge when ready, with a clear target | Deliver | The merge is confirmed and linked issues reflect the actual resolution |
+| Ship (bare or with a target), or merge | Deliver | The merge is confirmed and linked issues reflect the actual resolution |
 | Clean up merged local branches | Cleanup | Eligible local branches are deleted or reported as skipped |
 | Check status, consider filing, or discuss a possible change | Inspect | Findings only, with no writes |
 
@@ -39,11 +43,11 @@ An explicit request to deliver authorizes the necessary scoped implementation, c
 
 Keep scope bound to the requested target. Shipping an issue covers its acceptance criteria. Shipping a PR covers that PR's intended change, not every unfinished requirement in a linked issue. Report remaining issue scope without implementing it unless authorized.
 
-For a bare invocation, infer the target from the active task only when unambiguous. An incidental finding defaults to capture, even if the invocation says ship. An explicit request to implement or deliver that finding overrides this default.
+A bare ship with an active task means Deliver. For other bare invocations, infer the target from the active task only when unambiguous. An incidental finding defaults to Capture unless the user says ship or asks to implement it. Shipping a finding means Deliver, subject to explicit limits.
 
-When the target, repository, or destination remains ambiguous after read-only inspection, present a short lettered menu of plausible choices. Name the target and stopping point for each choice, including whether it publishes or merges. Mark a recommendation when the evidence supports one, but wait for the user's selection before the ambiguous action. Accept a letter or a natural-language choice. Offer only relevant options, not every destination. Ask one focused question instead when missing information cannot be resolved by choosing among known options. Do not show a menu when the request is already clear or use a recommendation as authorization.
+For a ship request, never show a menu or ask for confirmation. After read-only inspection, pick the most plausible target, repository, grouping, and option from the evidence. State the choice in the PR and final report, and proceed. For non-ship requests, when the target, repository, or destination remains ambiguous after read-only inspection, present a short lettered menu of plausible choices. Name the target and stopping point for each choice, including whether it publishes or merges. Mark a recommendation when the evidence supports one, but wait for the user's selection before the ambiguous action. Accept a letter or a natural-language choice. Offer only relevant options, not every destination. Ask one focused question instead when missing information cannot be resolved by choosing among known options. Do not show a menu when the request is already clear or use a recommendation as authorization.
 
-State the target and destination briefly, then proceed. Ask only for missing information or permission that changes correctness, safety, cost, or scope. Do authorized work before an approval stop. Keep branch cleanup within the rules below. Do not expand the task into deployment, releases, repository settings, or unrelated cleanup.
+State the target and destination briefly, then proceed. For non-ship requests, ask only for missing information or permission that changes correctness, safety, cost, or scope. For ship requests, decide these yourself. Choose the conservative option that satisfies the request and record it in the PR and final report. Required human approval by another person, missing access or credentials, and another actor owning active work remain hard blockers to report. Do authorized work before an approval stop. Keep branch cleanup within the rules below. Do not expand the task into deployment, releases, repository settings, or unrelated cleanup.
 
 ## Optional GitHub stacks
 
@@ -51,7 +55,7 @@ Stacks complement Ship; they are not a prerequisite. Keep ordinary PR work on it
 
 Ship owns the destination, authorized scope, readiness, and confirmation. The `github` skill owns stack discovery, setup, commands, and remote state. Read its stack references when native stacks are requested or the target already belongs to one. Ordinary dependent PRs do not imply native-stack membership.
 
-For native landing, identify every layer the merge would include and verify that delivery authorizes them all. A request to ship one PR does not authorize extra lower layers. Route native merge and subsequent cleanup through the GitHub workflow; do not invoke `land` on a native stack or dissolve the stack to bypass its guard. Recommend a missing official extension when useful, then continue independent ordinary work. Install only with authorization that covers setup.
+For native merges, identify every layer the merge would include and verify that delivery authorizes them all. A request to ship one PR does not authorize extra lower layers. Route native merge and subsequent cleanup through the GitHub workflow; do not invoke the merge command on a native stack or dissolve the stack to bypass its guard. Recommend a missing official extension when useful, then continue independent ordinary work. Install only with authorization that covers setup.
 
 ## Reconstruct and reconcile
 
@@ -70,7 +74,7 @@ Before creating branches or publishing, inventory accumulated authorized changes
 - Keep one coherent outcome in one PR. Split by concerns that can be understood, verified, and reverted independently, not by file count, chat turns, commit count, or an arbitrary diff limit.
 - Publish independent outcomes as separate PRs against the intended integration branch. Do not stack unrelated work or serialize it behind a blocked independent PR.
 - Use dependent PRs when actual dependencies benefit from separate review. Keep small, tightly coupled changes together when splitting adds no review or verification value. Native stacks remain optional.
-- Choose and briefly explain the grouping within existing authorization. Ask only for unresolved scope, ownership, or required approvals. Permission to ship one specific PR does not authorize other accumulated work.
+- Choose and briefly explain the grouping within existing authorization. For non-ship requests, ask only for unresolved scope, ownership, or required approvals. For ship requests, choose and record the conservative option that satisfies the request. Report required human approval by another person or another actor owning active work as a hard blocker. Permission to ship one specific PR does not authorize other accumulated work.
 
 `autommit` owns atomic commits, not PR grouping. Squashing is per PR and does not justify combining unrelated outcomes. Apply the chosen destination to every authorized PR. Report blockers per unit and continue independent work; do not report complete delivery until every authorized unit is confirmed merged.
 
@@ -98,22 +102,22 @@ Before creating branches or publishing, inventory accumulated authorized changes
 3. Verify reviewer claims against the code. Fix valid findings and explain disagreements with evidence. Batch known corrections into one publication when practical. Do not change code solely to silence a bot.
 4. After any change, repeat the affected behavioral checks, review, and CI checks. Refresh remote state before deciding readiness. Never disable checks, weaken tests, dismiss required approvals, force a merge, or rewrite shared history to obtain green.
 5. If CI is absent, report that fact and use the relevant local and behavioral checks. Do not invent a passing CI result or add a workflow unless requested. Pending, cancelled, inaccessible, and missing expected checks are not passes. Interpret skipped or neutral checks using the workflow and repository policy rather than assuming success or failure.
-6. Continue while actionable work or checks remain. Stop for a real blocker such as unavailable access, required human approval, an unresolved product decision, or verification that cannot be established. Report the exact blocker and the smallest action needed. Do not stop merely because the PR opened or a command finished.
+6. Continue while actionable work or checks remain. For ship requests, make the product decision that best fits the issue, codebase, and request, and document it in the PR. An unresolved product decision is not a ship blocker. Stop for a real blocker such as unavailable access, required human approval by another person, or verification that cannot be established. For non-ship requests, an unresolved product decision can also block progress. Report the exact blocker and the smallest action needed. Do not stop merely because the PR opened or a command finished.
 
 Merge-ready means the current patch satisfies acceptance criteria, relevant verification passes, substantive feedback is addressed, and the repository permits integration. A required approval is a blocker to report, not an approval to manufacture. For Prepare, stop here without merging.
 
 ## Deliver and confirm
 
-1. Run the `autoreview` skill before landing and resolve verified findings. Re-read the PR's current head, base, checks, review state, and mergeability. If the patch changed since verification, verify the affected behavior again.
-2. Once the reviewed PR is open and delivery is authorized, route ordinary GitHub landing to `land` with the repository's allowed merge method. It pins the local head, queues auto-merge, polls live state, rebases a behind branch, and cleans up only after MERGED. Do not replace it with a shell merge or cleanup loop. Ordinary dependent PRs land bottom-up after each parent reaches the intended branch; verify the child's live base before landing. Native stacks follow the GitHub skill's stack merge workflow within the authorized layers.
-3. Treat a failed check, closed unmerged PR, head mismatch, or timeout as a stop. Report the command's blocker without deleting branches or worktrees. A queued request is not completed delivery.
+1. Run the `autoreview` skill before merging and resolve verified findings. Re-read the PR's current head, base, checks, review state, and mergeability. If the patch changed since verification, verify the affected behavior again.
+2. Once the reviewed PR is open and delivery is authorized, route ordinary GitHub merges to the merge command with the repository's allowed merge method. It pins the local head, queues auto-merge, polls live state, rebases a behind branch, and cleans up only after MERGED. Do not replace it with a shell merge or cleanup loop. Ordinary dependent PRs merge bottom-up after each parent reaches the intended branch; verify the child's live base before merging. Native stacks follow the GitHub skill's stack merge workflow within the authorized layers.
+3. For ship requests, return failed checks, head mismatches, and behind or conflicting branches to the feedback loop. Diagnose, fix, re-verify, and rerun the merge command. If it times out with checks still pending, rerun it to reconcile live state. Bound reruns to three attempts per unchanged blocker. Diagnose repeated identical failures and report a blocker when no actionable fix remains or reruns are exhausted. A closed unmerged PR or a hard blocker also stops delivery. Report without deleting branches or worktrees. For non-ship requests, treat a failed check, closed unmerged PR, head mismatch, or timeout as a stop. A queued request is not completed delivery.
 4. Confirm the remote PR is merged and its change reached the intended branch. Inspect applicable post-merge checks. Report a post-merge failure as a delivery problem rather than concealing it behind a successful merge.
 5. Verify automatic issue closure. Close the linked issue only when its acceptance criteria are fully resolved and closure is authorized by the request. Keep partially resolved issues open with an accurate note. Never claim a closed PR without a merge solved the issue.
-6. `land` owns its ordinary target branch and optional worktree cleanup. Native-stack cleanup must account for remaining layers and server-side rebases. Use the rules below for other merged local branches, including branches merged before this invocation.
+6. The merge command owns its ordinary target branch and optional worktree cleanup. Native-stack cleanup must account for remaining layers and server-side rebases. Use the rules below for other merged local branches, including branches merged before this invocation.
 
 ## Clean up merged local branches
 
-Run this phase only for Deliver or Cleanup. Honor user and project approval requirements before deletion. Restrict cleanup to the resolved repository. Outside `land`'s authorized target cleanup, do not delete remote branches or remove worktrees.
+Run this phase only for Deliver or Cleanup. Honor user and project approval requirements before deletion. Restrict cleanup to the resolved repository. Outside the merge command's authorized target cleanup, do not delete remote branches or remove worktrees.
 
 1. Fetch the verified remote's default branch before evaluating candidates. Use its remote-tracking ref, not a stale local `main`. If the fetch fails, report cleanup as blocked.
 2. Inspect local branch tips, upstreams, and `git worktree list --porcelain`. Exclude the default branch, protected branches, and branches checked out in another worktree. Report worktree-bound skips with their checkout paths.
@@ -131,7 +135,7 @@ Report the destination reached, all scoped issue and PR links when present, obse
 
 These are natural-language examples, not shell commands. Angle-bracket values are placeholders.
 
-- `Ship <issue URL>.` Implement or resume the scoped task through confirmed merge.
+- `Ship.` or `Ship <issue URL>.` Deliver the active or named task unattended through confirmed merge.
 - `Ship this finding to <repository> as an issue for another agent. Do not implement it.` Capture and stop.
 - `Ship <PR URL>, but stop at merge-ready.` Resolve feedback and verify without merging.
 - `Should we file this upstream? Do not do it yet.` Inspect without writes.
