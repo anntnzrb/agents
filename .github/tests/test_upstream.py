@@ -2,6 +2,7 @@
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -108,3 +109,37 @@ def test_issue_body_diffs_upstream_against_itself() -> None:
     assert "skills/current/pstack/UPSTREAM.json" in body
     assert "docs/skills.md" in body
     assert "trigger" in body
+
+
+CUTOFF = datetime(2026, 10, 1, tzinfo=UTC)
+
+
+def release(tag: str, published: str, **flags: bool) -> dict[str, object]:
+    return {"tag_name": tag, "published_at": published, **flags}
+
+
+def test_settled_release_skips_releases_newer_than_the_cutoff() -> None:
+    releases = [
+        release("v1.2.0", "2026-10-10T00:00:00Z"),
+        release("v1.1.0", "2026-09-20T00:00:00Z"),
+        release("v1.0.0", "2026-09-01T00:00:00Z"),
+    ]
+    assert upstream.settled_release(releases, "v1.0.0", CUTOFF) == "v1.1.0"
+
+
+def test_settled_release_ignores_drafts_and_prereleases() -> None:
+    releases = [
+        release("v1.2.0-rc1", "2026-09-25T00:00:00Z", prerelease=True),
+        release("v1.1.0", "2026-09-20T00:00:00Z", draft=True),
+        release("v1.0.0", "2026-09-01T00:00:00Z"),
+    ]
+    assert upstream.settled_release(releases, "v0.9.0", CUTOFF) == "v1.0.0"
+
+
+def test_settled_release_is_none_when_the_pin_is_settled_or_newer() -> None:
+    releases = [
+        release("v1.2.0", "2026-10-10T00:00:00Z"),
+        release("v1.1.0", "2026-09-20T00:00:00Z"),
+    ]
+    assert upstream.settled_release(releases, "v1.1.0", CUTOFF) is None
+    assert upstream.settled_release(releases, "v1.2.0", CUTOFF) is None
