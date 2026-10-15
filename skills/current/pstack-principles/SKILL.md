@@ -1,6 +1,6 @@
 ---
 name: pstack-principles
-description: "Use before refactoring, debugging, design, or reporting a measured speedup, applying pstack engineering principles."
+description: "Use before refactoring, debugging, design, or any software engineering related task"
 license: AGPL-3.0-or-later
 ---
 
