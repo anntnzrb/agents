@@ -113,7 +113,7 @@ Retrieve external XML IDs for all matching view records:
 uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc external_id ir.ui.view '[<view_id_1>, <view_id_2>]'
 ```
 
-- Module views (e.g. `crm_espol.*`): automatically updated when `-u` runs.
+- Module views (e.g. `sale.*`): automatically updated when `-u` runs.
 - Studio views (prefixed with `studio_customization.*`): not updated by `-u`. Studio views referencing deleted fields will fail with `invalid custom view` warnings or break UI rendering.
 
 ### 4. Check Child Inheritances

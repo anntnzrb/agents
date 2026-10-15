@@ -83,7 +83,6 @@ def _to_str_dict(val: object) -> dict[str, object]:
 
 # Script Directories
 SCRIPT_DIR = Path(__file__).resolve().parent
-SQL_DIR = SCRIPT_DIR / "sql"
 PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 CONFIG_DIR = SCRIPT_DIR.parent / "config"
 RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
@@ -1010,56 +1009,129 @@ def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
 
 
 @dataclass
-class _LockState:
-    depth: int = 0
+class _HeldLock:
+    depth: int
+    shared: bool
 
 
-_LOCK_STATE = _LockState()
+# Lock file name -> lock held by this process. Lock order: database locks
+# (sorted by name), then the runs gate, then the pod lock.
+_HELD_LOCKS: dict[str, _HeldLock] = {}
+
+POD_LOCK_NAME = "odoo-ops.lock"
+RUNS_LOCK_NAME = "odoo-ops-runs.lock"
+
+
+def _lock_dir() -> Path:
+    """Return the directory that holds odoo-ops lock files."""
+    return Path(tempfile.gettempdir())
 
 
 @contextlib.contextmanager
-def _op_lock() -> Generator[None]:
-    """Exclusive file lock for pod creation and test execution."""
+def _file_lock(name: str, waiting: str, *, shared: bool = False) -> Generator[None]:
+    """Hold a reentrant flock on `<tmp>/<name>`, exclusive unless `shared`."""
     if fcntl is None:
         yield
         return
 
-    if _LOCK_STATE.depth > 0:
-        _LOCK_STATE.depth += 1
+    held = _HELD_LOCKS.get(name)
+    if held is not None:
+        if held.shared and not shared:
+            msg = f"Cannot upgrade shared lock {name} to exclusive (would deadlock)."
+            raise CliError(msg)
+        held.depth += 1
         try:
             yield
         finally:
-            _LOCK_STATE.depth -= 1
+            held.depth -= 1
         return
 
-    lock_file = Path(tempfile.gettempdir()) / "odoo-ops.lock"
+    mode = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+    lock_file = _lock_dir() / name
     with lock_file.open("a+", encoding="utf-8") as f:
         try:
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(f.fileno(), mode | fcntl.LOCK_NB)
         except BlockingIOError, OSError:
-            print(
-                "waiting for odoo-ops lock (another test/pod operation is running)...",
-                file=sys.stderr,
-            )
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            print(f"waiting for odoo-ops lock ({waiting})...", file=sys.stderr)
+            fcntl.flock(f.fileno(), mode)
 
-        _LOCK_STATE.depth = 1
+        _HELD_LOCKS[name] = _HeldLock(depth=1, shared=shared)
         try:
             yield
         finally:
-            _LOCK_STATE.depth = 0
+            del _HELD_LOCKS[name]
             with contextlib.suppress(OSError):
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
-def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> None:
-    """Ensure podman pod and postgres database container are initialized and running."""
-    with _op_lock():
+def _db_lock_name(db_name: str) -> str:
+    """Return the per-database lock file name for `db_name`."""
+    return f"odoo-ops-test-{re.sub(r'[^A-Za-z0-9_.-]', '_', db_name)}.lock"
+
+
+def _op_lock() -> contextlib.AbstractContextManager[None]:
+    """Exclusive global lock for pod and runtime creation and teardown."""
+    return _file_lock(POD_LOCK_NAME, "another pod operation is running")
+
+
+@contextlib.contextmanager
+def _db_locks(*db_names: str) -> Generator[None]:
+    """Exclusive per-database locks, taken in sorted order to avoid deadlocks."""
+    with contextlib.ExitStack() as stack:
+        for db_name in sorted(set(db_names)):
+            _ = stack.enter_context(
+                _file_lock(
+                    _db_lock_name(db_name),
+                    f"another test or database operation on {db_name!r} is running",
+                )
+            )
+        yield
+
+
+@contextlib.contextmanager
+def _test_run_lock(db_name: str) -> Generator[None]:
+    """Serialize test runs per database; `stop` waits for every run."""
+    with (
+        _db_locks(db_name),
+        _file_lock(RUNS_LOCK_NAME, "stop is running", shared=True),
+    ):
+        yield
+
+
+@contextlib.contextmanager
+def _pod_section(
+    *, wait_for_db: str | None = None, wait_for_all_runs: bool = False
+) -> Generator[None]:
+    """Hold the pod lock, first waiting for test runs in the global lock order."""
+    with contextlib.ExitStack() as stack:
+        if wait_for_db is not None:
+            _ = stack.enter_context(_db_locks(wait_for_db))
+        if wait_for_all_runs:
+            _ = stack.enter_context(
+                _file_lock(RUNS_LOCK_NAME, "a test run is in progress")
+            )
+        _ = stack.enter_context(_op_lock())
+        yield
+
+
+def _ensure_runtime_pod(
+    ctx: WorkspaceContext,
+    *,
+    recreate: bool = False,
+    wait_for_db: str | None = None,
+    wait_for_all_runs: bool = False,
+) -> None:
+    """Ensure podman pod and postgres database container are initialized and running.
+
+    `wait_for_db` waits for a test run on that database; `wait_for_all_runs`
+    waits for every test run. Both locks are held only while the pod is ensured.
+    """
+    if recreate:
+        # Teardown takes the runs gate, which must come before the pod lock.
+        _stop_all()
+    with _pod_section(wait_for_db=wait_for_db, wait_for_all_runs=wait_for_all_runs):
         _ensure_podman()
         status = _get_pod_status()
-        if recreate and status:
-            _stop_all()
-            status = None
 
         if not status:
             # Create shared network Pod
@@ -1125,10 +1197,14 @@ def _ensure_runtime_pod(ctx: WorkspaceContext, *, recreate: bool = False) -> Non
 def _stop_all() -> None:
     """Stop and remove all Odoo stack containers and the pod.
 
-    Holds the op lock so teardown never interrupts a test run or pod creation.
-    Removing containers keeps the bind-mounted PostgreSQL data directory.
+    Holds the runs gate exclusively, then the pod lock, so teardown never
+    interrupts a test run or pod creation. Removing containers keeps the
+    bind-mounted PostgreSQL data directory.
     """
-    with _op_lock():
+    with (
+        _file_lock(RUNS_LOCK_NAME, "a test run is in progress"),
+        _op_lock(),
+    ):
         _ensure_podman()
         _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
         _ = _run(
@@ -1184,7 +1260,14 @@ def cmd_dev(args: argparse.Namespace) -> int:
     profile = _load_workflow_profile(profile_name, workflow)
     db_to_use = _optional_str(args, "db") or profile.database
 
-    _ensure_runtime_pod(ctx)
+    if "_seed_" in db_to_use:
+        msg = (
+            f"Refusing to start dev on untouchable seed database {db_to_use!r}. "
+            "Clone to a work database first (e.g., db-clone)."
+        )
+        raise CliError(msg, code=2)
+
+    _ensure_runtime_pod(ctx, wait_for_db=db_to_use)
 
     # Remove prior web container if hanging
     _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
@@ -1841,30 +1924,28 @@ def _run_parallel_tests(
 
 def cmd_test(args: argparse.Namespace) -> int:
     """Run isolated Odoo 17 unit tests for a module or workflow."""
-    with _op_lock():
-        ctx = _resolve_workspace(args)
-        target = _require_str(args, "target", "crm")
-        profile_name = _require_str(args, "profile", "etech")
-        json_mode = _require_bool(args, "json")
-        explicit_tags = _optional_str(args, "tags")
-        explicit_db = _optional_str(args, "db")
-        parallel = _require_bool(args, "parallel")
-        jobs_val = _optional_int(args, "jobs")
-        jobs = jobs_val if jobs_val is not None else (4 if parallel else 1)
+    ctx = _resolve_workspace(args)
+    target = _require_str(args, "target", "crm")
+    profile_name = _require_str(args, "profile", "etech")
+    json_mode = _require_bool(args, "json")
+    explicit_tags = _optional_str(args, "tags")
+    explicit_db = _optional_str(args, "db")
+    parallel = _require_bool(args, "parallel")
+    jobs_val = _optional_int(args, "jobs")
+    jobs = jobs_val if jobs_val is not None else (4 if parallel else 1)
 
-        db_to_use, test_tags, update_mods = _resolve_test_targets(
-            ctx, target, profile_name
+    db_to_use, test_tags, update_mods = _resolve_test_targets(ctx, target, profile_name)
+    if explicit_db:
+        db_to_use = explicit_db
+
+    if "_seed_" in db_to_use:
+        msg = (
+            f"Refusing to execute tests on untouchable seed database "
+            f"{db_to_use!r}. Clone to a work database first (e.g., db-clone)."
         )
-        if explicit_db:
-            db_to_use = explicit_db
+        raise CliError(msg, code=2)
 
-        if "_seed_" in db_to_use:
-            msg = (
-                f"Refusing to execute tests on untouchable seed database "
-                f"{db_to_use!r}. Clone to a work database first (e.g., db-clone)."
-            )
-            raise CliError(msg, code=2)
-
+    with _test_run_lock(db_to_use):
         baseline_ref = _optional_str(args, "baseline")
         if baseline_ref:
             return _run_baseline_test_comparison(
@@ -2346,7 +2427,7 @@ def cmd_db_summary(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
     json_mode = _require_bool(args, "json")
-    _ensure_runtime_pod(ctx)
+    _ensure_runtime_pod(ctx, wait_for_db=db)
 
     sql = """
     SELECT
@@ -2375,7 +2456,7 @@ def cmd_db_tables(args: argparse.Namespace) -> int:
     db = ctx.effective_db_name
     limit = max(1, _require_int(args, "limit", 20))
     json_mode = _require_bool(args, "json")
-    _ensure_runtime_pod(ctx)
+    _ensure_runtime_pod(ctx, wait_for_db=db)
 
     sql = f"""
     SELECT
@@ -2471,7 +2552,7 @@ def cmd_db_query(args: argparse.Namespace) -> int:
 
         ctx = _resolve_workspace(args)
         db = ctx.effective_db_name
-        _ensure_runtime_pod(ctx)
+        _ensure_runtime_pod(ctx, wait_for_db=db)
 
         clean_sql = _strip_sql_comments(raw_sql).rstrip(";").strip()
 
@@ -2654,48 +2735,53 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
         )
         raise CliError(msg)
 
-    ctx = _resolve_workspace()
-    _ensure_runtime_pod(ctx)
+    with _db_locks(target):
+        ctx = _resolve_workspace()
+        _ensure_runtime_pod(ctx)
 
-    existing = _exec_sql_json(
-        f"SELECT datname FROM pg_database WHERE datname = '{target}';",  # noqa: S608 - validated database identifier
-        db="postgres",
-    )
-    if existing and not force:
-        msg = (
-            f"Target database {target!r} already exists. Pass --force to drop and "
-            "recreate it (destructive)."
+        existing = _exec_sql_json(
+            f"SELECT datname FROM pg_database WHERE datname = '{target}';",  # noqa: S608 - validated database identifier
+            db="postgres",
         )
-        raise CliError(msg)
-
-    size_mib = dump_path.stat().st_size / (1024 * 1024)
-    print(f"Restoring {dump_path.name} ({size_mib:.0f} MiB) -> {target!r}...")
-
-    drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
-    _ = _exec_sql(drop_sql, db="postgres")
-    create_sql = (
-        f'CREATE DATABASE "{target}" OWNER "{_validate_db_name(DEFAULT_DB_USER)}";'
-    )
-    _ = _exec_sql(create_sql, db="postgres")
-
-    started = time.monotonic()
-    _stream_dump_to_psql(dump_path, target)
-    _regenerate_db_uuid(target)
-    elapsed = time.monotonic() - started
-
-    print(
-        "[WARN] A SQL dump carries no filestore: attachments will not resolve in "
-        + f"{target!r}."
-    )
-    if json_mode:
-        print(
-            json.dumps(
-                {"status": "restored", "target": target, "seconds": round(elapsed, 1)}
+        if existing and not force:
+            msg = (
+                f"Target database {target!r} already exists. Pass --force to drop and "
+                "recreate it (destructive)."
             )
+            raise CliError(msg)
+
+        size_mib = dump_path.stat().st_size / (1024 * 1024)
+        print(f"Restoring {dump_path.name} ({size_mib:.0f} MiB) -> {target!r}...")
+
+        drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
+        _ = _exec_sql(drop_sql, db="postgres")
+        create_sql = (
+            f'CREATE DATABASE "{target}" OWNER "{_validate_db_name(DEFAULT_DB_USER)}";'
         )
-    else:
-        print(f"[OK] Database restored: {target} in {elapsed:.0f}s")
-    return 0
+        _ = _exec_sql(create_sql, db="postgres")
+
+        started = time.monotonic()
+        _stream_dump_to_psql(dump_path, target)
+        _regenerate_db_uuid(target)
+        elapsed = time.monotonic() - started
+
+        print(
+            "[WARN] A SQL dump carries no filestore: attachments will not resolve in "
+            + f"{target!r}."
+        )
+        if json_mode:
+            print(
+                json.dumps(
+                    {
+                        "status": "restored",
+                        "target": target,
+                        "seconds": round(elapsed, 1),
+                    }
+                )
+            )
+        else:
+            print(f"[OK] Database restored: {target} in {elapsed:.0f}s")
+        return 0
 
 
 def cmd_db_clone(args: argparse.Namespace) -> int:
@@ -2710,36 +2796,39 @@ def cmd_db_clone(args: argparse.Namespace) -> int:
     force = _require_bool(args, "force")
     json_mode = _require_bool(args, "json")
 
-    ctx = _resolve_workspace(args, require_db=False)
-    _ensure_runtime_pod(ctx)
+    with _db_locks(source, target):
+        ctx = _resolve_workspace(args, require_db=False)
+        _ensure_runtime_pod(ctx)
 
-    print(f"Cloning database {source!r} -> {target!r}...")
+        print(f"Cloning database {source!r} -> {target!r}...")
 
-    # 1. Terminate existing connections to source and target
-    term_sql = (
-        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated database identifiers
-        f"WHERE datname IN ('{source}', '{target}') AND pid <> pg_backend_pid();"
-    )
-    _ = _exec_sql(term_sql, db="postgres")
+        # 1. Terminate existing connections to source and target
+        term_sql = (
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated database identifiers
+            f"WHERE datname IN ('{source}', '{target}') AND pid <> pg_backend_pid();"
+        )
+        _ = _exec_sql(term_sql, db="postgres")
 
-    # 2. Drop target if requested
-    if force:
-        drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
-        _ = _exec_sql(drop_sql, db="postgres")
+        # 2. Drop target if requested
+        if force:
+            drop_sql = f'DROP DATABASE IF EXISTS "{target}";'
+            _ = _exec_sql(drop_sql, db="postgres")
 
-    # 3. Create database as template copy
-    create_sql = f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'
-    _ = _exec_sql(create_sql, db="postgres")
+        # 3. Create database as template copy
+        create_sql = (
+            f'CREATE DATABASE "{target}" WITH TEMPLATE "{source}" OWNER "{owner}";'
+        )
+        _ = _exec_sql(create_sql, db="postgres")
 
-    # 4. A template copy is neither filestore-aware nor uuid-unique
-    _ = _copy_filestore(ctx, source, target)
-    _regenerate_db_uuid(target)
+        # 4. A template copy is neither filestore-aware nor uuid-unique
+        _ = _copy_filestore(ctx, source, target)
+        _regenerate_db_uuid(target)
 
-    if json_mode:
-        print(json.dumps({"status": "cloned", "source": source, "target": target}))
-    else:
-        print(f"[OK] Database successfully cloned: {target}")
-    return 0
+        if json_mode:
+            print(json.dumps({"status": "cloned", "source": source, "target": target}))
+        else:
+            print(f"[OK] Database successfully cloned: {target}")
+        return 0
 
 
 def _remove_filestore(ctx: WorkspaceContext, db_name: str) -> bool:
@@ -2760,7 +2849,7 @@ def cmd_db_list(args: argparse.Namespace) -> int:
     """List local databases and their disk sizes (excluding templates/postgres)."""
     ctx = _resolve_workspace(args, require_db=False)
     json_mode = _require_bool(args, "json")
-    _ensure_runtime_pod(ctx)
+    _ensure_runtime_pod(ctx, wait_for_all_runs=True)
 
     sql = """
     SELECT
@@ -2803,50 +2892,51 @@ def cmd_db_drop(args: argparse.Namespace) -> int:
         )
         raise CliError(msg, code=2)
 
-    ctx = _resolve_workspace(args, require_db=False)
-    _ensure_runtime_pod(ctx)
+    with _db_locks(db_name):
+        ctx = _resolve_workspace(args, require_db=False)
+        _ensure_runtime_pod(ctx)
 
-    check_sql = f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"  # noqa: S608 - validated db name
-    exists_rows = _exec_sql_json(check_sql, db="postgres")
-    db_exists = bool(exists_rows)
+        check_sql = f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"  # noqa: S608 - validated db name
+        exists_rows = _exec_sql_json(check_sql, db="postgres")
+        db_exists = bool(exists_rows)
 
-    if db_exists:
-        term_sql = (
-            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated db name
-            f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
-        )
-        _ = _exec_sql(term_sql, db="postgres")
-        drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'
-        _ = _exec_sql(drop_sql, db="postgres")
-        fs_removed = _remove_filestore(ctx, db_name)
+        if db_exists:
+            term_sql = (
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "  # noqa: S608 - validated db name
+                f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
+            )
+            _ = _exec_sql(term_sql, db="postgres")
+            drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'
+            _ = _exec_sql(drop_sql, db="postgres")
+            fs_removed = _remove_filestore(ctx, db_name)
 
-        if json_mode:
+            if json_mode:
+                print(
+                    json.dumps(
+                        {
+                            "status": "dropped",
+                            "database": db_name,
+                            "filestore_removed": fs_removed,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(f"[OK] Database dropped: {db_name}")
+        elif json_mode:
             print(
                 json.dumps(
                     {
-                        "status": "dropped",
+                        "status": "not_found",
                         "database": db_name,
-                        "filestore_removed": fs_removed,
+                        "message": f"Database {db_name!r} does not exist.",
                     },
                     indent=2,
                 )
             )
         else:
-            print(f"[OK] Database dropped: {db_name}")
-    elif json_mode:
-        print(
-            json.dumps(
-                {
-                    "status": "not_found",
-                    "database": db_name,
-                    "message": f"Database {db_name!r} does not exist.",
-                },
-                indent=2,
-            )
-        )
-    else:
-        print(f"[INFO] Database {db_name!r} does not exist (nothing to drop).")
-    return 0
+            print(f"[INFO] Database {db_name!r} does not exist (nothing to drop).")
+        return 0
 
 
 def cmd_shell(args: argparse.Namespace) -> int:
@@ -2934,7 +3024,7 @@ def cmd_auth_temp(args: argparse.Namespace) -> int:
         )
         raise CliError(msg, code=2)
 
-    _ensure_runtime_pod(ctx)
+    _ensure_runtime_pod(ctx, wait_for_db=db)
 
     login_arg = _optional_str(args, "login")
     if login_arg:
@@ -3026,7 +3116,7 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
         )
         raise CliError(msg, code=2)
 
-    _ensure_runtime_pod(ctx)
+    _ensure_runtime_pod(ctx, wait_for_db=db)
 
     login_arg = _optional_str(args, "login")
     state_dir = _get_state_dir()

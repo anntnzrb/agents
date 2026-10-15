@@ -83,7 +83,7 @@ The CLI dry-run plan captures proposed changes and pre-images. It does not execu
 4. Check derived fields and protected invariants. JSON-RPC calls commit independently; an overall error does not mean zero changes persisted.
 5. If reads are unavailable, report an unknown outcome rather than retrying.
 6. Prepare a new guarded plan for only the verified remainder. Obtain fresh approval; do not bypass drift checks or reuse consumed authorization.
-7. Read back the complete cohort after recovery. Report completed and remaining counts explicitly.
+7. Read back every record in the batch after recovery. Report completed and remaining counts explicitly.
 
 For imports, compare normalized output rows against actual created records, not just the created-record count. Check stage, relations, ownership, and protected contact values.
 

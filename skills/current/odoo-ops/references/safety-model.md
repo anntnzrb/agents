@@ -13,7 +13,7 @@ The disposable local replica (`<prodDB>_work_YYYYMMDD`) is the default workspace
 - The seed database (`<prodDB>_seed_<YYYYMMDD>`) is an untouchable baseline restored directly from the DBA dump. Never install modules, run migrations, or execute writes against the seed.
 - The `shell` command runs interactive or script-based ORM Python on the local replica. By default, changes commit upon clean exit; use `--rollback` to test scripts safely. The CLI refuses to run `shell` against seed databases or production endpoints.
 - When executing long SQL statements or complex Python scripts, write them to a temporary file (`<temp-dir>`) and invoke `db-query --file PATH` or `shell --file PATH`. You do not need to delete temporary files after execution.
-- Pod creation and test execution are serialized by an internal lock in the CLI. Parallel agents do not need external wrapper locks like `flock`.
+- The CLI serializes pod creation and test runs with internal locks; external `flock` wrappers are unnecessary. See [Runtime discovery](runtime-discovery.md#isolation-and-multi-agent-concurrency).
 
 ## Production: Read-Only by Default
 
@@ -75,8 +75,8 @@ The CLI strictly refuses the following operations on production endpoints. If as
 4. Immediate background actions: invoking `run` on `ir.actions.server` or `method_direct_trigger` on `ir.cron`. Creating and executing Server Actions in production is done by the user in the Odoo web UI.
 5. Outbound communications: sending email, WhatsApp messages, SMS, creating messages (`message_post` / notifications), or launching mass mailings.
 6. Partner reconciliation: `res.partner` automated or manual merging.
-7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, and setting payslips to `done`.
-8. System credentials: modifying `set_param` values or changing user passwords.
+7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, setting payslips to `done`, and payment state changes (`action_paid`).
+8. System credentials: modifying `set_param` values, changing user passwords, or sending password resets (`action_reset_password`).
 
 Server Action templates remain valid as the user's manual UI path. Keep their `WRITE_APPROVED = False` safety by default, setting it to `True` only after explicit user review.
 
@@ -87,6 +87,6 @@ Record archival (`archive`), unarchival (`unarchive`), field updates (`write`), 
 
 ## Read-Only Caveats
 
-Client-side read allowlists inspect method names (`search_read`, `count`, `read`, `read_group`, `fields_get`, `get_view`, `metadata`, `external_id`, `default_get`, `check_access`, `user_has_groups`), but cannot enforce database transaction read-only isolation on the server. Computed fields with poorly designed `compute` methods or custom overrides can trigger database updates.
+The client-side read allowlist (`READONLY_ALLOWLIST` in `scripts/odoo_rpc.py`; its methods are listed under `call` in `SKILL.md`) inspects method names, but cannot enforce database transaction read-only isolation on the server. Computed fields with poorly designed `compute` methods or custom overrides can trigger database updates.
 
 In addition, `export_data` is excluded from the read allowlist: [`odoo/models.py`](https://github.com/odoo/odoo/blob/17.0/odoo/models.py) routes `export_data` through `_export_rows` and `__ensure_xml_id`, which inserts rows into `ir_model_data` for records lacking external IDs. Always use `read` or `search_read` with explicit field lists for inspection.
