@@ -1104,6 +1104,55 @@ class TestDbQueryInputAndOutput:
         assert "syntax error" in str(payload.get("error"))
 
 
+class TestCmdDevSeedGuard:
+    """Tests for the dev subcommand refusing seed databases."""
+
+    @staticmethod
+    def _dev_args(db: str) -> argparse.Namespace:
+        return argparse.Namespace(profile="p", workflow="crm", db=db, json=False)
+
+    def test_dev_refuses_seed_db_before_starting(self, tmp_path: Path) -> None:
+        """Verify dev exits with an error on a '_seed_' database before touching the pod."""
+        ctx = make_workspace_context(tmp_path)
+        profile = odooctl.WorkflowProfile(
+            database="erptech_work_20260908", modules=["m"]
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_load_workflow_profile", return_value=profile),
+            patch.object(odooctl, "_ensure_runtime_pod") as ensure_pod,
+            patch.object(odooctl, "_run") as run,
+            patch.object(subprocess, "run") as subprocess_run,
+            pytest.raises(odooctl.CliError) as exc_info,
+        ):
+            _ = odooctl.cmd_dev(self._dev_args("erptech_seed_20260908"))
+        assert exc_info.value.code == 2
+        assert "untouchable seed database" in str(exc_info.value)
+        ensure_pod.assert_not_called()
+        run.assert_not_called()
+        subprocess_run.assert_not_called()
+
+    def test_dev_starts_on_work_db(self, tmp_path: Path) -> None:
+        """Verify dev still starts Odoo with -i/-u on a '_work_' database."""
+        ctx = make_workspace_context(tmp_path)
+        profile = odooctl.WorkflowProfile(
+            database="erptech_work_20260908", modules=["m"]
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_load_workflow_profile", return_value=profile),
+            patch.object(odooctl, "_ensure_runtime_pod") as ensure_pod,
+            patch.object(odooctl, "_run"),
+            patch.object(subprocess, "run") as subprocess_run,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            _ = odooctl.cmd_dev(self._dev_args("erptech_work_20260908"))
+        ensure_pod.assert_called_once_with(ctx, wait_for_db="erptech_work_20260908")
+        cmd = to_str_list(mock_call_args(subprocess_run.call_args)[0])
+        assert cmd[cmd.index("-d") + 1] == "erptech_work_20260908"
+        assert cmd[cmd.index("-u") + 1] == "m"
+
+
 class TestCmdShell:
     """Tests for the shell subcommand running Python ORM code."""
 

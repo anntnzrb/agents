@@ -1261,6 +1261,13 @@ def cmd_dev(args: argparse.Namespace) -> int:
     profile = _load_workflow_profile(profile_name, workflow)
     db_to_use = _optional_str(args, "db") or profile.database
 
+    if "_seed_" in db_to_use:
+        msg = (
+            f"Refusing to start dev on untouchable seed database {db_to_use!r}. "
+            "Clone to a work database first (e.g., db-clone)."
+        )
+        raise CliError(msg, code=2)
+
     _ensure_runtime_pod(ctx, wait_for_db=db_to_use)
 
     # Remove prior web container if hanging
