@@ -38,6 +38,14 @@ Follow these situational reading rules before taking action:
 - Data discipline: preserve exact values in private operational inputs; minimize requested fields (`--fields`). Sanitize chat evidence and handoff fixtures. NEVER print tokens, expose secrets from `ir_config_parameter`, or upload production data to public hosts.
 - Long SQL or ORM scripts: write to `<temp-dir>` and pass `--file`.
 
+## Delegation boundary
+
+When an orchestrator splits work across delegated agents:
+
+- Delegated agents MUST NOT use JSON-RPC or touch production in any way, reads included.
+- Delegated agents may freely use the local environment: local replicas, tests, local shell, and local queries.
+- The orchestrator owns every production interaction and every JSON-RPC call. It requests user approval and hands delegated agents the data they need.
+
 ## Public entrypoint
 
 ```text
@@ -128,7 +136,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 
 ## Flags that trip agents
 
-- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. An internal lock (`odoo-ops.lock`) serializes test runs and pod creation. Prints `RESULT tests= failed= errors=`.
+- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. An internal lock (`odoo-ops.lock`) serializes test runs and pod creation, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Prints `RESULT tests= failed= errors=`.
 - `test --baseline <ref>`: separates new failures from pre-existing ones by running the same tests on `<ref>` in a temporary git worktree. Use it instead of `git stash`. Exit 0 means no new failures.
 - `auth-temp` / `auth-restore`: local login for UI verification. `auth-temp` backs up the user's hash and sets a random password; ALWAYS run `auth-restore` when done, even if verification fails. Never set passwords with SQL.
 - `shell`: requires `dev` running (local pod and DB must be up). Refuses `_seed_` and production. Commits on exit unless `--rollback` is passed.
