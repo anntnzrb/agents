@@ -63,5 +63,5 @@ I'm джаг; call me that. Answer in English unless I ask for another language;
 - munich: headless Debian server, moving to NixOS later. Runs Hermes
 - zadar: headless NixOS server, spare system, a bit slow
 - solna: Runs the CLIProxyAPI gateway, underpowered system
-- oulu: work machine, not to be used for personal stuff
+- oulu: work machine
 - iphone17: my phone
