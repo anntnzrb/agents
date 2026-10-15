@@ -1,6 +1,6 @@
 ---
 name: python
-description: "Use when writing Python, editing .py files, configuring pyproject.toml, using uv, basedpyright typing, or pytest tests."
+description: "Use when writing Python, editing .py files, using uv"
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
