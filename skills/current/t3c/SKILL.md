@@ -109,6 +109,12 @@ A delegate's report is a claim. Check the real diff and the verification output 
 4. Scout fails or the task needs debugging: re-dispatch it to the implementer.
 5. Reviewer reports issues: send the findings and any unresolved objections to the implementer, as a follow-up on its `childThreadId` or as a new round with the original brief.
 
+Infrastructure failures are not model failures and do not spend the retry in step 2. They include a driver crash or transport error, such as `Codex App Server transport operation ... failed`, and `provider_unavailable` or `model_unavailable`.
+
+- On a crash or transport error, check the diff, then re-dispatch once to the same target with the same brief and a new `clientRequestId`. If the failed run edited files, add the current diff to the brief.
+- On `provider_unavailable` or `model_unavailable`, follow the `orchestrator_capabilities` row under [Tools](#tools) instead of retrying.
+- A second infrastructure failure on the same slice: stop and report both errors to the user.
+
 ## Tools
 
 | Need | Tool |
