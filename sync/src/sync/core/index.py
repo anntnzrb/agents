@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +82,7 @@ __all__ = [
 DEFAULT_SYNC_TIMEOUT_SECONDS: int = 15 * 60
 CLEANUP_GRACE_SECONDS: int = 30
 SYNC_LOCK_FILE: str = "sync.lock"
+HANDOFF_ENV: str = "AGENTS_SYNC_HANDOFF"
 EXIT_OK: int = 0
 EXIT_ERROR: int = 1
 EXIT_UNSUPPORTED: int = 2
@@ -285,9 +287,13 @@ async def _async_main() -> int:
         err("another sync is already running; skipping")
         return EXIT_OK
     try:
-        return await run_sync_with_deadline(sync_env)
+        runtime_before = _runtime_release(sync_env)
+        exit_code = await run_sync_with_deadline(sync_env)
     finally:
         release_sync_lock(lock)
+    if exit_code == EXIT_OK and _should_hand_off(sync_env, runtime_before):
+        return await asyncio.to_thread(rerun_in_current_runtime, sync_env)
+    return exit_code
 
 
 def update_main() -> int:
@@ -303,6 +309,38 @@ def _runtime_release(sync_env: SyncEnv) -> str | None:
         return None
 
 
+def _should_hand_off(sync_env: SyncEnv, runtime_before: str | None) -> bool:
+    """Return True when this run published a runtime the process is not running.
+
+    A sync whose own code changed runs every job with the previous code, which
+    cannot know what the new code does differently. The first install has no
+    previous runtime: that process already runs the checkout's code. A process
+    that was itself handed off never hands off again.
+    """
+    if runtime_before is None or os.environ.get(HANDOFF_ENV):
+        return False
+    return _runtime_release(sync_env) != runtime_before
+
+
+def rerun_in_current_runtime(sync_env: SyncEnv, *args: str) -> int:
+    """Run sync again under the newly published runtime; return its exit code.
+
+    The caller must have released the sync lock: the new process takes it.
+    """
+    python = Path(sync_env.runtime_home) / "sync-current" / ".venv" / "bin" / "python"
+    warn("sync runtime changed; reconciling again with the new runtime")
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed interpreter and arguments
+            [str(python), "-m", "sync.cli", *args],
+            env={**os.environ, HANDOFF_ENV: "1"},
+            check=False,
+        )
+    except OSError as error:
+        err(f"rerun with the new runtime failed: {panic_message(error)}")
+        return EXIT_ERROR
+    return result.returncode
+
+
 async def _async_update_main() -> int:
     """Fast-forward the SSOT and reconcile a commit not yet synced.
 
@@ -316,21 +354,25 @@ async def _async_update_main() -> int:
         return EXIT_ERROR
     if lock is None:
         return EXIT_OK
+    hand_off = False
     try:
         head = await fast_forward_ssot(sync_env.ssot_home)
         if head is None or head == read_synced_commit(sync_env.managed_state_home):
             return EXIT_OK
         runtime_before = _runtime_release(sync_env)
         exit_code = await run_sync_with_deadline(sync_env)
-        if exit_code != EXIT_OK:
-            return exit_code
-        if _runtime_release(sync_env) == runtime_before:
-            record_synced_commit(sync_env.managed_state_home, head)
-        else:
-            warn("update: sync runtime changed; reconciling again on the next run")
-        return exit_code
+        if exit_code == EXIT_OK:
+            if _runtime_release(sync_env) == runtime_before:
+                record_synced_commit(sync_env.managed_state_home, head)
+            elif _should_hand_off(sync_env, runtime_before):
+                hand_off = True
+            else:
+                warn("update: sync runtime changed; reconciling again on the next run")
     finally:
         release_sync_lock(lock)
+    if hand_off:
+        return await asyncio.to_thread(rerun_in_current_runtime, sync_env, "update")
+    return exit_code
 
 
 def launch_main(source_name: str, args: Sequence[str]) -> int:
@@ -359,6 +401,7 @@ async def _sync_before_launch(sync_env: SyncEnv) -> None:
         warn("another sync is already running; continuing launch")
         return
     try:
+        runtime_before = _runtime_release(sync_env)
         try:
             async with asyncio.timeout(sync_timeout()):
                 success = await run_sync(sync_env)
@@ -367,8 +410,13 @@ async def _sync_before_launch(sync_env: SyncEnv) -> None:
             return
         if not success:
             warn("continuing launch without completed sync")
+            return
     finally:
         release_sync_lock(lock)
+    if _should_hand_off(sync_env, runtime_before):
+        exit_code = await asyncio.to_thread(rerun_in_current_runtime, sync_env)
+        if exit_code != EXIT_OK:
+            warn("continuing launch without completed sync")
 
 
 def _resolve_launch_target(

@@ -959,3 +959,44 @@ def test_git_repository_env_is_scrubbed_for_test_subprocesses() -> None:
     ).stdout.split()
     assert local_vars
     assert [name for name in local_vars if name in os.environ] == []
+
+
+def test_integration_sync_reruns_with_a_changed_runtime(tmp_path: Path) -> None:
+    """A sync that installs changed sync code finishes the run with that code.
+
+    The installed runtime runs the sync, so a change to sync itself would
+    otherwise be reconciled once by the previous code.
+    """
+    home = make_fixture(tmp_path)
+    first = run_sync_process(home, timeout_seconds=120.0)
+    assert first.exit_code == 0, first.stderr or first.stdout
+    marker = home / "rerun-marker"
+    index = home / "src" / "agents" / "sync" / "src" / "sync" / "core" / "index.py"
+    patch = (
+        "\n\nif os.environ.get(HANDOFF_ENV):\n"
+        f"    Path({str(marker)!r}).write_text('new runtime', encoding='utf-8')\n"
+    )
+    _ = index.write_text(index.read_text(encoding="utf-8") + patch, encoding="utf-8")
+    installed = home / ".local" / "share" / "agents" / "sync-current"
+    python = installed / ".venv" / "bin" / "python"
+
+    second = subprocess.run(  # noqa: S603
+        [str(python), "-m", "sync.cli"],
+        cwd=str(home),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "XDG_CACHE_HOME": str(home / ".cache"),
+            "PATH": PRISTINE_PATH,
+            **shared_tool_cache_env,
+        },
+        timeout=300,
+        check=False,
+    )
+
+    assert second.returncode == 0, second.stderr or second.stdout
+    assert "reconciling again with the new runtime" in second.stderr
+    assert marker.read_text(encoding="utf-8") == "new runtime"
