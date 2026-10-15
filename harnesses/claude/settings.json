@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$T3CODE_HOME\" ] || exit 0; jq -e '.tool_input.run_in_background == true' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"T3 Code counts a background Bash command as a long-lived command such as a dev server, so the thread leaves the user'\\''s Working list while it runs. If you are waiting on this result, use the Monitor tool for the wait instead; to wait on a pull request, use the T3 watch_pull_request tool and call unwatch_pull_request before handing back. Leave servers and other long-lived processes as background Bash.\"}}'"
+            "command": "[ -n \"$T3CODE_HOME\" ] || exit 0; jq -e '.tool_input.run_in_background == true' >/dev/null || exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"T3 Code counts a background Bash command as a long-lived command such as a dev server, so the thread leaves the user'\\''s Working list while it runs. If you are waiting on this result, use the Monitor tool for the wait instead, with a command that exits once the condition holds, such as an until-loop, never tail -f, because a running Monitor keeps the thread in Working; to wait on a pull request, use the T3 watch_pull_request tool and call unwatch_pull_request before handing back. Leave servers and other long-lived processes as background Bash.\"}}'"
           }
         ]
       },
