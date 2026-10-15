@@ -68,6 +68,12 @@ The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 - Appends the file contents of `sync/pyproject.toml` and `sync/uv.lock` in sequence.
 
 Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. A failed or aborted installation job cleans up its private staging directory in a `finally` block, leaving active and previous releases intact. During post-sync pruning, sync prunes completed, unreferenced releases and safely cleans up stale `.stage-<pid>-<nonce>` directories whose creating PID is no longer alive or is older than the install timeout, without deleting unrecognized user directories or active releases. Package operations similarly use unique per-operation staging (`staging-<pid>-<timestamp>`) and backup (`backup-<pid>-<timestamp>`) paths, rolling back to previous directory content on failure and cleaning up temporary backups only upon successful completion. Any legacy `~/.local/share/agents/sync/` mutable directory is removed after callers have migrated to `sync-current`.
+## Runtime handoff
+
+Every sync entrypoint except the first install runs from an installed runtime, so a run whose own sync code changed executes every job with the previous code. Manual sync, `sync update`, and cold-launch sync detect when their run published a different `sync-current` release, release the process lock, and run the same command again with the new runtime. The rerun logs `sync runtime changed; reconciling again with the new runtime`, and its exit status becomes the command's exit status. A rerun process never hands off again, so one change costs at most one extra reconcile. A cold launch whose rerun fails warns and continues to the harness.
+
+The release id ignores Python bytecode (`__pycache__`, `*.pyc`, `*.pyo`), which the release copy also skips, so running the checkout's tests or sync from source does not create a new release.
+
 ## Extension hook state
 
 Extension dependency hooks compute a content fingerprint (`fingerprint_tree` in `sync/src/sync/core/hook_state.py`) of their source directory to skip redundant installation steps when dependencies and sources have not changed:
@@ -110,7 +116,7 @@ The machine configuration schedules `sync update` every few minutes on each host
 2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout. Each of these cases logs a `sync: warning: update: …` line naming the blocker (the changed files, the branch, or the local and upstream commit counts), so a host that stops converging shows why in its updater log; an up-to-date run logs nothing.
 3. Reconciles only when the checked-out commit differs from the last one it reconciled successfully (`sync-managed/update.json`). A failed reconcile is retried on the next run.
 
-The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled first by the previous runtime, which cannot know about anything the new code adds, such as a new harness adapter. When that reconcile installs a new runtime, the updater does not record the commit as synced and logs `update: sync runtime changed; reconciling again on the next run`; the next run reconciles the same commit with the new runtime.
+The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled first by the previous runtime, which cannot know about anything the new code adds or removes, such as a new harness adapter. When that reconcile installs a new runtime, the updater does not record the commit and reruns `update` with the new runtime in the same round; see [Runtime handoff](#runtime-handoff).
 
 The schedule needs no credentials because `origin` is public over HTTPS.
 

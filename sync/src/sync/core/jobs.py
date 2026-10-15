@@ -27,14 +27,13 @@ from sync.core.cliproxy_deployment import (
     publish_cliproxy_endpoint_templates,
     sync_cliproxy_endpoint_template,
 )
-from sync.core.json_config import sync_json_config, sync_rendered_json
+from sync.core.json_config import sync_json_config
 from sync.core.plan import (
     CliProxyEndpointTemplatesJob,
     CliProxyReadinessJob,
     DirJob,
     FileJob,
     Job,
-    PiMcpJob,
     PreserveJsonKeysJob,
     SecretTemplateJob,
     SyncRuntimeInstallJob,
@@ -44,6 +43,7 @@ from sync.runtime.errors import assert_never, err, panic_message, warn
 from sync.runtime.fs import (
     SourceContentCache,
     is_identical_file,
+    is_ignored_sync_entry,
     is_symlink,
     rm_entry,
     sync_managed_children,
@@ -195,7 +195,7 @@ def _run_cliproxy_endpoint_templates_job(
     return True
 
 
-async def _run_job(  # noqa: C901
+async def _run_job(
     job: Job,
     preserve_paths_by_dst: Mapping[str, Sequence[str]],
     source_content_cache: SourceContentCache,
@@ -203,10 +203,6 @@ async def _run_job(  # noqa: C901
 ) -> bool:
     try:
         match job:
-            case PiMcpJob():
-                sync_rendered_json(str(Path(job.root) / "mcp.json"), job.config)
-                sync_rendered_json(str(Path(job.root) / "settings.json"), job.settings)
-                success = True
             case DirJob():
                 success = _run_dir_job(job, preserve_paths_by_dst, source_content_cache)
             case FileJob():
@@ -375,6 +371,9 @@ def _hash_runtime_directory(root: str, hasher: Hasher, prefix: str = "") -> None
         raise RuntimeError(message) from error
 
     for entry in entries:
+        # The copy skips these, so they must not change the release id either.
+        if is_ignored_sync_entry(entry.name):
+            continue
         rel = entry.name if not prefix else f"{prefix}/{entry.name}"
         if entry.is_symlink():
             try:

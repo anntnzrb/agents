@@ -7,16 +7,16 @@ failed, timed-out, or lock-contended pre-launch sync must never block the launch
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 import pytest
 
-from sync.core.index import EXIT_ERROR, EXIT_OK, EXIT_UNSUPPORTED, launch_main
+from sync.core.index import EXIT_ERROR, EXIT_OK, EXIT_UNSUPPORTED, launch_main, main
 from sync.runtime.process import ExecPlan
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
     from sync.core.harness import Harness, SyncEnv
     from sync.core.launcher import NpmPackageSpec
@@ -235,3 +235,97 @@ def test_launch_main_reports_exec_failure(
 
     assert launch_main("codex", []) == EXIT_ERROR
     assert "launch failed" in capsys.readouterr().err
+
+
+def test_manual_sync_reruns_under_a_newly_installed_runtime(
+    home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sync that installs a new runtime hands the rest of the run to it.
+
+    The running (old) code cannot know what the new code changed, so the same
+    reconcile must run again with the new runtime before sync reports done.
+    """
+    _make_ssot(home)
+    runtime = home / ".local" / "share" / "agents"
+    (runtime / "release-old").mkdir(parents=True)
+    (runtime / "release-new").mkdir()
+    (runtime / "sync-current").symlink_to("release-old")
+    calls: list[str] = []
+    handoffs: list[str] = []
+
+    async def _sync(_env: SyncEnv, **_kwargs: object) -> bool:
+        calls.append("sync")
+        current = runtime / "sync-current"
+        current.unlink()
+        current.symlink_to("release-new")
+        return True
+
+    def _handoff(sync_env: SyncEnv) -> int:
+        handoffs.append(str((Path(sync_env.runtime_home) / "sync-current").resolve()))
+        return EXIT_OK
+
+    monkeypatch.setattr("sync.core.index.run_sync", _sync)
+    monkeypatch.setattr("sync.core.index.rerun_in_current_runtime", _handoff)
+
+    assert main() == EXIT_OK
+    assert calls == ["sync"]
+    assert handoffs == [str(runtime / "release-new")]
+
+
+def test_manual_sync_does_not_rerun_when_runtime_is_unchanged(
+    home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unchanged runtime finishes in one pass."""
+    _make_ssot(home)
+    runtime = home / ".local" / "share" / "agents"
+    (runtime / "release").mkdir(parents=True)
+    (runtime / "sync-current").symlink_to("release")
+
+    async def _sync(_env: SyncEnv, **_kwargs: object) -> bool:
+        return True
+
+    def _handoff(_env: SyncEnv) -> int:
+        message = "must not hand off"
+        raise AssertionError(message)
+
+    monkeypatch.setattr("sync.core.index.run_sync", _sync)
+    monkeypatch.setattr("sync.core.index.rerun_in_current_runtime", _handoff)
+
+    assert main() == EXIT_OK
+
+
+def test_launch_sync_reruns_under_a_newly_installed_runtime(
+    home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cold-launch sync that swaps the runtime reruns it before launching."""
+    _make_ssot(home, ["codex"])
+    runtime = home / ".local" / "share" / "agents"
+    (runtime / "release-old").mkdir(parents=True)
+    (runtime / "release-new").mkdir()
+    (runtime / "sync-current").symlink_to("release-old")
+    executed: list[str] = []
+
+    async def _sync(_env: SyncEnv, **_kwargs: object) -> bool:
+        executed.append("sync")
+        current = runtime / "sync-current"
+        current.unlink()
+        current.symlink_to("release-new")
+        return True
+
+    def _handoff(_env: SyncEnv) -> int:
+        executed.append("rerun")
+        return EXIT_OK
+
+    async def _record(_env: SyncEnv, harness: Harness, _args: Sequence[str]) -> int:
+        executed.append(f"launch:{harness.source_name}")
+        return EXIT_OK
+
+    monkeypatch.setattr("sync.core.index.run_sync", _sync)
+    monkeypatch.setattr("sync.core.index.rerun_in_current_runtime", _handoff)
+    monkeypatch.setattr("sync.core.index.launch_harness", _record)
+
+    assert launch_main("codex", []) == EXIT_OK
+    assert executed == ["sync", "rerun", "launch:codex"]

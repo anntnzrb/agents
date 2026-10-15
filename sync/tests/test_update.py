@@ -125,10 +125,10 @@ def test_update_retries_reconcile_after_failure(
 def test_update_reconciles_again_after_runtime_switch(
     repos: tuple[Path, Path], home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A reconcile that installs a new sync runtime is not recorded as done.
+    """A reconcile that installs a new sync runtime hands the commit to it.
 
-    The running (old) runtime cannot know adapters the pulled commit adds, so the
-    next run must reconcile the same commit again under the new runtime.
+    The running (old) runtime cannot know adapters the pulled commit adds, so it
+    does not record the commit and reruns ``update`` under the new runtime now.
     """
     _, peer = repos
     _ = _push_new_commit(peer, "change")
@@ -145,12 +145,19 @@ def test_update_reconciles_again_after_runtime_switch(
         current.symlink_to("release-new")
         return True
 
+    handoffs: list[tuple[str, ...]] = []
+
+    def _handoff(_env: SyncEnv, *args: str) -> int:
+        handoffs.append(args)
+        return EXIT_OK
+
     monkeypatch.setattr("sync.core.index.run_sync", _sync)
+    monkeypatch.setattr("sync.core.index.rerun_in_current_runtime", _handoff)
 
     assert update_main() == EXIT_OK
-    assert update_main() == EXIT_OK
-    assert update_main() == EXIT_OK
-    assert calls == ["sync", "sync"]
+    assert calls == ["sync"]
+    assert handoffs == [("update",)]
+    assert not (runtime / "sync-managed" / "update.json").exists()
 
 
 def test_update_leaves_dirty_checkout_untouched(
