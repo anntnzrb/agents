@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -31,10 +30,7 @@ from sync.core.harness import (
     harness_source_root,
 )
 from sync.core.harness_adapters import ExtensionDepsHook, PackageBootstrapHook
-from sync.core.json_config import read_json_object
-from sync.core.pi_mcp import render_pi_mcp
 from sync.runtime.errors import assert_never, panic_message
-from sync.runtime.jsonc import is_obj_list
 
 type JobKind = Literal[
     "Dir",
@@ -45,18 +41,7 @@ type JobKind = Literal[
     "CliProxyEndpointTemplates",
     "CliProxyConfig",
     "SyncRuntimeInstall",
-    "PiMcp",
 ]
-
-
-@dataclass(frozen=True, slots=True)
-class PiMcpJob:
-    """Validated native MCP and settings publication for the Pi adapter."""
-
-    root: str
-    config: dict[str, object]
-    settings: dict[str, object]
-    kind: Literal["PiMcp"] = "PiMcp"
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,8 +115,7 @@ class SyncRuntimeInstallJob:
 
 
 type Job = (
-    PiMcpJob
-    | DirJob
+    DirJob
     | FileJob
     | PreserveJsonKeysJob
     | SecretTemplateJob
@@ -284,8 +268,6 @@ def _current_managed_entry_names(
     has_skills_source: bool,
 ) -> list[str]:
     names: set[str] = {harness.instruction_file, *top_level_entry_names(source_root)}
-    if harness.id == "pi":
-        names.update(("mcp.json", "settings.json"))
     if has_skills_source:
         names.add(SKILLS_DST_DIR)
     return sorted(names)
@@ -407,7 +389,6 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
                 preserve_paths=(
                     *template_paths_by_id.get(plan.harness.id, ()),
                     *plan.harness.preserve_json_keys,
-                    *(("mcp.json", "settings.json") if plan.harness.id == "pi" else ()),
                 ),
             )
             for plan in harnesses
@@ -443,27 +424,6 @@ def build_sync_plan(sync_env: SyncEnv) -> SyncPlan:
             template_paths_by_id,
         ),
     ]
-
-    for plan in harnesses:
-        if plan.harness.id != "pi":
-            continue
-        source = read_json_object(ssot / "tools/mcporter/mcporter.jsonc") or {}
-        config, exclusions = render_pi_mcp(
-            source, plan.root, sync_env.root_env | dict(os.environ)
-        )
-        settings = read_json_object(Path(plan.source_root) / "settings.json") or {}
-        skills = settings.get("skills", [])
-        if not is_obj_list(skills) or not all(
-            isinstance(skill, str) for skill in skills
-        ):
-            message = "Pi settings skills must be an array of strings"
-            raise ValueError(message)
-        if exclusions:
-            settings["skills"] = [
-                *skills,
-                *(entry for entry in exclusions if entry not in skills),
-            ]
-        jobs.append(PiMcpJob(root=plan.root, config=config, settings=settings))
 
     hooks = tuple(hook for plan in harnesses for hook in plan.hooks)
 
