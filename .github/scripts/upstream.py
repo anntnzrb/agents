@@ -11,7 +11,8 @@ release (`release`) or the head of a branch (`branch`). An optional `watch`
 lists every entry of an upstream directory known at the pin, so new upstream
 directories are reported too.
 
-The script compares the pin with the current upstream target through `gh`.
+The script compares the pin with the newest upstream target that is at least
+`COOLDOWN` old, through `gh`, so fast-moving upstreams settle before a port.
 With `--issues-repo`, it keeps one open issue per drifted skill, creating it
 or updating its body. A maintainer ports what matters and updates the pin.
 """
@@ -20,9 +21,13 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TypeIs
+
+COOLDOWN = timedelta(days=14)
 
 
 def is_record(value: object) -> TypeIs[dict[str, object]]:
@@ -169,10 +174,50 @@ def gh(*args: str) -> str:
     ).stdout.strip()
 
 
-def target_ref(pin: Pin) -> str:
-    if pin.branch is not None:
-        return gh("api", f"repos/{pin.repo}/commits/{pin.branch}", "--jq", ".sha")
-    return gh("api", f"repos/{pin.repo}/releases/latest", "--jq", ".tag_name")
+def settled_release(
+    releases: Sequence[object], pinned: str, cutoff: datetime
+) -> str | None:
+    """Newest stable release published by `cutoff`, unless the pin is that new."""
+    stable = sorted(
+        (
+            (datetime.fromisoformat(published), tag)
+            for entry in releases
+            if is_record(entry)
+            and not entry.get("draft")
+            and not entry.get("prerelease")
+            and isinstance(tag := entry.get("tag_name"), str)
+            and isinstance(published := entry.get("published_at"), str)
+        ),
+        reverse=True,
+    )
+    for published, tag in stable:
+        if tag == pinned:
+            return None
+        if published <= cutoff:
+            return tag
+    return None
+
+
+def target_ref(pin: Pin, cutoff: datetime) -> str | None:
+    """The upstream ref to compare against, or None when the pin is not behind it."""
+    if pin.release is not None:
+        releases: object = json.loads(
+            gh("api", f"repos/{pin.repo}/releases?per_page=100")
+        )
+        return settled_release(
+            releases if is_list(releases) else [], pin.release, cutoff
+        )
+    until = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+    settled = gh(
+        "api", f"repos/{pin.repo}/commits?sha={pin.branch}&until={until}&per_page=1",
+        "--jq", ".[0].sha // empty",
+    )  # fmt: skip
+    if not settled:
+        return None
+    status = gh(
+        "api", f"repos/{pin.repo}/compare/{settled}...{pin.commit}", "--jq", ".status"
+    )
+    return None if status in ("identical", "ahead") else settled
 
 
 def tree_hashes(repo: str, ref: str, parents: list[str]) -> dict[str, str]:
@@ -211,9 +256,13 @@ def main() -> int:
     args = parser.parse_args()
     issues_repo: str | None = args.issues_repo
     root = Path(__file__).resolve().parents[2]
+    cutoff = datetime.now(UTC) - COOLDOWN
     behind = 0
     for pin in pins(root):
-        target = target_ref(pin)
+        target = target_ref(pin, cutoff)
+        if target is None:
+            print(f"{pin.skill}: no {pin.repo} change older than {COOLDOWN.days} days")
+            continue
         found = drift(pin, tree_hashes(pin.repo, target, lookup_parents(pin)))
         if not found:
             print(f"{pin.skill}: current with {pin.repo} {target}")

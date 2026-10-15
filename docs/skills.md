@@ -138,7 +138,7 @@ A skill ported from a repository that keeps evolving records its source in `skil
 - `trees` lists every upstream directory the port derives from. Get a hash with `git rev-parse <commit>:<directory>` in a clone, or from `gh api repos/<owner>/<repo>/contents/<parent>?ref=<commit>`.
 - `watch` is optional. It reports upstream directories that appear under a parent and are not in its list, such as a new skill or principle.
 
-The daily `upstream` workflow (`.github/workflows/upstream.yml`) compares each pin with the upstream target. It keeps one open issue per drifted skill and refreshes its body while the pin stays behind.
+The daily `upstream` workflow (`.github/workflows/upstream.yml`) compares each pin with the newest upstream target that is at least 14 days old: the branch head as of that cutoff, or the latest stable release published by then. The cooldown lets fast-moving upstreams settle before a port, and a pin at or ahead of that target is current. It keeps one open issue per drifted skill and refreshes its body while the pin stays behind.
 
 Review drift against upstream itself, not against the local port. Local adaptations (renamed tools, removed vendor-specific steps, merged skills) always differ from upstream, so a local comparison is noise. The issue gives the upstream-only command:
 
