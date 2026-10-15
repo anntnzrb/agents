@@ -83,7 +83,6 @@ def _to_str_dict(val: object) -> dict[str, object]:
 
 # Script Directories
 SCRIPT_DIR = Path(__file__).resolve().parent
-SQL_DIR = SCRIPT_DIR / "sql"
 PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 CONFIG_DIR = SCRIPT_DIR.parent / "config"
 RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
