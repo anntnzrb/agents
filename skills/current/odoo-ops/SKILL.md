@@ -61,6 +61,7 @@ In examples below, `odoo-ops` represents this exact command.
 | Permission and production boundaries | [Safety model](references/safety-model.md) | Before RPC or production work |
 | Local paths and database identity | [Runtime discovery](references/runtime-discovery.md) | Before local runtime or database operations |
 | Local SQL, ORM shell, and cloning | [Database recipes](references/db-recipes.md) | Querying or rebuilding a replica |
+| One replica per agent, sizing, and current limits | [Parallel work](references/parallel-work.md) | Only when splitting work across agents with separate replicas |
 | Technical facts and environment quirks | [Gotchas](references/gotchas.md) | Writing SQL, crons, tests, or debugging |
 | Performance and pre-deploy auditing | [Performance diagnostics](references/perf-diagnostics.md) | Auditing slow views, notifications, or field removals |
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
@@ -136,7 +137,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 
 ## Flags that trip agents
 
-- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. An internal lock (`odoo-ops.lock`) serializes test runs and pod creation, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Prints `RESULT tests= failed= errors=`.
+- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. A per-database lock serializes test runs on the same database, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Prints `RESULT tests= failed= errors=`.
 - `test --baseline <ref>`: separates new failures from pre-existing ones by running the same tests on `<ref>` in a temporary git worktree. Use it instead of `git stash`. Exit 0 means no new failures.
 - `auth-temp` / `auth-restore`: local login for UI verification. `auth-temp` backs up the user's hash and sets a random password; ALWAYS run `auth-restore` when done, even if verification fails. Never set passwords with SQL.
 - `shell`: requires `dev` running (local pod and DB must be up). Refuses `_seed_` and production. Commits on exit unless `--rollback` is passed.

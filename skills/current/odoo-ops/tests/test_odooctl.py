@@ -5,6 +5,7 @@ import base64
 import configparser
 import contextlib
 import email.message
+import fcntl
 import gzip
 import hashlib
 import io
@@ -13,6 +14,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -44,7 +46,37 @@ from _narrow import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Iterator, Sequence
+
+
+@pytest.fixture(autouse=True)
+def isolated_lock_dir(tmp_path: Path) -> Iterator[Path]:
+    """Keep lock files out of the shared temp dir, where live runs hold them."""
+    lock_dir = tmp_path / "locks"
+    lock_dir.mkdir()
+    with patch.object(odooctl, "_lock_dir", return_value=lock_dir):
+        yield lock_dir
+
+
+def _lock_depth(name: str) -> int:
+    """Return how deeply this process holds lock `name` (0 when not held)."""
+    held = odooctl._HELD_LOCKS.get(name)
+    return held.depth if held is not None else 0
+
+
+class _StopError(Exception):
+    """Stops a command right after it takes its locks."""
+
+
+def _try_flock(path: Path, mode: int) -> bool:
+    """Return whether a separate open file description can take the flock."""
+    with path.open("a+", encoding="utf-8") as f:
+        try:
+            fcntl.flock(f.fileno(), mode | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return True
 
 
 def make_workspace_context(workspace_root: Path) -> odooctl.WorkspaceContext:
@@ -475,12 +507,17 @@ class TestStopAndDevLifecycle:
             assert mock_run.call_count == 3
 
     def test_cmd_stop_waits_for_op_lock_and_stops_db_gracefully(self) -> None:
-        """Verify full stop holds the op lock and gives postgres a shutdown window."""
+        """Verify full stop holds the runs gate and pod lock and gives postgres a shutdown window."""
         args = argparse.Namespace(json=True)
         lock_depths: list[int] = []
 
         def record(*_a: object, **_k: object) -> MagicMock:
-            lock_depths.append(odooctl._LOCK_STATE.depth)
+            lock_depths.append(
+                min(
+                    _lock_depth(odooctl.POD_LOCK_NAME),
+                    _lock_depth(odooctl.RUNS_LOCK_NAME),
+                )
+            )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with (
@@ -1322,17 +1359,328 @@ class TestCmdDbListAndDrop:
 
 
 class TestOpLockReentrancy:
-    """Tests for the internal operation lock helper."""
+    """Tests for the pod lock, per-database test locks, and the runs gate."""
 
     def test_op_lock_reentrancy_within_same_process(self) -> None:
         """Verify _op_lock is reentrant within the same process without deadlocking."""
-        assert odooctl._LOCK_STATE.depth == 0
+        pod = odooctl.POD_LOCK_NAME
+        assert _lock_depth(pod) == 0
         with odooctl._op_lock():
-            assert odooctl._LOCK_STATE.depth == 1
+            assert _lock_depth(pod) == 1
             with odooctl._op_lock():
-                assert odooctl._LOCK_STATE.depth == 2
-            assert odooctl._LOCK_STATE.depth == 1
-        assert odooctl._LOCK_STATE.depth == 0
+                assert _lock_depth(pod) == 2
+            assert _lock_depth(pod) == 1
+        assert _lock_depth(pod) == 0
+
+    def test_test_run_lock_reentrancy_within_same_process(self) -> None:
+        """Verify nested test-run locks on one database do not deadlock."""
+        name = odooctl._db_lock_name("work_a")
+        with odooctl._test_run_lock("work_a"):
+            with odooctl._test_run_lock("work_a"):
+                assert _lock_depth(name) == 2
+            assert _lock_depth(name) == 1
+        assert _lock_depth(name) == 0
+
+    def test_same_database_serializes(self, isolated_lock_dir: Path) -> None:
+        """Verify a second run on the same database cannot take its lock."""
+        db_lock = isolated_lock_dir / odooctl._db_lock_name("work_a")
+        with odooctl._test_run_lock("work_a"):
+            assert not _try_flock(db_lock, fcntl.LOCK_EX)
+        assert _try_flock(db_lock, fcntl.LOCK_EX)
+
+    def test_different_databases_use_independent_locks(
+        self, isolated_lock_dir: Path
+    ) -> None:
+        """Verify runs on different databases neither share a lock nor block each other."""
+        assert odooctl._db_lock_name("work_a") != odooctl._db_lock_name("work_b")
+        with odooctl._test_run_lock("work_a"):
+            other = isolated_lock_dir / odooctl._db_lock_name("work_b")
+            assert _try_flock(other, fcntl.LOCK_EX)
+            runs = isolated_lock_dir / odooctl.RUNS_LOCK_NAME
+            assert _try_flock(runs, fcntl.LOCK_SH)
+            assert not _try_flock(runs, fcntl.LOCK_EX)
+
+    def test_test_run_does_not_hold_pod_lock(self, isolated_lock_dir: Path) -> None:
+        """Verify a test run takes the pod lock only while creating the pod."""
+        pod = isolated_lock_dir / odooctl.POD_LOCK_NAME
+        with odooctl._test_run_lock("work_a"):
+            assert _try_flock(pod, fcntl.LOCK_EX)
+            with odooctl._op_lock():
+                assert not _try_flock(pod, fcntl.LOCK_EX)
+
+    def test_pod_creation_stays_global(self, tmp_path: Path) -> None:
+        """Verify pod creation holds the global pod lock whatever database is in use."""
+        ctx = make_workspace_context(tmp_path)
+        depths: list[int] = []
+
+        def record() -> str:
+            depths.append(_lock_depth(odooctl.POD_LOCK_NAME))
+            return "Running"
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", side_effect=record),
+            patch.object(odooctl, "_run", return_value=MagicMock(stdout="Up")),
+        ):
+            odooctl._ensure_runtime_pod(ctx)
+        assert depths == [1]
+
+    def test_db_lock_name_sanitizes_database_name(self) -> None:
+        """Verify lock file names cannot escape the lock directory."""
+        assert odooctl._db_lock_name("prod_work_20261015_a") == (
+            "odoo-ops-test-prod_work_20261015_a.lock"
+        )
+        assert "/" not in odooctl._db_lock_name("../x/y")
+
+    def test_waiting_message_names_the_database(self, isolated_lock_dir: Path) -> None:
+        """Verify a blocked run reports which database it waits for."""
+        db_lock = isolated_lock_dir / odooctl._db_lock_name("work_a")
+        stderr = io.StringIO()
+        entered = threading.Event()
+
+        def run() -> None:
+            with odooctl._test_run_lock("work_a"):
+                entered.set()
+
+        with db_lock.open("a+", encoding="utf-8") as holder:
+            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+            with contextlib.redirect_stderr(stderr):
+                worker = threading.Thread(target=run)
+                worker.start()
+                for _ in range(200):
+                    if "waiting for odoo-ops lock" in stderr.getvalue():
+                        break
+                    _ = threading.Event().wait(0.01)
+                assert not entered.is_set()
+                fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+                worker.join(timeout=5)
+        assert entered.is_set()
+        assert "waiting for odoo-ops lock" in stderr.getvalue()
+        assert "'work_a'" in stderr.getvalue()
+
+    def test_stop_inside_test_run_fails_instead_of_deadlocking(self) -> None:
+        """Verify upgrading the shared runs gate raises instead of blocking forever."""
+        with (
+            odooctl._test_run_lock("work_a"),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_run"),
+            pytest.raises(odooctl.CliError, match="upgrade shared lock"),
+        ):
+            odooctl._stop_all()
+
+    def test_cmd_test_locks_the_resolved_database(self, tmp_path: Path) -> None:
+        """Verify cmd_test locks the database it resolves, including a --db override."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="mod",
+            profile="p",
+            json=False,
+            tags=None,
+            db="work_b",
+            parallel=False,
+            jobs=None,
+            baseline=None,
+        )
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("work_a", ["/mod"], ["mod"]),
+            ),
+            patch.object(
+                odooctl, "_test_run_lock", side_effect=_StopError
+            ) as test_run_lock,
+            pytest.raises(_StopError),
+        ):
+            _ = odooctl.cmd_test(args)
+        test_run_lock.assert_called_once_with("work_b")
+
+    @pytest.mark.parametrize(
+        ("command", "args", "expected"),
+        [
+            (
+                odooctl.cmd_db_clone,
+                {"source": "seed", "target": "work", "force": True},
+                ("seed", "work"),
+            ),
+            (
+                odooctl.cmd_db_drop,
+                {"name": "work", "force": True, "allow_seed": False},
+                ("work",),
+            ),
+        ],
+    )
+    def test_db_lifecycle_commands_take_database_locks(
+        self,
+        tmp_path: Path,
+        command: Callable[[argparse.Namespace], int],
+        args: dict[str, object],
+        expected: tuple[str, ...],
+    ) -> None:
+        """Verify clone and drop wait for test runs on the databases they touch."""
+        ctx = make_workspace_context(tmp_path)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_db_locks", side_effect=_StopError) as db_locks,
+            pytest.raises(_StopError),
+        ):
+            _ = command(argparse.Namespace(json=False, **args))
+        db_locks.assert_called_once_with(*expected)
+
+
+class TestCommandsWaitForTestRuns:
+    """Commands that ensure the pod wait for a test run on their own database only."""
+
+    @staticmethod
+    def _reaches_database_while_locked(
+        lock_dir: Path,
+        ctx: odooctl.WorkspaceContext,
+        held_db: str,
+        command: Callable[[argparse.Namespace], int],
+        args: argparse.Namespace,
+    ) -> tuple[bool, bool]:
+        """Return whether the command reached its database while and after `held_db` was locked."""
+        reached = threading.Event()
+
+        def stop(*_a: object, **_k: object) -> object:
+            reached.set()
+            raise _StopError
+
+        def run() -> None:
+            with contextlib.suppress(_StopError):
+                _ = command(args)
+
+        held_lock = lock_dir / odooctl._db_lock_name(held_db)
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_run", return_value=MagicMock(stdout="Up")),
+            patch.object(odooctl, "_exec_sql_json", side_effect=stop),
+            patch.object(odooctl, "_exec_sql", side_effect=stop),
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.redirect_stdout(io.StringIO()),
+            held_lock.open("a+", encoding="utf-8") as holder,
+        ):
+            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+            worker = threading.Thread(target=run)
+            worker.start()
+            while_held = reached.wait(0.5)
+            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+            worker.join(timeout=5)
+        return while_held, reached.is_set()
+
+    @pytest.mark.parametrize(
+        ("command", "args"),
+        [
+            (
+                odooctl.cmd_db_query,
+                argparse.Namespace(
+                    json=True, file=None, sql="SELECT 1", unsafe=False, db=None
+                ),
+            ),
+            (
+                odooctl.cmd_auth_temp,
+                argparse.Namespace(json=True, login=None, db=None),
+            ),
+        ],
+    )
+    def test_waits_for_a_test_run_on_the_same_database(
+        self,
+        tmp_path: Path,
+        isolated_lock_dir: Path,
+        command: Callable[[argparse.Namespace], int],
+        args: argparse.Namespace,
+    ) -> None:
+        """Verify the command blocks until a test run on its database releases the lock."""
+        ctx = make_workspace_context(tmp_path)
+        while_held, after = self._reaches_database_while_locked(
+            isolated_lock_dir, ctx, ctx.effective_db_name, command, args
+        )
+        assert not while_held
+        assert after
+
+    @pytest.mark.parametrize(
+        ("command", "args"),
+        [
+            (
+                odooctl.cmd_db_query,
+                argparse.Namespace(
+                    json=True, file=None, sql="SELECT 1", unsafe=False, db=None
+                ),
+            ),
+            (
+                odooctl.cmd_auth_temp,
+                argparse.Namespace(json=True, login=None, db=None),
+            ),
+        ],
+    )
+    def test_ignores_a_test_run_on_another_database(
+        self,
+        tmp_path: Path,
+        isolated_lock_dir: Path,
+        command: Callable[[argparse.Namespace], int],
+        args: argparse.Namespace,
+    ) -> None:
+        """Verify a test run on another database does not block the command."""
+        ctx = make_workspace_context(tmp_path)
+        while_held, _after = self._reaches_database_while_locked(
+            isolated_lock_dir, ctx, "other_work", command, args
+        )
+        assert while_held
+
+    def test_db_list_waits_for_any_test_run(
+        self, tmp_path: Path, isolated_lock_dir: Path
+    ) -> None:
+        """Verify db-list holds the runs gate exclusively while ensuring the pod."""
+        ctx = make_workspace_context(tmp_path)
+        depths: list[tuple[int, int]] = []
+        shared_blocked: list[bool] = []
+        runs = isolated_lock_dir / odooctl.RUNS_LOCK_NAME
+
+        def record() -> str:
+            shared_blocked.append(not _try_flock(runs, fcntl.LOCK_SH))
+            depths.append(
+                (
+                    _lock_depth(odooctl.RUNS_LOCK_NAME),
+                    _lock_depth(odooctl.POD_LOCK_NAME),
+                )
+            )
+            return "Running"
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", side_effect=record),
+            patch.object(odooctl, "_run", return_value=MagicMock(stdout="Up")),
+            patch.object(odooctl, "_exec_sql_json", return_value=[]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            _ = odooctl.cmd_db_list(argparse.Namespace(json=True))
+        assert depths == [(1, 1)]
+        assert shared_blocked == [True]
+
+    def test_wait_locks_are_released_after_ensuring_the_pod(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify waiting commands hold the database lock only while ensuring the pod."""
+        ctx = make_workspace_context(tmp_path)
+        name = odooctl._db_lock_name("work_a")
+        inside: list[int] = []
+
+        def record() -> str:
+            inside.append(_lock_depth(name))
+            return "Running"
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", side_effect=record),
+            patch.object(odooctl, "_run", return_value=MagicMock(stdout="Up")),
+        ):
+            odooctl._ensure_runtime_pod(ctx, wait_for_db="work_a")
+        assert inside == [1]
+        assert _lock_depth(name) == 0
 
 
 class TestStopWebOnly:
