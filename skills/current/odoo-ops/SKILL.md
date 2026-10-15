@@ -25,7 +25,7 @@ Follow these situational reading rules before taking action:
 
 - The skill CLI is the single interface between user, model, and Odoo. Execute all commands via `uv run --script <skill-dir>/scripts/cli.py` in shell. Agents MUST NOT write custom HTTP, XML-RPC, or JSON-RPC scripts, import skill transports or Python modules into notebooks or eval kernels, or use `curl`/`requests`/`urllib`. Stop and report any missing CLI capability.
 - Explore first: inspect provisioned source (`env --json`: `runtime_path`, `addons_paths`) and extend native primitives before designing changes or interventions. Never invent modules or APIs.
-- Local replica (`<prodDB>_work_YYYYMMDD`): unrestricted reads and writes for fast iteration. Seed replica (`<prodDB>_seed_<YYYYMMDD>`) is an untouched baseline; never write to it. Rebuild broken replicas with `db-clone`.
+- Local replica (`<prodDB>_work_<YYYYMMDD>`): unrestricted reads and writes for fast iteration. Seed replica (`<prodDB>_seed_<YYYYMMDD>`) is an untouched baseline; never write to it. Rebuild broken replicas with `db-clone`.
 - Production reads: no per-read approval required. Credentials auto-load from `<skill-dir>/.env` (`--env-file` overrides). Pass `--allow-rpc` on every RPC invocation (before or after the subcommand). Placing RPC flags before `rpc` exits 2 with a hint.
 - Production writes: plan and apply workflow. Any mutation without `--write` creates a dry-run plan (on loopback too). On production, passing `--write` on direct mutations is blocked; `--write` is valid exclusively with `apply <plan-id>`.
   1. Rehearse logic on local replica (validate behavior, not IDs).
@@ -105,7 +105,7 @@ odoo-ops routes --json
 
 ## Authorized JSON-RPC
 
-Credentials load automatically from `<skill-dir>/.env`. Every call requires `--allow-rpc`. `--fields` accepts space-separated, comma-separated, or JSON array strings. `search_read` defaults to `--limit 10` and warns on truncation.
+`--fields` accepts space-separated, comma-separated, or JSON array strings.
 
 Read operations:
 ```text

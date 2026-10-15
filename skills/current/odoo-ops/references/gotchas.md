@@ -7,7 +7,6 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 - Translated char fields are stored as `jsonb` in PostgreSQL. Raw SQL queries must extract the locale key (e.g. `name->>'en_US'`) or cast with `::text`. Running `ILIKE` directly on `jsonb` raises a PostgreSQL type error. The `arch_db` column on `ir.ui.view` is also `jsonb`.
 - Model name to SQL table name mapping replaces dots with underscores (e.g. `sale.order.line` maps to `sale_order_line`). Special exceptions exist: `ir.actions.server` maps to table `ir_act_server`. Cron triggers use `ir_cron_trigger` and automation triggers use `base_automation_trigger`.
 - Inside containerized PostgreSQL, `\copy ... FROM` executes inside the container namespace and cannot access host file paths. Feed data through stdin (e.g. `cat file.csv | db-query ...`).
-- Restoring a replica from a database dump without its accompanying filestore causes missing binary attachments and broken spreadsheet dashboards. This is an expected artifact of SQL-only dumps, not a code defect.
 - `db-restore` skips production `GRANT`, `REVOKE`, and `ALTER DEFAULT PRIVILEGES` statements in SQL dumps for local replicas, preserving COPY data.
 
 ## Models, ORM, and Fields
@@ -15,7 +14,7 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 - `ir.actions.server` has no `active` field. Attempting to filter or write `['active', '=', ...]` on server actions raises a missing field error.
 - Default `copy()` duplicates field values without modification unless explicitly overridden in `default` or model logic. This can violate PostgreSQL `UNIQUE` constraints (e.g. unique codes or references).
 - `@api.onchange` methods execute only in web client form interactions. They never execute during RPC calls, controller executions, or background operations.
-- `export_data` is not a pure read. [`odoo/models.py`](https://github.com/odoo/odoo/blob/17.0/odoo/models.py) routes `export_data` through `_export_rows` and `__ensure_xml_id`, which inserts new rows into `ir_model_data` when records lack XML IDs. Use `read` or `search_read` for pure inspection.
+- `export_data` is not a pure read; see [Safety model](safety-model.md#read-only-caveats).
 - Import batches roll back entirely on any validation or constraint error. In addition, `base_import.import` caches field mappings across calls within the session.
 - `@api.constrains` methods run only when a create or write touches a field they declare (`odoo/models.py`, `_validate_fields`). Editing other fields of a record that already violates the rule does not re-check it.
 - Writing a field's current value does not update that column: `Field.write` in `odoo/fields.py` drops records whose cached value is unchanged. On models with `_log_access`, `BaseModel.write` still sets `write_date` and `write_uid`, so the first write in a transaction emits an `UPDATE`; a repeat write in the same transaction, or any same-value write on a model without `_log_access`, emits none. Never use a same-value write as a touch to lock a row; lock explicitly with `SELECT ... FOR UPDATE` through `self.env.cr`.

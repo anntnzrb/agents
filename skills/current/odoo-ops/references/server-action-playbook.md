@@ -19,7 +19,7 @@ Read [Safety model](safety-model.md) first. Production reads via the CLI require
 
 ## Required workflow
 
-1. `Source evidence`: read local code/report to identify the real fields used, e.g. report uses `lead.periodo_id` versus subfield `postgrado_id.periodo_ids`
+1. `Source evidence`: read local code/report to identify the real fields used, e.g. whether a report reads a field on the record itself or a subfield through a related record
 2. `Read-only audit`: use `search_count`, `read_group`, first/last ids, samples only when needed
 3. `Dry run`: exact target and excluded IDs, expected counts, values, preconditions, distribution, and expected side effects
 4. `Approval and execute`: obtain user approval of the rendered operation and exact scope, then set `WRITE_APPROVED = True`. Use ORM for small/business-logic writes; direct SQL requires approval of its bypassed ORM behavior.
