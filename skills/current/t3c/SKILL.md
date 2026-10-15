@@ -1,6 +1,6 @@
 ---
 name: t3c
-description: "Use when running in T3 Code and delegating, splitting, or routing work to subagents, not for races or best-of attempts."
+description: "Use when using T3 Code."
 license: AGPL-3.0-or-later
 ---
 
