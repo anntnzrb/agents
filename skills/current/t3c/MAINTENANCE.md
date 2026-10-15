@@ -63,6 +63,8 @@ The user settled decisions 1 to 11 on 2026-10-11 and 12 to 15 on 2026-10-15. A r
 11. Delegation uses T3 tools only.
 12. The orchestrator may steer or follow up a child through `t3_thread_send` on its `childThreadId`. Independent review rounds still start with a new `delegate_task`.
 13. Delegated threads from `t3_thread_launch` serve multi-round dialogues. Each round ends with a result file, a `t3_thread_send` in `queue` mode to the orchestrator, no running processes, and an idle thread. The orchestrator archives the thread when the dialogue ends.
+14. Every delegate runs unattended. Its brief forbids asking the user and routes questions to the orchestrator, forbids production access, external writes, leftover processes, commits, and pushes. Its report starts with a short summary. A report too large for a tool result goes complete to a file under /tmp, and the final message carries the summary and the path; detail is never truncated. The skill stays project-agnostic.
+15. The orchestrator is the most expensive model, so it delegates mechanical and trivial work. It may write briefs and notes outside the repository, and edit a file itself when delegating costs more than the edit.
 
 ## Refresh procedure
 
