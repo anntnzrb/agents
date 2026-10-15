@@ -42,7 +42,7 @@ Use the CLI subcommands to inspect and manage container state:
 - `health [--port PORT] [--wait SECONDS]`: probes HTTP endpoint on `127.0.0.1` (never use `localhost` due to IPv6 binding conflicts). Use this command instead of invoking `curl` directly.
 - `logs [-c web|db|test] [-f] [-n LINES]`: displays or tails logs from specific containers in the pod.
 - `shell [script|-] [--file PATH] [--db DB] [--rollback]`: runs Python ORM code against the local replica (refuses `_seed_` and production). Requires `dev` to be running. Commits on exit unless `--rollback` is passed.
-- `prune`: removes orphaned test containers (`odoo-test-*`) left behind after aborted test runs.
+- `prune`: removes every test container (`odoo-test-*`), including running ones, not only those left behind by aborted runs.
 - `stop [--web]`: stops the pod or gracefully stops only the web container.
 
 ## Session Lifecycle

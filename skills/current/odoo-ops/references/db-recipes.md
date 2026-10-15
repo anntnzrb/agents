@@ -67,7 +67,7 @@ uv run --script <skill-dir>/scripts/cli.py logs -c test
 uv run --script <skill-dir>/scripts/cli.py stop
 uv run --script <skill-dir>/scripts/cli.py stop --web
 
-# Prune orphaned odoo-test containers
+# Remove every odoo-test-* container, including running ones
 uv run --script <skill-dir>/scripts/cli.py prune
 ```
 
@@ -101,22 +101,32 @@ uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_seed_<YYYYMMDD> --fo
 
 Rehearse a module upgrade on a fresh working copy before it ships. Never touch the seed.
 
+There is no update-only command. `dev` is the upgrade path: every start runs Odoo with `-i` and `-u` for all modules of the profile workflow, as a deploy does. `test` also runs `-u`, but with `--test-enable`, so it is not a rehearsal. `dev` runs in the foreground until stopped; an unattended agent starts it as a background process. `dev` does not refuse `_seed_` databases, so always pass the working copy with `--db`.
+
 ```text
 # 1. Fresh working copy from the seed
 uv run --script <skill-dir>/scripts/cli.py db-clone <prodDB>_seed_<YYYYMMDD> <prodDB>_work_<YYYYMMDD> --force
 
-# 2. Upgrade the module with the new code: `test` runs Odoo with `-u <module> --stop-after-init` and the module's tests
-uv run --script <skill-dir>/scripts/cli.py test <module> --db <prodDB>_work_<YYYYMMDD>
+# 2. Upgrade: start dev on the working copy (background process)
+uv run --script <skill-dir>/scripts/cli.py dev <workflow> --db <prodDB>_work_<YYYYMMDD>
 
-# 3. Verify results and data
+# 3. Wait for the update to finish, then check for errors
+uv run --script <skill-dir>/scripts/cli.py logs -c web -n 200
+uv run --script <skill-dir>/scripts/cli.py health --wait 60
+
+# 4. Verify results and data
 uv run --script <skill-dir>/scripts/cli.py db-query --file <temp-dir>/check.sql --db <prodDB>_work_<YYYYMMDD> --json
 
-# 4. Upgrade again and rerun the check: the output must match step 3
-uv run --script <skill-dir>/scripts/cli.py test <module> --db <prodDB>_work_<YYYYMMDD>
+# 5. Second -u: restart dev, wait as in step 3, rerun the check; the output must match step 4
+uv run --script <skill-dir>/scripts/cli.py stop --web
+uv run --script <skill-dir>/scripts/cli.py dev <workflow> --db <prodDB>_work_<YYYYMMDD>
 uv run --script <skill-dir>/scripts/cli.py db-query --file <temp-dir>/check.sql --db <prodDB>_work_<YYYYMMDD> --json
+
+# 6. Stop the server
+uv run --script <skill-dir>/scripts/cli.py stop --web
 ```
 
-`test` passes `-u` only for the target module, so the module must already be installed in the working copy; `dev` installs the profile's modules with `-i`. `test` refuses databases whose name contains `_seed_`. If any step fails, drop the working copy and clone it again from the seed:
+The update has finished when the web log shows `Registry loaded in`. `health` alone does not prove it: without workers, Odoo starts its HTTP server before it loads and updates the registry (`odoo/service/server.py`, `ThreadedServer.run`). Treat `ERROR`, `CRITICAL`, or a traceback in the log during the update as a failed rehearsal. If any step fails, drop the working copy and clone it again from the seed:
 
 ```text
 uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_work_<YYYYMMDD> --force
