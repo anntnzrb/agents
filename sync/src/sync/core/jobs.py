@@ -43,6 +43,7 @@ from sync.runtime.errors import assert_never, err, panic_message, warn
 from sync.runtime.fs import (
     SourceContentCache,
     is_identical_file,
+    is_ignored_sync_entry,
     is_symlink,
     rm_entry,
     sync_managed_children,
@@ -370,6 +371,9 @@ def _hash_runtime_directory(root: str, hasher: Hasher, prefix: str = "") -> None
         raise RuntimeError(message) from error
 
     for entry in entries:
+        # The copy skips these, so they must not change the release id either.
+        if is_ignored_sync_entry(entry.name):
+            continue
         rel = entry.name if not prefix else f"{prefix}/{entry.name}"
         if entry.is_symlink():
             try:

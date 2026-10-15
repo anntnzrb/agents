@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 from sync.core.harness import SyncEnv
 from sync.core.index import run_sync
 from sync.core.jobs import (
+    RequiredPaths,
+    _compute_runtime_release_id,  # pyright: ignore[reportPrivateUsage]
     prune_unreferenced_releases,
     remove_legacy_runtime_install,
     run_jobs_with_preserve,
@@ -108,6 +110,27 @@ def test_plan_includes_the_job_with_new_runtime_paths(tmp_path: Path) -> None:
     assert job.releases_root == str(Path(sync_env.runtime_home) / "sync-releases")
     assert job.current_link == str(Path(sync_env.runtime_home) / "sync-current")
     assert job.timeout_ms > 0
+
+
+def test_release_id_ignores_bytecode_caches(tmp_path: Path) -> None:
+    """Bytecode caches never change the release id; the copy skips them too."""
+    home = make_home(tmp_path)
+    source_root = Path(seed_source_root(home))
+    for cache in source_root.rglob("__pycache__"):
+        shutil.rmtree(cache)
+    paths = RequiredPaths(
+        src_dir=str(source_root / "src"),
+        pyproject_toml=str(source_root / "pyproject.toml"),
+        uv_lock=str(source_root / "uv.lock"),
+    )
+    clean = _compute_runtime_release_id(paths)
+
+    cache = source_root / "src" / "sync" / "__pycache__"
+    cache.mkdir()
+    _ = (cache / "cli.cpython-399.pyc").write_bytes(b"bytecode")
+    _ = (source_root / "src" / "sync" / "stray.pyc").write_bytes(b"bytecode")
+
+    assert _compute_runtime_release_id(paths) == clean
 
 
 def test_publishes_current_link_and_installs_dependencies(
