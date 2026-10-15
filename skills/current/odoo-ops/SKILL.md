@@ -145,7 +145,9 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 - `check_access`: takes positional action `{read,write,create,unlink}`, not `--operation`.
 - `default_get`: takes space-separated positional field names, not a JSON array.
 - `read_group`: domain is positional before flags (`read_group <model> [domain] --groupby f [f ...]`). Flags like `--groupby` consume arguments that follow them.
-- `call`: takes positional `model` and `method` plus `--ids JSON`, `--args JSON`, `--kwargs JSON`.
+- `call`: takes positional `model` and `method` plus `--ids JSON`, `--args JSON`, `--kwargs JSON`. Only methods in `READONLY_ALLOWLIST` (`scripts/odoo_rpc.py`: `search`, `search_read`, `search_count`, `search_fetch`, `read`, `read_group`, `fields_get`, `get_view`, `get_views`, `name_search`, `name_get`, `get_metadata`, `get_external_id`, `default_get`, `check_access_rights`, `check_field_access_rights`, `user_has_groups`) run directly. Any other public method creates a dry-run mutation plan, even if it only reads. Methods starting with `_` are refused.
+- `call` plans have no automatic revert: the plan's pre-image holds only `display_name` and `write_date`, and `revert` exits 1 for method calls. Before `apply`, save the previous values of every affected field to a file outside the repository.
+- `count`: a subcommand of `rpc` (`rpc --allow-rpc count <model> '<domain>'`). Without `rpc`, the CLI exits with `invalid choice`.
 - `write-batch`: takes positional `model` and `file` mapping record ID to values dict.
 - RPC flag placement: `--allow-rpc` can appear before or after the subcommand. Placing RPC flags before `rpc` exits 2 with a hint.
 - On production: passing `--write` on direct mutations is blocked; `--write` is valid exclusively with `apply <plan-id>`.
