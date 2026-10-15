@@ -96,3 +96,43 @@ uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_work_<YYYYMMDD> --fo
 # Dropping a seed database requires explicit confirmation flag
 uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_seed_<YYYYMMDD> --force --allow-seed
 ```
+
+## Upgrade Rehearsal
+
+Rehearse a module upgrade on a fresh working copy before it ships. Never touch the seed.
+
+```text
+# 1. Fresh working copy from the seed
+uv run --script <skill-dir>/scripts/cli.py db-clone <prodDB>_seed_<YYYYMMDD> <prodDB>_work_<YYYYMMDD> --force
+
+# 2. Upgrade the module with the new code: `test` runs Odoo with `-u <module> --stop-after-init` and the module's tests
+uv run --script <skill-dir>/scripts/cli.py test <module> --db <prodDB>_work_<YYYYMMDD>
+
+# 3. Verify results and data
+uv run --script <skill-dir>/scripts/cli.py db-query --file <temp-dir>/check.sql --db <prodDB>_work_<YYYYMMDD> --json
+
+# 4. Upgrade again and rerun the check: the output must match step 3
+uv run --script <skill-dir>/scripts/cli.py test <module> --db <prodDB>_work_<YYYYMMDD>
+uv run --script <skill-dir>/scripts/cli.py db-query --file <temp-dir>/check.sql --db <prodDB>_work_<YYYYMMDD> --json
+```
+
+`test` passes `-u` only for the target module, so the module must already be installed in the working copy; `dev` installs the profile's modules with `-i`. `test` refuses databases whose name contains `_seed_`. If any step fails, drop the working copy and clone it again from the seed:
+
+```text
+uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_work_<YYYYMMDD> --force
+uv run --script <skill-dir>/scripts/cli.py db-clone <prodDB>_seed_<YYYYMMDD> <prodDB>_work_<YYYYMMDD> --force
+```
+
+## One-Time Backfill During Upgrade
+
+`noupdate="1"` data cannot carry an upgrade-time backfill: its `<function>` tags run only at install (see [Gotchas](gotchas.md)). Use a regular data file instead:
+
+1. Add a data file without `noupdate` as the last entry of `data` in `__manifest__.py`, so it loads after every record it depends on.
+2. In it, call a private model method: `<function model="res.partner" name="_backfill_example"/>`.
+3. The method returns at once when an `ir.config_parameter` marker, such as `<module>.backfill_example_done`, is set. Otherwise it fixes the existing records, then sets the marker as its last step.
+
+The data file runs on every upgrade, but the marker makes later upgrades skip the work and leaves records created after the backfill alone. Verify it with the [upgrade rehearsal](#upgrade-rehearsal): the second `-u` must change nothing.
+
+## Tests That Need Committed Data
+
+In a `TransactionCase`, `self.registry.cursor()` opens a new database cursor that sees only committed data, never the test's own records. `HttpCase` puts the registry in test mode, where `registry.cursor()` wraps the test cursor instead (`odoo/modules/registry.py`, `cursor`; `odoo/tests/common.py`, `HttpCase`). When a test reads through a second cursor and depends on data that must already exist in the database, call `self.skipTest("<reason>")` when that data is missing instead of failing on the environment.

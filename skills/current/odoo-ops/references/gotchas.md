@@ -5,7 +5,7 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 ## Database and SQL
 
 - Translated char fields are stored as `jsonb` in PostgreSQL. Raw SQL queries must extract the locale key (e.g. `name->>'en_US'`) or cast with `::text`. Running `ILIKE` directly on `jsonb` raises a PostgreSQL type error. The `arch_db` column on `ir.ui.view` is also `jsonb`.
-- Model name to SQL table name mapping replaces dots with underscores (e.g. `crm.espol.periodo` maps to `crm_espol_periodo`). Special exceptions exist: `ir.actions.server` maps to table `ir_act_server`. Cron triggers use `ir_cron_trigger` and automation triggers use `base_automation_trigger`.
+- Model name to SQL table name mapping replaces dots with underscores (e.g. `sale.order.line` maps to `sale_order_line`). Special exceptions exist: `ir.actions.server` maps to table `ir_act_server`. Cron triggers use `ir_cron_trigger` and automation triggers use `base_automation_trigger`.
 - Inside containerized PostgreSQL, `\copy ... FROM` executes inside the container namespace and cannot access host file paths. Feed data through stdin (e.g. `cat file.csv | db-query ...`).
 - Restoring a replica from a database dump without its accompanying filestore causes missing binary attachments and broken spreadsheet dashboards. This is an expected artifact of SQL-only dumps, not a code defect.
 - `db-restore` skips production `GRANT`, `REVOKE`, and `ALTER DEFAULT PRIVILEGES` statements in SQL dumps for local replicas, preserving COPY data.
@@ -17,6 +17,36 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 - `@api.onchange` methods execute only in web client form interactions. They never execute during RPC calls, controller executions, or background operations.
 - `export_data` is not a pure read. [`odoo/models.py`](https://github.com/odoo/odoo/blob/17.0/odoo/models.py) routes `export_data` through `_export_rows` and `__ensure_xml_id`, which inserts new rows into `ir_model_data` when records lack XML IDs. Use `read` or `search_read` for pure inspection.
 - Import batches roll back entirely on any validation or constraint error. In addition, `base_import.import` caches field mappings across calls within the session.
+- `@api.constrains` methods run only when a create or write touches a field they declare (`odoo/models.py`, `_validate_fields`). Editing other fields of a record that already violates the rule does not re-check it.
+- Writing a field's current value does not update that column: `Field.write` in `odoo/fields.py` drops records whose cached value is unchanged. On models with `_log_access`, `BaseModel.write` still sets `write_date` and `write_uid`, so the first write in a transaction emits an `UPDATE`; a repeat write in the same transaction, or any same-value write on a model without `_log_access`, emits none. Never use a same-value write as a touch to lock a row; lock explicitly with `SELECT ... FOR UPDATE` through `self.env.cr`.
+- Writing a `translate=True` field updates only the context language (`lang`, default `en_US`), plus `en_US` when that language is inactive (`odoo/fields.py`, `_String.write`). To rename a record in every language, call `update_field_translations(field_name, {lang: value, ...})`; over RPC it is a `call`, so it produces a plan. A later module upgrade rewrites only the fields the module's data file declares, so it does not restore a name the XML record omits.
+
+## Modules and Data Loading
+
+- A `<function>` tag inside `noupdate="1"` data runs only at install (`odoo/tools/convert.py`, `_tag_function` returns when `noupdate` and mode is not `init`). A module upgrade (`-u`) skips it. For upgrade-time data changes, see the one-time backfill in [Database recipes](db-recipes.md).
+- `pre_init_hook` and `post_init_hook` run only on a new install (`odoo/modules/loading.py`, `load_module_graph`, `new_install`), never on upgrade.
+
+## Controllers
+
+- Odoo serves each HTTP request through `retrying` in `odoo/service/model.py`, which retries up to 5 times on the PostgreSQL errors in `PG_CONCURRENCY_ERRORS_TO_RETRY`: `LOCK_NOT_AVAILABLE` (55P03), `SERIALIZATION_FAILURE` (40001), and `DEADLOCK_DETECTED` (40P01). A broad `except Exception` in a controller that swallows these errors disables the retry. Re-raise them before generic handling:
+
+```python
+from psycopg2 import OperationalError
+from odoo.service.model import PG_CONCURRENCY_ERRORS_TO_RETRY
+
+try:
+    ...
+except OperationalError as exc:
+    if exc.pgcode in PG_CONCURRENCY_ERRORS_TO_RETRY:
+        raise
+    ...
+except Exception:
+    ...
+```
+
+## Web Client
+
+- List and form views hide the Archive and Unarchive actions when the model's `active` field is `readonly` (`archiveEnabled` in `web/static/src/views/list/list_controller.js` and `web/static/src/views/form/form_controller.js`).
 
 ## Scheduled Actions and Server Actions
 
@@ -27,6 +57,7 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 ## Mail, Discuss, and Notifications
 
 - Emails composed through the mail composer are saved in `mail.message` with `message_type='comment'`. Internal notes share the same message type and are distinguished solely by their subtype `mail.mt_note`.
+- Context `mail_notrack=True` skips value tracking on create and write, so no tracking messages reach the chatter. `tracking_disable=True` is broader: create and write skip all MailThread features, including auto-subscription, tracking, and posting (`mail/models/mail_thread.py`, class docstring and `write`).
 - Calling `discuss.channel.add_members()` automatically pins the channel (`is_pinned=True`) and opens chat windows for added members, creating reactive state in their frontend sessions.
 
 ## Container, System, and Environment
