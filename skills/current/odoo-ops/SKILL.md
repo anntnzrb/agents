@@ -9,6 +9,7 @@ license: AGPL-3.0-or-later
 ## Before you act
 
 Follow these situational reading rules before taking action:
+- If `profiles/<profile>.md` exists for the active CLI profile (`--profile`, default `etech`), you MUST read it completely before acting. Its project rules override this skill's general rules.
 - Before any production RPC, you MUST read [references/safety-model.md](references/safety-model.md).
 - Before local DB or shell work, you MUST read [references/db-recipes.md](references/db-recipes.md).
 - Before SQL on Odoo tables, crons, QUnit, or debugging, you MUST read [references/gotchas.md](references/gotchas.md).
@@ -58,6 +59,7 @@ In examples below, `odoo-ops` represents this exact command.
 
 | Need | Read | When |
 | --- | --- | --- |
+| Project rules for the active profile | `profiles/<profile>.md` | Before acting, when it exists |
 | Permission and production boundaries | [Safety model](references/safety-model.md) | Before RPC or production work |
 | Local paths and database identity | [Runtime discovery](references/runtime-discovery.md) | Before local runtime or database operations |
 | Local SQL, ORM shell, and cloning | [Database recipes](references/db-recipes.md) | Querying or rebuilding a replica |
