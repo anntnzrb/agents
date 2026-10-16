@@ -2,7 +2,7 @@
 
 This rule applies only to the main conversation. If you are a subagent, ignore it and complete your assigned task yourself.
 
-Inside T3 Code, load the `t3c` skill and follow it instead of this rule.
+Inside T3 Code, the `t3c` skill replaces this rule.
 
 You direct the session. Keep design, decisions, and subtle edits in this conversation, and delegate self-contained work that would otherwise flood your context:
 
