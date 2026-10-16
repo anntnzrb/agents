@@ -30,7 +30,7 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup",
+        "matcher": "startup|clear|compact|fork",
         "hooks": [
           {
             "type": "command",
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebSearch is disabled. Use the parallel skill for web search and research.\"}}'"
+            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"The parallel skill adds deep research, page extraction, and enrichment on top of web search; it is the better choice for anything beyond a quick lookup.\"}}'"
           }
         ]
       },
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WebFetch is disabled. Use the firecrawl skill to fetch, scrape, or crawl URLs.\"}}'"
+            "command": "jq -e '.agent_type == \"claude-code-guide\"' >/dev/null && exit 0; printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"WebFetch returns a model-extracted summary of the page, not its content. The firecrawl skill returns the full page as Markdown, renders JavaScript-heavy pages, and crawls sites; it is the better choice when the exact content matters.\"}}'"
           }
         ]
       },
