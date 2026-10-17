@@ -1,0 +1,38 @@
+[graph]
+all-features = true
+
+[advisories]
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = []                      # entries need { id = "RUSTSEC-…", reason = "…" }; humans only
+
+[bans]
+multiple-versions = "warn"       # "deny" fails on almost every real tree; review the warning output
+wildcards = "deny"
+allow-wildcard-paths = false
+deny = [
+  { crate = "openssl", reason = "Use rustls." },
+  { crate = "atty", reason = "Unmaintained; use std::io::IsTerminal." },
+]
+skip = []
+skip-tree = []
+
+[licenses]
+confidence-threshold = 0.93
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+unused-allowed-license = "allow"
+exceptions = []
+
+[licenses.private]
+ignore = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[bans.std-replacements]
+scope = "workspace"
+level = "deny"

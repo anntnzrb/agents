@@ -1,0 +1,13 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = false
+avoid-breaking-exported-api = false   # apply lints to public APIs too
+too-many-lines-threshold = 80
+too-many-arguments-threshold = 5
+cognitive-complexity-threshold = 20
+disallowed-methods = [
+  { path = "std::thread::sleep", reason = "Inject a clock, or use the async runtime's sleep." },
+]

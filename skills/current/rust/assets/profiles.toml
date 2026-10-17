@@ -1,0 +1,10 @@
+[profile.release]
+overflow-checks = true   # keep arithmetic checks in release builds
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+# panic = "abort"        # binaries only, and only if nothing relies on unwinding
+
+[profile.dev]
+overflow-checks = true
+debug-assertions = true
