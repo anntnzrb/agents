@@ -2,6 +2,20 @@
 
 Read this file when the user wants to create, run, grade, benchmark, review, or iterate skill evals. This file holds the detailed runner, viewer, grading, feedback, and iteration process; keep `SKILL.md` as the routing entrypoint.
 
+## Section index
+
+- [Running and Evaluating Test Cases](#running-and-evaluating-test-cases)
+  - [Step 1: Spawn all runs in the same turn](#step-1-spawn-all-runs-in-the-same-turn)
+  - [Step 2: Draft assertions while runs are in progress](#step-2-draft-assertions-while-runs-are-in-progress)
+  - [Step 3: Capture timing data as notifications arrive](#step-3-capture-timing-data-as-notifications-arrive)
+  - [Step 4: Grade, aggregate, analyze, then launch viewer](#step-4-grade-aggregate-analyze-then-launch-viewer)
+  - [What the user sees in the viewer](#what-the-user-sees-in-the-viewer)
+  - [Step 5: Read feedback](#step-5-read-feedback)
+- [Improving the Skill](#improving-the-skill)
+  - [How to think about improvements](#how-to-think-about-improvements)
+  - [Iteration loop](#iteration-loop)
+- [Related agent references](#related-agent-references)
+
 ## Running and Evaluating Test Cases
 
 This section is one continuous sequence. Finish it once started. You NEVER use `/skill-test` or any other testing skill.

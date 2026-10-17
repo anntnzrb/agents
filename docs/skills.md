@@ -187,7 +187,8 @@ The next sync removes the managed copy from harness homes. Sync does not publish
   - Target `SKILL.md` at ≤150 lines; hard cap 250 lines unless the skill has no bundled references.
   - Move stable explanation/API notes to `references/`; move worked examples to `cookbook/`; move deterministic fetching/parsing/scoring/generation into `scripts/`.
   - When bundled docs exist, `SKILL.md` MUST include a required follow-up reads table with columns: `Need`, `Read`, `When`.
-  - Reference files over 300 lines MUST start with a table of contents or equivalent section index.
+  - Route every bundled doc a task needs from that table. A reference MAY link to another as optional reading, but MUST NOT make reading it a requirement. Models often only preview files reached through another reference.
+  - Reference files over 100 lines MUST start with a table of contents or equivalent section index, so a partial read still shows the file's scope. Verbatim upstream bytes are exempt.
   - Do not place large always-loaded docs in skill-package `AGENTS.md`; use `references/` and route to them from `SKILL.md`.
 - In `SKILL.md`, define the exact runnable entrypoint under `## Public entrypoint`. Worked examples in `## Common calls` and CLI `--help` text SHOULD use clean shorthand (e.g. `<command> <args>`) to minimize noise.
 
