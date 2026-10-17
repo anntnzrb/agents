@@ -15,7 +15,7 @@ Read before running the full gate, auditing a Rust repository, or reporting miss
 ## Execute the installed gate
 
 - MUST run `uv run --script <skill-dir>/scripts/cli.py gate --base <base-ref> --path <workspace>` with the intended review base. [scripts/cli.py gate]
-- MUST let the gate run step 8: it writes the diff to `<temp-dir>/diff.patch`, caps lints through a rustc workspace wrapper, and builds mutants in an isolated target directory. NEVER substitute a bare `cargo mutants` run. [cargo-mutants; scripts/cli.py gate]
+- MUST let the gate run step 8: it writes the diff to `<temp-dir>/diff.patch`, caps lints through a rustc workspace wrapper, and builds mutants in an isolated target directory. NEVER substitute a bare `cargo mutants` run; the CI `mutants` job applies the same wrapper and target directory. [cargo-mutants; scripts/cli.py gate; CI]
 - MUST stop at the first failing step, repair code or tests, and rerun the gate. If the gate appears wrong, report its diagnostic, location, and reason. NEVER suppress it or change configuration. [scripts/cli.py gate; governance-check; self-check]
 - MUST use the gate to include tracked changes and untracked, non-ignored files in mutation, Miri, and governance checks. The gate builds textual diffs without modifying the index. [scripts/cli.py gate; governance-check]
 - MUST NOT use `--no-verify`, skip flags, mutation exclusions, or environment overrides to weaken verification. [self-check]
