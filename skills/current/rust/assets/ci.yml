@@ -63,9 +63,14 @@ jobs:
         with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with: { tool: "cargo-mutants,cargo-nextest" }
-      - env:
+      - name: Test mutations in the pull request diff
+        env:
           BASE_REF: ${{ github.base_ref }}
+          RUSTC_WORKSPACE_WRAPPER: ${{ runner.temp }}/cap-lints-rustc
+          CARGO_TARGET_DIR: ${{ runner.temp }}/mutants-target
         run: |
+          printf '%s\n' '#!/bin/sh' 'exec "$@" --cap-lints=warn' > "$RUNNER_TEMP/cap-lints-rustc"
+          chmod 700 "$RUNNER_TEMP/cap-lints-rustc"
           git diff "origin/${BASE_REF}...HEAD" > "$RUNNER_TEMP/pr.diff"
           cargo mutants --in-diff "$RUNNER_TEMP/pr.diff" --test-tool nextest --output "$RUNNER_TEMP"
 

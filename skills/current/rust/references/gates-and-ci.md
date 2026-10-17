@@ -15,7 +15,7 @@ Read before running the full gate, auditing a Rust repository, or reporting miss
 ## Execute the installed gate
 
 - MUST run `uv run --script <skill-dir>/scripts/cli.py gate --base <base-ref> --path <workspace>` with the intended review base. [scripts/cli.py gate]
-- MUST let the gate run step 8: it writes the diff to `<temp-dir>/diff.patch`, caps lints through a rustc workspace wrapper, and builds mutants in an isolated target directory. NEVER substitute a bare `cargo mutants` run. [cargo-mutants; scripts/cli.py gate]
+- MUST let the gate run step 8: it writes the diff to `<temp-dir>/diff.patch`, caps lints through a rustc workspace wrapper, and builds mutants in an isolated target directory. NEVER substitute a bare `cargo mutants` run; the CI `mutants` job applies the same wrapper and target directory. [cargo-mutants; scripts/cli.py gate; CI]
 - MUST stop at the first failing step, repair code or tests, and rerun the gate. If the gate appears wrong, report its diagnostic, location, and reason. NEVER suppress it or change configuration. [scripts/cli.py gate; governance-check; self-check]
 - MUST use the gate to include tracked changes and untracked, non-ignored files in mutation, Miri, and governance checks. The gate builds textual diffs without modifying the index. [scripts/cli.py gate; governance-check]
 - MUST NOT use `--no-verify`, skip flags, mutation exclusions, or environment overrides to weaken verification. [self-check]
@@ -86,7 +86,7 @@ identities = ["nextest:package:binary:module::test_name"]
 
 - MUST keep added or changed `macro_rules!` definitions containing a literal `#` or metavariable attribute-construction shape (`$name ! [...]` or `$name [...]`) inside escape-hatch paths. All whitespace and definition delimiters are recognized; unbounded token trees fail closed. Bare invocation-side `#` tokens also require an approved path. Ordinary tt passthrough macros remain permitted. [governance-check]
 - MUST keep every changed path belonging to a package with `proc-macro = true` inside escape-hatch paths. [governance-check]
-- MUST have a human allowlist every existing or new symlink in the proposed tree. Unchanged source links can expose changed non-Rust target content. [governance-check]
+- MUST have a human allowlist every existing or new symlink in the proposed tree: tracked links, links in submodule working trees, symlinked parent directories, and untracked, non-ignored links. Ignored build output such as a `nix build` `result` link is not proposed. Unchanged source links can expose changed non-Rust target content. [governance-check]
 - MUST treat the merge base's `.gate/governance-check.py` as authoritative for gate step 9 governance checks; the local gate runs bundled `assets/governance-check.py --doctests` for step 4, while target repositories install `.gate/governance-check.py` from the template. [governance-check]
 - MUST treat a missing `.gate/escape-hatch-paths` as approving no paths: every escape hatch is then rejected and gate step 10 selects no packages. [governance-check; scripts/cli.py gate]
 

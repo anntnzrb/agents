@@ -50,7 +50,7 @@ Maintainer reference. Each entry states the current decision, why it holds, and 
 
 - Decision: Run mutation testing strictly on the diff using `cargo-mutants`, capping lints via compiler wrapper configuration and isolating the mutation build target directory.
 - Why: Denied workspace lints caused body-replacement mutants to fail during compilation as unviable rather than caught by tests; sharing a build target directory polluted subsequent gate steps with stale mutated artifacts.
-- Evidence: `retrofit` and `async` tasks in `evals/evals.json` demonstrating unviable mutants without lint capping; `ffi` task in `evals/evals.json` exposing stale build artifacts.
+- Evidence: `retrofit` and `async` tasks in `evals/evals.json` demonstrating unviable mutants without lint capping; `ffi` task in `evals/evals.json` exposing stale build artifacts. `assets/ci.yml` `mutants` job applies the same wrapper and target directory; cargo-mutants 27.0.0 does not cap lints by default.
 
 ### Equivalent mutants reporting and human exclusion
 

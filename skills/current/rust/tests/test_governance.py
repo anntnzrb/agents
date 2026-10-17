@@ -519,6 +519,110 @@ def test_existing_symlink_requires_approval(
         assert "symlink outside allowlist" in result.stderr
 
 
+@pytest.mark.parametrize("ignored", [False, True])
+def test_only_proposed_untracked_symlinks_checked(
+    repository: Path, *, ignored: bool
+) -> None:
+    """Ignored build output such as a `nix build` result link is not proposed."""
+    _ = (repository / ".gitignore").write_text(
+        "/result\n" if ignored else "/other\n", encoding="utf-8"
+    )
+    _ = git(repository, "add", ".gitignore")
+    _ = git(repository, "commit", "--quiet", "-m", "ignore build output")
+    (repository / "result").symlink_to("/nix/store/example")
+    result = check(repository)
+    if ignored:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode == 1
+        assert "symlink outside allowlist in result" in result.stderr
+
+
+@pytest.mark.parametrize("name", ["li\rnk", "li\r\nnk"])
+def test_carriage_return_symlink_names_rejected(repository: Path, name: str) -> None:
+    """Git path output keeps exact filesystem names without newline translation."""
+    (repository / name).symlink_to("/nonexistent")
+    result = check(repository)
+    assert result.returncode == 1
+    assert "symlink outside allowlist" in result.stderr
+
+
+def test_symlinked_ancestor_of_tracked_path_rejected(
+    repository: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A tracked directory replaced by a link cannot serve outside content."""
+    outside = tmp_path_factory.mktemp("outside") / "src"
+    _ = (repository / "src").rename(outside)
+    (repository / "src").symlink_to(outside)
+    result = check(repository)
+    assert result.returncode == 1
+    assert "symlink outside allowlist in src" in result.stderr
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_untracked_embedded_repository_symlinks(
+    repository: Path, *, ignored: bool
+) -> None:
+    """Git lists an untracked nested repository as one entry; its links still count."""
+    _ = (repository / ".gitignore").write_text(
+        "/build/\n" if ignored else "/other/\n", encoding="utf-8"
+    )
+    _ = git(repository, "add", ".gitignore")
+    _ = git(repository, "commit", "--quiet", "-m", "ignore build output")
+    module = repository / "build/vendor"
+    module.mkdir(parents=True)
+    _ = git(module, "init", "--quiet")
+    (module / "linked").symlink_to("/nonexistent")
+    result = check(repository)
+    if ignored:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode == 1
+        assert "symlink outside allowlist in build/vendor/linked" in result.stderr
+
+
+def test_indexed_symlink_below_symlinked_parent_reported(
+    repository: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Indexed links skip ignore classification, so Git cannot abort the check."""
+    (repository / "dir").mkdir()
+    (repository / "dir/link").symlink_to("/nonexistent")
+    _ = git(repository, "add", ".")
+    _ = git(repository, "commit", "--quiet", "-m", "linked directory")
+    outside = tmp_path_factory.mktemp("outside") / "dir"
+    _ = (repository / "dir").rename(outside)
+    (repository / "dir").symlink_to(outside)
+    result = check(repository)
+    assert result.returncode == 1
+    assert "symlink outside allowlist in dir\n" in result.stderr
+    assert "symlink outside allowlist in dir/link" in result.stderr
+
+
+def test_submodule_update_symlink_rejected(repository: Path) -> None:
+    """Links inside a submodule working tree remain proposed content."""
+    module = repository / "dep"
+    module.mkdir()
+    _ = git(module, "init", "--quiet")
+    for key, value in (
+        ("user.name", "Test"),
+        ("user.email", "test@example.invalid"),
+        ("commit.gpgsign", "false"),
+    ):
+        _ = git(module, "config", key, value)
+    _ = (module / "README").write_text("dependency\n", encoding="utf-8")
+    _ = git(module, "add", ".")
+    _ = git(module, "commit", "--quiet", "-m", "dependency")
+    _ = git(repository, "add", "dep")
+    _ = git(repository, "commit", "--quiet", "-m", "submodule")
+    (module / "linked").symlink_to("README")
+    _ = git(module, "add", ".")
+    _ = git(module, "commit", "--quiet", "-m", "link")
+    _ = git(repository, "add", "dep")
+    result = check(repository)
+    assert result.returncode == 1
+    assert "symlink outside allowlist in dep/linked" in result.stderr
+
+
 @pytest.mark.parametrize("approved", [False, True])
 def test_proc_macro_package_changes(repository: Path, *, approved: bool) -> None:
     """Every changed path inside a proc-macro package requires human authorization."""

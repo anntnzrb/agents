@@ -668,17 +668,54 @@ def count_findings(added: list[str], removed: list[str]) -> list[str]:
 
 def symlink_findings(patterns: list[str]) -> list[str]:
     """Reject every proposed symlink lacking a trusted exact-path/glob approval."""
-    errors: list[str] = []
+    staged = subprocess.run(
+        ["git", "ls-files", "-s", "-z"], check=True, capture_output=True
+    ).stdout
+    entries = [entry.split(b"\t", 1) for entry in staged.split(b"\0") if entry]
+    indexed = {
+        os.fsdecode(path) for meta, path in entries if meta.startswith(b"120000 ")
+    }
+    modules = [
+        os.fsdecode(path) for meta, path in entries if meta.startswith(b"160000 ")
+    ]
+    walked: set[str] = set()
     for folder, directories, files in os.walk(".", followlinks=False):
         directories[:] = [name for name in directories if name != ".git"]
-        for name in [*directories, *files]:
-            path = Path(folder) / name
-            relative = path.as_posix().removeprefix("./")
-            if path.is_symlink() and not any(
-                fnmatch.fnmatchcase(relative, pattern) for pattern in patterns
-            ):
-                errors.append(f"symlink outside allowlist in {relative}")
-    return errors
+        walked.update(
+            (Path(folder) / name).as_posix()
+            for name in [*directories, *files]
+            if (Path(folder) / name).is_symlink()
+        )
+
+    def unapproved(paths: set[str]) -> set[str]:
+        return {
+            path
+            for path in paths
+            if not any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+        }
+
+    # Indexed links and submodule content are proposed regardless of ignore rules;
+    # Git also cannot classify paths inside a submodule.
+    rejected = unapproved(indexed) | {
+        path
+        for path in unapproved(walked)
+        if any(path.startswith(f"{module}/") for module in modules)
+    }
+    queried = sorted(unapproved(walked) - rejected)
+    command = ["git", "check-ignore", "-z", "--stdin"]
+    result = subprocess.run(
+        command,
+        input=b"".join(os.fsencode(path) + b"\0" for path in queried),
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode not in (0, 1):
+        raise subprocess.CalledProcessError(
+            result.returncode, command, result.stdout, result.stderr
+        )
+    ignored = {os.fsdecode(path) for path in result.stdout.split(b"\0") if path}
+    rejected.update(path for path in queried if path not in ignored)
+    return [f"symlink outside allowlist in {path}" for path in sorted(rejected)]
 
 
 def proc_macro_findings(
