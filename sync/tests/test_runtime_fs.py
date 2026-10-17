@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import os
-import stat
 from typing import TYPE_CHECKING
 
 import pytest
@@ -13,7 +12,6 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from sync.core.secret_template import render_secret_template, sync_secret_template
 from sync.runtime.fs import (
     CachedSourceContent,
     is_identical_file,
@@ -352,41 +350,3 @@ def test_strip_jsonc() -> None:
         "b": [2, 3],
         "msg": "hello, world,",
     }
-
-
-def test_secret_template_rendering_and_sync(tmp_path: Path) -> None:
-    """render_secret_template and sync_secret_template perform atomic private sync."""
-    template = '{"api_key": ${SECRET_KEY}, "other": "plain"}'
-    rendered = render_secret_template(template, {"SECRET_KEY": "super_secret"})
-    assert rendered == '{"api_key": "super_secret", "other": "plain"}'
-
-    # Invalid placeholder format
-    with pytest.raises(ValueError, match="invalid secret placeholder:"):
-        _ = render_secret_template("${invalid-name}", {"invalid-name": "val"})
-
-    # Missing secret
-    with pytest.raises(ValueError, match="missing secret:"):
-        _ = render_secret_template("${MISSING_KEY}", {})
-
-    # sync_secret_template end to end
-    tmpl_file = tmp_path / "tmpl.json"
-    secrets_file = tmp_path / "secrets.jsonc"
-    dst_file = tmp_path / "out.json"
-
-    _ = tmpl_file.write_text(template, encoding="utf-8")
-    _ = secrets_file.write_text(
-        '{\n  // secrets\n  "SECRET_KEY": "val",\n}\n',
-        encoding="utf-8",
-    )
-
-    sync_secret_template(tmpl_file, dst_file, secrets_file)
-    assert dst_file.read_text(encoding="utf-8") == (
-        '{"api_key": "val", "other": "plain"}'
-    )
-    assert stat.S_IMODE(dst_file.stat().st_mode) == PRIVATE_FILE_MODE
-
-    # Idempotent write (no change)
-    mtime_before = dst_file.stat().st_mtime_ns
-    sync_secret_template(tmpl_file, dst_file, secrets_file)
-    mtime_after = dst_file.stat().st_mtime_ns
-    assert mtime_before == mtime_after

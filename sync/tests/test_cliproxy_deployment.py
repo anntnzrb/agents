@@ -142,16 +142,6 @@ def test_cliproxy_target_readiness_requires_a_nonempty_models_payload() -> None:
         assert ready is expected
 
 
-def test_cliproxy_target_readiness_accepts_201_with_data() -> None:
-    """Test target readiness check accepts HTTP 201 response with data array."""
-    response = httpx.Response(201, json={"data": [{"id": "ready"}]})
-    ready = is_cliproxy_target_ready(
-        DEPLOYMENT,
-        CliProxyEndpointSyncOptions(fetch=_make_fake_fetch(response)),
-    )
-    assert ready is True
-
-
 def test_cliproxy_endpoint_publication_requires_a_keyless_ready_target(
     tmp_path: Path,
 ) -> None:
@@ -413,33 +403,3 @@ def test_append_preserved_sections_handles_various_newline_layouts() -> None:
     )
     assert append_preserved_sections("rendered\n", "") == "rendered\n"
     assert append_preserved_sections("", "[table]\nk = 1\n") == "[table]\nk = 1\n"
-
-
-def test_cliproxy_opencode_endpoint_removes_placeholder_and_injects_base_url(
-    tmp_path: Path,
-) -> None:
-    """Test endpoint template rendering for opencode jsonc and ts configs."""
-    dst_dir = tmp_path / ".config" / "opencode"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    jsonc_src = tmp_path / "opencode.jsonc.tmpl"
-    ts_src = tmp_path / "cliproxy.ts.tmpl"
-    _ = jsonc_src.write_text(
-        f'const x = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n',
-        encoding="utf-8",
-    )
-    _ = ts_src.write_text(
-        f'const x = "{CLI_PROXY_CLIENT_BASE_URL_PLACEHOLDER}";\n',
-        encoding="utf-8",
-    )
-
-    sync_cliproxy_endpoint_template(jsonc_src, dst_dir / "opencode.jsonc", DEPLOYMENT)
-    sync_cliproxy_endpoint_template(
-        ts_src, dst_dir / "plugins" / "cliproxy.ts", DEPLOYMENT
-    )
-
-    assert (dst_dir / "opencode.jsonc").read_text(encoding="utf-8") == (
-        f'const x = "{DEPLOYMENT.gateway.base_url}";\n'
-    )
-    assert (dst_dir / "plugins" / "cliproxy.ts").read_text(encoding="utf-8") == (
-        f'const x = "{DEPLOYMENT.gateway.base_url}";\n'
-    )

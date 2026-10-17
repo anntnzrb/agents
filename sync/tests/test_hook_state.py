@@ -31,7 +31,6 @@ from sync.core.managed_state import (
     top_level_entry_names,
 )
 from sync.core.plan import ExtensionDepsHookPlan
-from sync.core.secret_template import render_secret_template
 from sync.runtime.fs import sync_text_file
 from sync.runtime.jsonc import strip_jsonc
 
@@ -638,20 +637,6 @@ def test_fingerprint_tree_propagates_oserror_when_not_enoent(tmp_path: Path) -> 
             _ = fingerprint_tree(unreadable_dir)
     finally:
         unreadable_dir.chmod(0o755)
-
-
-def test_render_secret_template_preserves_non_ascii_unicode_bytes() -> None:
-    """render_secret_template produces unescaped UTF-8 matching JSON.stringify."""
-    template = '{"secret": ${SECRET_VAL}, "plain": "ok"}'
-    unicode_value = "clé_secrète_🔑_日本語"
-    rendered = render_secret_template(template, {"SECRET_VAL": unicode_value})
-    assert f'"{unicode_value}"' in rendered
-    assert "\\u" not in rendered
-
-    parsed: object = json.loads(rendered)  # pyright: ignore[reportAny]
-    assert _is_obj_dict(parsed)
-    assert parsed["secret"] == unicode_value
-    assert parsed["plain"] == "ok"
 
 
 def test_top_level_entry_names_reexported_from_plan(tmp_path: Path) -> None:

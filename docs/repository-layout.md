@@ -32,7 +32,7 @@ Each harness source starts under `harnesses/<id>/`. When an adapter defines `run
 | `sync/src/sync/cli.py` (`sync` console script) | Public command entrypoint |
 | `sync/src/sync/core/` | Plans, jobs, adapters, wrappers, and managed tools |
 | `sync/src/sync/extensions/` | Extension dependency hooks |
-| `sync/src/sync/packages/` | Harness package bootstrap logic |
+| `sync/src/sync/packages/` | Extension dependency inference and installation |
 | `sync/src/sync/runtime/` | Filesystem, JSONC, process, lock, and error boundaries |
 | `sync/tests/` | Unit and process-level integration tests for sync behavior |
 

@@ -34,7 +34,6 @@ __all__ = [
     "exec_process",
     "log_command_failure",
     "resolve_executable",
-    "run_command",
     "run_command_outcome",
     "run_process",
 ]
@@ -397,20 +396,6 @@ async def run_command_outcome(
     if result.exit_code == EXIT_SUCCESS:
         return Success()
     return Failure(detail=detail_from_output(result.stdout, result.stderr))
-
-
-async def run_command(
-    command: Sequence[str],
-    cwd: str | Path | None,
-    timeout_ms: float,
-    action: str,
-) -> bool:
-    """Run a command, logging failure messages to stderr on non-zero outcome."""
-    outcome = await run_command_outcome(command, cwd, timeout_ms)
-    if outcome.tag == "Success":
-        return True
-    log_command_failure(command, action, outcome)
-    return False
 
 
 def log_command_failure(

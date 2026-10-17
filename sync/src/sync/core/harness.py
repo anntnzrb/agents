@@ -16,21 +16,18 @@ import dotenv
 
 from sync.core.harness_adapters import (
     DEFAULT_INSTRUCTION_FILE,
-    DEFAULT_PACKAGE_CACHE_SUBDIR,
     HARNESS_ADAPTERS,
     ExtensionDepsHook,
     HarnessAdapter,
-    HarnessHookSpec,
     HarnessId,
     HarnessLauncherSpec,
     HostPlatform,
     LauncherEnv,
-    PackageBootstrapHook,
     StaticReleaseLauncherSpec,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
 
 SOURCE_AGENT_FILE: str = "HARNESS.md"
 INSTALL_TIMEOUT_MS: int = 120_000
@@ -38,8 +35,6 @@ MANAGED_STATE_SUBDIR: str = ".local/share/agents/sync-managed"
 SKILLS_DST_DIR: str = "skills"
 SKILLS_SOURCE_SUBDIR: str = "current"
 PATH_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9._-]+$")
-
-type HarnessHook = PackageBootstrapHook | ExtensionDepsHook
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,8 +55,6 @@ class NpmLauncher:
 
     package: str
     bin: str
-    dist_tag: str = "latest"
-    smoke_check: str = "--version"
     default_args: tuple[str, ...] = ()
     env: dict[str, str] | None = None
 
@@ -72,7 +65,6 @@ class StaticReleaseLauncher:
 
     bin: str
     release: StaticRelease
-    smoke_check: str = "--version"
     default_args: tuple[str, ...] = ()
     env: dict[str, str] | None = None
 
@@ -90,12 +82,11 @@ class Harness:
     launcher: HarnessLauncher
     instruction_file: str = DEFAULT_INSTRUCTION_FILE
     runtime_subdir: str | None = None
-    compat_managed_entries: tuple[str, ...] = ()
     preserve_json_keys: Mapping[str, tuple[str, ...]] = MappingProxyType({})
     cliproxy_templates: tuple[str, ...] = ()
     cliproxy_preserve_top_levels: Mapping[str, tuple[str, ...]] = MappingProxyType({})
     python_env_segments: tuple[str, ...] | None = None
-    hooks: tuple[HarnessHook, ...] = ()
+    hooks: tuple[ExtensionDepsHook, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,7 +218,6 @@ def _resolve_launcher_env(
 
 def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
     launcher_env = _resolve_launcher_env(spec.env, home)
-    smoke_check = spec.smoke_check or "--version"
     default_args = spec.default_args or ()
 
     if isinstance(spec, StaticReleaseLauncherSpec):
@@ -241,15 +231,12 @@ def _build_launcher(spec: HarnessLauncherSpec, home: str) -> HarnessLauncher:
                 man_segments=spec.release.man_segments,
                 man_dest_segments=spec.release.man_dest_segments,
             ),
-            smoke_check=smoke_check,
             default_args=default_args,
             env=launcher_env,
         )
     return NpmLauncher(
         package=spec.package,
         bin=spec.bin,
-        dist_tag=spec.dist_tag or "latest",
-        smoke_check=smoke_check,
         default_args=default_args,
         env=launcher_env,
     )
@@ -276,12 +263,11 @@ def harness_from_adapter(
         launcher=_build_launcher(adapter.launcher, target_home),
         instruction_file=adapter.instruction_file or DEFAULT_INSTRUCTION_FILE,
         runtime_subdir=adapter.runtime_subdir,
-        compat_managed_entries=adapter.compat_managed_entries or (),
         preserve_json_keys=adapter.preserve_json_keys or {},
         cliproxy_templates=adapter.cliproxy_templates,
         cliproxy_preserve_top_levels=adapter.cliproxy_preserve_top_levels or {},
         python_env_segments=adapter.python_env_segments or None,
-        hooks=normalize_hooks(adapter.hooks or ()),
+        hooks=adapter.hooks or (),
     )
 
 
@@ -373,28 +359,8 @@ def harness_managed_state_path(harness: Harness, managed_state_home: str) -> str
     return str(Path(managed_state_home) / f"{harness.source_name}.json")
 
 
-def normalize_hooks(
-    hooks: Sequence[HarnessHookSpec] = (),
-) -> tuple[HarnessHook, ...]:
-    """Normalize harness hook specifications with default file paths."""
-    result: list[HarnessHook] = []
-    for hook in hooks:
-        if isinstance(hook, PackageBootstrapHook):
-            result.append(
-                PackageBootstrapHook(
-                    manifest_file=hook.manifest_file or "packages.json",
-                    settings_file=hook.settings_file or "settings.json",
-                    cache_subdir=hook.cache_subdir or DEFAULT_PACKAGE_CACHE_SUBDIR,
-                )
-            )
-        else:
-            result.append(hook)
-    return tuple(result)
-
-
 __all__ = [
     "DEFAULT_INSTRUCTION_FILE",
-    "DEFAULT_PACKAGE_CACHE_SUBDIR",
     "HARNESS_ADAPTERS",
     "INSTALL_TIMEOUT_MS",
     "MANAGED_STATE_SUBDIR",
@@ -405,12 +371,10 @@ __all__ = [
     "ExtensionDepsHook",
     "Harness",
     "HarnessAdapter",
-    "HarnessHookSpec",
     "HarnessId",
     "HarnessLauncherSpec",
     "HostPlatform",
     "NpmLauncher",
-    "PackageBootstrapHook",
     "RootEnvReadError",
     "StaticRelease",
     "StaticReleaseLauncher",

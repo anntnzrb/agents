@@ -18,7 +18,6 @@ from sync.core.cliproxy_deployment import (
     read_agents_settings,
 )
 from sync.core.harness import (
-    DEFAULT_PACKAGE_CACHE_SUBDIR,
     SKILLS_DST_DIR,
     SKILLS_SOURCE_SUBDIR,
     SOURCE_AGENT_FILE,
@@ -29,19 +28,8 @@ from sync.core.harness import (
     harness_root,
     harness_source_root,
 )
-from sync.core.harness_adapters import ExtensionDepsHook, PackageBootstrapHook
+from sync.core.harness_adapters import ExtensionDepsHook
 from sync.runtime.errors import assert_never, panic_message
-
-type JobKind = Literal[
-    "Dir",
-    "File",
-    "PreserveJsonKeys",
-    "SecretTemplate",
-    "CliProxyReadiness",
-    "CliProxyEndpointTemplates",
-    "CliProxyConfig",
-    "SyncRuntimeInstall",
-]
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,16 +65,6 @@ class PreserveJsonKeysJob:
 
 
 @dataclass(frozen=True, slots=True)
-class SecretTemplateJob:
-    """Secret template rendering and deployment job."""
-
-    src: str
-    dst: str
-    secrets_path: str
-    kind: Literal["SecretTemplate"] = "SecretTemplate"
-
-
-@dataclass(frozen=True, slots=True)
 class CliProxyReadinessJob:
     """CLI proxy readiness probe job."""
 
@@ -118,23 +96,10 @@ type Job = (
     DirJob
     | FileJob
     | PreserveJsonKeysJob
-    | SecretTemplateJob
     | CliProxyReadinessJob
     | CliProxyEndpointTemplatesJob
     | SyncRuntimeInstallJob
 )
-
-
-@dataclass(frozen=True, slots=True)
-class PackageBootstrapHookPlan:
-    """Hook plan for bootstrapping packages for a harness."""
-
-    harness: Harness
-    manifest_path: str
-    runtime_settings_path: str
-    cache_root: str
-    timeout_ms: int
-    kind: Literal["PackageBootstrap"] = "PackageBootstrap"
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,9 +116,6 @@ class ExtensionDepsHookPlan:
     kind: Literal["ExtensionDeps"] = "ExtensionDeps"
 
 
-type SyncHookPlan = PackageBootstrapHookPlan | ExtensionDepsHookPlan
-
-
 @dataclass(frozen=True, slots=True)
 class HarnessPlan:
     """Per-harness planning metadata and associated hooks."""
@@ -165,7 +127,7 @@ class HarnessPlan:
     instruction_target: str
     current_entry_names: tuple[str, ...]
     cleanup_entry_names: tuple[str, ...]
-    hooks: tuple[SyncHookPlan, ...]
+    hooks: tuple[ExtensionDepsHookPlan, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,7 +136,7 @@ class SyncPlan:
 
     harnesses: tuple[HarnessPlan, ...]
     jobs: tuple[Job, ...]
-    hooks: tuple[SyncHookPlan, ...]
+    hooks: tuple[ExtensionDepsHookPlan, ...]
     cli_proxy_deployment: AgentsSettings
 
 
@@ -199,27 +161,10 @@ def _build_hook_plans(
     harness: Harness,
     root: str,
     source_root: str,
-) -> list[SyncHookPlan]:
-    hook_plans: list[SyncHookPlan] = []
+) -> list[ExtensionDepsHookPlan]:
+    hook_plans: list[ExtensionDepsHookPlan] = []
     for hook in harness.hooks:
         match hook:
-            case PackageBootstrapHook():
-                hook_plans.append(
-                    PackageBootstrapHookPlan(
-                        harness=harness,
-                        manifest_path=str(
-                            Path(source_root) / (hook.manifest_file or "")
-                        ),
-                        runtime_settings_path=str(
-                            Path(root) / (hook.settings_file or "")
-                        ),
-                        cache_root=str(
-                            Path(sync_env.home)
-                            / (hook.cache_subdir or DEFAULT_PACKAGE_CACHE_SUBDIR)
-                        ),
-                        timeout_ms=sync_env.install_timeout_ms,
-                    )
-                )
             case ExtensionDepsHook():
                 hook_plans.append(
                     ExtensionDepsHookPlan(
@@ -281,10 +226,10 @@ def _build_harness_plan(sync_env: SyncEnv, harness: Harness) -> HarnessPlan:
     current_entry_names = tuple(
         _current_managed_entry_names(harness, source_root, has_skills_source=has_skills)
     )
-    cleanup_entry_names = tuple(
-        sorted(set(current_entry_names) | set(harness.compat_managed_entries))
+    cleanup_entry_names = current_entry_names
+    hooks: list[ExtensionDepsHookPlan] = _build_hook_plans(
+        sync_env, harness, root, source_root
     )
-    hooks: list[SyncHookPlan] = _build_hook_plans(sync_env, harness, root, source_root)
     if (skill_hook := _build_skill_hook_plan(sync_env, harness, root)) is not None:
         hooks.append(skill_hook)
 
@@ -442,9 +387,7 @@ __all__ = [
     "ExtensionDepsHookPlan",
     "FileJob",
     "Job",
-    "PackageBootstrapHookPlan",
     "PreserveJsonKeysJob",
-    "SecretTemplateJob",
     "SyncRuntimeInstallJob",
     "build_sync_plan",
     "top_level_entry_names",

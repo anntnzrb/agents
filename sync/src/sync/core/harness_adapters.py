@@ -18,7 +18,6 @@ type HostPlatform = Literal["darwin", "linux"]
 type HarnessId = Literal["amp", "claude", "codex", "devin", "opencode", "pi", "omp"]
 
 DEFAULT_INSTRUCTION_FILE: str = "AGENTS.md"
-DEFAULT_PACKAGE_CACHE_SUBDIR: str = ".local/share/agents/pi-packages"
 
 type LauncherEnv = dict[str, str] | Callable[[str], dict[str, str]]
 
@@ -41,8 +40,6 @@ class NpmLauncherSpec:
 
     package: str
     bin: str
-    dist_tag: str | None = None
-    smoke_check: str | None = None
     default_args: tuple[str, ...] | None = None
     env: LauncherEnv | None = None
 
@@ -53,7 +50,6 @@ class StaticReleaseLauncherSpec:
 
     bin: str
     release: StaticReleaseSpec
-    smoke_check: str | None = None
     default_args: tuple[str, ...] | None = None
     env: LauncherEnv | None = None
 
@@ -62,24 +58,11 @@ type HarnessLauncherSpec = NpmLauncherSpec | StaticReleaseLauncherSpec
 
 
 @dataclass(frozen=True, slots=True)
-class PackageBootstrapHook:
-    """Hook specification for bootstrapping packages into a harness runtime."""
-
-    manifest_file: str | None = None
-    settings_file: str | None = None
-    cache_subdir: str | None = None
-    kind: Literal["PackageBootstrap"] = "PackageBootstrap"
-
-
-@dataclass(frozen=True, slots=True)
 class ExtensionDepsHook:
     """Hook specification for installing extension dependencies."""
 
     root_dir: str
     kind: Literal["ExtensionDeps"] = "ExtensionDeps"
-
-
-type HarnessHookSpec = PackageBootstrapHook | ExtensionDepsHook
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,12 +75,11 @@ class HarnessAdapter:
     launcher: HarnessLauncherSpec
     instruction_file: str | None = None
     runtime_subdir: str | None = None
-    compat_managed_entries: tuple[str, ...] | None = None
     preserve_json_keys: Mapping[str, tuple[str, ...]] | None = None
     cliproxy_templates: tuple[str, ...] = ()
     cliproxy_preserve_top_levels: Mapping[str, tuple[str, ...]] | None = None
     python_env_segments: tuple[str, ...] | None = None
-    hooks: tuple[HarnessHookSpec, ...] | None = None
+    hooks: tuple[ExtensionDepsHook, ...] | None = None
 
 
 HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
@@ -161,15 +143,8 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
             bin="pi",
         ),
         runtime_subdir="agent",
-        compat_managed_entries=("legacy",),
         cliproxy_templates=("extensions/cliproxy/index.ts",),
-        hooks=(
-            PackageBootstrapHook(
-                manifest_file="packages.json",
-                settings_file="settings.json",
-            ),
-            ExtensionDepsHook(root_dir="extensions"),
-        ),
+        hooks=(ExtensionDepsHook(root_dir="extensions"),),
     ),
     HarnessAdapter(
         id="omp",
@@ -209,16 +184,13 @@ HARNESS_ADAPTERS: tuple[HarnessAdapter, ...] = (
 
 __all__ = [
     "DEFAULT_INSTRUCTION_FILE",
-    "DEFAULT_PACKAGE_CACHE_SUBDIR",
     "HARNESS_ADAPTERS",
     "ExtensionDepsHook",
     "HarnessAdapter",
-    "HarnessHookSpec",
     "HarnessId",
     "HarnessLauncherSpec",
     "HostPlatform",
     "LauncherEnv",
     "NpmLauncherSpec",
-    "PackageBootstrapHook",
     "StaticReleaseLauncherSpec",
 ]

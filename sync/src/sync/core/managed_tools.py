@@ -82,16 +82,6 @@ def _extract_with_timeout(
         executor.shutdown(wait=False, cancel_futures=True)
 
 
-def extract_release(
-    archive: str | Path,
-    destination: str | Path,
-    entry_name: str,
-    timeout_ms: int,
-) -> None:
-    """Extract a single entry from a tarball archive to destination directory."""
-    _extract_with_timeout(Path(archive), Path(destination), entry_name, timeout_ms)
-
-
 def extract_archive(
     archive: str | Path,
     destination: str | Path,

@@ -25,8 +25,6 @@ class ToolLauncherSpec:
     id: str
     package: str
     bin: str
-    dist_tag: str | None = None
-    smoke_check: str | None = None
     default_args: tuple[str, ...] = ()
     config_home_segments: tuple[str, ...] = ()
 

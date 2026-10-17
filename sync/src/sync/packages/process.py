@@ -1,5 +1,5 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""Subprocess execution for package dependency installation and builds."""
+"""Subprocess execution for inferred extension dependency installation."""
 
 from __future__ import annotations
 
@@ -12,34 +12,14 @@ from sync.runtime.process import (
     Success,
     log_command_failure,
     resolve_executable,
-    run_command,
     run_command_outcome,
 )
 
 __all__ = [
     "install_inferred_import_packages",
-    "install_package_deps",
 ]
 
 _EMPTY_PACKAGE_JSON: str = '{\n  "name": "pi-extension-deps",\n  "private": true\n}\n'
-
-
-async def install_package_deps(target_dir: str, timeout_ms: int) -> bool:
-    """Install package dependencies via bun install or inferred imports."""
-    if not await asyncio.to_thread(Path(target_dir, "package.json").is_file):
-        return await install_inferred_import_packages(target_dir, timeout_ms)
-
-    tool = await resolve_executable("bun")
-    if not tool:
-        err(f"bun is required for dependency install in {target_dir}")
-        return False
-
-    install_command = [tool, "install"]
-    if not await run_command(
-        install_command, cwd=target_dir, timeout_ms=timeout_ms, action="install"
-    ):
-        return False
-    return await install_inferred_import_packages(target_dir, timeout_ms)
 
 
 async def install_inferred_import_packages(
@@ -73,18 +53,6 @@ async def install_inferred_import_packages(
 
     log_command_failure(command, "install inferred packages", outcome)
     return False
-
-
-async def run_package_build(target_dir: str, timeout_ms: int) -> bool:
-    """Execute bun run build in the specified package directory."""
-    tool = await resolve_executable("bun")
-    if not tool:
-        err(f"bun is required for build in {target_dir}")
-        return False
-
-    return await run_command(
-        [tool, "run", "build"], cwd=target_dir, timeout_ms=timeout_ms, action="build"
-    )
 
 
 def _write_empty_package_json(target_dir: str) -> bool:

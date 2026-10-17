@@ -148,7 +148,7 @@ Document how to operate the tool on a focused page under `docs/` and link it fro
 
 ## Parsing and format contracts
 
-Sync parses configuration, secrets, environment files, and extension/skill sources across several formats. All implementations must uphold these parsing contracts:
+Sync parses configuration, environment files, and extension/skill sources across several formats. All implementations must uphold these parsing contracts:
 
 ### JavaScript and TypeScript import extraction
 
@@ -207,7 +207,7 @@ Sync is compliant if and only if it satisfies all of the following black-box beh
 
 ### 3. Owned entry cleanup vs. unmanaged file preservation
 
-- **Pruning stale owned entries**: Stale managed files (entries recorded in previous state files or declared in harness adapters but removed from current SSOT) are automatically removed upon synchronization.
+- **Pruning stale owned entries**: Stale managed files (entries recorded in previous state files but removed from current SSOT) are automatically removed upon synchronization.
 - **Preserving unmanaged user files**: Files placed in harness homes or tool directories by users (e.g., `~/.omp/agent/logs/user.log`, `~/.local/bin/my-script`) that were never managed by sync are strictly preserved.
 - **Unmanaged wrapper conflicts**: If an unmanaged file already exists at a desired wrapper path (e.g., `~/.local/bin/codex`), sync preserves the unmanaged binary without overwriting it, records the conflict, and emits a warning on stderr (`preserving unmanaged wrapper conflict`).
 

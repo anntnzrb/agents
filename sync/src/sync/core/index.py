@@ -23,7 +23,6 @@ from sync.core.hook_state import (
 )
 from sync.core.jobs import (
     prune_unreferenced_releases,
-    remove_legacy_runtime_install,
     run_jobs_with_preserve,
 )
 from sync.core.launcher import (
@@ -41,7 +40,6 @@ from sync.core.managed_state import (
 )
 from sync.core.plan import (
     ExtensionDepsHookPlan,
-    SyncHookPlan,
     build_sync_plan,
 )
 from sync.core.tool_launchers import ToolLauncherSpec, tool_launcher
@@ -52,10 +50,6 @@ from sync.core.update import (
 )
 from sync.core.wrappers import reconcile_wrappers
 from sync.extensions.install import install_extension_deps
-from sync.packages.index import (
-    PackageBootstrapTarget,
-    bootstrap_package_target,
-)
 from sync.runtime.errors import err, panic_message, warn
 from sync.runtime.lock import (
     SyncLock,
@@ -195,12 +189,6 @@ async def run_sync(
 
     wrapper_success = reconcile_wrappers(sync_env) if base_success else False
 
-    legacy_cleanup_success = (
-        remove_legacy_runtime_install(sync_env.runtime_home)
-        if (base_success and wrapper_success)
-        else True
-    )
-
     if base_success and wrapper_success:
         prune_unreferenced_releases(
             str(Path(sync_env.runtime_home) / "sync-releases"),
@@ -220,13 +208,7 @@ async def run_sync(
         else True
     )
 
-    return (
-        base_success
-        and wrapper_success
-        and managed_state_success
-        and hook_success
-        and legacy_cleanup_success
-    )
+    return base_success and wrapper_success and managed_state_success and hook_success
 
 
 def main() -> int:
@@ -465,8 +447,6 @@ async def _async_launch_main(
                 tool=tool.id,
                 package=tool.package,
                 bin=tool.bin,
-                dist_tag=tool.dist_tag,
-                smoke_check=tool.smoke_check,
             )
         has_cache = (
             current_cached_package(npm_cache_layout(sync_env.home, spec), spec)
@@ -496,7 +476,7 @@ async def _async_launch_main(
 
 
 async def run_sync_hooks(
-    hooks: Sequence[SyncHookPlan],
+    hooks: Sequence[ExtensionDepsHookPlan],
     extension_hook_states: Mapping[str, ExtensionHookRuntimeState],
 ) -> bool:
     """Run all sync hook plans, returning True if all succeeded."""
@@ -513,20 +493,12 @@ async def run_sync_hooks(
 
 
 async def run_sync_hook(
-    hook: SyncHookPlan,
+    hook: ExtensionDepsHookPlan,
     extension_hook_state: PreparedExtensionHookState | None = None,
 ) -> bool:
     """Execute a single sync hook plan and record updated state."""
     try:
         match hook.kind:
-            case "PackageBootstrap":
-                target = PackageBootstrapTarget(
-                    manifest_path=hook.manifest_path,
-                    runtime_settings_path=hook.runtime_settings_path,
-                    cache_root=hook.cache_root,
-                    timeout_ms=hook.timeout_ms,
-                )
-                return await bootstrap_package_target(target)
             case "ExtensionDeps":
                 if (
                     extension_hook_state is not None
@@ -556,7 +528,7 @@ async def run_sync_hook(
 
 
 def prepare_extension_hook_states(
-    hooks: Sequence[SyncHookPlan],
+    hooks: Sequence[ExtensionDepsHookPlan],
 ) -> dict[str, ExtensionHookRuntimeState]:
     """Compute prepared states for all ExtensionDeps hooks."""
     states: dict[str, ExtensionHookRuntimeState] = {}

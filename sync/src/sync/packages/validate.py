@@ -1,16 +1,11 @@
 # Copyright (c) 2026 agents-sync. SPDX-License-Identifier: AGPL-3.0-or-later
-"""Package health validation, manifest inspection, and JS/TS import extraction."""
+"""JS/TS import extraction and missing extension dependency detection."""
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from pathlib import Path
-
-from sync.runtime.jsonc import is_obj_dict, is_obj_list, strip_jsonc
-
-RESOURCE_KEYS: tuple[str, ...] = ("extensions", "skills", "prompts", "themes")
 
 BUILTIN_PACKAGE_ROOTS: frozenset[str] = frozenset(
     {
@@ -124,40 +119,6 @@ _SOURCE_EXTENSIONS: tuple[str, ...] = (
     ".cjs",
 )
 _MIN_SCOPED_PARTS = 2
-
-
-def package_is_healthy(target_dir: str) -> bool:
-    """Return True if package dir contains valid resources and no missing imports."""
-    if not _is_directory(target_dir):
-        return False
-    if missing_package_roots(target_dir):
-        return False
-
-    package_json_path = str(Path(target_dir) / "package.json")
-    if _is_file(package_json_path):
-        package_json = _read_json_file(package_json_path)
-        if is_obj_dict(package_json):
-            pi = package_json.get("pi")
-            if is_obj_dict(pi):
-                validated = _validate_pi_manifest(target_dir, pi)
-                if validated is not None:
-                    return validated
-
-    return any(_exists(str(Path(target_dir) / key)) for key in RESOURCE_KEYS)
-
-
-def package_has_build_script(target_dir: str) -> bool:
-    """Return True if package.json contains a build script entry."""
-    package_json_path = str(Path(target_dir) / "package.json")
-    if not _is_file(package_json_path):
-        return False
-
-    package_json = _read_json_file(package_json_path)
-
-    if not is_obj_dict(package_json):
-        return False
-    scripts = package_json.get("scripts")
-    return isinstance(scripts, dict) and "build" in scripts
 
 
 def missing_package_roots(target_dir: str) -> list[str]:
@@ -510,41 +471,11 @@ def _package_root_is_builtin(package_root: str) -> bool:
     return package_root in BUILTIN_PACKAGE_ROOTS
 
 
-def _validate_pi_manifest(target_dir: str, pi: dict[str, object]) -> bool | None:
-    has_entries = False
-    for key in RESOURCE_KEYS:
-        entries = pi.get(key)
-        if not is_obj_list(entries):
-            continue
-        for entry in entries:
-            if not isinstance(entry, str):
-                continue
-            if _is_pattern_entry(entry):
-                continue
-            has_entries = True
-            if not _exists(str(Path(target_dir) / entry)):
-                return False
-    return True if has_entries else None
-
-
-def _is_pattern_entry(value: str) -> bool:
-    return value.startswith(("!", "+", "-")) or "*" in value or "?" in value
-
-
 def _read_file(path: str) -> str:
     try:
         return Path(path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as error:
         message = f"read {path} ({error})"
-        raise ValueError(message) from error
-
-
-def _read_json_file(path: str) -> object:
-    content = _read_file(path)
-    try:
-        return json.loads(strip_jsonc(content))  # pyright: ignore[reportAny]
-    except (ValueError, TypeError) as error:
-        message = f"parse {path} ({error})"
         raise ValueError(message) from error
 
 
@@ -570,13 +501,6 @@ def _package_source_files(root: str) -> list[str]:
 def _is_directory(path: str) -> bool:
     try:
         return Path(path).is_dir()
-    except OSError:
-        return False
-
-
-def _is_file(path: str) -> bool:
-    try:
-        return Path(path).is_file()
     except OSError:
         return False
 

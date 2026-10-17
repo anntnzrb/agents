@@ -35,10 +35,8 @@ from sync.core.plan import (
     FileJob,
     Job,
     PreserveJsonKeysJob,
-    SecretTemplateJob,
     SyncRuntimeInstallJob,
 )
-from sync.core.secret_template import sync_secret_template
 from sync.runtime.errors import assert_never, err, panic_message, warn
 from sync.runtime.fs import (
     SourceContentCache,
@@ -159,17 +157,6 @@ def _run_preserve_json_keys_job(job: PreserveJsonKeysJob) -> bool:
     return True
 
 
-def _run_secret_template_job(job: SecretTemplateJob) -> bool:
-    if not Path(job.src).exists():
-        err(f"missing source: {job.src}")
-        return True
-    if not Path(job.secrets_path).exists():
-        warn(f"missing local secrets {job.secrets_path}; skipping {job.dst}")
-        return True
-    sync_secret_template(job.src, job.dst, job.secrets_path)
-    return True
-
-
 def _run_cliproxy_readiness_job(job: CliProxyReadinessJob, state: JobRunState) -> bool:
     state.cli_proxy_target_ready = is_cliproxy_target_ready(job.deployment)
     if not state.cli_proxy_target_ready:
@@ -209,8 +196,6 @@ async def _run_job(
                 success = _run_file_job(job)
             case PreserveJsonKeysJob():
                 success = _run_preserve_json_keys_job(job)
-            case SecretTemplateJob():
-                success = _run_secret_template_job(job)
             case CliProxyReadinessJob():
                 success = _run_cliproxy_readiness_job(job, state)
             case CliProxyEndpointTemplatesJob():
@@ -556,24 +541,7 @@ def prune_unreferenced_releases(
         _prune_unreferenced_release(releases_root, entry.name)
 
 
-def remove_legacy_runtime_install(runtime_home: str) -> bool:
-    """Remove legacy mutable runtime directory if it exists."""
-    legacy = Path(runtime_home) / "sync"
-    try:
-        if not legacy.exists() and not legacy.is_symlink():
-            return True
-        metadata = legacy.lstat()
-        if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-            return True
-        rm_entry(legacy)
-    except (OSError, RuntimeError) as error:
-        err(f"legacy runtime cleanup failed: {legacy} ({panic_message(error)})")
-        return False
-    return True
-
-
 __all__ = [
     "prune_unreferenced_releases",
-    "remove_legacy_runtime_install",
     "run_jobs_with_preserve",
 ]

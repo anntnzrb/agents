@@ -173,13 +173,3 @@ def test_fetch_manifest_wraps_transport_errors(monkeypatch: pytest.MonkeyPatch) 
         _ = fetch_static_release_manifest(
             "https://cdn.example.test/manifest.json", 1000
         )
-
-
-def test_fetch_manifest_wraps_os_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An OS-level failure (for example DNS) is wrapped the same way."""
-    _install_get(monkeypatch, error=OSError("temporary failure in name resolution"))
-
-    with pytest.raises(RuntimeError, match="release manifest fetch failed"):
-        _ = fetch_static_release_manifest(
-            "https://cdn.example.test/manifest.json", 1000
-        )
