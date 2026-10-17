@@ -10,15 +10,23 @@
   "editorPaddingX": 1,
   "extensions": ["-builtin:llama.cpp", "-extensions/find/index.ts"],
   "packages": [
-    "npm:pi-subagents@0.78.0",
-    "npm:@vanillagreen/pi-background-tasks@2.2.0",
-    "npm:pi-intercom@0.17.1",
-    "npm:@howaboua/pi-ask@0.0.14"
+    "npm:pi-subagents@0.79.0"
   ],
   "find": {
     "classifier": "cliproxy/typesafe/jev-1.13"
   },
   "followUpMode": "all",
+  "subagents": {
+    "agentOverrides": {
+      "scout": { "model": "cliproxy/gemini-3.8-flash-high", "thinking": "medium" },
+      "worker": { "model": "cliproxy/gpt-6.1-sol", "thinking": "medium" },
+      "delegate": { "model": "cliproxy/gpt-6.1-sol", "thinking": "medium" },
+      "reviewer": { "model": "cliproxy/gpt-6.1-sol", "thinking": "xhigh" },
+      "researcher": { "disabled": true },
+      "evidence-auditor": { "disabled": true },
+      "oracle": { "disabled": true }
+    }
+  },
   "hideThinkingBlock": true,
   "lastChangelogVersion": "1.0.0",
   "enabledModels": [
