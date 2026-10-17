@@ -12,7 +12,6 @@
   "packages": [
     "npm:pi-subagents@0.79.0",
     "npm:@vanillagreen/pi-background-tasks@2.2.0",
-    "npm:pi-intercom@0.17.1",
     "npm:@howaboua/pi-ask@0.0.14"
   ],
   "find": {
