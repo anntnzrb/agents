@@ -83,7 +83,8 @@ Patterns:
 - Every reference: explicit when-to-read guidance at its top and in the routing table.
 - Prefer `scripts/` for deterministic or repetitive work.
 - Keep inline snippets tiny.
-- Add a table of contents to reference files >300 lines.
+- Route every reference a task needs from `SKILL.md`. A reference MAY link to another as optional reading, never as a requirement. Models often only preview files reached through another reference.
+- Put a table of contents or section index at the top of reference files over 100 lines, so a partial read still shows the file's scope.
 - Multiple domains/frameworks: organize by variant so the agent reads only the relevant reference.
 
 ## Eval Workflow Summary

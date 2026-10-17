@@ -40,7 +40,7 @@ Run `quick-validate` for the deterministic gate: nonempty trigger wording, an ap
 
 During authoring review, require a concrete user situation, scope consistent with the body, and a boundary from neighboring capabilities where needed. Reject synopsis wording even when an approved opener precedes it. Compare a positive request with a plausible near-miss. Record why each should or should not load the skill. Keep this review separate from the deterministic validator.
 
-Checking is harness-agnostic: present the full enabled skill listing (every `name: description` line) and one query to a model, ask which skill it would load or none, and compare against the expected label. Run each query at least 3 times and treat the majority as the result. Use any model the environment provides; prefer the model the user works with, since trigger behavior varies by model.
+Checking is harness-agnostic: present the full enabled skill listing (every `name: description` line) and one query to a model, ask which skill it would load or none, and compare against the expected label. Run each query at least 3 times and treat the majority as the result. Check the trigger on each model the skill will run on, starting with the one the user works with, since trigger behavior varies by model.
 
 Run the bundled `trigger-eval` command manually. It costs inference and is OPTIONAL. CI MUST NOT run it. Save the JSON array above as a cases file, replacing the placeholder queries and labels:
 

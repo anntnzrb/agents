@@ -2,11 +2,27 @@
 
 Read this file when the user wants to create, run, grade, benchmark, review, or iterate skill evals. This file holds the detailed runner, viewer, grading, feedback, and iteration process; keep `SKILL.md` as the routing entrypoint.
 
+## Section index
+
+- [Running and Evaluating Test Cases](#running-and-evaluating-test-cases)
+  - [Step 1: Spawn all runs in the same turn](#step-1-spawn-all-runs-in-the-same-turn)
+  - [Step 2: Draft assertions while runs are in progress](#step-2-draft-assertions-while-runs-are-in-progress)
+  - [Step 3: Capture timing data as notifications arrive](#step-3-capture-timing-data-as-notifications-arrive)
+  - [Step 4: Grade, aggregate, analyze, then launch viewer](#step-4-grade-aggregate-analyze-then-launch-viewer)
+  - [What the user sees in the viewer](#what-the-user-sees-in-the-viewer)
+  - [Step 5: Read feedback](#step-5-read-feedback)
+- [Improving the Skill](#improving-the-skill)
+  - [How to think about improvements](#how-to-think-about-improvements)
+  - [Iteration loop](#iteration-loop)
+- [Related agent references](#related-agent-references)
+
 ## Running and Evaluating Test Cases
 
 This section is one continuous sequence. Finish it once started. You NEVER use `/skill-test` or any other testing skill.
 
 Put results in `<skill-name>-workspace/` as a sibling to the skill directory. Organize by iteration (`iteration-1/`, `iteration-2/`, etc.). Within each iteration, create one directory per test case (`eval-0/`, `eval-1/`, etc., or descriptive names). Create directories as you go, not upfront.
+
+Run the test cases on each model the skill will run on; skill effectiveness varies by model.
 
 ### Step 1: Spawn all runs in the same turn
 
@@ -160,6 +176,8 @@ This is the heart of the loop: use transcripts, user feedback, and benchmark dat
 3. **Explain the why.** Even terse feedback usually points to a real user need. Understand the task, the user's words, and the missed expectation; transmit that understanding into the skill. If you reach for rigid ALWAYS/NEVER language, first ask whether an explanation would generalize better
 
 4. **Bundle repeated work.** If multiple test runs independently create the same helper script or repeat the same multi-step procedure, bundle that script in `scripts/` and point the skill to it. Save future invocations from reinventing it
+
+5. **Verify reads.** Check which bundled files each run opened in its tool calls. An agent's report that it read a file is not evidence
 
 Draft the revision, reread it cold, and improve it before retesting.
 

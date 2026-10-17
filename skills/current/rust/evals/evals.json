@@ -1,0 +1,76 @@
+{
+  "skill_name": "rust",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build an async TCP service `shout` using tokio. It listens on a configurable address, and for each connection reads newline-delimited UTF-8 lines and replies with each line uppercased. Requirements: at most N concurrent connections (configurable; extra connections wait for a slot), a per-connection idle timeout (configurable), lines longer than 8 KiB close that connection with an error line, and graceful shutdown on Ctrl-C that stops accepting, lets in-flight connections finish their current line, and exits within a bounded time. Include tests that exercise the protocol over a real loopback socket, the connection limit, the idle timeout, and the oversized-line case.",
+      "expected_output": "A tokio TCP service shout with configurable address, concurrency and idle timeout, bounded graceful shutdown, and real loopback behavior tests.",
+      "files": [],
+      "expectations": [
+        "The full public gate passes with --base main.",
+        "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
+        "No files under the skill directory or protected gate files are changed.",
+        "No license or repository metadata values are invented; missing human-owned metadata is reported.",
+        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "The layout follows references/types-and-apis.md: a virtual workspace root and crates/* members, with a -core library and thin binary where the task includes a CLI.",
+        "A tokio TCP service shout with configurable address, concurrency and idle timeout, bounded graceful shutdown, and real loopback behavior tests."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build a public library `slugkit` intended for publication on crates.io. API: a function that converts arbitrary UTF-8 text into a URL slug, plus a builder-style options type (separator character, maximum length, whether to transliterate common Latin accents to ASCII, a stop-word list). Invalid options (such as a separator that is alphanumeric, or a maximum length of zero) are typed errors. Provide complete public documentation with runnable examples, a property test showing slugs only contain allowed characters and never exceed the maximum length, and design the public API so future options can be added without a breaking change. Use license `MIT OR Apache-2.0`, repository `https://example.invalid/slugkit`, and a crate README.",
+      "expected_output": "A publishable, documented slugkit library with typed option errors, an extensible builder API, runnable examples, and property tests.",
+      "files": [],
+      "expectations": [
+        "The full public gate passes with --base main.",
+        "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
+        "No files under the skill directory or protected gate files are changed.",
+        "No license or repository metadata values are invented; missing human-owned metadata is reported.",
+        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "The layout follows references/types-and-apis.md: a virtual workspace root and one library crate at crates/slugkit/, held to the core rules.",
+        "A publishable, documented slugkit library with typed option errors, an extensible builder API, runnable examples, and property tests."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "A human vendored vendor/adler32.c and vendor/adler32.h and approved `crates/*-ffi/*` in .gate/escape-hatch-paths. Expose the vendored C `adler32` function to Rust through a safe API, compile the C code with the `cc` crate, and provide a CLI `adler` that prints the Adler-32 checksum (lowercase hex, 8 digits) of a file given as its only argument. Also implement Adler-32 in pure safe Rust and add a property test proving the C and Rust implementations agree for arbitrary byte inputs, including empty input.",
+      "expected_output": "A safe Rust wrapper over the vendored C implementation, a pure Rust implementation, equivalence property tests, and the adler file checksum CLI.",
+      "files": [
+        "evals/files/ffi/vendor/adler32.c",
+        "evals/files/ffi/vendor/adler32.h"
+      ],
+      "expectations": [
+        "The full public gate passes with --base main.",
+        "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
+        "No files under the skill directory or protected gate files are changed.",
+        "No license or repository metadata values are invented; missing human-owned metadata is reported.",
+        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "The layout follows references/types-and-apis.md: a virtual workspace root and crates/* members, with a -core library and thin binary where the task includes a CLI.",
+        "The Miri step runs only the -ffi package, and only foreign-calling tests carry cfg_attr(miri, ignore = ...) with a reason.",
+        "A safe Rust wrapper over the vendored C implementation, a pure Rust implementation, equivalence property tests, and the adler file checksum CLI."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This is an existing legacy word-frequency library `tally` plus a CLI; a human installed the protected gate files and the gate currently fails on the legacy code. Retrofit the repository so the full gate passes with `--base main`, following the skill's retrofit guidance. Preserve the library's observable behavior and the CLI's behavior (`tally <path>` prints the top 5 words). Every existing test identity must remain compiled and at least as strong; fix weak tests rather than deleting them. Report every place where the skill's retrofit guidance was unclear or where you had to choose between conflicting rules.",
+      "expected_output": "The legacy tally crate passes the full gate while preserving library and CLI behavior and every existing compiled test identity with assertions at least as strong.",
+      "files": [
+        "evals/files/retrofit/.gitignore",
+        "evals/files/retrofit/Cargo.lock",
+        "evals/files/retrofit/Cargo.toml",
+        "evals/files/retrofit/src/lib.rs",
+        "evals/files/retrofit/src/main.rs",
+        "evals/files/retrofit/tests/cli.rs"
+      ],
+      "expectations": [
+        "The full public gate passes with --base main.",
+        "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
+        "No files under the skill directory or protected gate files are changed.",
+        "No license or repository metadata values are invented; missing human-owned metadata is reported.",
+        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "The layout follows references/types-and-apis.md: the existing crate layout is preserved.",
+        "The legacy tally crate passes the full gate while preserving library and CLI behavior and every existing compiled test identity with assertions at least as strong."
+      ]
+    }
+  ]
+}

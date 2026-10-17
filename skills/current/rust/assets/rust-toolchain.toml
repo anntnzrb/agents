@@ -1,0 +1,4 @@
+[toolchain]
+channel = "1.99.1"   # exact pin; humans bump it deliberately and re-run the full gate
+components = ["clippy", "rustfmt"]
+profile = "minimal"

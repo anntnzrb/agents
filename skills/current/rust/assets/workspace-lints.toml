@@ -1,0 +1,98 @@
+[workspace.lints.rust]
+rust_2018_idioms = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+unused = { level = "deny", priority = -1 }
+unsafe_code = "deny"                    # pure crates add #![forbid(unsafe_code)]; adapters use #[expect(unsafe_code, reason)]
+unsafe_op_in_unsafe_fn = "deny"
+unreachable_pub = "deny"
+missing_debug_implementations = "deny"
+missing_docs = "deny"
+unused_qualifications = "deny"
+non_ascii_idents = "deny"
+let_underscore_drop = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unfulfilled_lint_expectations = "deny"  # stale #[expect] fails the build
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+multiple_crate_versions = "allow"       # duplicates are policed by cargo-deny instead
+redundant_pub_crate = "allow" # conflicts with rustc unreachable_pub, which enforces minimal visibility
+
+# Anti-gaming
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+
+# Unsafe hygiene
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unnecessary_safety_comment = "deny"
+unnecessary_safety_doc = "deny"
+
+# No panics in non-test code (tests are exempted via clippy.toml)
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+exit = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+panic_in_result_fn = "deny"
+unwrap_in_result = "deny"
+get_unwrap = "deny"
+missing_assert_message = "deny"
+assertions_on_result_states = "deny"
+
+# Arithmetic and casts
+arithmetic_side_effects = "deny"
+as_conversions = "deny"
+as_pointer_underscore = "deny"
+as_underscore = "deny"
+fn_to_numeric_cast_any = "deny"
+lossy_float_literal = "deny"
+float_cmp_const = "deny"
+unchecked_time_subtraction = "deny"
+
+# Silent error dropping
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+unused_result_ok = "deny"
+map_err_ignore = "deny"
+mem_forget = "deny"
+error_impl_error = "deny"
+try_err = "deny"
+
+# Determinism and debugging leftovers
+iter_over_hash_type = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+
+# Shared-state smells
+rc_buffer = "deny"
+rc_mutex = "deny"
+mutex_atomic = "deny"
+mutex_integer = "deny"
+clone_on_ref_ptr = "deny"
+
+# Structure
+wildcard_enum_match_arm = "deny"
+rest_pat_in_fully_bound_structs = "deny"
+mod_module_files = "deny"
+tests_outside_test_module = "deny"
+shadow_unrelated = "deny"
+renamed_function_params = "deny"
+infinite_loop = "deny"
+empty_drop = "deny"
+
+# Additional restriction lints
+cfg_not_test = "deny"
+ignore_without_reason = "deny"
+non_zero_suggestions = "deny"
