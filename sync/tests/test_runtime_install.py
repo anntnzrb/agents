@@ -14,12 +14,10 @@ if TYPE_CHECKING:
     import pytest
 
 from sync.core.harness import SyncEnv
-from sync.core.index import run_sync
 from sync.core.jobs import (
     RequiredPaths,
     _compute_runtime_release_id,  # pyright: ignore[reportPrivateUsage]
     prune_unreferenced_releases,
-    remove_legacy_runtime_install,
     run_jobs_with_preserve,
 )
 from sync.core.plan import SyncRuntimeInstallJob, build_sync_plan
@@ -348,39 +346,6 @@ def test_prune_unreferenced_releases_cleans_complete_unreferenced_and_stale_stag
     assert active_release_name == current_release_name
     assert first_release_name not in remaining
     assert ".stage-99999999-deadbeef12345678" not in remaining
-
-
-def test_remove_legacy_runtime_install_removes_legacy_directory(
-    tmp_path: Path,
-) -> None:
-    """Test that remove_legacy_runtime_install removes legacy mutable sync dir."""
-    home = make_home(tmp_path)
-    runtime_home = str(Path(home) / ".local" / "share" / "agents")
-    legacy = Path(runtime_home) / "sync"
-    (legacy / "src").mkdir(parents=True, exist_ok=True)
-    _ = (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
-
-    ok = remove_legacy_runtime_install(runtime_home)
-    assert ok is True
-    assert not legacy.exists()
-
-
-def test_run_sync_removes_the_legacy_mutable_runtime_after_current_link_and_wrappers(
-    tmp_path: Path,
-) -> None:
-    """run_sync removes legacy mutable runtime directory e2e."""
-    home = make_home(tmp_path)
-    legacy = Path(home) / ".local" / "share" / "agents" / "sync"
-    (legacy / "src").mkdir(parents=True, exist_ok=True)
-    _ = (legacy / "src" / "cli.py").write_text('print("legacy")\n', encoding="utf-8")
-    _ = seed_source_root(home)
-
-    sync_env = SyncEnv.from_home(home, TEST_TIMEOUT_MS, platform="linux")
-    ok = asyncio.run(run_sync(sync_env))
-    assert ok is True
-    assert not legacy.exists()
-    current_link = Path(home) / ".local" / "share" / "agents" / "sync-current"
-    assert current_link.exists()
 
 
 def test_runtime_install_fails_loudly_when_source_subdir_is_unreadable(

@@ -40,22 +40,11 @@ from sync.core.managed_state import (
 from sync.core.plan import (
     CliProxyEndpointTemplatesJob,
     DirJob,
-    ExtensionDepsHookPlan,
     Job,
-    PackageBootstrapHookPlan,
     PreserveJsonKeysJob,
-    SecretTemplateJob,
     build_sync_plan,
 )
 from sync.extensions.install import iter_extension_packages, run_install
-from sync.packages.index import (
-    package_cache_dir,
-    package_has_build_script,
-    package_is_healthy,
-    patch_runtime_settings,
-    read_package_manifest,
-)
-from sync.packages.source import clone_package_with_runner
 from sync.packages.validate import extract_import_specifiers, missing_package_roots
 from sync.runtime.lock import release_sync_lock
 from sync.runtime.process import (
@@ -78,7 +67,6 @@ MODE_SECRET: Final[int] = 0o600
 PERMISSION_MASK: Final[int] = 0o777
 
 EXPECTED_PACKAGES_COUNT: Final[int] = 2
-EXPECTED_ATTEMPTS_COUNT: Final[int] = 2
 EXIT_WATCHDOG_TIMEOUT: Final[int] = 124
 
 TIMEOUT_ONE_SECOND_MS: Final[float] = 1000.0
@@ -119,28 +107,6 @@ def _is_gone(pid: int) -> bool:
         return False
 
 
-def _init_git_repo(path: Path) -> None:
-    """Initialize a mock git repository with one commit."""
-    git_bin = shutil.which("git") or "git"
-    _ = asyncio.run(run_process([git_bin, "init"], RunProcessOptions(cwd=path)))
-    _ = asyncio.run(
-        run_process(
-            [git_bin, "config", "user.name", "Test User"],
-            RunProcessOptions(cwd=path),
-        )
-    )
-    _ = asyncio.run(
-        run_process(
-            [git_bin, "config", "user.email", "test@example.com"],
-            RunProcessOptions(cwd=path),
-        )
-    )
-    _ = asyncio.run(run_process([git_bin, "add", "."], RunProcessOptions(cwd=path)))
-    _ = asyncio.run(
-        run_process([git_bin, "commit", "-m", "init"], RunProcessOptions(cwd=path))
-    )
-
-
 def _make_sync_env(
     root: Path,
     install_timeout_ms: int = 10_000,
@@ -169,70 +135,6 @@ def _make_sync_env(
         (agents_root / "harnesses" / harness_id).mkdir(parents=True, exist_ok=True)
 
     return SyncEnv.from_home(str(root), install_timeout_ms)
-
-
-def test_run_jobs_with_preserve_renders_secret_template_idempotently(
-    tmp_path: Path,
-) -> None:
-    """Verify secret template job renders idempotently with preserved mode."""
-    src = str(tmp_path / "config.yaml.tmpl")
-    dst = str(tmp_path / "runtime" / "config.yaml")
-    secrets_path = str(tmp_path / "secrets.local.json")
-    _write_file(Path(src), "api-key: ${API_KEY}\n")
-    _write_file(
-        Path(secrets_path),
-        f"{json.dumps({'API_KEY': 'quoted"value'})}\n",
-    )
-
-    jobs: list[Job] = [SecretTemplateJob(src=src, dst=dst, secrets_path=secrets_path)]
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    assert (
-        Path(dst).read_text(encoding="utf-8")
-        == f"api-key: {json.dumps('quoted"value')}\n"
-    )
-    assert (Path(dst).lstat().st_mode & PERMISSION_MASK) == MODE_SECRET
-
-    first = Path(dst).lstat()
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    second = Path(dst).lstat()
-    assert second.st_ino == first.st_ino
-    assert second.st_mtime_ns == first.st_mtime_ns
-
-
-def test_run_jobs_with_preserve_skips_secret_template_without_local_secrets(
-    tmp_path: Path,
-) -> None:
-    """Verify secret template job skips execution when secrets are absent."""
-    src = str(tmp_path / "config.yaml.tmpl")
-    dst = str(tmp_path / "config.yaml")
-    _write_file(Path(src), "api-key: ${API_KEY}\n")
-    _write_file(Path(dst), "keep\n")
-
-    jobs: list[Job] = [
-        SecretTemplateJob(
-            src=src,
-            dst=dst,
-            secrets_path=str(tmp_path / "missing-secrets.json"),
-        )
-    ]
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is True
-    assert Path(dst).read_text(encoding="utf-8") == "keep\n"
-
-
-def test_run_jobs_with_preserve_rejects_missing_template_secret(
-    tmp_path: Path,
-) -> None:
-    """Verify secret template job fails when template references missing key."""
-    src = str(tmp_path / "config.yaml.tmpl")
-    dst = str(tmp_path / "config.yaml")
-    secrets_path = str(tmp_path / "secrets.local.json")
-    _write_file(Path(src), "api-key: ${API_KEY}\n")
-    _write_file(Path(dst), "keep\n")
-    _write_file(Path(secrets_path), "{}\n")
-
-    jobs: list[Job] = [SecretTemplateJob(src=src, dst=dst, secrets_path=secrets_path)]
-    assert asyncio.run(run_jobs_with_preserve(jobs)) is False
-    assert Path(dst).read_text(encoding="utf-8") == "keep\n"
 
 
 def test_run_jobs_with_preserve_keeps_generated_extension_entries(
@@ -624,24 +526,7 @@ def test_sync_plan_resolves_hook_targets_from_harness_specs(
     sync_env = _make_sync_env(home)
     sync_plan = build_sync_plan(sync_env)
 
-    package_hook = next(
-        (h for h in sync_plan.hooks if isinstance(h, PackageBootstrapHookPlan)),
-        None,
-    )
-    extension_hooks = [
-        h for h in sync_plan.hooks if isinstance(h, ExtensionDepsHookPlan)
-    ]
-
-    assert package_hook is not None
-    assert package_hook.manifest_path == str(
-        home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
-    )
-    assert package_hook.runtime_settings_path == str(
-        home / ".pi" / "agent" / "settings.json"
-    )
-    assert package_hook.cache_root == str(
-        home / ".local" / "share" / "agents" / "pi-packages"
-    )
+    extension_hooks = sync_plan.hooks
 
     assert [(h.harness.id, h.root) for h in extension_hooks] == [
         ("opencode", str(home / ".config" / "opencode")),
@@ -882,22 +767,6 @@ def test_run_sync_omp_cleans_managed_entries_but_preserves_local_files(
     assert (seeded_home / ".omp" / "agent" / "skills" / "skill.txt").exists()
     assert not (seeded_home / ".omp" / "agent" / "skills" / "stale.txt").exists()
     assert (seeded_home / ".omp" / "agent" / "logs" / "keep.txt").exists()
-
-
-def test_run_sync_cleans_legacy_pi_entries_without_prior_state(
-    seeded_home: Path,
-) -> None:
-    """Verify legacy pi entries are purged during initial sync without prior state."""
-    sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / "src" / "agents"
-
-    _write_file(agents_root / "HARNESS.md", "agent-instructions")
-    _write_file(seeded_home / ".pi" / "agent" / "legacy" / "old.txt", "stale")
-    _write_file(seeded_home / ".pi" / "agent" / "auth.json", '{"token":1}')
-
-    assert asyncio.run(run_sync(sync_env)) is True
-    assert not (seeded_home / ".pi" / "agent" / "legacy").exists()
-    assert (seeded_home / ".pi" / "agent" / "auth.json").exists()
 
 
 def test_run_sync_removes_entries_removed_from_ssot_after_prior_sync(
@@ -1166,30 +1035,6 @@ def test_run_sync_removes_generated_extension_runtime_when_hook_inputs_change(
     assert not (seeded_home / ".pi" / "agent" / "extensions" / "node_modules").exists()
 
 
-def test_run_sync_omp_does_not_bootstrap_packages(
-    seeded_home: Path,
-) -> None:
-    """Verify OMP harness skips package bootstrap step."""
-    sync_env = _make_sync_env(seeded_home)
-    agents_root = seeded_home / "src" / "agents"
-
-    _write_file(agents_root / "HARNESS.md", "agent-instructions")
-    _write_file(
-        agents_root / "harnesses" / "omp" / "agent" / "config.yml",
-        "interruptMode: immediate\n",
-    )
-    _write_file(
-        agents_root / "harnesses" / "omp" / "agent" / "packages.json",
-        "this is not valid json\n",
-    )
-
-    assert asyncio.run(run_sync(sync_env)) is True
-    assert (seeded_home / ".omp" / "agent" / "packages.json").read_text(
-        encoding="utf-8"
-    ) == "this is not valid json\n"
-    assert (seeded_home / ".omp" / "agent" / "config.yml").exists()
-
-
 def test_run_sync_omp_ignores_runtime_session_sources_when_inferring_dependencies(
     seeded_home: Path,
 ) -> None:
@@ -1246,218 +1091,6 @@ def test_missing_package_roots_ignores_invalid_package_names_in_source(
     _ = (src_dir / "index.ts").write_text(index_source, encoding="utf-8")
     missing = missing_package_roots(str(tmp_path))
     assert missing == ["@oh-my-pi/pi-coding-agent"]
-
-
-def test_read_package_manifest_dedupes_sources(tmp_path: Path) -> None:
-    """Verify read_package_manifest eliminates duplicate package URLs."""
-    manifest_path = tmp_path / "packages.json"
-    _ = manifest_path.write_text(
-        f"{
-            json.dumps(
-                {
-                    'packages': [
-                        'https://github.com/tintinweb/pi-supervisor',
-                        'https://github.com/tintinweb/pi-supervisor',
-                        'https://github.com/joelhooks/pi-tools',
-                    ],
-                },
-                indent=2,
-            )
-        }\n",
-        encoding="utf-8",
-    )
-    manifest = read_package_manifest(str(manifest_path))
-    assert len(manifest.packages) == EXPECTED_PACKAGES_COUNT
-
-
-def test_patch_runtime_settings_preserves_other_keys(tmp_path: Path) -> None:
-    """Verify updating packages array in settings.json preserves existing keys."""
-    path = tmp_path / "settings.json"
-    _ = path.write_text(
-        '{\n  "theme": "dark",\n  "defaultModel": "gpt-5.4"\n}\n',
-        encoding="utf-8",
-    )
-    patch_runtime_settings(str(path), [str(tmp_path / "pkg")])
-    settings_text = path.read_text(encoding="utf-8")
-    settings_raw: object = json.loads(settings_text)  # pyright: ignore[reportAny]
-    assert _is_dict(settings_raw)
-    assert settings_raw.get("theme") == "dark"
-    assert settings_raw.get("packages") == [str(tmp_path / "pkg")]
-
-
-def test_package_cache_dir_is_stable(tmp_path: Path) -> None:
-    """Verify package cache directory generation is deterministic."""
-    root = str(tmp_path / "cache-root")
-    left = package_cache_dir(root, "https://github.com/tintinweb/pi-supervisor")
-    right = package_cache_dir(root, "https://github.com/tintinweb/pi-supervisor")
-    assert left == right
-
-
-def test_package_cache_dir_uses_basename_for_local_paths(
-    tmp_path: Path,
-) -> None:
-    """Verify local directory sources use directory basename in slug."""
-    root = str(tmp_path / "cache-root")
-    sources = [
-        str(tmp_path / "opt" / "packages" / "foo"),
-        str(tmp_path / "var" / "tmp" / "foo") + "/",
-    ]
-
-    for source in sources:
-        cache_dir = package_cache_dir(root, source)
-        assert Path(cache_dir).name.startswith("foo-"), source
-
-
-def test_github_clone_command_prefers_gh_when_available(
-    tmp_path: Path,
-) -> None:
-    """Verify gh CLI is tried first when available."""
-    target = str(tmp_path / "out")
-    attempts: list[list[str]] = []
-
-    async def fake_runner(command: Sequence[str]) -> bool:
-        attempts.append(list(command))
-        return True
-
-    _ = asyncio.run(
-        clone_package_with_runner(
-            "https://github.com/tintinweb/pi-supervisor",
-            target,
-            gh_available=True,
-            runner=fake_runner,
-        )
-    )
-    assert len(attempts) == 1
-    assert attempts[0][0] == "gh"
-    assert attempts[0][3] == "tintinweb/pi-supervisor"
-
-
-def test_github_clone_falls_back_to_git_after_gh_failure(
-    tmp_path: Path,
-) -> None:
-    """Verify clone runner falls back to git clone if gh fails."""
-    target = str(tmp_path / "out")
-    attempts: list[list[str]] = []
-    outcomes = [False, True]
-    index = 0
-
-    async def fake_runner(command: Sequence[str]) -> bool:
-        nonlocal index
-        attempts.append(list(command))
-        outcome = outcomes[index] if index < len(outcomes) else False
-        index += 1
-        return outcome
-
-    success = asyncio.run(
-        clone_package_with_runner(
-            "https://github.com/tintinweb/pi-supervisor",
-            target,
-            gh_available=True,
-            runner=fake_runner,
-        )
-    )
-
-    assert success is True
-    assert len(attempts) == EXPECTED_ATTEMPTS_COUNT
-    assert attempts[0][0] == "gh"
-    assert attempts[1][0] == "git"
-    assert attempts[1][3] == "https://github.com/tintinweb/pi-supervisor"
-
-
-def test_validate_package_dir_accepts_manifest_and_conventional_dirs(
-    tmp_path: Path,
-) -> None:
-    """Verify package health checks accept manifest and conventional extension dirs."""
-    manifest_pkg = tmp_path / "manifest-pkg"
-    _write_file(
-        manifest_pkg / "package.json",
-        f"{json.dumps({'pi': {'extensions': ['./src/index.ts']}})}\n",
-    )
-    _write_file(manifest_pkg / "src" / "index.ts", "export default {}\n")
-    assert package_is_healthy(str(manifest_pkg)) is True
-
-    conventional_pkg = tmp_path / "conventional-pkg"
-    _write_file(conventional_pkg / "extensions" / "index.ts", "export default {}\n")
-    assert package_is_healthy(str(conventional_pkg)) is True
-
-
-def test_validate_package_dir_detects_missing_import_packages(
-    tmp_path: Path,
-) -> None:
-    """Verify missing imported dependencies cause package health check to fail."""
-    pkg = tmp_path / "import-pkg"
-    _write_file(
-        pkg / "package.json",
-        f"{json.dumps({'pi': {'extensions': ['./index.ts']}})}\n",
-    )
-    _write_file(
-        pkg / "index.ts",
-        'import { Text } from "@earendil-works/pi-tui";\nexport default Text;\n',
-    )
-    assert package_is_healthy(str(pkg)) is False
-
-    _write_file(
-        pkg / "node_modules" / "@earendil-works" / "pi-tui" / "package.json",
-        "{}\n",
-    )
-    assert package_is_healthy(str(pkg)) is True
-
-
-def test_validate_package_dir_rejects_malformed_package_json(
-    tmp_path: Path,
-) -> None:
-    """Verify malformed package.json raises ValueError on health and build checks."""
-    pkg = tmp_path / "bad-pkg"
-    _write_file(pkg / "package.json", "{not valid json")
-
-    with pytest.raises(ValueError, match=r"parse .*package\.json"):
-        _ = package_is_healthy(str(pkg))
-    with pytest.raises(ValueError, match=r"parse .*package\.json"):
-        _ = package_has_build_script(str(pkg))
-
-
-def test_run_sync_bootstraps_packages_and_patches_runtime_settings(
-    seeded_home: Path,
-) -> None:
-    """Verify bootstrap hook builds and registers packages in settings.json."""
-    sync_env = _make_sync_env(seeded_home)
-    _write_file(
-        seeded_home / "src" / "agents" / "HARNESS.md",
-        "agent-instructions",
-    )
-    _write_file(seeded_home / ".pi" / "agent" / "settings.json", "{}\n")
-
-    repos = seeded_home / "repos"
-    source_repo = repos / "source-pkg"
-    _write_file(
-        source_repo / "package.json",
-        '{\n  "pi": {\n    "extensions": ["./src/index.ts"]\n  }\n}\n',
-    )
-    _write_file(source_repo / "src" / "index.ts", "export default {}\n")
-    _init_git_repo(source_repo)
-
-    build_repo = repos / "build-pkg"
-    package_json = (
-        '{\n  "scripts": {\n    "build": "mkdir -p dist && '
-        "printf 'export default {}\\n' > dist/index.js\"\n  },\n"
-        '  "pi": {\n    "extensions": ["./dist/index.js"]\n  }\n}\n'
-    )
-    _write_file(build_repo / "package.json", package_json)
-    _init_git_repo(build_repo)
-
-    _write_file(
-        seeded_home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json",
-        f"{json.dumps({'packages': [str(source_repo), str(build_repo)]}, indent=2)}\n",
-    )
-
-    success = asyncio.run(run_sync(sync_env))
-    assert success is True
-    settings = (seeded_home / ".pi" / "agent" / "settings.json").read_text(
-        encoding="utf-8"
-    )
-    assert "source-pkg" in settings
-    assert "build-pkg" in settings
-    assert (seeded_home / ".local" / "share" / "agents" / "pi-packages").exists()
 
 
 def test_managed_state_helpers_match_safe_entry_rules(home: Path) -> None:

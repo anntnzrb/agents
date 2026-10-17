@@ -10,8 +10,6 @@ import pytest
 from sync.packages.validate import (
     extract_import_specifiers,
     missing_package_roots,
-    package_has_build_script,
-    package_is_healthy,
 )
 
 if TYPE_CHECKING:
@@ -138,7 +136,6 @@ def test_missing_package_roots_reports_only_real_package_roots(
     (tmp_path / "node_modules" / "some-pkg").mkdir(parents=True, exist_ok=True)
 
     assert missing_package_roots(str(tmp_path)) == []
-    assert package_is_healthy(str(tmp_path)) is True
 
 
 def test_missing_package_roots_ignores_node_builtin_roots(tmp_path: Path) -> None:
@@ -217,26 +214,6 @@ def test_extract_import_specifiers_ignores_regex_literals() -> None:
     assert "phantom-ternary2" not in specifiers
 
 
-def test_package_is_healthy_propagates_corrupt_package_json(
-    tmp_path: Path,
-) -> None:
-    """package_is_healthy propagates parse error with path diagnostics."""
-    pkg_json = tmp_path / "package.json"
-    _ = pkg_json.write_text("{corrupt json", encoding="utf-8")
-    with pytest.raises(ValueError, match=f"parse {pkg_json}"):
-        _ = package_is_healthy(str(tmp_path))
-
-
-def test_package_has_build_script_propagates_corrupt_package_json(
-    tmp_path: Path,
-) -> None:
-    """package_has_build_script propagates parse error with path diagnostics."""
-    pkg_json = tmp_path / "package.json"
-    _ = pkg_json.write_text("{corrupt json", encoding="utf-8")
-    with pytest.raises(ValueError, match=f"parse {pkg_json}"):
-        _ = package_has_build_script(str(tmp_path))
-
-
 def test_missing_package_roots_propagates_unreadable_source_file(
     tmp_path: Path,
 ) -> None:
@@ -247,15 +224,3 @@ def test_missing_package_roots_propagates_unreadable_source_file(
     _ = bad_file.write_bytes(b"\xff\xfe\x00\x00")
     with pytest.raises(ValueError, match=f"read {bad_file}"):
         _ = missing_package_roots(str(tmp_path))
-
-
-def test_package_is_healthy_propagates_unreadable_source_file(
-    tmp_path: Path,
-) -> None:
-    """package_is_healthy propagates read error with path diagnostics."""
-    skills_dir = tmp_path / "skills"
-    skills_dir.mkdir(parents=True, exist_ok=True)
-    bad_file = skills_dir / "invalid.ts"
-    _ = bad_file.write_bytes(b"\xff\xfe\x00\x00")
-    with pytest.raises(ValueError, match=f"read {bad_file}"):
-        _ = package_is_healthy(str(tmp_path))

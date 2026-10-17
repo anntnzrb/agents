@@ -47,8 +47,6 @@ async def _refresh_packages(sync_env: SyncEnv) -> int:
             tool=tool.id,
             package=tool.package,
             bin=tool.bin,
-            dist_tag=tool.dist_tag,
-            smoke_check=tool.smoke_check,
         )
         for tool in TOOL_LAUNCHERS
     ]

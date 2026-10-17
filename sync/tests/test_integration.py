@@ -301,59 +301,6 @@ def seed_cached_npm_package(
     current_link.symlink_to(Path("versions") / version)
 
 
-def init_git_repo(repo_path: Path) -> None:
-    """Initialize a git repository with an initial commit."""
-    commands = [
-        ["git", "init"],
-        ["git", "config", "user.name", "Test User"],
-        ["git", "config", "user.email", "test@example.com"],
-        ["git", "add", "."],
-        ["git", "commit", "-m", "init"],
-    ]
-    for cmd in commands:
-        res = subprocess.run(  # noqa: S603
-            cmd,
-            cwd=str(repo_path),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert res.returncode == 0, res.stderr or res.stdout
-
-
-def setup_package_repos(source_repo: Path, build_repo: Path) -> None:
-    """Initialize test package repositories for pi package bootstrapping."""
-    (source_repo / "src").mkdir(parents=True, exist_ok=True)
-    (build_repo / "src").mkdir(parents=True, exist_ok=True)
-    _ = (source_repo / "package.json").write_text(
-        json.dumps({"pi": {"extensions": ["./src/index.ts"]}}, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    _ = (source_repo / "src" / "index.ts").write_text(
-        "export default {}\n",
-        encoding="utf-8",
-    )
-    _ = (build_repo / "package.json").write_text(
-        json.dumps(
-            {
-                "scripts": {"build": "bun run build.ts"},
-                "pi": {"extensions": ["./dist/index.js"]},
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    build_script = (
-        'import { mkdirSync, writeFileSync } from "node:fs";\n'
-        'mkdirSync("dist", { recursive: true });\n'
-        'writeFileSync("dist/index.js", "export default {}\\n");\n'
-    )
-    _ = (build_repo / "build.ts").write_text(build_script, encoding="utf-8")
-    init_git_repo(source_repo)
-    init_git_repo(build_repo)
-
-
 def snapshot_home(home: Path) -> list[SnapshotEntry]:
     """Capture snapshot of managed directories in home sandbox."""
     roots = [
@@ -366,7 +313,6 @@ def snapshot_home(home: Path) -> list[SnapshotEntry]:
         ".summarize",
         ".cli-proxy-api",
         ".local/share/agents/sync-managed",
-        ".local/share/agents/pi-packages",
         ".local/bin",
     ]
     entries: list[SnapshotEntry] = []
@@ -375,16 +321,6 @@ def snapshot_home(home: Path) -> list[SnapshotEntry]:
         if abs_path.exists():
             _walk(abs_path, root, entries)
     return [e for e in entries if not e.path.endswith("/sync.lock")]
-
-
-def snapshot_selected(root: Path) -> list[SnapshotEntry]:
-    """Capture snapshot of a specific directory tree excluding git and modules."""
-    entries: list[SnapshotEntry] = []
-    if root.exists():
-        _walk(root, "", entries)
-    return [
-        e for e in entries if "/.git" not in e.path and "/node_modules" not in e.path
-    ]
 
 
 def _walk(abs_path: Path, rel_path: str, out: list[SnapshotEntry]) -> None:
@@ -828,56 +764,19 @@ def test_integration_unavailable_client_preserves_all_cliproxy_artifacts(
     assert after == before
 
 
-def test_integration_package_bootstrap_patches_settings_and_cache_paths(
-    tmp_path: Path,
-) -> None:
-    """Test package bootstrap updates pi settings and builds package caches."""
+def test_integration_preserves_native_package_settings(tmp_path: Path) -> None:
+    """Publish package sources and all other settings without rewriting them."""
     home = make_fixture(tmp_path)
-    source_repo = tmp_path / "repos" / "source-pkg"
-    build_repo = tmp_path / "repos" / "build-pkg"
-    setup_package_repos(source_repo, build_repo)
-
-    pkgs_json = home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
-    pkgs_json.parent.mkdir(parents=True, exist_ok=True)
-    _ = pkgs_json.write_text(
-        json.dumps({"packages": [str(source_repo), str(build_repo)]}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    source = home / "src/agents/harnesses/pi/agent/settings.json"
+    settings = {"packages": ["npm:example-pkg@1.0.0"], "theme": "dark"}
+    content = json.dumps(settings, indent=2) + "\n"
+    _ = source.write_text(content, encoding="utf-8")
 
     result = run_sync_process(home)
     assert result.exit_code == 0, result.stderr or result.stdout
-
-    settings = (home / ".pi" / "agent" / "settings.json").read_text(encoding="utf-8")
-    assert "source-pkg" in settings
-    assert "build-pkg" in settings
-
-    cache_snapshot = snapshot_selected(
-        home / ".local" / "share" / "agents" / "pi-packages"
-    )
-    assert any("source-pkg" in entry.path for entry in cache_snapshot)
-    assert any("build-pkg" in entry.path for entry in cache_snapshot)
-
-
-def test_integration_invalid_package_json_fails_package_bootstrap(
-    tmp_path: Path,
-) -> None:
-    """Test invalid package.json in bootstrap packages causes sync failure."""
-    home = make_fixture(tmp_path)
-    bad_repo = tmp_path / "repos" / "bad-pkg"
-    bad_repo.mkdir(parents=True, exist_ok=True)
-    _ = (bad_repo / "package.json").write_text("{not valid json", encoding="utf-8")
-    init_git_repo(bad_repo)
-
-    pkgs_json = home / "src" / "agents" / "harnesses" / "pi" / "agent" / "packages.json"
-    pkgs_json.parent.mkdir(parents=True, exist_ok=True)
-    _ = pkgs_json.write_text(
-        json.dumps({"packages": [str(bad_repo)]}, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    result = run_sync_process(home)
-    assert result.exit_code != 0
-    assert "package bootstrap failed for" in result.stderr
+    published = home / ".pi/agent/settings.json"
+    assert published.read_text(encoding="utf-8") == content
+    assert not list((home / ".local/share/agents").glob("*-packages"))
 
 
 def test_integration_wrapper_forwards_arguments_to_faked_runtime(

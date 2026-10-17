@@ -161,10 +161,9 @@ def plan_managed_entries_for_sync_plan(
 
         root = harness_root(harness)
         recorded = load_recorded_entry_names(state_path)
-        compat_entries = harness.compat_managed_entries or ()
         stale_entry_names = [
             entry_name
-            for entry_name in unique_sorted([*compat_entries, *recorded])
+            for entry_name in unique_sorted(recorded)
             if is_safe_managed_entry_name(entry_name)
         ]
         harnesses.append(

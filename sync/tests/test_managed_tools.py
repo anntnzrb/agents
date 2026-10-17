@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 from sync.core.managed_tools import (
     download_release,
     extract_archive,
-    extract_release,
     supported_arch,
     sys_platform,
     verify_checksum,
@@ -48,11 +47,11 @@ def test_sys_platform_returns_darwin_or_linux(monkeypatch: pytest.MonkeyPatch) -
     assert sys_platform() == "linux"
 
 
-def test_extract_release_enforces_timeout(
+def test_extract_archive_enforces_timeout(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """extract_release raises TimeoutError when extraction exceeds deadline."""
+    """extract_archive raises TimeoutError when extraction exceeds deadline."""
     archive_path = tmp_path / "test.tar.gz"
     entry_file = tmp_path / "dummy.txt"
     _ = entry_file.write_text("dummy", encoding="utf-8")
@@ -71,7 +70,7 @@ def test_extract_release_enforces_timeout(
     dest = tmp_path / "dest"
     dest.mkdir(parents=True, exist_ok=True)
     with pytest.raises(TimeoutError, match=r"archive extraction timed out"):
-        extract_release(archive_path, dest, "dummy.txt", timeout_ms=10)
+        extract_archive(archive_path, dest, timeout_ms=10)
 
 
 def test_extract_archive_extracts_all_entries(tmp_path: Path) -> None:

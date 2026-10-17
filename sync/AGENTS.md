@@ -21,10 +21,9 @@ This is the isolated sync application.
 
 ## Managed Tool Contract
 
-- Managed release manifests live under `../tools/cliproxyapi/` and pin every supported platform asset by SHA-256.
 - Sync downloads only pinned official release assets and caches verified executables under `~/.cache/github-tools` by default.
 - Managed tool wrappers use the upstream executable name and pass generated configuration explicitly.
-- The machine configuration owns services and timers; sync implements maintenance subcommands and service jobs (`sync job`, `sync t3`).
+- The machine configuration owns services and timers; sync implements maintenance subcommands and service jobs (`sync job`).
 
 ## Model Catalog Contract
 

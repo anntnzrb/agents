@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import gzip
 import hashlib
 import io
@@ -21,9 +20,7 @@ import pytest
 from sync.core.harness import StaticReleaseLauncher, SyncEnv, supported_harness
 from sync.core.launcher import (
     NpmPackageSpec,
-    PreparePackageOptions,
     npm_cache_layout,
-    refresh_npm_package,
 )
 from sync.core.tool_launchers import TOOL_LAUNCHERS
 from sync.core.wrappers import render_launch_wrapper
@@ -330,21 +327,6 @@ def test_first_cli_launch_installs_and_fails_without_registry(
     result = run_sync_process(home, ["launch", "summarize"], env=registry.env)
     assert result.exit_code == 1
     assert "could not resolve" in result.stderr
-
-
-def test_refresh_respects_version_pin(
-    home: Path, registry: Registry, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """An exact-version dist_tag cannot drift to a newer registry latest."""
-    registry.version = "3.0.0"
-    spec = NpmPackageSpec("mcporter", "mcporter", "mcporter", dist_tag="2.0.0")
-    for key, value in registry.env.items():
-        monkeypatch.setenv(key, value)
-    assert asyncio.run(refresh_npm_package(spec, PreparePackageOptions(home=str(home))))
-    layout = npm_cache_layout(str(home), spec)
-    assert Path(layout.current_link).readlink().name == "2.0.0"
-    assert "tar/mcporter/2.0.0" in registry.requests
-    assert "tar/mcporter/3.0.0" not in registry.requests
 
 
 def test_refresh_cli_discovers_installed_harness_without_ssot(

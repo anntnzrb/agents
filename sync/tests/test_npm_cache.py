@@ -8,17 +8,16 @@ import os
 import shutil
 from typing import TYPE_CHECKING
 
-import pytest
-
 from sync.maintenance.npm_cache import clean_npm_cache
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
 
-@pytest.mark.parametrize("dry_run", [False, True])
+
 def test_npm_clean_skipped_when_npm_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, dry_run: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """If npm is not on PATH, skip with exit code 0."""
 
@@ -26,7 +25,7 @@ def test_npm_clean_skipped_when_npm_missing(
         return None
 
     monkeypatch.setattr(shutil, "which", fake_which)
-    assert clean_npm_cache(home=tmp_path, dry_run=dry_run) == 0
+    assert clean_npm_cache(home=tmp_path, dry_run=False) == 0
 
 
 def test_npm_clean_skipped_when_no_cache_dir(

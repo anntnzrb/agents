@@ -10,15 +10,12 @@ import pytest
 
 from sync.cli import EXIT_USAGE, main
 from sync.core.harness import (
-    DEFAULT_PACKAGE_CACHE_SUBDIR,
     NpmLauncher,
-    PackageBootstrapHook,
     RootEnvReadError,
     StaticReleaseLauncher,
     SyncEnv,
     assert_path_component,
     harness_from_adapter,
-    load_root_env,
     platform_from_process,
     supported_harness,
 )
@@ -30,7 +27,6 @@ from sync.core.harness_adapters import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from sync.core.harness import HostPlatform
 
 TEST_TIMEOUT_MS: int = 1000
 
@@ -101,21 +97,6 @@ def test_root_env_throws_when_reading_env_fails_with_non_enoent_error(
     assert str(bad_env_path) in str(exc_info.value)
 
 
-def test_load_root_env_returns_tagged_error_when_reading_fails(
-    tmp_path: Path,
-) -> None:
-    """Test load_root_env directly raises RootEnvReadError with the target path."""
-    agents_home = tmp_path / "src" / "agents"
-    bad_env_path = agents_home / ".env"
-    bad_env_path.mkdir(parents=True, exist_ok=True)
-
-    with pytest.raises(RootEnvReadError) as exc_info:
-        _ = load_root_env(str(bad_env_path))
-
-    assert exc_info.value.path == str(bad_env_path)
-    assert "failed to read root environment file" in str(exc_info.value)
-
-
 def test_supported_harness_resolves_devin_static_release(tmp_path: Path) -> None:
     """Verify the devin adapter resolves a static release launcher and merge file."""
     devin = supported_harness(str(tmp_path), "devin", "linux")
@@ -151,19 +132,16 @@ def test_supported_harness_resolves_devin_static_release(tmp_path: Path) -> None
     )
 
 
-@pytest.mark.parametrize("platform", ["darwin", "linux"])
 def test_supported_harness_resolves_amp_npm_launcher(
     tmp_path: Path,
-    platform: HostPlatform,
 ) -> None:
     """Verify the amp adapter resolves an npm launcher and its config home."""
-    amp = supported_harness(str(tmp_path), "amp", platform)
+    amp = supported_harness(str(tmp_path), "amp", "linux")
     assert amp is not None
     assert amp.home == str(tmp_path / ".config" / "amp")
     assert isinstance(amp.launcher, NpmLauncher)
     assert amp.launcher.package == "@ampcode/cli"
     assert amp.launcher.bin == "amp"
-    assert amp.launcher.dist_tag == "latest"
     assert amp.launcher.default_args == ("--remote-control-terminal",)
     assert amp.instruction_file == "AGENTS.md"
     assert amp.runtime_subdir is None
@@ -171,19 +149,16 @@ def test_supported_harness_resolves_amp_npm_launcher(
     assert amp.hooks == ()
 
 
-@pytest.mark.parametrize("platform", ["darwin", "linux"])
 def test_supported_harness_resolves_claude_npm_launcher(
     tmp_path: Path,
-    platform: HostPlatform,
 ) -> None:
     """Verify the claude adapter resolves its npm launcher, home, and memory file."""
-    claude = supported_harness(str(tmp_path), "claude", platform)
+    claude = supported_harness(str(tmp_path), "claude", "linux")
     assert claude is not None
     assert claude.home == str(tmp_path / ".claude")
     assert isinstance(claude.launcher, NpmLauncher)
     assert claude.launcher.package == "@anthropic-ai/claude-code"
     assert claude.launcher.bin == "claude"
-    assert claude.launcher.dist_tag == "latest"
     assert claude.instruction_file == "CLAUDE.md"
     assert claude.runtime_subdir is None
     assert claude.preserve_json_keys == {}
@@ -212,8 +187,6 @@ def test_harness_from_adapter_applies_launcher_defaults(tmp_path: Path) -> None:
     harness = harness_from_adapter(adapter, str(tmp_path))
     launcher = harness.launcher
     assert isinstance(launcher, NpmLauncher)
-    assert launcher.dist_tag == "latest"
-    assert launcher.smoke_check == "--version"
     assert launcher.default_args == ()
     assert launcher.env is None
 
@@ -230,20 +203,6 @@ def test_harness_from_adapter_resolves_callable_launcher_env(tmp_path: Path) -> 
     )
     harness = harness_from_adapter(adapter, str(tmp_path))
     assert harness.launcher.env == {"CODEX_SYNC_HOME": str(tmp_path / ".codex")}
-
-
-def test_harness_from_adapter_normalizes_hook_defaults(tmp_path: Path) -> None:
-    """Package bootstrap hooks must receive their default files and cache."""
-    adapter = replace(
-        next(a for a in HARNESS_ADAPTERS if a.id == "pi"),
-        hooks=(PackageBootstrapHook(),),
-    )
-    harness = harness_from_adapter(adapter, str(tmp_path))
-    hook = harness.hooks[0]
-    assert isinstance(hook, PackageBootstrapHook)
-    assert hook.manifest_file == "packages.json"
-    assert hook.settings_file == "settings.json"
-    assert hook.cache_subdir == DEFAULT_PACKAGE_CACHE_SUBDIR
 
 
 def test_harness_from_adapter_propagates_declarative_adapter_fields(
@@ -280,7 +239,6 @@ def test_harness_from_adapter_defaults_are_independent_per_harness(
     assert codex.instruction_file == "AGENTS.md"
     assert devin.instruction_file == "AGENTS.md"
     assert codex.preserve_json_keys == {}
-    assert devin.compat_managed_entries == ()
     assert codex.hooks == ()
     # Empty mappings must be allocated per call, not shared between harnesses.
     assert codex.preserve_json_keys is not devin.preserve_json_keys

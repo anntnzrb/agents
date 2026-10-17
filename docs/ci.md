@@ -28,7 +28,7 @@ uv run --script .github/scripts/ci.py metadata
 
 Run a selected skill's gates using [Manage shared skills](skills.md#validate-python-skills-standard). Run sync checks using [Develop the sync application](sync/development.md#run-the-full-checks). Harness validation stays beside its source.
 
-The `repository-checks` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) also lints, formats, type-checks, and tests `.github/` and the Python tools under `tools/` with pinned `uvx` commands. Run the same commands locally after changing those paths.
+The `repository-checks` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) also lints, formats, type-checks, and tests `.github/` with pinned `uvx` commands. Run the same commands locally after changing that directory.
 
 Reproduce a skill shard by copying its `SKILLS` JSON array from the job's environment:
 

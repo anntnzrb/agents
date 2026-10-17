@@ -89,8 +89,6 @@ class NpmPackageSpec:
     tool: str
     package: str
     bin: str
-    dist_tag: str | None = None
-    smoke_check: str | None = None
     env: dict[str, str] | None = None
 
 
@@ -197,19 +195,17 @@ async def _install_staged_package(
         )
         raise RuntimeError(message)
 
-    smoke_check = spec.smoke_check if spec.smoke_check is not None else "--version"
-    if smoke_check != "-":
-        smoke = await runner(
-            [installed_bin, smoke_check],
-            RunProcessOptions(
-                cwd=stage_dir,
-                timeout_ms=timeout_ms,
-            ),
-        )
-        if smoke.timed_out or smoke.output_limited or smoke.exit_code != 0:
-            detail = detail_from_output(smoke.stdout, smoke.stderr)
-            message = f"installed package smoke check failed: {detail}"
-            raise RuntimeError(message)
+    smoke = await runner(
+        [installed_bin, "--version"],
+        RunProcessOptions(
+            cwd=stage_dir,
+            timeout_ms=timeout_ms,
+        ),
+    )
+    if smoke.timed_out or smoke.output_limited or smoke.exit_code != 0:
+        detail = detail_from_output(smoke.stdout, smoke.stderr)
+        message = f"installed package smoke check failed: {detail}"
+        raise RuntimeError(message)
 
 
 async def _ensure_version_installed(
@@ -266,9 +262,8 @@ async def _prepare_locked_package(
         if runtime and runtime.resolve_version
         else resolve_version
     )
-    dist_tag = spec.dist_tag or "latest"
     resolved_version = validate_resolved_version(
-        await resolver(spec.package, dist_tag, timeout_ms)
+        await resolver(spec.package, "latest", timeout_ms)
     )
     await _ensure_version_installed(layout, spec, resolved_version, options, timeout_ms)
     update_current_and_previous(layout, resolved_version)
@@ -705,8 +700,6 @@ def harness_package_spec(
         tool=harness.source_name,
         package=launcher.package,
         bin=launcher.bin,
-        dist_tag=launcher.dist_tag,
-        smoke_check=launcher.smoke_check,
         env=env,
     )
 
@@ -721,18 +714,18 @@ def harness_has_cache(home: str, harness: Harness) -> bool:
 
 async def resolve_version(
     package_name: str,
-    dist_tag: str,
+    tag: str,
     timeout_ms: int,
 ) -> str:
     """Query npm registry for the version string matching a given dist-tag."""
     result = await run_process(
-        ["npm", "view", f"{package_name}@{dist_tag}", "version"],
+        ["npm", "view", f"{package_name}@{tag}", "version"],
         RunProcessOptions(
             timeout_ms=timeout_ms,
         ),
     )
     if result.timed_out or result.output_limited or result.exit_code != 0:
-        message = f"could not resolve {package_name}@{dist_tag}"
+        message = f"could not resolve {package_name}@{tag}"
         raise RuntimeError(message)
     return result.stdout.replace("\r", "").replace("\n", "").strip()
 
@@ -904,17 +897,8 @@ def validate_spec(spec: NpmPackageSpec) -> None:
     """Validate that spec components adhere to safe identifier patterns."""
     assert_path_component(spec.tool, "tool")
     assert_path_component(spec.bin, "bin")
-    dist_tag = spec.dist_tag or "latest"
-    assert_path_component(dist_tag, "dist-tag")
     if not PACKAGE_PATTERN.match(spec.package):
         message = f"invalid package: {spec.package}"
-        raise ValueError(message)
-    if (
-        spec.smoke_check is not None
-        and not spec.smoke_check.strip()
-        and spec.smoke_check != "-"
-    ):
-        message = "missing smoke check"
         raise ValueError(message)
 
 
