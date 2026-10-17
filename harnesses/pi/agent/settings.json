@@ -10,9 +10,7 @@
   "editorPaddingX": 1,
   "extensions": ["-builtin:llama.cpp", "-extensions/find/index.ts"],
   "packages": [
-    "npm:pi-subagents@0.79.0",
-    "npm:@vanillagreen/pi-background-tasks@2.2.0",
-    "npm:@howaboua/pi-ask@0.0.14"
+    "npm:pi-subagents@0.79.0"
   ],
   "find": {
     "classifier": "cliproxy/typesafe/jev-1.13"
