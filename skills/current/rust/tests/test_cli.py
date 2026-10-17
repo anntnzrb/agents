@@ -239,11 +239,16 @@ def test_miri_for_unsafe_diff(workspace: Path) -> None:
 
 def test_missing_cargo(workspace: Path) -> None:
     """Missing executables use the repository's 127 convention."""
-    # A broken interpreter path gives ENOENT even when a host cargo is installed.
-    _ = (workspace / "tools/cargo").write_text(
-        "#!/missing-rust-test-interpreter\n", encoding="utf-8"
+    # Executable lookup skips ENOENT entries, so a host cargo must be off PATH.
+    (workspace / "tools/cargo").unlink()
+    result = subprocess.run(
+        [sys.executable, str(CLI), "gate", "--path", str(workspace), "--base", "HEAD"],
+        env={**os.environ, "PATH": str(workspace / "tools")},
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
     )
-    result = invoke(workspace)
     assert result.returncode == MISSING_EXECUTABLE
     assert "missing executable" in result.stderr
 
