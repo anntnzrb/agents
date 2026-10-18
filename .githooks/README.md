@@ -25,15 +25,11 @@ reconcile this local virtual environment automatically on every invocation via
 `uv sync --frozen` to keep up with lock changes without rewriting tracked source
 files.
 
-Branch guard (`reference-transaction`):
-- `main` only changes through pull requests; the GitHub ruleset rejects direct pushes.
-- When a commit, merge, rebase, reset, or `git update-ref` moves `main` to a commit that is not on `origin/main`, the hook moves that commit to a new `work/<8-hex>` branch, puts `main` back, and switches every worktree that had `main` checked out to the new branch. The command succeeds, files stay as they are, and later commits land on the new branch. This includes `git commit --no-verify` and tools that commit in a temporary worktree.
-- Without an `origin/main` ref the hook does nothing.
-- Push the reported branch and open a pull request.
-- Pulls, fast-forwards, and resets to `origin/main` are untouched.
-- Running Git with `-c core.hooksPath=` skips every hook, so the ruleset remains the enforcement.
+Local integration into `main` and normal direct pushes follow the
+[repository integration policy](../docs/ci.md#integrate-and-publish-a-change).
+These hooks validate changes without moving branches or switching worktrees.
 
 Quality gates (`sync-gates` console script, defined in `sync/src/sync/gates.py`):
 - `pre-commit`: runs `git diff --cached --check`, followed by `sync-gates` (ruff check, ruff format check, basedpyright).
 - `pre-push`: runs the static gates with `sync-gates`, then the full test suite serially with `pytest -n 0 -o addopts="" -q`. Clearing configured pytest options prevents parallel workers on production hosts. It then runs `ci.py local` from the repository root against `origin/main`; see [Run checks locally](../docs/ci.md#run-checks-locally).
-- The `autommit` skill runs `pre-commit` once on the full staged snapshot before planning, then creates each commit in a temporary worktree with hooks disabled. The branch guard and `pre-push` still run.
+- The `autommit` skill runs `pre-commit` once on the full staged snapshot before planning, then creates each commit in a temporary worktree with hooks disabled. The `pre-push` hook still runs.

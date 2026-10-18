@@ -9,7 +9,7 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 3. For a skill with Python code, run its gates and tests as described in [Validate Python skills](#validate-python-skills-standard).
 4. Run the checks that match the changed files: [Validate an executable skill](#validate-an-executable-skill) and [Validate skill metadata](#validate-skill-metadata).
 5. Complete the [Final authoring review](#final-authoring-review).
-6. Commit with the `autommit` skill; the subject starts with `skills(<name>):`. Open a pull request as described in [Verify a change in CI](ci.md#merge-a-pull-request).
+6. Commit with the `autommit` skill; the subject starts with `skills(<name>):`. Follow the [repository integration policy](ci.md#integrate-and-publish-a-change) to integrate and publish the checked change. Use a pull request when requested or required.
 7. Run `uv run --project sync sync` from `~/src/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/src/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
 
 ## Create a skill
@@ -37,7 +37,7 @@ Sync publishes every skill to every enabled harness, so each new skill spends di
    uv run --script .github/scripts/ci.py metadata
    ```
 
-7. Commit and open a pull request as in [Change a skill](#change-a-skill). Check which CI jobs the branch gets with `uv run --script .github/scripts/ci.py plan --base origin/main`; [Verify a change in CI](ci.md#maintain-merge-protection) explains the selection.
+7. Commit, integrate, and publish as in [Change a skill](#change-a-skill). Check which CI jobs the branch gets with `uv run --script .github/scripts/ci.py plan --base origin/main`; [Verify a change in CI](ci.md#maintain-merge-protection) explains the selection.
 
 Keep development credentials in the root ignored `.env` file (`.env.example` at the repository root lists the shared template variables).
 
@@ -151,7 +151,7 @@ To resolve an issue:
 1. Read the upstream diff. Port changes that improve the skill and fit this setup; skip vendor-specific ones such as model slugs, vendor tool parameters, and vendor paths.
 2. Apply the skill gate to the ported text, including the final authoring review. Never copy an upstream `description`. Upstream descriptions are usually summaries; here the description is the trigger, so keep the local one or rewrite it under the [Metadata budget](#metadata-budget).
 3. Update the pin: `commit`, `release` for release pins, every tree hash, and `watch` entries for each new directory reviewed, ported or not.
-4. Put `Closes #<issue>` in the pull request body. The workflow creates and refreshes drift issues but never closes them.
+4. Put `Closes #<issue>` in the integration commit message or optional pull request body. The workflow creates and refreshes drift issues but never closes them.
 
 Check locally with an authenticated `gh`; the command exits `1` while any pin is behind:
 

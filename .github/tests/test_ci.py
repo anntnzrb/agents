@@ -2,9 +2,12 @@
 
 import json
 import os
+import shlex
 import subprocess
 import sys
+from itertools import takewhile
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -118,6 +121,145 @@ def test_no_base_runs_every_owned_suite(repo: Path) -> None:
         "skills": ["alpha", "beta"],
         "harnesses": ["opencode", "pi"],
     }
+
+
+def workflow_run(step: str, filename: str = "ci.yml") -> str:
+    """Execute the workflow's shell, rather than duplicate its baseline logic."""
+    workflow = SCRIPT.parents[1] / "workflows" / filename
+    lines = iter(workflow.read_text(encoding="utf-8").splitlines(keepends=True))
+    next(line for line in lines if line.strip() == f"- {step}")
+    next(line for line in lines if line.strip() == "run: |")
+    return dedent(
+        "".join(
+            takewhile(
+                lambda line: line.startswith("          ") or not line.strip(), lines
+            )
+        )
+    )
+
+
+@pytest.mark.parametrize("baseline", ["before", "", "0" * 40, "unavailable"])
+def test_workflow_plan_covers_whole_push_or_all_suites(
+    repo: Path, baseline: str
+) -> None:
+    write(repo, "skills/current/alpha/references/usage.md")
+    before = commit_change(repo)
+    write(repo, "harnesses/pi/agent/extensions/find/index.ts")
+    commit_change(repo)
+    command = workflow_run("id: plan").replace(
+        "uv run --script .github/scripts/ci.py",
+        shlex.join([sys.executable, str(SCRIPT)]),
+    )
+    result = subprocess.run(
+        ["bash", "-e", "-c", command],
+        cwd=repo,
+        env=os.environ | {"BASE": before if baseline == "before" else baseline},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == (
+        {"skills": ["alpha"], "harnesses": ["pi"]}
+        if baseline == "before"
+        else {"skills": ["alpha", "beta"], "harnesses": ["opencode", "pi"]}
+    )
+
+
+@pytest.mark.parametrize("baseline", ["before", "", "0" * 40, "unavailable"])
+def test_workflow_whitespace_checks_earlier_push_commits(
+    repo: Path, baseline: str
+) -> None:
+    write(repo, "skills/current/alpha/references/usage.md", "Trailing space \n")
+    before = commit_change(repo)
+    write(repo, "harnesses/pi/agent/extensions/find/index.ts")
+    commit_change(repo)
+    result = subprocess.run(
+        ["bash", "-e", "-c", workflow_run("name: Check introduced whitespace")],
+        cwd=repo,
+        env=os.environ | {"BASE": before if baseline == "before" else baseline},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "skills/current/alpha/references/usage.md" in result.stdout
+    assert "trailing whitespace" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("author", "is_bot", "state", "draft", "head", "merge", "merge_status"),
+    [
+        ("app/dependabot", True, "OPEN", False, "tested-sha", True, 0),
+        ("human", False, "OPEN", False, "tested-sha", False, 0),
+        ("app/dependabot", False, "OPEN", False, "tested-sha", False, 0),
+        ("app/dependabot", True, "CLOSED", False, "tested-sha", False, 0),
+        ("app/dependabot", True, "OPEN", True, "tested-sha", False, 0),
+        ("app/dependabot", True, "OPEN", False, "newer-sha", False, 0),
+        ("app/dependabot", True, "OPEN", False, "tested-sha", True, 1),
+    ],
+)
+def test_dependency_merge_requires_current_open_bot_head(
+    tmp_path: Path,
+    author: str,
+    is_bot: bool,
+    state: str,
+    draft: bool,
+    head: str,
+    merge: bool,
+    merge_status: int,
+) -> None:
+    write(
+        tmp_path,
+        "bin/gh",
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALLS"\n'
+        'case "$1 $2" in\n'
+        '  "pr view") printf "%s\\n" "$PR_JSON";;\n'
+        '  "pr merge") exit "$MERGE_STATUS";;\n'
+        '  "workflow run") exit 0;;\n'
+        "  *) exit 2;;\nesac\n",
+    )
+    (tmp_path / "bin/gh").chmod(0o755)
+    event = tmp_path / "event.json"
+    event.write_text(
+        json.dumps({"workflow_run": {"pull_requests": [{"number": 42}]}}),
+        encoding="utf-8",
+    )
+    calls = tmp_path / "calls"
+    calls.touch()
+    result = subprocess.run(
+        [
+            "bash",
+            "-eo",
+            "pipefail",
+            "-c",
+            workflow_run("name: Merge checked Dependabot heads", "auto-merge.yml"),
+        ],
+        cwd=tmp_path,
+        env=os.environ
+        | {
+            "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+            "GITHUB_EVENT_PATH": str(event),
+            "HEAD_SHA": "tested-sha",
+            "CALLS": str(calls),
+            "MERGE_STATUS": str(merge_status),
+            "PR_JSON": json.dumps(
+                {
+                    "author": {"login": author, "is_bot": is_bot},
+                    "state": state,
+                    "isDraft": draft,
+                    "headRefOid": head,
+                }
+            ),
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == merge_status, result.stderr
+    expected = ["pr view 42 --json author,state,isDraft,headRefOid"]
+    if merge:
+        expected.append("pr merge 42 --merge --match-head-commit tested-sha")
+        if merge_status == 0:
+            expected.append("workflow run ci.yml --ref main")
+    assert calls.read_text(encoding="utf-8").splitlines() == expected
 
 
 @pytest.mark.parametrize(
