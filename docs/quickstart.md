@@ -37,7 +37,7 @@ cd ~/src/agents
 
 The shell is now in `~/src/agents`.
 
-Enable the repository's [Git hooks](../.githooks/README.md), which run the sync quality gates and keep commits off `main`:
+Enable the repository's [Git hooks](../.githooks/README.md), which run the sync quality gates and selected repository checks:
 
 ```bash
 git config --local core.hooksPath .githooks

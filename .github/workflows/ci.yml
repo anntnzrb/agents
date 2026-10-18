@@ -1,8 +1,9 @@
 name: ci
 
-# Branch protection requires an up-to-date PR, so the merged tree is the tested tree.
-# main gets no push run; the weekly schedule catches drift from moving dependencies.
+# Validate optional PRs and published main changes; scheduled runs catch dependency drift.
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -35,9 +36,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
       - id: plan
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          if [ -n "$BASE" ]; then
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null && git merge-base "$BASE" HEAD >/dev/null 2>&1; then
             uv run --script .github/scripts/ci.py plan --base "$BASE"
           else
             uv run --script .github/scripts/ci.py plan
@@ -66,12 +67,13 @@ jobs:
             skills/current/skill-creator/scripts/*.py
       - name: Check introduced whitespace
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            BASE=$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null && MERGE_BASE=$(git merge-base "$BASE" HEAD); then
+            git diff --check "$MERGE_BASE" HEAD
+          else
+            git diff --check "$(git hash-object -t tree /dev/null)" HEAD
           fi
-          git diff --check "$(git merge-base "$BASE" HEAD 2>/dev/null || echo "$BASE")" HEAD
       - name: Validate workflows
         if: runner.os == 'Linux'
         uses: raven-actions/actionlint@v2
