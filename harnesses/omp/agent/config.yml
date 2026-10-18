@@ -4,11 +4,11 @@
 
 modelRoles:
   default: "@opus"
-  slow: "@opus"
+  slow: cliproxy/gpt-6.1-sol:xhigh
   smol: "@gem"
   vision: "@gem"
   commit: "@gem"
-  task: "@gem"
+  task: "@sol"
   advisor: "@gem"
   tiny: local/lfm2.5-230m,@gem
   web: web/parallel
