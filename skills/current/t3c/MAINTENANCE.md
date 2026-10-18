@@ -37,6 +37,8 @@ Recheck each fact against its anchor after a T3 update. If one no longer holds, 
 | A child runs in the parent's worktree | `function makeSubagentChildThread`, then `cwd` in `RuntimePolicyV2` |
 | An ACP-driver child, such as one on `acpRegistry`, gets the T3 MCP server through the stdio `t3 acp-mcp-bridge` | `acp-mcp-bridge` in the `provider-acp/src/server/adapter.ts` region |
 | An async child wakes the parent. A wait child does not wake it until its timeout | `completionWake: input.mode` |
+| `watch_pull_request` wakes the thread on checks, comments, or conflicts | the `watch_pull_request` tool description |
+| `unwatch_pull_request` returns the thread to the user inbox | the `unwatch_pull_request` tool description |
 | A cross-provider target does not inherit options | `resolveTarget` in the `OrchestratorMcpService` region |
 | Nothing stops a child from calling `delegate_task` | the `delegateTask` handler, which checks only for an active parent run |
 | Reading a terminal result through `t3_thread_read` acknowledges the wake | the `t3_thread_read` tool description |
@@ -58,7 +60,7 @@ The user settled decisions 1 to 11 on 2026-10-11 and 12 to 15 on 2026-10-15. A r
 6. Escalation stops after one retry. The orchestrator then reports to the user instead of taking over the work. Infrastructure failures, such as a driver crash, a transport error, `provider_unavailable`, or `model_unavailable`, do not spend that retry.
 7. The scout and runner run Gemini 3.8 Flash on the `opencode` driver, for its wider tool set and its `shell` tool's `background` option. Pi was rejected for its four default tools and blocking `bash`. The native `antigravity` driver was rejected because its own subagents cannot be disabled. Oh-my-pi through the `acpRegistry` driver is the parked alternative.
 8. Luna, Haiku, Sonnet, and Sol at low effort are excluded. With Gemini at zero effective cost, the Artificial Analysis frontier dominates them for these roles. Haiku beats Gemini on Terminal-Bench only at `xhigh` effort, which the runner does not need.
-9. The orchestrator never blocks a turn. Waiting for a child's result through its completion wake is allowed.
+9. The orchestrator never blocks a turn. Waiting for a child result through completion wakes or PR status through `watch_pull_request` is allowed; yielding a turn while retaining task ownership is not abandoning the task. The orchestrator unwatches PRs before final handoff.
 10. Children share the orchestrator's worktree. Parallel slices need disjoint owned files.
 11. Delegation uses T3 tools only.
 12. The orchestrator may steer or follow up a child through `t3_thread_send` on its `childThreadId`. Independent review rounds still start with a new `delegate_task`.
