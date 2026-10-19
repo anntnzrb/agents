@@ -8,7 +8,7 @@ Read when a benchmark or profile identifies a performance problem, or when revie
 - MUST record the workload, baseline, changed result, and measurement conditions. Keep setup, I/O, and random generation outside the measured loop unless they are the workload. [self-check]
 - MUST use `std::hint::black_box` where needed to prevent dead-code elimination, without inventing a universal speed threshold for benchmarks or optimization targets. [self-check]
 - MUST prefer algorithmic and layout improvements before unsafe access or forced inlining. Verify the actual bottleneck after the change. [self-check]
-- MUST leave human-owned profiles unchanged. Read [profiles.toml](../assets/profiles.toml) for the supplied build settings. [governance-check]
+- MUST leave installed profiles unchanged unless the user asks to change them. Read [profiles.toml](../assets/profiles.toml) for the supplied build settings. [governance-check]
 - MAY use `panic = "abort"` only in human-configured binaries that never rely on unwinding. [governance-check; self-check]
 - SHOULD evaluate `mimalloc` for long-running multithreaded services against a representative workload. [self-check]
 - MUST restrict fast non-cryptographic hashers such as `foldhash` or `FxHash` to maps whose keys cannot be adversarial. [self-check]

@@ -13,7 +13,7 @@ Read before adding or updating crates, changing features, building a public libr
 - MUST NOT add wildcard versions, unapproved Git dependencies, or path dependencies outside the workspace. Local path-boundary review remains a self-check. [cargo-deny; self-check]
 - MUST commit `Cargo.lock` for libraries and applications and use `--locked` on build, test, documentation, and supply-chain commands that support it. [cargo --locked; self-check]
 - MUST create and update `Cargo.lock` only through Cargo commands, never by hand. [cargo --locked]
-- MUST keep the exact `rust-toolchain.toml` pin consistent with the human-owned Nix toolchain when Nix is used. Agents report pin drift rather than editing protected files. [governance-check; self-check]
+- MUST keep the exact `rust-toolchain.toml` pin consistent with the human-owned Nix toolchain when Nix is used. Report pin drift; edit protected files only on the user's request. [governance-check; self-check]
 - MUST fill package description, keywords, and categories for crates meant for publication. [cargo_common_metadata]
 - MUST take `license`, `repository`, `homepage`, and `readme` values for crates meant for publication from the task or the existing manifest. When they are missing, stop and report them as human-owned inputs; NEVER invent them. Applications and internal crates that are not published set `publish = false` and need none of them. [cargo_common_metadata; cargo-deny; self-check]
 

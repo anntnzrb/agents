@@ -18,6 +18,12 @@ Maintainer reference. Each entry states the current decision, why it holds, and 
 - Why: Language models game invariant claims, unwrap variants, and lint suppressions to force green builds instead of handling failures. The gate is the specification.
 - Evidence: `references/sources.md` settled overrides rejecting Microsoft M-PANIC-ON-BUG and BurntSushi unwrap guidance; *Rust for Rustaceans*.
 
+### User-requested gate installation
+
+- Decision: Agents install the bundled assets into a target repository when the user asks to create a Rust project or to install the gates, following the install procedure in `references/gates-and-ci.md`. Without that request, gate configuration stays unchanged, and agents never edit bundled assets.
+- Why: The threat is an agent weakening its own judge to get green, not a user-requested installation. A human-only rule made agents refuse explicit scaffold requests, even when the skill author gave the instruction.
+- Evidence: Agent transcripts that refused to copy assets into a new workspace; `assets/governance-check.py` still rejects gate-file changes in the reviewed diff, so the installation commit becomes the trusted base.
+
 ### Exact toolchain pin
 
 - Decision: Require an exact toolchain pin in `assets/rust-toolchain.toml`, treating the asset value as an example that repository maintainers configure.

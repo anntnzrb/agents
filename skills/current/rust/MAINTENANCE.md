@@ -98,7 +98,7 @@ Verify each tool against upstream updates:
 4. Update the commit hash and takeaways in `references/sources.md`. Keep the step about recording read date, access path, and decisions per source.
 5. Preserve settled overrides recorded in the first Policy entry of [DECISIONS.md](DECISIONS.md). Report conflicting new evidence instead of silently reversing policy.
 
-Maintainer-authorized skill refreshes may update bundled templates. Ordinary agents applying the Rust skill to target repositories never edit protected assets or gate configuration.
+Maintainer-authorized skill refreshes may update bundled templates. Ordinary agents applying the Rust skill never edit bundled assets. They install assets into a target repository, or change its gate configuration, only on the user's explicit request.
 
 ## Playbook: extending the skill
 

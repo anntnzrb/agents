@@ -30,7 +30,7 @@ Read when changing threads, tasks, locks, atomics, channels, futures, or shutdow
 - MUST use Acquire/Release when publishing data and Relaxed only for independent counters or flags that publish nothing. Explain every ordering at its call site. [loom; self-check]
 - MUST NOT use `SeqCst` as a substitute for a synchronization argument. Even a total atomic order does not repair an incorrect protocol. [loom; self-check]
 - MUST add a loom model test for any custom synchronization, including custom atomics. Tests only on x86 can conceal ordering failures visible on weaker architectures. [loom]
-- MUST report to a human when loom tests need `cfg(loom)` declared in the workspace `unexpected_cfgs` check-cfg list; agents do not edit lint tables. [unexpected_cfgs; governance-check]
+- MUST report to the user when loom tests need `cfg(loom)` declared in the workspace `unexpected_cfgs` check-cfg list; edit lint tables only on the user's request. [unexpected_cfgs; governance-check]
 - SHOULD use `compare_exchange_weak` in retry loops, handling spurious failure by retrying. [self-check]
 - MUST use a valid compare-exchange failure ordering: never Release or AcqRel. Choose the success and failure orderings from the actual publication protocol. [invalid_atomic_ordering; loom; self-check]
 - MUST document ABA and lifetime protection when compare-exchange manipulates reusable pointers or handles. [loom; self-check]

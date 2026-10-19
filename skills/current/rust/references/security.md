@@ -26,9 +26,9 @@ Read when handling untrusted inputs, subprocesses, filesystem boundaries, secret
 ## Build integrity
 
 - MUST retain release `overflow-checks = true` alongside explicit checked arithmetic. NEVER disable dev or test overflow checks or debug assertions to pass a gate. [arithmetic_side_effects; governance-check; self-check]
-- MUST NOT override `RUSTC`, `RUSTC_WRAPPER`, or compiler flags to circumvent checks. Use the human-installed toolchain and gate configuration. [governance-check; self-check]
+- MUST NOT override `RUSTC`, `RUSTC_WRAPPER`, or compiler flags to circumvent checks. Use the installed toolchain and gate configuration. [governance-check; self-check]
 - MUST use official Tier 1 targets for safety-critical deployments unless the project has explicitly established another validated target policy. [self-check]
 - MUST inspect direct and transitive dependency risk, including unsafe code, build scripts, maintenance, advisories, and licenses. [cargo-deny; self-check]
 - MUST reject OpenSSL dependencies in favor of the project's approved Rust TLS stack, normally rustls. [cargo-deny; self-check]
 - MUST run the repository's human-installed fuzz target for changed untrusted-input parsers with a time bound and keep minimized failures as regression tests, or report fuzzing as missing human-owned setup. [cargo-fuzz; self-check]
-- MUST keep quality-gate files human-owned and verify required server-side checks rather than trusting skippable hooks. [governance-check; repository rulesets; self-check]
+- MUST change quality-gate files only on the user's request and verify required server-side checks rather than trusting skippable hooks. [governance-check; repository rulesets; self-check]
