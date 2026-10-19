@@ -122,7 +122,10 @@ class TestOdooRpcConfig(unittest.TestCase):
                 )
 
     def test_missing_explicit_token_path_fails_closed(self) -> None:
-        with pytest.raises(FileNotFoundError, match="Explicit token file not found"):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(FileNotFoundError, match="Explicit token file not found"),
+        ):
             _ = OdooRpcConfig.from_env(
                 url="https://test.erp.com/jsonrpc",
                 database="testdb",
