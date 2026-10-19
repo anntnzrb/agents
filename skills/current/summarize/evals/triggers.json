@@ -1,0 +1,11 @@
+[
+  { "query": "resume ./report.pdf", "expect": "summarize" },
+  { "query": "resumir https://www.youtube.com/watch?v=I845O57ZSy4", "expect": "summarize" },
+  { "query": "summary https://example.com/article", "expect": "summarize" },
+  { "query": "Dame un resumen de ./interview.m4a; conserva los detalles.", "expect": "summarize" },
+  { "query": "Resume https://example.com/report.pdf, pero más corto esta vez.", "expect": "summarize" },
+  { "query": "Summarize the attached local recording at ./meeting.mp4.", "expect": "summarize" },
+  { "query": "Download this YouTube video as an MP4: https://www.youtube.com/watch?v=I845O57ZSy4", "expect": "youtube" },
+  { "query": "Resume lo que hablamos en este chat; no hay archivos ni enlaces que consultar.", "expect": "none" },
+  { "query": "Shorten your previous answer to two sentences.", "expect": "none" }
+]
