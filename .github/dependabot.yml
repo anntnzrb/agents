@@ -31,5 +31,9 @@ updates:
     groups:
       bun:
         patterns: ["*"]
+    ignore:
+      # Must equal the exact effect version @opencode/plugin depends on; a different
+      # version installs a second effect copy whose Schema rejects @opencode schemas.
+      - dependency-name: effect
     commit-message:
       prefix: deps
