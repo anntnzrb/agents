@@ -18,7 +18,7 @@
     "embeddedVideo": "both",
     "videoMode": "auto"
   },
-  "model": "openai/gemini-3.8-flash-high",
+  "model": "openai/gemini-3.8-flash-high(high)",
   "output": {
     "language": "auto",
     "length": "xxl"
