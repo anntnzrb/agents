@@ -75,5 +75,8 @@ Commits:
 - For harness-specific changes use `<harness>: ...`; for example `pi: configure fallback model`
 - For generic changes: `docs:`, `sync:`, `ci:`, `deps:`, `skills(<skill>):`, `tools(<tool>):`
 
-Pull requests:
-- `main` changes only through pull requests; push a `work/<8-lowercase-hex>` branch and follow "Merge a pull request" in `docs/ci.md`
+Integration and publication:
+- Default to local integration into `main` and normal direct pushes after the relevant checks pass. Follow "Integrate and publish a change" in `docs/ci.md`.
+- Isolate parallel tasks on short `work/<8-lowercase-hex>` branches, with the suffix generated mechanically. Assign one owner to integrate the final target.
+- Preserve other work. Do not force-push, reset, discard changes, or mutate a shared checkout's branch or worktree state to integrate a task.
+- Use a pull request when requested or required by server rules; follow "Merge a pull request" in `docs/ci.md`. Never bypass server rules; report blockers.

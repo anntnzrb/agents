@@ -21,9 +21,26 @@ Read `roles.toml` beside this file before the first delegation. Each role there 
 Waiting for results is expected. Blocking the turn is not.
 
 - Dispatch with `delegate_task` in `mode: "async"`, then end the turn. A finished child wakes this thread with its result.
+- For pull requests, follow [Pull request waiting and watcher ownership](#pull-request-waiting-and-watcher-ownership) to wait passively.
+- Yielding a turn to wait for a durable platform wake (an async child completion wake or PR watcher notification) is expected and required to stay non-blocking. Yielding is not abandoning: retain task ownership across wakes and never leave empty promises.
+- When the app wakes this thread, resume immediately, inspect results, fix failures, and confirm completion.
+- Direct pushes have no PR watcher target. When remote CI is an expected delivery check, delegate the bounded read-only CI wait to a runner child (whose completion wakes this parent) instead of creating a fake PR, polling in the parent, or treating publication as green CI.
 - A delegated thread does not wake this thread. Its brief makes it notify you; see [Delegated threads](#delegated-threads).
 - NEVER use `mode: "wait"`, `t3_thread_wait`, a `task_status` polling loop, or `sleep`. Each one blocks the turn and locks the user out.
 - While delegates run, keep answering the user.
+
+## Pull request waiting and watcher ownership
+
+When waiting on pull requests in T3:
+
+- Register every thread PR immediately with `link_pull_request`.
+- If expected checks and reviews already pass for the current head, proceed to the authorized exact-head merge or stop at merge-ready for Prepare. Do not register a watcher for an already-ready PR.
+- Await pending checks and reviews passively with `watch_pull_request` during feedback and readiness resolution. Explicit Prepare must never queue auto-merge; it passively awaits green and stops without merging.
+- For Deliver: queue authorized exact-head auto-merge before checks only when the server enforces the expected checks. If the server does not enforce them (or auto-merge is unsupported), auto-merge can merge prematurely: call `watch_pull_request` to wait for expected current-head checks and reviews to pass, release the turn, and run exact-head merge after app wake.
+- Call `watch_pull_request` and end the turn. T3 wakes this thread when checks finish, comments arrive, or conflicts arise.
+- On wake, resume, diagnose failures or conflicts, fix them, re-verify, and confirm merge.
+- Before handing the thread back to the user, ALWAYS call `unwatch_pull_request` so the thread returns to their inbox.
+- Do not run blocking CLI polling and `watch_pull_request` concurrently.
 
 ## Child or thread
 
@@ -39,6 +56,7 @@ Waiting for results is expected. Blocking the turn is not.
 - Decide edge cases and behavior choices in the brief. Never hand them to a delegate as "choose and justify".
 - Group small dependent slices into one delegation while the resulting diff stays reviewable. Split smaller only when the risk justifies it.
 - Delegates run in this thread's worktree with no isolation. Run slices in parallel only when their file sets are disjoint and each delegate has its own stateful resources: its own worktree and its own copy of any shared database, service, or port it mutates or tests against. Otherwise run them one after another.
+- Assign a single integrator for a target branch and publication. Never let multiple delegates or threads contend to push or integrate into the same target ref.
 - With that isolation, review slice N while slice N+1 runs.
 - Before dispatching implementers, call `t3_worktree_status` to confirm the branch and path they inherit.
 
@@ -136,6 +154,9 @@ Infrastructure failures are not model failures and do not spend the retry in ste
 | Archive a finished delegated thread | `t3_thread_organize` (`action: "archive"`) |
 | Confirm the inherited checkout | `t3_worktree_status` |
 | Recover from `provider_unavailable` or `model_unavailable` | `orchestrator_capabilities` |
+| Register PR for thread | `link_pull_request` |
+| Passive PR wait on app wake | `watch_pull_request` |
+| Return thread to user inbox after PR wait | `unwatch_pull_request` |
 
 - `orchestrator_capabilities` returns the full model catalog, often hundreds of thousands of characters. Call it only after one of those errors, filter it for the role's provider and model, and report a missing target to the user.
 - Use `create_threads` only when the user asks for separate threads that share this checkout.
