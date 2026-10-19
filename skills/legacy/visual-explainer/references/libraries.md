@@ -291,7 +291,7 @@ B->>S: POST /submit with selected indices
 flowchart LR
   A --> B --> C --> D --> E
   A --> F --> G --> H
-  
+
 %% RIGHT; TD uses vertical space, labels stay readable
 flowchart TD
   A --> B --> C --> D --> E

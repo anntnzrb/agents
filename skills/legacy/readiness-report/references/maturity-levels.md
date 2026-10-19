@@ -13,7 +13,7 @@ Repositories progress through five levels. Each level represents a qualitative s
 
 ## Level 1: Initial
 
-**Status**: Basic version control  
+**Status**: Basic version control\
 **Agent Capability**: Manual assistance only
 
 ### Requirements
@@ -47,7 +47,7 @@ Without L1, agents operate blind; no way to verify builds, run tests, or ensure 
 
 ## Level 2: Managed
 
-**Status**: Basic CI/CD and testing  
+**Status**: Basic CI/CD and testing\
 **Agent Capability**: Simple, well-defined tasks
 
 ### Requirements
@@ -92,7 +92,7 @@ Without L2, feedback loops are too slow. Agents wait minutes for CI instead of s
 
 ## Level 3: Standardized
 
-**Status**: Production-ready for agents  
+**Status**: Production-ready for agents\
 **Agent Capability**: Routine maintenance
 
 ### Requirements
@@ -145,7 +145,7 @@ Clear processes defined and enforced. This is the target for most teams.
 
 ## Level 4: Measured
 
-**Status**: Comprehensive automation  
+**Status**: Comprehensive automation\
 **Agent Capability**: Complex features
 
 ### Requirements
@@ -187,7 +187,7 @@ Advanced tooling and metrics for optimization.
 
 ## Level 5: Optimized
 
-**Status**: Full autonomous capability  
+**Status**: Full autonomous capability\
 **Agent Capability**: End-to-end development
 
 ### Requirements

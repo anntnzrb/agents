@@ -49,4 +49,3 @@ gleam run                      # Execute main
 gleam format                   # Format all
 gleam add pkg --dev            # Dev dependency
 ```
-

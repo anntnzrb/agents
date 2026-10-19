@@ -368,4 +368,3 @@ func fetchRelease(ctx context.Context, tag string) (*githubRelease, error) {
 ```
 
 **Tip**: Treat external API responses as untrusted input. Use `DisallowUnknownFields` and validate mandatory fields after decoding; APIs change silently.
-

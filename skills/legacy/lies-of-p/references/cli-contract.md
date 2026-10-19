@@ -10,14 +10,14 @@ Output: deterministic UTF-8 text. `--json`: compact sorted-key JSON, formatting 
 
 `compare`: accepts ≥1 candidate. Physical, elemental, and weight stats, plus `--motion`, MUST be nonnegative; `crit_percent`: 0-100; `--critical-multiplier`: ≥1; retained physical/elemental factors: 0-1. Invalid input → status 2.
 
-`displayed_ar = physical + elemental`  
+`displayed_ar = physical + elemental`\
 `adjusted_hit = (physical × physical_retained + elemental × elemental_retained) × motion`
 
 With a critical multiplier: `expected_hit = adjusted_hit × (1 + crit_percent/100 × (critical_multiplier − 1))`. Rank by `expected_hit` when available; otherwise `adjusted_hit`.
 
 Comparator scope: deterministic displayed-AR arithmetic only. Excludes enemy defense, hidden scaling/saturation, animation DPS, status buildup, and Fable effects; makes no claim of exact hidden AR, scaling, or DPS.
 
-`fresh`: displays version, difficulty, complete build object.  
+`fresh`: displays version, difficulty, complete build object.\
 `build`: displays the same build object; `--level N` adds `level`. Weapon fields describe the Technique lane: Path of the Bastard or Wintry Rapier start → Booster Glaive handle in Chapter 3 → Bone-Cutting Sawblade acquisition in Chapter 5's Malum District → Sawblade + Booster assembly.
 
 Without `--spoilers`, `bosses` returns aggregate count/type guidance; a named query returns only that base-game boss's name and generic guidance, never future names, areas, or plans. `--spoilers` returns full rows.
