@@ -217,7 +217,9 @@ def target_ref(pin: Pin, cutoff: datetime) -> str | None:
     status = gh(
         "api", f"repos/{pin.repo}/compare/{settled}...{pin.commit}", "--jq", ".status"
     )
-    return None if status in ("identical", "ahead") else settled
+    # A merged side branch can surface an older commit that lacks the pin
+    # ("diverged"); only a settled head that contains the pin is newer.
+    return settled if status == "behind" else None
 
 
 def tree_hashes(repo: str, ref: str, parents: list[str]) -> dict[str, str]:

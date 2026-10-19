@@ -143,3 +143,18 @@ def test_settled_release_is_none_when_the_pin_is_settled_or_newer() -> None:
     ]
     assert upstream.settled_release(releases, "v1.1.0", CUTOFF) is None
     assert upstream.settled_release(releases, "v1.2.0", CUTOFF) is None
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [("behind", "b" * 40), ("identical", None), ("ahead", None), ("diverged", None)],
+)
+def test_target_ref_reports_only_settled_heads_that_contain_the_pin(
+    monkeypatch: pytest.MonkeyPatch, status: str, expected: str | None
+) -> None:
+    def gh(*args: str) -> str:
+        return "b" * 40 if "commits" in args[1] else status
+
+    monkeypatch.setattr(upstream, "gh", gh)
+    pin = upstream.Pin.parse("x", BRANCH_PIN)
+    assert upstream.target_ref(pin, CUTOFF) == expected
