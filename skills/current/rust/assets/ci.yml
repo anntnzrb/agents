@@ -70,7 +70,11 @@ jobs:
         run: |
           printf '%s\n' '#!/bin/sh' 'exec "$@" --cap-lints=warn' > "$RUNNER_TEMP/cap-lints-rustc"
           chmod 700 "$RUNNER_TEMP/cap-lints-rustc"
-          git diff "${BASE}...HEAD" > "$RUNNER_TEMP/pr.diff"
+          if [ "$BASE" = 0000000000000000000000000000000000000000 ]; then
+            git diff "$(git hash-object -t tree /dev/null)" HEAD > "$RUNNER_TEMP/pr.diff"
+          else
+            git diff "${BASE}...HEAD" > "$RUNNER_TEMP/pr.diff"
+          fi
           cargo mutants --in-diff "$RUNNER_TEMP/pr.diff" --test-tool nextest --output "$RUNNER_TEMP"
 
   # Enable when the workspace contains unsafe code Miri can execute.
