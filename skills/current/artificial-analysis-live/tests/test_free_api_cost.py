@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from artificial_analysis import rsc
+from artificial_analysis import cli, rsc
 from artificial_analysis.contracts import as_dict, as_list, parse_json
 
 
@@ -213,3 +213,69 @@ def test_free_api_rejects_repeated_model_across_pages() -> None:
     ):
         _ = rsc.fetch_all_models("key")
 
+
+def test_fetch_uses_advertised_manifest_despite_valid_partial_rows(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    host = {"slug": "provider", "name": "Provider"}
+    models = [{"slug": f"model-{index}", "name": f"Model {index}"} for index in (1, 2)]
+    rows: list[object] = [
+        {"host": host, "model": model, "pricing": {"price1mInputTokens": 1}}
+        for model in models
+    ]
+    page = "0:" + json.dumps(
+        {
+            "models": models,
+            "hosts": [host],
+            "rows": rows[:1],
+            "manifest": {"path": "/manifest.bin", "key": "00" * 32},
+        }
+    )
+    official = json.dumps({"status": 200, "prompt_options": {}, "data": []})
+    snapshot = tmp_path / "snapshot.json"
+    with (
+        patch.object(cli, "_required_api_key", return_value="fixture-key"),
+        patch.object(
+            cli,
+            "fetch_rsc",
+            return_value=rsc.FetchResult(page, 200, {}, "2026-01-01T00:00:00+00:00"),
+        ),
+        patch.object(
+            cli,
+            "fetch_all_models",
+            return_value=rsc.FetchResult(
+                official, 200, {}, "2026-01-01T00:00:00+00:00"
+            ),
+        ),
+        patch.object(
+            cli,
+            "fetch_provider_manifest",
+            return_value=(rows, {"sha256": "manifest-digest"}),
+        ),
+    ):
+        assert (
+            cli.main(
+                [
+                    "fetch",
+                    "--cache-dir",
+                    str(tmp_path / "cache"),
+                    "--output-json",
+                    str(snapshot),
+                    "--output-endpoints",
+                    str(tmp_path / "endpoints.txt"),
+                    "--output-url",
+                    str(tmp_path / "url.txt"),
+                    "--min-endpoints",
+                    "1",
+                    "--min-providers",
+                    "1",
+                ]
+            )
+            == 0
+        )
+    _ = capsys.readouterr()
+    payload = as_dict(parse_json(snapshot.read_text(encoding="utf-8")))
+    endpoints = [as_dict(row) for row in as_list(payload["hosts_models"])]
+    assert {row["model_slug"] for row in endpoints} == {"model-1", "model-2"}
+    sources = as_dict(as_dict(payload["meta"])["sources"])
+    assert as_dict(sources["provider_manifest"])["sha256"] == "manifest-digest"

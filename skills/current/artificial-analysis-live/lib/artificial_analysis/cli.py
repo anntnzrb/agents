@@ -780,10 +780,19 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
         frames = parse_json_frames(body)
         provider_manifest_source: dict[str, object] | None = None
         provider_page_source: dict[str, object] | None = None
+        manifest = extract_evaluation_manifest(frames)
+        if manifest is not None:
+            provider_rows, provider_manifest_source = fetch_provider_manifest(
+                manifest, base_url=BASE_URL, timeout_seconds=timeout_seconds
+            )
+            frames.append(("provider_manifest", {"rows": provider_rows}))
         try:
             raw_models, raw_hosts, raw_hosts_models = extract_lists(frames)
         except ExtractionError as exc:
-            if "Missing sections in RSC payload: hostsModels" not in str(exc):
+            if (
+                manifest is not None
+                or "Missing sections in RSC payload: hostsModels" not in str(exc)
+            ):
                 raise
             page = fetch_page(BASE_URL, timeout_seconds=timeout_seconds)
             provider_page_source = {
