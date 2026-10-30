@@ -137,23 +137,18 @@ lsp:
 # ─────────────────────────────────────────────────────────────────────────────
 
 bash:
-  enabled: true
   autoBackground:
-    enabled: true
     thresholdMs: 5000
-  direnv: auto
+  gitGuard: true
 
 shellMinimizer:
   enabled: false
 
 eval:
-  py: true
   js: false
   autoBackground:
     enabled: true
     thresholdMs: 5000
-python:
-  kernelMode: session
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. TOOLS & CAPABILITIES (Tab: tools)
@@ -162,59 +157,31 @@ python:
 tools:
   xdev: false
   intentTracing: false
-  approvalMode: yolo
-
-grep:
-  enabled: true
-
-glob:
-  enabled: true
-
-astGrep:
-  enabled: false
+  restrictedFolders:
+    - ~/.ssh
+    - ~/.config/sops
 
 astEdit:
   enabled: false
-
-fetch:
-  enabled: true
 
 web_search:
   enabled: false
 
 browser:
-  enabled: true
   relay: true
-  headless: true
   cmux: false
 
-computer:
-  enabled: false
-  display: all
 ask:
-  enabled: true
   timeout: 600
 
 todo:
-  enabled: true
-  eager: default
-  reminders: true
   remindersMax: 2
 
 debug:
   enabled: false
 
-launch:
-  enabled: true
-
-async:
-  enabled: true
-
 checkpoint:
   enabled: true
-
-vault:
-  enabled: false
 
 github:
   enabled: true
@@ -222,25 +189,12 @@ github:
 security:
   enabled: true
 
-generate_image:
-  enabled: false
-
-speechgen:
-  enabled: false
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. TASKS & SUBAGENTS (Tab: tasks)
 # ─────────────────────────────────────────────────────────────────────────────
 
 task:
   showResolvedModelBadge: true
-  # always: director plans and fans out; workers (@task/@smol) do the implementation
-  # eager: always
-  batch: true
-  maxConcurrency: 32
-  enableEffort: false
-  enableLsp: false
-  prewalk: false
   agentModelOverrides:
     sonic: "@smol"              # Vibe 'fast' tier worker
     scout: "@smol"              # Fast read-only codebase explorer
