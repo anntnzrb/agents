@@ -58,6 +58,14 @@
     { "action": "webfetch", "resource": "*", "effect": "deny" },
   ],
 
+  "references": {
+    "vendored": {
+      "path": "~/src/vendored",
+      "description":
+        "Read-only upstream checkouts at <host>/<namespace>/<repo>, refreshed on a schedule. Read them for library and tool internals instead of relying on memory; never edit them.",
+    },
+  },
+
   "update": "disable",
   "websearch": false,
   "experimental": {
