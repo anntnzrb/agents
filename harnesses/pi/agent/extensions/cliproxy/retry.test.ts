@@ -9,7 +9,6 @@ const failed = (errorMessage: string, provider = "cliproxy"): AssistantMessage =
 test("gateway stream drops become errors Pi's retry policy accepts", () => {
   for (const drop of [
     "read tcp 10.0.0.1:443: use of closed network connection",
-    "stream disconnected before completion: stream closed before response.completed",
     "invalid SSE data JSON",
   ]) {
     expect(isRetryableAssistantError(failed(drop))).toBe(false);
@@ -17,6 +16,12 @@ test("gateway stream drops become errors Pi's retry policy accepts", () => {
     expect(marked).toBeDefined();
     expect(isRetryableAssistantError(marked!)).toBe(true);
   }
+});
+
+test("Pi handles stream disconnects without gateway normalization", () => {
+  const message = failed("stream disconnected before completion: stream closed before response.completed");
+  expect(isRetryableAssistantError(message)).toBe(true);
+  expect(markTransientStreamError(message)).toBeUndefined();
 });
 
 test("other errors, other providers, and successful turns pass through unchanged", () => {
