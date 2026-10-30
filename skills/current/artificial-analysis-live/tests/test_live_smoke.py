@@ -73,7 +73,7 @@ def test_live_fetch_and_stats_smoke_are_shape_only(tmp_path: Path) -> None:
     assert freshness["mode"] in {"fresh", "cache-revalidated"}
     assert freshness["stale"] is False
 
-    stats = _run_cli(["stats", "--snapshot", str(snapshot)], env=env)
+    stats = _run_cli(["stats", str(snapshot)], env=env)
     assert stats["ok"] is True
     stats_data = as_dict(stats["data"])
     assert stats_data
@@ -81,6 +81,15 @@ def test_live_fetch_and_stats_smoke_are_shape_only(tmp_path: Path) -> None:
     assert counts
 
     sources = as_dict(data["sources"])
+    official = as_dict(sources["official_api"])
+    assert "/api/v2/language/models/free" in str(official["url"])
+    saved = as_dict(parse_json(snapshot.read_text(encoding="utf-8")))
+    metadata = as_dict(saved["meta"])
+    saved_sources = as_dict(metadata["sources"])
+    api_source = as_dict(saved_sources["official_api"])
+    assert isinstance(api_source["intelligence_index_version"], int)
+    assert api_source["pages"]
+    assert "/api/v2/data/" not in json.dumps(saved_sources)
     evidence: dict[str, object] = {
         "fetch": {
             "freshness": data["freshness"],

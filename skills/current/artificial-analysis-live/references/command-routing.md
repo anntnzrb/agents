@@ -14,8 +14,8 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 Schema-v2 snapshot structure:
 - One canonical model record per slug.
 - Slim provider endpoint records joined by `model_slug`.
-- Official API canonical model pricing uses a 3:1 blend.
-- RSC endpoint pricing uses a 7:2:1 blend.
+- Free API canonical model pricing supplies input, output, cache-hit, and cache-write rates.
+- Provider endpoint pricing remains separate from model pricing.
 
 ### compare
 Compare canonical models across published releases and reasoning efforts without duplicating provider endpoints:
@@ -54,6 +54,17 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation
 
 Generic evaluation extraction depends on page schema structure. Dedicated page scores remain separate from official model snapshot metrics.
 
+### eval-cost
+Estimate per-variant evaluation cost. Use the page metric and the total rollout count from the methodology; FrontierCode 2.0 has 132 tasks with three attempts each.
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" eval-cost \
+  https://artificialanalysis.ai/evaluations/frontiercode-2-0 \
+  --metric frontierCode20 --attempts 396 --snapshot <temp-dir>/full-data.json
+```
+
+The calculation assumes all cacheable input is cached and uses the manifest cache-hit price, then the snapshot cache-hit price, and falls back to input pricing when neither is available. It is derived, not AA's measured cost. Missing inputs yield null. Snapshot pricing is optional and joined by exact slug. This command is CLI-only.
+
 ### stats
 Display snapshot counts and top providers.
 
@@ -85,7 +96,7 @@ Reports redacted snapshot, cache, schema, parser, freshness, artifact, and diagn
 - Pass `--json-errors` to write one compact redacted error object to stdout. Pass `--legacy-errors` for human-readable stderr errors.
 - RPC returns stable error codes and one response per non-empty request.
 - Set `ARTIFICIAL_ANALYSIS_API_KEY` in the environment or set `ARTIFICIAL_ANALYSIS_ENV_FILE` to a restricted file path outside the skill tree. Pass credentials through environment variables rather than command arguments.
-- Treat skill-root or ancestor `.env` files as transitional compatibility.
+- Do not rely on skill-root or ancestor `.env` files.
 - Asset-sync processes MUST exclude `.env` and secret files when generating homes.
 - Provide HTTPS URLs to `evaluation`, or use `--input` for local saved HTML/RSC files. Credential query parameters are redacted automatically.
 

@@ -13,6 +13,7 @@ This tool extracts data from the Artificial Analysis model catalog and provider 
 - [Diff](#diff)
 - [Compare releases and efforts](#compare-releases-and-efforts)
 - [Dedicated evaluation pages](#dedicated-evaluation-pages)
+- [Evaluation cost](#evaluation-cost)
 - [Query](#query-modelprovider-benchmark-questions)
 - [QA](#qa-minimum-natural-language-command)
 - [Schema](#schema)
@@ -24,7 +25,7 @@ This tool extracts data from the Artificial Analysis model catalog and provider 
 Live `fetch` combines two required sources:
 
 - Provider endpoints from `https://artificialanalysis.ai/leaderboards/providers` with header `RSC: 1`
-- Canonical models from `https://artificialanalysis.ai/api/v2/data/llms/models`
+- Canonical models from `https://artificialanalysis.ai/api/v2/language/models/free`
 
 ## Fetch credentials
 
@@ -90,7 +91,19 @@ Cache and ETag behavior:
 
 `models` is the canonical unique model table. `hosts_models` contains provider and endpoint observations, joining each record to `models` using `model_slug` without repeating model metrics. Model identity, official evaluations, and the official API pricing object belong to canonical models. Provider speed, latency, context, features, classification, and RSC pricing belong to endpoints.
 
-The official API uses a 3:1 model pricing blend. The RSC endpoint feed uses a 7:2:1 endpoint pricing blend. Retain both blends: model pricing applies to the canonical model, and endpoint pricing applies to the provider endpoint.
+The free API supplies model identity, nine capability indices, Intelligence Index cost, token prices, and performance medians. Its paginated response does not supply individual benchmark scores. The snapshot records the API index version and page hashes. Provider endpoint observations come from the leaderboard, including its full endpoint manifest when present. Keep provider endpoint prices separate from canonical model prices. Use `evaluation` for published individual benchmark scores; those page populations are not merged into the snapshot. Missing benchmark values stay missing.
+
+## Evaluation cost
+
+```bash
+uv run --script <skill-dir>/scripts/cli.py eval-cost \
+  https://artificialanalysis.ai/evaluations/frontiercode-2-0 \
+  --metric frontierCode20 --attempts 396 --snapshot <temp-dir>/full-data.json
+```
+
+The command estimates USD per variant from published score and token counts. It prices input and output using the manifest prices, falling back to the snapshot by exact slug. It uses manifest cache-hit pricing, then snapshot cache-hit pricing; otherwise it prices cacheable input at the input rate. It assumes every cacheable token is a cache hit, an upper bound on cache hits, not observed spend. Missing or invalid counts or prices produce null costs. Output retains the page URL, manifest hash, snapshot hash, rates, and pricing sources. `--snapshot` is optional; without it cacheable input uses the manifest cache price or the input rate.
+
+`--attempts` is the total number of rollouts, not the number of unique tasks. FrontierCode 2.0 uses 132 tasks and three attempts each. The resulting per-task field is cost per attempt. Verify the count for other evaluations in [AA's methodology](https://artificialanalysis.ai/methodology/intelligence-benchmarking). AA uses measured typical cache-hit rates in its own cost methodology; this estimate does not reproduce them. This command is CLI-only.
 
 ## Stats
 

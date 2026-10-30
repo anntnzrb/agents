@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import json
 import os
+import ssl
 import tempfile
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -14,7 +15,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.error import HTTPError
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import (
+    parse_qsl,
+    quote,
+    urlencode,
+    urljoin,
+    urlparse,
+    urlsplit,
+    urlunsplit,
+)
 from urllib.request import Request, urlopen
 
 from cryptography.exceptions import InvalidTag
@@ -47,8 +56,9 @@ if TYPE_CHECKING:
 
 NOT_MODIFIED = 304
 MIN_SAMPLE_SIZE = 2
+MAX_FREE_API_PAGES = 100
 BASE_URL = "https://artificialanalysis.ai/leaderboards/providers"
-MODEL_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+MODEL_API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
 MODEL_API_KEY_ENV = "ARTIFICIAL_ANALYSIS_API_KEY"
 MODEL_API_BASE_URL_ENV = "ARTIFICIAL_ANALYSIS_API_BASE_URL"
 CACHE_META_FILE = "providers-cache.json"
@@ -109,6 +119,14 @@ class _HttpResponseContext(Protocol):
 
 def _urlopen(request: Request, timeout_seconds: float) -> object:
     fn: Callable[..., object] = urlopen
+    default_ca = ssl.get_default_verify_paths().cafile
+    system_ca = Path("/etc/ssl/certs/ca-certificates.crt")
+    if not default_ca and not os.environ.get("SSL_CERT_FILE") and system_ca.is_file():
+        return fn(
+            request,
+            timeout=timeout_seconds,
+            context=ssl.create_default_context(cafile=str(system_ca)),
+        )
     return fn(request, timeout=timeout_seconds)
 
 
@@ -355,6 +373,103 @@ def fetch_models(
         _raise_os_error(message, exc)
 
 
+def fetch_all_models(api_key: str, *, timeout_seconds: float = 60.0) -> FetchResult:
+    """Collect every free API page, validating pagination before publishing."""
+    base = os.environ.get(MODEL_API_BASE_URL_ENV) or MODEL_API_URL
+    parts = urlsplit(base)
+    query = [(key, value) for key, value in parse_qsl(parts.query) if key != "page"]
+    rows: list[object] = []
+    pages: list[dict[str, object]] = []
+    page = 1
+    first: FetchResult | None = None
+    version: object = None
+    expected_pages: int | None = None
+    while True:
+        url = urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                urlencode([*query, ("page", str(page))]),
+                parts.fragment,
+            )
+        )
+        result = fetch_models(api_key, timeout_seconds=timeout_seconds, url=url)
+        if first is None:
+            first = result
+        try:
+            payload = parse_json(result.body)
+        except json.JSONDecodeError as exc:
+            _raise_extraction_error("Official model API returned invalid JSON.", exc)
+        if (
+            not is_str_dict(payload)
+            or not is_object_list(payload.get("data"))
+            or not is_str_dict(payload.get("pagination"))
+        ):
+            _raise_extraction_error("Official model API requires data and pagination.")
+        pagination = payload.get("pagination")
+        data = payload.get("data")
+        if not is_str_dict(pagination) or not is_object_list(data):
+            _raise_extraction_error("Official model API requires data and pagination.")
+        current_version = payload.get("intelligence_index_version")
+        if page == 1:
+            version = current_version
+        total_pages = pagination.get("total_pages")
+        has_more = pagination.get("has_more")
+        if (
+            page == 1
+            and isinstance(total_pages, int)
+            and not isinstance(total_pages, bool)
+        ):
+            expected_pages = total_pages
+        if (
+            payload.get("tier") != "free"
+            or not isinstance(current_version, int)
+            or isinstance(current_version, bool)
+            or current_version != version
+            or pagination.get("page") != page
+            or expected_pages is None
+            or not 1 <= expected_pages <= MAX_FREE_API_PAGES
+            or total_pages != expected_pages
+            or not isinstance(has_more, bool)
+            or has_more != (page < expected_pages)
+            or not data
+        ):
+            _raise_extraction_error(
+                "Official model API pagination or index version is inconsistent."
+            )
+        rows.extend(data)
+        pages.append(
+            {
+                "page": page,
+                "url": redact_query(url),
+                "sha256": hashlib.sha256(result.body.encode("utf-8")).hexdigest(),
+            }
+        )
+        if not has_more:
+            break
+        page += 1
+    body = json.dumps(
+        {
+            "tier": "free",
+            "pages": pages,
+            "intelligence_index_version": version,
+            "data": rows,
+            "pagination": {"page": 1, "total_pages": page, "has_more": False},
+        }
+    )
+    raw = body.encode("utf-8")
+    return FetchResult(
+        body,
+        first.status_code,
+        first.headers,
+        first.fetched_at,
+        final_url=base,
+        sha256=hashlib.sha256(raw).hexdigest(),
+        byte_length=len(raw),
+    )
+
+
 def normalize_official_models(
     api_payload: str,
     *,
@@ -375,10 +490,12 @@ def normalize_official_models(
     status = parsed_dict.get("status")
     prompt_options = parsed_dict.get("prompt_options")
     rows_raw = parsed_dict.get("data")
-    if (
-        not isinstance(status, int)
-        or not is_str_dict(prompt_options)
-        or not is_object_list(rows_raw)
+    if not is_object_list(rows_raw) or not (
+        (isinstance(status, int) and is_str_dict(prompt_options))
+        or (
+            parsed_dict.get("tier") == "free"
+            and is_str_dict(parsed_dict.get("pagination"))
+        )
     ):
         msg = (
             "Official model API envelope requires integer status, object "
@@ -419,6 +536,8 @@ _OFFICIAL_MODEL_FIELDS = frozenset(
         "model_creator",
         "evaluations",
         "pricing",
+        "performance",
+        "artificial_analysis_intelligence_index_cost",
         "median_output_tokens_per_second",
         "median_time_to_first_token_seconds",
         "median_time_to_first_answer_token",
@@ -432,6 +551,10 @@ _MODEL_PRICING_FIELDS = frozenset(
         "price_1m_output",
         "price_1m_cached_input",
         "price_1m_cache_read",
+        "price_1m_input_tokens",
+        "price_1m_output_tokens",
+        "price_1m_cache_hit_tokens",
+        "price_1m_cache_write_tokens",
     },
 )
 
@@ -551,7 +674,13 @@ def _normalize_official_model(
         parser=parser,
         diagnostics=diagnostics,
     )
+    performance = row_dict.get("performance")
+    performance = performance if is_str_dict(performance) else {}
     result: dict[str, object] = {
+        "performance": performance,
+        "artificial_analysis_intelligence_index_cost": row_dict.get(
+            "artificial_analysis_intelligence_index_cost"
+        ),
         "id": source.get("id"),
         "slug": slug,
         "name": name,
@@ -563,14 +692,17 @@ def _normalize_official_model(
             if key not in {"raw_fields", "raw_metadata"}
         },
         "pricing": normalized_pricing,
-        "median_output_tokens_per_second": source.get(
+        "median_output_tokens_per_second": performance.get(
             "median_output_tokens_per_second",
+            source.get("median_output_tokens_per_second"),
         ),
-        "median_time_to_first_token_seconds": source.get(
+        "median_time_to_first_token_seconds": performance.get(
             "median_time_to_first_token_seconds",
+            source.get("median_time_to_first_token_seconds"),
         ),
-        "median_time_to_first_answer_token": source.get(
-            "median_time_to_first_answer_token",
+        "median_time_to_first_answer_token": performance.get(
+            "median_time_to_first_answer_token_seconds",
+            source.get("median_time_to_first_answer_token"),
         ),
         "identity": canonical_model_identity(
             slug,
@@ -614,6 +746,13 @@ def _normalize_official_model(
 _OFFICIAL_EVALUATION_NAMES = {
     "artificial_analysis_intelligence_index": "intelligence_index",
     "artificial_analysis_coding_index": "coding_index",
+    "artificial_analysis_agentic_index": "agentic_index",
+    "artificial_analysis_economics_index": "economics_index",
+    "artificial_analysis_engineering_index": "engineering_index",
+    "artificial_analysis_finance_and_accounting_index": "finance_and_accounting_index",
+    "artificial_analysis_healthcare_and_medical_index": "healthcare_and_medical_index",
+    "artificial_analysis_legal_index": "legal_index",
+    "artificial_analysis_strategy_and_ops_index": "strategy_and_ops_index",
     "artificial_analysis_math_index": "math_index",
     "terminalbench_v2_1": "terminalbench_v21",
     "tau2": "tau_2",
@@ -811,17 +950,71 @@ def _find_manifest_node(node: object) -> dict[str, str] | None:
     return None
 
 
-def decode_manifest_payload(data: bytes, key_hex: str) -> dict[str, object]:
-    """Decode the public frontend's authenticated, compressed model catalog."""
+def _decode_manifest(data: bytes, key_hex: str) -> object:
     try:
         key = bytes.fromhex(key_hex)
         decrypted = AESGCM(key).decrypt(hashlib.sha256(key).digest()[:12], data, None)
-        parsed = parse_json(gzip.decompress(decrypted))
+        return parse_json(gzip.decompress(decrypted))
     except (ValueError, InvalidTag, OSError, EOFError, binascii.Error) as exc:
         _raise_extraction_error("Invalid public evaluation manifest payload", exc)
+
+
+def decode_manifest_payload(data: bytes, key_hex: str) -> dict[str, object]:
+    """Decode the public frontend's authenticated, compressed model catalog."""
+    parsed = _decode_manifest(data, key_hex)
     if not is_str_dict(parsed):
         _raise_extraction_error("Evaluation manifest must contain an object")
     return parsed
+
+
+def decode_provider_manifest(data: bytes, key_hex: str) -> list[object]:
+    """Decode the provider leaderboard's full endpoint population."""
+    parsed = _decode_manifest(data, key_hex)
+    if not is_object_list(parsed) or not parsed:
+        _raise_extraction_error("Provider manifest must contain endpoint rows")
+    return parsed
+
+
+def fetch_provider_manifest(
+    manifest: dict[str, str], *, base_url: str, timeout_seconds: float = 60.0
+) -> tuple[list[object], dict[str, object]]:
+    """Fetch provider rows from the page's origin and record their hash."""
+    url = urljoin(base_url, manifest["path"])
+    base = urlparse(base_url)
+    target = urlparse(url)
+    if (
+        target.scheme != "https"
+        or target.netloc != base.netloc
+        or target.username
+        or target.password
+    ):
+        _raise_extraction_error("Provider manifest must use the page's HTTPS origin")
+    request = Request(url, headers={"User-Agent": "artificial-analysis/0.3"})
+    try:
+        response = _urlopen(request, timeout_seconds)
+        if not isinstance(response, _HttpResponseContext):
+            _raise_os_error("Failed to open response context", ValueError())
+        with response as opened:
+            final = _response_final_url(opened, url) or url
+            if (
+                urlparse(final).scheme != "https"
+                or urlparse(final).netloc != base.netloc
+            ):
+                _raise_extraction_error(
+                    "Provider manifest redirected outside its origin"
+                )
+            raw = response.read()
+            status = _response_status(opened)
+    except HTTPError as exc:
+        _raise_os_error(f"Provider manifest request failed: HTTP {exc.code}", exc)
+    return decode_provider_manifest(raw, manifest["key"]), {
+        "url": redact_query(url),
+        "final_url": redact_query(final),
+        "status_code": status,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "byte_length": len(raw),
+        "population": "manifest_endpoints",
+    }
 
 
 def fetch_manifest_models(
@@ -1665,7 +1858,14 @@ def build_snapshot_payload(  # noqa: PLR0913
         "source_path": source_path,
         "unmatched_api_model_slugs": unmatched_api,
     }
+    api_envelope: object = (
+        parse_json(official_result.body) if official_result.body else {}
+    )
     official_source: dict[str, object] = {
+        "pages": api_envelope.get("pages") if is_str_dict(api_envelope) else None,
+        "intelligence_index_version": api_envelope.get("intelligence_index_version")
+        if is_str_dict(api_envelope)
+        else None,
         "url": api_url,
         "final_url": redact_query(official_result.final_url or api_url),
         "status_code": official_result.status_code,
@@ -1877,7 +2077,13 @@ def _merge_canonical_model(  # noqa: C901
     if rsc_model is None and official_model is None:
         return {}
     if rsc_model is None:
-        return dict(official_model) if official_model is not None else {}
+        if official_model is None:
+            return {}
+        merged = dict(official_model)
+        evaluations = official_model.get("evaluations")
+        if is_str_dict(evaluations):
+            merged.update(evaluations)
+        return merged
     merged = dict(rsc_model)
     if official_model is None:
         if "creator" not in merged and isinstance(merged.get("model_creators"), dict):
@@ -1894,6 +2100,8 @@ def _merge_canonical_model(  # noqa: C901
         "slug",
         "name",
         "release_date",
+        "artificial_analysis_intelligence_index_cost",
+        "performance",
         "creator",
         "pricing",
         "median_output_tokens_per_second",
@@ -1904,9 +2112,7 @@ def _merge_canonical_model(  # noqa: C901
             merged[key] = official_model[key]
     evaluations = official_model.get("evaluations")
     if is_str_dict(evaluations):
-        merged.update(
-            {name: value for name, value in evaluations.items() if value is not None}
-        )
+        merged.update(evaluations)
     rsc_raw = merged.get("raw_fields")
     official_raw = official_model.get("raw_fields")
     if is_str_dict(official_raw):
