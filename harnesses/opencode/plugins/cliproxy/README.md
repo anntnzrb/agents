@@ -28,7 +28,9 @@ Discovery:
    last `/`, then the same keys with a trailing thinking-level qualifier (`-minimal`, `-low`, `-medium`,
    `-high`, `-xhigh`, `-max`, `-thinking`) removed, so `gemini-3.8-flash-high` resolves to the
    catalog's `gemini-3.8-flash` row. When several rows share a key, the widest context window wins.
-   Matched models copy name, release date, tool support, input modalities, limits, and tiered cost.
+   Matched models copy name, family, release date, tool support, input modalities, limits, and tiered cost.
+   The family lets OpenCode pick a small model for session titles (`gpt-luna`, then `gemini-flash-lite`,
+   `gemini-flash`, `claude-haiku`) instead of the session's own model.
 3. Unknown ids keep the `Model.Info.default` limits and no cost.
 
 Every model ships `variants` so `variant_cycle` (`ctrl+t`) and the variant list work through the proxy.

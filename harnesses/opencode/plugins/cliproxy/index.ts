@@ -107,6 +107,8 @@ function toModel(model: GatewayModel, entry: Model.Info | undefined): Model.Info
 	return {
 		...base,
 		name: pool ? `${name} (${pool})` : name,
+		// OpenCode picks the title agent's small model and groups model versions by family.
+		...(entry?.family && { family: entry.family }),
 		time: { released: entry?.time.released ?? 0 },
 		capabilities: {
 			tools: entry?.capabilities.tools ?? true,

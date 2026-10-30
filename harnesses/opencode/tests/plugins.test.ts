@@ -33,6 +33,7 @@ test("discovery enriches gateway models from the models.dev provider records", a
   }) as typeof fetch;
   const flash = catalogModel("gemini-3.8-flash", {
     name: "Gemini Flash",
+    family: "gemini-flash" as never,
     limit: { context: 1000000, output: 64000 },
     capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
     cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }] as never,
@@ -81,7 +82,7 @@ test("discovery enriches gateway models from the models.dev provider records", a
       for (const model of models) Schema.decodeUnknownSync(Model.Info)(model);
       expect(models[0]).toMatchObject({
         id: "gemini-3.8-flash-high", modelID: "gemini-3.8-flash-high", providerID: "cliproxy",
-        name: "Gemini Flash (antigravity)", limit: { context: 1000000, output: 64000 },
+        name: "Gemini Flash (antigravity)", family: "gemini-flash", limit: { context: 1000000, output: 64000 },
         capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
         cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }],
         variants: [
