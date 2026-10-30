@@ -8,12 +8,11 @@
 
 [implementer]
 role = "implementation"
-use_for = "Logic changes and debugging, checked with one targeted command for its own slice, and any slice the scout failed"
-not_for = "Edits the scout can do, full test suites, and CI gates"
+use_for = "Parallel logic slices with disjoint files, implementation or debugging whose context the orchestrator has not loaded, and any slice the scout failed, each checked with one targeted command for its own slice"
+not_for = "Changes whose context the orchestrator already holds, full test suites, and CI gates"
 provider = "codex"
-model = "gpt-6.1-sol"
+model = "gpt-6.1-terra"
 options = { reasoningEffort = "medium" }
-retry_options = { reasoningEffort = "xhigh" }
 
 [reviewer]
 role = "review"
@@ -21,20 +20,12 @@ use_for = "A code diff that changes behavior, before the orchestrator reports it
 not_for = "Prose-only, mechanical, or typo-sized diffs"
 provider = "codex"
 model = "gpt-6.1-sol"
-options = { reasoningEffort = "high" }
-
-[runner]
-role = "test"
-use_for = "Running the verification commands the orchestrator names, such as test suites, builds, linters, and CI gates, then reporting pass or fail with trimmed failure output"
-not_for = "Editing files, fixing failures, choosing which checks to run"
-provider = "opencode"
-model = "cliproxy/gemini-3.8-flash-high"
-options = { variant = "high" }
+options = { reasoningEffort = "medium" }
 
 [scout]
 role = "research"
-use_for = "Read-only recon, code search, summaries, web research, mechanical or prose edits in named files such as renames, find-and-replace, or rewording, and review of prose-only or mechanical diffs when the user asks for one"
-not_for = "Debugging, logic changes, long command chains"
+use_for = "Read-only work: recon, code search, summaries, web research, running the verification commands the orchestrator names, such as full test suites, builds, linters, CI gates, and CI waits, then reporting pass or fail with trimmed failure output, and review of prose-only or mechanical diffs when the user asks for one"
+not_for = "Edits of any kind, fixing failures, choosing which checks to run, debugging, logic changes, and one quick targeted check the orchestrator runs itself"
 provider = "opencode"
 model = "cliproxy/gemini-3.8-flash-high"
 options = { variant = "high" }

@@ -79,7 +79,7 @@ Use local integration into `main` and normal direct pushes by default. Use short
 4. Verify the combined diff against `origin/main` and rerun checks affected by integration. Run `git diff --check origin/main HEAD` and `uv run --script .github/scripts/ci.py local --base origin/main`. Run the sync gates and tests linked above; the pre-push hook also runs them.
 5. Publish with `git push origin main`. Inspect the resulting CI run before reporting publication as checked.
 
-In T3, a read-only runner child can verify the push's expected CI checks and wake the parent on completion. Do not create a placeholder PR for a watcher or poll from the parent.
+In T3, a read-only scout child can verify the push's expected CI checks and wake the parent on completion. Do not create a placeholder PR for a watcher or poll from the parent.
 
 If `origin/main` has advanced beyond the local history, stop the fast-forward step and reconcile the histories in the owner's isolated checkout. Review conflicts and repeat the relevant checks before pushing. Do not force-push, reset, discard unfamiliar changes, or switch a shared checkout's branch or worktree state.
 
