@@ -25,18 +25,18 @@ For implementation, refactoring, or review, loading this file alone is incomplet
 ## Inspect real source
 
 1. Inspect project manifests, lockfiles, imports, installed exports, and declarations.
-   Before writing Effect code, read the installed `effect/AGENTS.md` completely and follow its links as needed. If absent, read the matching upstream `LLMS.md`.
-2. Inspect the vendored `Effect-TS/effect` source checkout (or upstream repository) for implementation, tests, examples, `LLMS.md`, and `MIGRATION.md`.
-3. If the checkout is absent, follow the global vendored-source policy to create its lightweight clone.
-4. If the checkout revision differs from the project version, state the mismatch. Inspect the installed package or a temporary shallow clone of the matching tag. Never treat current `main` as proof for a pinned release.
+2. Follow the project's own Effect guidance first: instruction-file routes, Effect convention docs, and pinned reference checkouts such as `.repos/effect*`. Project house style overrides this skill's generic patterns.
+3. Before writing Effect code, resolve the `effect` package installed for the package you are editing. Workspace packages can install separate copies, such as `<workspace-package>/node_modules/effect`. Read its `AGENTS.md` completely and open the `ai-docs/src` examples it links for the task. It ships with the package, so it matches the installed version exactly. Check API signatures against the installed `src/` and declarations.
+4. For `MIGRATION.md`, upstream tests, and examples outside the package, use the vendored `Effect-TS/effect` checkout. If it is absent, shallow-clone it at its vendored-source path under the global policy without asking. The scheduled refresh maintains it afterward. Do not pull, reset, or switch an existing checkout.
+5. The vendored checkout tracks `main`. If its version differs from the installed version, state the mismatch, then inspect the installed package or a temporary shallow clone of the matching tag. Never treat current `main` as proof for a pinned release.
 
-Treat vendored repositories as read-only references. Never import from them or edit them as application code.
+`Effect-TS/effect-smol` merged into `Effect-TS/effect`. Do not vendor it separately. Treat vendored repositories as read-only references. Never import from them or edit them as application code.
 
 ## Use live Effect documentation
 
-Effect API questions MUST use authoritative documentation sources.
+Effect API questions MUST use authoritative documentation sources. Answer from the installed package and vendored source first. Use live documentation when they lack coverage, for packages not installed, or when no project exists yet.
 
-For targeted package and API documentation, query Context7 directly:
+Context7 can return v3 content. Discard results that do not match the project's major version. Query it directly:
 
 ```bash
 bun x ctx7@latest docs /effect-ts/effect "<what to look up>"

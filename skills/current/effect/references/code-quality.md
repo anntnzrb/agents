@@ -84,7 +84,7 @@ A narrow JavaScript `try/catch` can be valid in a non-Effect host adapter or aro
 
 ## Mandatory review pass
 
-1. Inspect the nearest version-matched Effect implementation, tests, `LLMS.md`, migration note, and project precedent for every unfamiliar API.
+1. Inspect the installed `effect/AGENTS.md`, the nearest version-matched Effect implementation, tests, migration note, and project precedent for every unfamiliar API.
 2. Trace one complete changed path from external input through domain logic and services to the runtime output. Confirm each concern has one owner.
 3. Review the candidate inventory from the entry pass. For each occurrence, identify who owns sequencing, failure translation, interruption, and cleanup. Keep only constructs required by a boundary or demonstrated in matching source.
 4. Reject these patterns unless a host boundary demonstrably requires them:

@@ -77,10 +77,11 @@
       "expected_output": "Uses the shared lightweight Effect checkout as read-only reference and keeps the project version authoritative.",
       "files": [],
       "expectations": [
-        "The answer uses the vendored Effect checkout or upstream repository",
-        "The answer reads relevant implementation, tests, LLMS.md, and MIGRATION.md",
+        "The answer reads the installed effect package's AGENTS.md and linked ai-docs examples first",
+        "The answer uses the vendored Effect checkout and shallow-clones it without asking when absent",
+        "The answer reads relevant implementation, tests, and MIGRATION.md",
         "The answer treats the checkout as read-only and never imports from it",
-        "The answer follows the global vendored-source policy and never pulls, edits, builds, switches, resets, or cleans the shared checkout",
+        "The answer follows the global vendored-source policy and never pulls, edits, builds, switches, resets, or cleans an existing shared checkout",
         "The answer states the mismatch and inspects matching installed code or a matching revision instead of trusting main"
       ]
     },

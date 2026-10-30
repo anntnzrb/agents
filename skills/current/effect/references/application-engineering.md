@@ -22,9 +22,7 @@ Never mix Effect v3 and v4 packages, package names, imports, documentation, or e
 
 When maintaining an existing project, inspect its manifest, lockfile, imports, installed exports, and declarations first. Honor the pinned major version for the requested maintenance task. Do not migrate an existing v3 project to v4 without approval, and never use v4 guidance as if it applied to v3.
 
-Inspect the shared vendored Effect source checkout under the configured vendored sources directory (or the upstream repository `Effect-TS/effect`).
-
-If the checkout is absent, clone it under the global vendored-source policy. Read `LLMS.md`, `MIGRATION.md`, package manifests, implementation, tests, and examples relevant to the task. Prefer source patterns over guesses and fragmented web snippets.
+Read the installed package's `AGENTS.md` and the `ai-docs/src` examples it links. They match the installed version exactly. For `MIGRATION.md`, tests, and examples outside the package, inspect the shared vendored `Effect-TS/effect` checkout. If it is absent, shallow-clone it at its vendored-source path under the global policy without asking. Prefer source patterns over guesses and fragmented web snippets.
 
 The project version remains authoritative. If the shared checkout does not match the installed project version, state the mismatch. Inspect the installed package or a temporary shallow clone of the matching tag instead of pretending that `main` is compatible.
 
@@ -168,7 +166,7 @@ Before coding:
 
 1. Define the requested outcome and acceptance criteria.
 2. Inspect the project versions, installed exports, declarations, and nearest working code.
-3. Inspect matching vendored Effect source, `LLMS.md`, `MIGRATION.md`, tests, and examples.
+3. Read the installed `effect/AGENTS.md`, then inspect matching vendored Effect source, `MIGRATION.md`, tests, and examples.
 4. Read `code-quality.md` and use live Effect v4 documentation for API questions.
 5. State the smallest architecture, services, Layers, and dependencies for non-trivial work.
 6. Add or update a failing test first when the behavior has a cheap local test path.
@@ -197,8 +195,8 @@ Report the implementation, changed files, dependencies, commands, diagnostics, t
 
 Use sources in this order:
 
-1. Project manifest, lockfile, installed `effect/AGENTS.md`, exports, and declarations.
-2. Matching vendored Effect implementation, tests, examples, `LLMS.md`, and `MIGRATION.md`.
+1. Project manifest, lockfile, project Effect guidance, installed `effect/AGENTS.md` with its `ai-docs` examples, exports, and declarations.
+2. Matching vendored Effect implementation, tests, examples, and `MIGRATION.md`, cloned on demand when absent.
 3. Current official documentation and source:
    - <https://www.effect.website/docs/v4>
    - <https://github.com/Effect-TS/effect/tree/main>
