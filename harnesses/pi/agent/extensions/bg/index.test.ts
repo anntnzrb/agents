@@ -265,3 +265,26 @@ test("kill racing session shutdown resolves instead of failing on the removed lo
   const kill = h.jobs("kill", id); await pause(100); await h.shutdown();
   await expect(kill).resolves.toBeDefined();
 });
+test("jobs and logs die with Pi even when Pi is killed with SIGKILL", async () => {
+  // A stand-in Pi process loads the extension, starts a background job that escapes its group, and is SIGKILLed.
+  const marker = `${process.pid}${Date.now() % 100000}`;
+  const host = spawn(process.execPath, ["-e", `
+    const bg = (await import(${JSON.stringify(new URL("./index.ts", import.meta.url).href)})).default;
+    const tools = new Map();
+    bg({ getSettings: () => ({ bg: { thresholdMs: 40 } }), registerTool: t => tools.set(t.name, t), on: () => {}, sendMessage: () => {} });
+    const ctx = { cwd: process.cwd(), mode: "rpc", hasUI: true, hasPendingMessages: () => false, sessionManager: { getSessionId: () => "t", getSessionFile: () => undefined } };
+    const r = await tools.get("bash").execute("t", { command: "perl -e 'use POSIX; setsid(); exec \\"sleep\\", \\"${marker}\\"' & exec sleep ${marker}", background: true }, undefined, undefined, ctx);
+    console.log(r.content[0].text.match(/Log: (\\S+)/)[1]);
+  `], { stdio: ["ignore", "pipe", "inherit"] });
+  let out = ""; host.stdout.on("data", c => { out += c; });
+  await until(() => out.includes("\n"));
+  const log = out.trim();
+  const count = () => new Promise<number>(resolve => { let s = ""; const p = spawn("pgrep", ["-f", `^sleep ${marker}$`]); p.stdout.on("data", c => { s += c; }); p.once("exit", () => resolve(s.trim().split("\n").filter(Boolean).length)); });
+  await until(() => false, 500);
+  expect(await count()).toBe(2);
+  host.kill("SIGKILL");
+  let left = 2; for (const end = Date.now() + 5000; left && Date.now() < end; await pause(100)) left = await count();
+  expect(left).toBe(0);
+  let removed = false; for (const end = Date.now() + 3000; !removed && Date.now() < end; await pause(100)) removed = await access(log).then(() => false, () => true);
+  expect(removed).toBe(true);
+});

@@ -64,13 +64,18 @@ script, stay in the foreground because the caller needs the command's own result
 execution requires POSIX process groups and an interactive or RPC context with UI support.
 
 Output is written to the log with backpressure, so a fast producer waits on the disk instead of
-growing Pi's memory. The hard maximum kills the process group. Session shutdown, including Pi's
-SIGTERM and SIGHUP handling, kills active groups, waits for them, and removes the log directory.
-SIGKILL of Pi leaves jobs running because no handler can run. Logs and IDs are session-local;
-reload/resume never adopts old PIDs. Normal shell exit also cleans up residual descendants in its
-group. Commands that deliberately detach into a different process group are outside this ownership
-boundary: they keep running, but a job whose shell exited settles once its pipes go quiet even if
-such a descendant still holds them.
+growing Pi's memory. The hard maximum kills the process group. Session shutdown kills active
+groups, waits for them, and removes the log directory. Logs and IDs are session-local;
+reload/resume never adopts old PIDs. A job whose shell exited settles once its pipes go quiet, even
+if a detached descendant still holds them.
+
+No job outlives Pi. The first background job starts [`reaper.sh`](reaper.sh), a small `/bin/sh`
+process whose stdin Pi holds open. However Pi exits (quit, Ctrl+C, closed terminal, SIGTERM,
+SIGHUP, or SIGKILL), the kernel closes that pipe, and the reaper sends SIGTERM and then, after one
+second, SIGKILL to every live job group, then removes the log directory and exits. Every job also
+carries `PI_BG_OWNER=<tag>` in its environment, so the reaper also kills processes that left their
+group with `setsid`. A process that clears its own environment and leaves its group is the only
+remaining escape.
 After publishing, `/reload` or restart Pi to load changes; reload stops existing managed jobs.
 
 ## Validate
@@ -92,3 +97,6 @@ completion has been delivered. Check three scenarios in the JSONL events:
    starts a new turn.
 
 Afterwards confirm with `pgrep` that no job processes remain.
+
+The test suite also kills a host process with SIGKILL and checks that its jobs, including a
+`setsid` escapee, and its log directory are gone.

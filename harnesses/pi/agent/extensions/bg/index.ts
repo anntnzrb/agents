@@ -2,6 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, open, rm, stat, type FileHandle } from "node:fs/promises";
 import { constants, tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+const REAPER = fileURLToPath(new URL("./reaper.sh", import.meta.url));
 import { Type } from "typebox";
 import { createBashToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, getShellConfig, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -80,6 +82,9 @@ export default function bg(pi: ExtensionAPI) {
   let delivery: ReturnType<typeof setTimeout> | undefined;
   let shutdown: Promise<void> | undefined;
   let starting = 0;
+  let reaper: ChildProcess | undefined;
+  // Tags every job so the reaper also finds processes that left the job's group.
+  const owner = `${process.pid}-${Date.now().toString(36)}`;
   const settings = () => {
     const all = pi.getSettings();
     const config = (all as typeof all & { bg?: { thresholdMs?: number; maxJobMs?: number } }).bg;
@@ -126,14 +131,22 @@ export default function bg(pi: ExtensionAPI) {
           if (execution.signal?.aborted) throw new Error("aborted");
           if (execution.timeout !== undefined && (!Number.isFinite(execution.timeout) || execution.timeout <= 0 || execution.timeout * 1000 > 2147483647)) throw new Error("Invalid timeout: must be a finite positive number of seconds <= 2147483.647");
           const shell = getShellConfig(all.shellPath);
-          directory ??= mkdtemp(join(tmpdir(), "pi-bg-"));
+          directory ??= mkdtemp(join(tmpdir(), "pi-bg-")).then(dir => {
+            // The reaper outlives Pi only long enough to kill its jobs: Pi holds its stdin, and the
+            // kernel closes that pipe however Pi exits, even SIGKILL.
+            reaper = spawn("/bin/sh", [REAPER, dir, owner], { detached: true, stdio: ["pipe", "ignore", "ignore"] });
+            reaper.stdin!.on("error", () => {});
+            reaper.unref(); (reaper.stdin as unknown as { unref?: () => void }).unref?.();
+            return dir;
+          });
           const sequence = ++serial;
           const path = join(await directory, `${sequence}.log`);
           const file = await open(path, "wx", 0o600);
           if (closing || execution.signal?.aborted) { await file.close(); throw new Error("aborted"); }
-          const child = spawn(shell.shell, [...shell.args, command], { cwd, env: execution.env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+          const child = spawn(shell.shell, [...shell.args, command], { cwd, env: { ...execution.env, PI_BG_OWNER: owner }, detached: true, stdio: ["ignore", "pipe", "pipe"] });
           const job: Job = { id: `bg-${sequence}`, command: params.command, path, child, pid: child.pid, file, started: Date.now(), background: false, consumed: false, watchers: 0, done: Promise.resolve(), writes: Promise.resolve() };
           jobs.set(job.id, job);
+          if (child.pid) reaper?.stdin!.write(`+${child.pid}\n`);
           starting--; reserved = false;
           let timedOut = false;
           let failure: Error | undefined;
@@ -163,6 +176,7 @@ export default function bg(pi: ExtensionAPI) {
               job.code = sig ? 128 + constants.signals[sig] : code ?? 1;
               if (failure) job.code = 1;
               await job.writes; await file.close(); job.ended = Date.now();
+              if (child.pid) reaper?.stdin!.write(`-${child.pid}\n`);
               resolve(); if (job.background) schedule();
             };
             child.once("exit", (code, sig) => {
@@ -263,6 +277,7 @@ export default function bg(pi: ExtensionAPI) {
       for (const job of jobs.values()) if (job.ended === undefined || job.terminating) signalGroup(job, "SIGKILL");
       await Promise.all([...jobs.values()].map(j => j.done));
       if (directory) await rm(await directory, { recursive: true, force: true });
+      reaper?.stdin!.end();
     })();
     return shutdown;
   });
