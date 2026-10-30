@@ -1,8 +1,8 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "ea32d9562a1c9f077d7cdd3be53d07383eb18866",
+  "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
   "trees": {
-    "pstack/skills/how": "9b4be46559d1aba8b01c0cb9e78d8b9ca76f3201"
+    "pstack/skills/how": "3fd1c05ec675e7225d51e19e8ec80b92217adfbf"
   }
 }
