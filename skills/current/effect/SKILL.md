@@ -60,7 +60,7 @@ bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
 
 - Before editing, classify changed control flow as pure TypeScript, an Effect program, or a host adapter. Assign sequencing, failure, interruption, and cleanup to one owner.
 - Keep one control-flow owner. An Effect-returning function is not `async`. Never use JavaScript `try/catch` around `yield*` or round-trip through Effect runners and Promises.
-- Use `Effect.fn("name")` for named Effect functions and `Effect.gen` for local sequential composition. Use `return yield*` for terminal Effects.
+- Use `Effect.fn("name")` for named Effect functions and `Effect.gen` for local sequential composition. Use `Effect.fnUntraced` instead when tracing is not useful, such as library internals and hot paths. Use `return yield*` for terminal Effects.
 - Wrap foreign throws, rejections, and callbacks once with the matching Effect constructor. Preserve cancellation at the boundary.
 - Use `Schema.TaggedError` for expected errors in new v4 code. Translate once, recover by tag when possible, and never catch merely to log and rethrow.
 - Decode untrusted input once at the edge with the project's schema boundary. Keep domain values typed thereafter.

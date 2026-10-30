@@ -148,7 +148,7 @@ Test:
 - HTTP, CLI, SQL, or other boundaries that the application exposes
 Prefer test Layers, test services, `TestClock`, in-memory edges, and dependency replacement over global module mocking. Keep tests deterministic. Do not require live credentials unless the task explicitly requests an integration test.
 
-Effect platform services such as `FileSystem` and `Path` perform asynchronous operations (`exists`, `readFileString`). Attempting to drive them with `Effect.runSync` will fail. Always drive platform-dependent Effect programs with `await Effect.runPromise(...)` in test suites.
+Effect platform services such as `FileSystem` and `Path` perform asynchronous operations (`exists`, `readFileString`). Attempting to drive them with `Effect.runSync` will fail. In a new Bun application without a project test harness, drive platform-dependent Effect programs with `await Effect.runPromise(...)`. In an existing project, follow its Effect test harness and lint rules.
 ## Dependency exclusions
 
 Do not use old Effect package names or v3-only tutorials:

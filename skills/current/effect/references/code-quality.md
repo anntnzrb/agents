@@ -31,7 +31,7 @@ These constructs require review, but they are not automatic violations.
 
 - A function whose contract returns `Effect` is not `async`. Keep sequencing, failure, interruption, retry, timeout, and cleanup in Effect.
 - Never use JavaScript `try/catch` around `yield*` to handle an Effect failure. Handle the Effect error channel with Effect combinators.
-- Use `Effect.gen(function*() { ... })` for local sequential composition. Use `Effect.fn("qualifiedName")` for a reusable named Effect function instead of returning `Effect.gen` from a plain wrapper.
+- Use `Effect.gen(function*() { ... })` for local sequential composition. Use `Effect.fn("qualifiedName")` for a reusable named Effect function instead of returning `Effect.gen` from a plain wrapper. Use `Effect.fnUntraced` when tracing is not useful, such as library internals and hot paths.
 - Attach transforms as additional `Effect.fn` arguments. Do not pipe the function value itself.
 - Use `return yield*` for terminal failures, interrupts, or other terminal Effects inside a generator.
 - Yield, return, compose, or intentionally assign every Effect. A floating Effect does no work.
