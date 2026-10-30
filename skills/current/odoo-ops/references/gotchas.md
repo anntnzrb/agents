@@ -35,6 +35,28 @@ except psycopg2.errors.UniqueViolation:
 - `Command.unlink(id)` on a One2many deletes the child record when the inverse many2one has `ondelete='cascade'`; otherwise it sets the inverse to `False` (`odoo/fields.py`, `Command.unlink`). `Command.delete(id)` always deletes.
 - Writing a `translate=True` field updates only the context language (`lang`, default `en_US`), plus `en_US` when that language is inactive (`odoo/fields.py`, `_String.write`). To rename a record in every language, call `update_field_translations(field_name, {lang: value, ...})`; over RPC it is a `call`, so it produces a plan. A later module upgrade rewrites only the fields the module's data file declares, so it does not restore a name the XML record omits.
 
+## APIs from later versions
+
+Docs and examples for Odoo 18 to 20 use APIs that 17.0 lacks. Use the 17 equivalent:
+
+| Later API | Odoo 17 equivalent |
+| --- | --- |
+| Field `aggregator=` | `group_operator=` |
+| `check_access(op)` | `check_access_rights(op)` then `check_access_rule(op)` |
+| `has_access(op)`, `_filtered_access(op)` | `check_access_rights(op, raise_exception=False)`, `_filter_access_rules(op)` |
+| `models.Constraint`, `models.Index` | `_sql_constraints`, field `index=` |
+| `Domain` class | `odoo.osv.expression` (`AND`, `OR`, `normalize_domain`) |
+| `self.env._("...")` | `from odoo import _` |
+| `env.user.has_groups(...)`, `res.groups.privilege_id` | `user_has_groups(...)` or `env.user.has_group(xmlid)`, `category_id` |
+| Route `type="json2"`, bearer API keys | Route `type="json"` (JSON-RPC) |
+| `<list>` view tag, `<chatter/>` | `<tree>`, `<div class="oe_chatter">` |
+| `Interaction` public classes, OWL 3 `computed` | `publicWidget`, OWL 2.8 hooks |
+| Cron `_commit_progress` | Process a batch, commit, then `self.env.ref(cron_xmlid)._trigger()` for the rest |
+
+The route option `readonly=` is accepted in 17 but nothing reads it (`odoo/http.py`), so it has no effect.
+
+These look newer but exist in 17.0: `@api.private`, `fields.NO_ACCESS`, `_allow_sudo_commands`, `odoo.tools.SQL`, `search_fetch`, `_read_group(domain, groupby, aggregates)`, `_compute_display_name`, `precompute=`, and `_check_company_domain`. Some arrived by backport: `@api.private` reached 17.0 in February 2025, so an older 17.0 build lacks it. Check the provisioned source with `rg -n "def private" <runtime_path>/odoo/api.py` before relying on one.
+
 ## Modules and Data Loading
 
 - A `<function>` tag inside `noupdate="1"` data runs only at install (`odoo/tools/convert.py`, `_tag_function` returns when `noupdate` and mode is not `init`). A module upgrade (`-u`) skips it. For upgrade-time data changes, see the one-time backfill in [Database recipes](db-recipes.md).
