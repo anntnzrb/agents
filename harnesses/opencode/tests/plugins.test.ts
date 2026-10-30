@@ -1,5 +1,8 @@
 import { expect, jest, test } from "bun:test";
 import { Model } from "@opencode/plugin";
+// Deliberately undeclared: this resolves to the single `effect` copy that `@opencode/plugin`
+// installs. Declaring a version here installs a second copy whenever the two disagree, and a
+// second copy owns a different Schema class, so decoding an @opencode schema with it fails.
 import { Schema } from "effect";
 import discovery from "../plugins/cliproxy";
 import tmap from "../plugins/tmap";
