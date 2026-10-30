@@ -62,6 +62,7 @@ class TestCliDefaultPaths(unittest.TestCase):
             "diff",
             "diagnose",
             "evaluation",
+            "eval-cost",
             "query",
             "qa",
             "compare",

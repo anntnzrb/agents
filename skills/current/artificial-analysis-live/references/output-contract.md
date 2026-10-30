@@ -5,10 +5,10 @@ All CLI and RPC commands output JSON.
 ## CLI
 
 ```json
-{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|evaluation|compare|query|qa|schema","data":{...}}
+{"ok":true,"version":"1","command":"fetch|stats|diff|diagnose|evaluation|eval-cost|compare|query|qa|schema","data":{...}}
 ```
 
-The CLI provides a single entry point. An omitted command defaults to `fetch`. Supported commands are `fetch`, `stats`, `diff`, `diagnose`, `evaluation`, `compare`, `query`, `qa`, and `schema`. Successful execution MUST return `ok: true`, string `version: "1"`, `command`, and `data`.
+The CLI provides a single entry point. An omitted command defaults to `fetch`. Supported commands are `fetch`, `stats`, `diff`, `diagnose`, `evaluation`, `eval-cost` (CLI only), `compare`, `query`, `qa`, and `schema`. Successful execution MUST return `ok: true`, string `version: "1"`, `command`, and `data`.
 
 Default artifacts write to `<temp-dir>/artifacts/artificial-analysis/{full-data.json,endpoints.txt,full-url.txt}` unless an explicit output path is specified.
 
@@ -67,7 +67,7 @@ Snapshot JSON v2 structures data under four top-level keys: `meta`, `models`, `h
 
 `hosts_models` is a provider-endpoint table. Each row includes `model_slug` to join the canonical model and contains endpoint pricing, speed, latency, context size, features, and classifications. Rows in `hosts_models` MUST NOT embed full `model` objects.
 
-Model pricing uses `price_1m_blended_3_to_1` for API scopes. Provider endpoint pricing uses `price_1m_blended_7_to_2_to_1` for RSC scopes.
+API metadata records the Intelligence Index version and per-page hashes. `eval-cost` records derived totals and per-attempt costs, token counts, price sources, page URL, manifest hash, and pricing snapshot hash. It assumes full cache hits for cacheable input; this is not AA measured spend. Missing inputs produce null costs.
 
 ## Evidence, statuses, eligibility
 

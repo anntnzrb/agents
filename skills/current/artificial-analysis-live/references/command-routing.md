@@ -54,6 +54,17 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation
 
 Generic evaluation extraction depends on page schema structure. Dedicated page scores remain separate from official model snapshot metrics.
 
+### eval-cost
+Estimate per-variant evaluation cost. Use the page metric and the total rollout count from the methodology; FrontierCode 2.0 has 132 tasks with three attempts each.
+
+```bash
+uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" eval-cost \
+  https://artificialanalysis.ai/evaluations/frontiercode-2-0 \
+  --metric frontierCode20 --attempts 396 --snapshot <temp-dir>/full-data.json
+```
+
+The calculation assumes all cacheable input is cached and uses the manifest cache-hit price, then the snapshot cache-hit price, and falls back to input pricing when neither is available. It is derived, not AA's measured cost. Missing inputs yield null. Snapshot pricing is optional and joined by exact slug. This command is CLI-only.
+
 ### stats
 Display snapshot counts and top providers.
 

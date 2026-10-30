@@ -33,6 +33,7 @@ from .contracts import (
 from .diagnose import diagnose
 from .diagnostics import redact, redact_query
 from .diff import schema_aware_diff
+from .eval_cost import derive_eval_cost
 from .evidence import (
     attach_payload_evidence,
     attach_row_evidence,
@@ -286,6 +287,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_diff_parser(subparsers)
     _add_diagnose_parser(subparsers)
     _add_evaluation_parser(subparsers)
+    _add_eval_cost_parser(subparsers)
     _add_query_parser(subparsers)
     _add_qa_parser(subparsers)
     _add_compare_parser(subparsers)
@@ -361,6 +363,19 @@ def _add_evaluation_parser(subparsers: _Subparsers) -> None:
     for option in EVALUATION_OPTIONS:
         option.add(evaluation_parser)
     evaluation_parser.set_defaults(handler=_handle_evaluation)
+
+
+def _add_eval_cost_parser(subparsers: _Subparsers) -> None:
+    parser = subparsers.add_parser(
+        "eval-cost", help="Estimate per-variant evaluation costs."
+    )
+    _ = parser.add_argument("url", nargs="?", help="public evaluation page URL")
+    for option in EVALUATION_OPTIONS:
+        option.add(parser)
+    _ = parser.add_argument("--metric", required=True)
+    _ = parser.add_argument("--attempts", required=True, type=int)
+    _ = parser.add_argument("--snapshot", type=Path)
+    parser.set_defaults(handler=_handle_eval_cost)
 
 
 def _add_query_parser(subparsers: _Subparsers) -> None:
@@ -440,6 +455,7 @@ def _normalize_argv(argv: Sequence[str] | None) -> list[str]:
         "diff",
         "diagnose",
         "evaluation",
+        "eval-cost",
         "query",
         "qa",
         "compare",
@@ -1756,6 +1772,72 @@ def _handle_evaluation(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_eval_cost(args: argparse.Namespace) -> int:
+    attempts = _ns_int(args, "attempts")
+    metric = _ns_str(args, "metric")
+    snapshot_path = _ns_optional_path(args, "snapshot")
+    if attempts < 1:
+        _raise_cli_usage_error("attempts must be positive")
+    if (
+        _ns_optional_path(args, "output_json") is not None
+        or _ns_optional_str(args, "sort_by") is not None
+        or _ns_optional_int(args, "limit") is not None
+    ):
+        _raise_cli_usage_error(
+            "eval-cost does not support --output-json, --sort-by or --limit"
+        )
+    evaluation = _evaluation_payload(args)
+    prices: dict[str, dict[str, object]] = {}
+    snapshot_hash: str | None = None
+    if snapshot_path is not None:
+        snapshot_hash = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+        snapshot = load_snapshot(snapshot_path)
+        for item in as_list(snapshot.get("models")):
+            if (
+                is_str_dict(item)
+                and isinstance(item.get("slug"), str)
+                and is_str_dict(item.get("pricing"))
+            ):
+                slug = item.get("slug")
+                pricing = item.get("pricing")
+                if isinstance(slug, str) and is_str_dict(pricing):
+                    prices[slug] = pricing
+    source = as_dict(evaluation.get("source"))
+    population = as_dict(evaluation.get("population_source"))
+    rows = [item for item in as_list(evaluation.get("rows")) if is_str_dict(item)]
+    derived = derive_eval_cost(
+        rows,
+        metric,
+        attempts,
+        prices,
+        source_url=str(source.get("url")),
+        manifest_hash=(str(population["sha256"]) if population.get("sha256") else None),
+    )
+    if not derived:
+        _raise_cli_usage_error(f"No published scores for metric {metric!r}")
+    for row in derived:
+        row["pricing_snapshot_hash"] = snapshot_hash
+    _emit_json(
+        _envelope(
+            "eval-cost",
+            {
+                "value_status": "derived",
+                "source": source,
+                "population_source": population,
+                "pricing_snapshot": str(snapshot_path) if snapshot_path else None,
+                "pricing_snapshot_hash": snapshot_hash,
+                "cache_assumption": (
+                    "All cacheable input tokens are assumed cache hits; "
+                    "this is not AA measured spend."
+                ),
+                "rows": derived,
+            },
+        ),
+        stdout=sys.stdout,
+    )
+    return 0
+
+
 def _handle_query(args: argparse.Namespace) -> int:
     _emit_json(_envelope("query", _query_payload(args)), stdout=sys.stdout)
     return 0
@@ -1886,6 +1968,18 @@ def _capability_schema() -> dict[str, object]:
                 "args": ["url (optional when input is supplied)"],
                 "flags": schema_options(EVALUATION_OPTIONS),
                 "value_status": "published rows; filters/counts are derived",
+            },
+            "eval-cost": {
+                "description": (
+                    "Estimate per-variant costs from evaluation tokens and prices."
+                ),
+                "args": ["url (optional when input is supplied)"],
+                "flags": {
+                    "metric": "published evaluation field",
+                    "attempts": "positive rollout count",
+                    "snapshot": "optional pricing snapshot",
+                },
+                "value_status": "derived",
             },
             "query": {
                 "description": (
@@ -2303,6 +2397,7 @@ def _command_from_argv(values: Sequence[str]) -> str:
         "diff",
         "diagnose",
         "evaluation",
+        "eval-cost",
         "query",
         "qa",
         "compare",

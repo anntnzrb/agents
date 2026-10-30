@@ -41,6 +41,7 @@ uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
 - Rely on published release and effort metadata. Do not assume maximum effort for a bare model slug. Do not assume non-reasoning mode when effort metadata is missing.
 - Resolve ambiguous model families or requested effort levels before running comparisons. MUST NOT omit a requested variant silently.
 - Preserve newly published fields without assuming units or equivalence. Free API snapshots contain indices, prices, and performance, not individual benchmark scores. Use `evaluation` for page scores.
+- Use `eval-cost` for derived per-variant evaluation cost. Supply the metric, total attempts, and optionally a pricing snapshot. Label the full-cache assumption and preserve provenance; AA uses measured cache-hit rates for its own costs.
 - For dedicated benchmark pages, use `evaluation` and match rows against canonical model slugs. Store benchmark scores in a separate table scoped to that source. Do not join rows solely by display name. Do not substitute alternative effort levels when a benchmark page omits one.
 - Report the Intelligence Index version recorded in the API envelope. Report other benchmark versions only when published by their source.
 

@@ -53,6 +53,55 @@ def test_free_api_collects_pages_and_preserves_nulls() -> None:
     assert models[0]["median_output_tokens_per_second"] == 2
 
 
+def test_cost_prices_cache_and_marks_assumptions() -> None:
+    from artificial_analysis.eval_cost import derive_eval_cost
+
+    rows: list[dict[str, object]] = [
+        {
+            "slug": "model",
+            "name": "Model (high)",
+            "frontierCode20": 0.5,
+            "canonicalEvalTokenCounts": {
+                "frontierCode20": {
+                    "input": 1000000,
+                    "answer": 100000,
+                    "reasoning": 100000,
+                    "cacheableInput": 800000,
+                }
+            },
+            "price1mInputTokens": 2,
+            "price1mOutputTokens": 10,
+        }
+    ]
+    priced = derive_eval_cost(
+        rows,
+        "frontierCode20",
+        396,
+        {"model": {"price_1m_cache_hit_tokens": 0.5}},
+        source_url="https://example.test/evaluation",
+        manifest_hash="abc",
+    )
+    assert priced[0]["total_cost_usd"] == 2.8
+    assert priced[0]["cost_per_task_usd"] == pytest.approx(2.8 / 396)
+    assert priced[0]["value_status"] == "derived"
+    assert priced[0]["manifest_hash"] == "abc"
+    assert priced[0]["cache_pricing"] == "cache_hit_assumed"
+    rows[0]["cacheHitPrice"] = 0.25
+    manifest_priced = derive_eval_cost(
+        rows,
+        "frontierCode20",
+        396,
+        {"model": {"price_1m_cache_hit_tokens": 0.5}},
+        source_url="https://example.test/evaluation",
+        manifest_hash="abc",
+    )
+    assert manifest_priced[0]["total_cost_usd"] == 2.6
+    assert (
+        as_dict(manifest_priced[0]["pricing_source"])["cache_hit"]
+        == "evaluation_manifest"
+    )
+
+
 def test_provider_manifest_decodes_complete_endpoint_population() -> None:
     import gzip
     import hashlib
@@ -69,6 +118,56 @@ def test_provider_manifest_decodes_complete_endpoint_population() -> None:
     assert rsc.decode_provider_manifest(raw, key.hex()) == rows
 
 
+def test_eval_cost_cli_replays_page_and_joins_snapshot(tmp_path: Path) -> None:
+    snapshot = tmp_path / "snapshot.json"
+    _ = snapshot.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "model-high",
+                        "pricing": {"price_1m_cache_hit_tokens": 0.5},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    fixture = Path(__file__).parent / "fixtures" / "eval-cost" / "frontier.rsc"
+    cli = Path(__file__).resolve().parents[1] / "scripts" / "cli.py"
+    env = {name: os.environ[name] for name in ("PATH", "HOME") if name in os.environ}
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(cli),
+            "eval-cost",
+            "--input",
+            str(fixture),
+            "--metric",
+            "frontierCode20",
+            "--attempts",
+            "396",
+            "--snapshot",
+            str(snapshot),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+        check=True,
+    )
+    data = as_dict(as_dict(parse_json(completed.stdout))["data"])
+    rows = [as_dict(row) for row in as_list(data["rows"])]
+    assert [row["slug"] for row in rows] == ["model-high", "model-low"]
+    assert rows[0]["total_cost_usd"] == 2.8
+    assert rows[1]["total_cost_usd"] is None
+    assert rows[0]["pricing_snapshot_hash"]
+    assert rows[0]["source_url"] == fixture.resolve().as_uri()
+    assert rows[1]["cache_pricing"] == "input_rate_fallback"
+
+
+def test_free_api_rejects_inconsistent_pagination() -> None:
+    bad = json.dumps(
         {
             "tier": "free",
             "intelligence_index_version": 5,
