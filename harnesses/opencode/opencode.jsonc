@@ -41,7 +41,11 @@
         { "action": "subagent", "resource": "explore", "effect": "allow" },
       ],
     },
+    "title": {
+      "model": "cliproxy/opencode-go/deepseek-v4.1-flash",
+    },
     "explore": {
+      "model": "cliproxy/opencode-go/deepseek-v4.1-flash",
       "description":
         "Read-only scout. Use proactively for exploring codebases (pattern matching, structural search, finding usages, multi-file analysis) and for web research through skills. Specify thoroughness: 'quick', 'medium', or 'very thorough'.",
       "permissions": [
