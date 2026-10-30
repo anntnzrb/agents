@@ -19,7 +19,8 @@ Its exit code describes the acknowledgement, not the still-running command.
 When a job exits, its report is sent as a `bg-result` steering message: it reaches a working agent
 at its next turn boundary and starts a new turn when the agent is idle. Reports that settle together
 are coalesced. A report carries the actual exit code, duration, and head/tail output with exact
-omitted byte and newline counts. Process output is fenced as untrusted data.
+omitted byte and newline counts; it reads only both ends of the log, never the whole file. Process
+output is fenced as untrusted data, with terminal escape sequences and control bytes removed.
 
 `jobs` accepts `action: "list" | "output" | "kill" | "wait"` and an optional `id`:
 

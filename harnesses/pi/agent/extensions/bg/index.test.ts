@@ -205,3 +205,9 @@ test("wait returns as soon as a user message is queued", async () => {
   expect(Date.now() - start).toBeLessThan(2000);
   await h.jobs("kill", id);
 });
+test("reports strip terminal control sequences and binary bytes from process output", async () => {
+  const h = load(); await h.bash(String.raw`printf '\033[31mred\033[0m\033]0;title\007\001\002ok'`, true);
+  await until(() => h.messages.length > 0);
+  const content = h.messages[0].content;
+  expect(content).toContain("redok"); expect(content).not.toMatch(/[\x00-\x08\x0b\x0c\x0e-\x1f]/);
+});
