@@ -142,7 +142,8 @@ test("middle truncation preserves both ends and exact omission counts", () => {
 });
 test("wait any, timeout and in-flight abort preserve delivery", async () => {
   const h = load(); const id = h.id(await h.bash("sleep 0.2; echo any", true));
-  expect(h.text(await h.jobs("wait", undefined, { timeout: 0.01 }))).toContain("timed out");
+  const timedOut = h.text(await h.jobs("wait", undefined, { timeout: 0.01 }));
+  expect(timedOut).toContain("timed out"); expect(timedOut).toMatch(new RegExp(`${id}: running \\d+s, 0 bytes of output`));
   const abort = new AbortController(); const wait = h.jobs("wait", id, {}, abort.signal);
   setTimeout(() => abort.abort(), 20); await expect(wait).rejects.toThrow("aborted");
   expect(h.text(await h.jobs("wait"))).toContain("any");

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, open, readFile, rm, type FileHandle } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, stat, type FileHandle } from "node:fs/promises";
 import { constants, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
@@ -12,6 +12,7 @@ interface Job {
   done: Promise<void>; writes: Promise<unknown>; file: FileHandle;
 }
 const textResult = (text: string, details: unknown = undefined) => ({ content: [{ type: "text" as const, text }], details });
+const status = (job: Job) => job.ended === undefined ? `running ${((Date.now() - job.started) / 1000).toFixed(0)}s` : `exit ${job.code}`;
 function signalGroup(job: Job, signal: NodeJS.Signals) {
   if (!job.pid || job.pid <= 0) return;
   try { process.kill(-job.pid, signal); }
@@ -154,7 +155,9 @@ export default function bg(pi: ExtensionAPI) {
             }
             job.background = true;
             execution.signal?.removeEventListener("abort", abort);
-            execution.onData(Buffer.from(`\nBackground job ${job.id}\nLog: ${path}\nResult delivered automatically; polling is unnecessary.\n`));
+            const moved = params.background ? "Started in the background" : `Still running after ${threshold / 1000}s with ${await progress(job)}; moved to the background`;
+            const judge = params.background ? "It" : "Judge now whether this command should take this long. If a faster approach exists (an indexed or native tool instead of a per-line loop, a narrower path, a bounded scan), stop it with jobs kill and run that instead. Otherwise it";
+            execution.onData(Buffer.from(`\n${moved} as job ${job.id}. Log: ${path}\n${judge} keeps running; do not start a second copy. Its result arrives automatically when it exits, so do not poll: keep working on anything that does not need it, or end your turn if nothing remains.\n`));
             if (job.ended !== undefined) schedule();
             return { exitCode: 0 };
           } catch (error) { abort(); await job.done; job.consumed = true; throw error; }
@@ -165,12 +168,18 @@ export default function bg(pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "jobs", label: "jobs", description: "List, read new output, kill, or wait for session background bash jobs.",
-    promptGuidelines: ["Use jobs wait only when the next step needs a job result and no other work remains; completions otherwise arrive automatically after the run, and jobs wait returns early when the user sends a message."],
-    parameters: Type.Object({ action: Type.Union([Type.Literal("list"), Type.Literal("output"), Type.Literal("kill"), Type.Literal("wait")]), id: Type.Optional(Type.String()), offset: Type.Optional(Type.Integer({ minimum: 0 })), timeout: Type.Optional(Type.Number({ minimum: 0, maximum: 600 })) }),
+    promptGuidelines: [
+      "Bash commands still running after a few seconds move to the background and report their result automatically when they exit; use jobs list or jobs output to judge a running job and jobs kill to stop one that is slow, stuck, or no longer needed.",
+      "Use jobs wait only when the next step needs a job result and no other work remains; it returns after 30 seconds by default with progress to re-judge, and early when the user sends a message.",
+    ],
+    parameters: Type.Object({ action: Type.Union([Type.Literal("list"), Type.Literal("output"), Type.Literal("kill"), Type.Literal("wait")]), id: Type.Optional(Type.String()), offset: Type.Optional(Type.Integer({ minimum: 0 })), timeout: Type.Optional(Type.Number({ minimum: 0, maximum: 120, description: "Seconds; default 30." })) }),
     async execute(_id, args, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("aborted");
       const visible = [...jobs.values()].filter(j => j.background);
-      if (args.action === "list") return textResult(visible.map(j => `${j.id}: ${j.ended === undefined ? "running" : `exit ${j.code}`} Log: ${j.path}`).join("\n") || "No jobs.");
+      if (args.action === "list") {
+        const lines = await Promise.all(visible.map(async j => `${j.id}: ${status(j)}, ${await progress(j)}, ${JSON.stringify(j.command.slice(0, 160))} Log: ${j.path}`));
+        return textResult(lines.join("\n") || "No jobs.");
+      }
       const job = args.id ? visible.find(j => j.id === args.id) : undefined;
       if (args.id && !job) throw new Error("Unknown session job");
       if (args.action === "output") {

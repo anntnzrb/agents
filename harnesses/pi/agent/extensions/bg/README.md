@@ -63,20 +63,20 @@ After publishing, `/reload` or restart Pi to load changes; reload stops existing
 
 ## Validate
 
-From the repository root, use installed host packages without modifying the synced home:
+Run the Pi harness tests from the repository root:
 
 ```sh
-T=$(mktemp -d)
-cp -R harnesses/pi/agent/extensions/bg "$T/bg"
-ln -s ~/.pi/agent/extensions/node_modules "$T/node_modules"
-(cd "$T" && bun test bg/)
-git diff --check
+uv run --script .github/scripts/ci.py harness pi
 ```
 
-For a live check, invoke the installed Pi CLI directly (not a sync-managed launch wrapper), with
-a separate `PI_CODING_AGENT_DIR` containing the provider configuration. Load the absolute path to
-`index.ts` using `--no-extensions -e`, `--no-session --mode rpc`, and tools `bash,jobs`.
-Keep stdin open: run `echo start; sleep 10; echo done`, then another short command after the
-background notice. Inspect JSONL for the five-second Bash acknowledgement, intervening work,
-one `bg-result`, and its triggered assistant response. Close stdin for orderly shutdown and
-check the recorded PIDs with `ps` and `process.kill(pid, 0)`.
+For a live check, drive the installed Pi CLI in RPC mode (`--mode rpc --no-session`) with this
+extension loaded via `-e <absolute path to index.ts>` and keep stdin open until the background
+completion has been delivered. Check three scenarios in the JSONL events:
+
+1. A wasteful command, such as a per-line `grep` loop over a multi-million-line file, returns after
+   five seconds; the agent stops it with `jobs kill` and runs a faster command.
+2. A legitimately slow command keeps running while the agent completes other calls.
+3. A `background: true` command whose agent ended its turn produces one `bg-result` message that
+   starts a new turn.
+
+Afterwards confirm with `pgrep` that no job processes remain.
