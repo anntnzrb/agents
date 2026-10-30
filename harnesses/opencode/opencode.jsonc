@@ -39,7 +39,6 @@
         "Use proactively for researching complex questions, isolated investigations, and multi-step tasks in parallel. Returns only a concise final summary to keep the main session context clean.",
       "permissions": [
         { "action": "subagent", "resource": "explore", "effect": "allow" },
-        { "action": "external_directory", "resource": "*", "effect": "allow" },
       ],
     },
     "explore": {
