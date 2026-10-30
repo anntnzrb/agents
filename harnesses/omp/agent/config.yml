@@ -155,7 +155,9 @@ eval:
 # ─────────────────────────────────────────────────────────────────────────────
 
 tools:
-  xdev: false
+  xdev: true
+  # builtins: core xd:// docs stay inline; browser exceeds the 10k-char per-device cap and loads on demand
+  xdevDocs: builtins
   intentTracing: false
   restrictedFolders:
     - ~/.ssh
