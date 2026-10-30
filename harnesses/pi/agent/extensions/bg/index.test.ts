@@ -211,3 +211,21 @@ test("reports strip terminal control sequences and binary bytes from process out
   const content = h.messages[0].content;
   expect(content).toContain("redok"); expect(content).not.toMatch(/[\x00-\x08\x0b\x0c\x0e-\x1f]/);
 });
+test("a report does not load the whole log into memory", async () => {
+  const h = load({ maxJobMs: 60000 });
+  await h.bash("head -c 300000000 /dev/zero | tr '\\0' 'a'", true);
+  let peak = 0; const before = process.memoryUsage().rss;
+  const sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss - before); }, 5);
+  await until(() => h.messages.length > 0, 30000); clearInterval(sampler);
+  expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("Omitted");
+  expect(peak).toBeLessThan(150_000_000);
+});
+test("a fast producer does not buffer its output in memory", async () => {
+  const h = load({ maxJobMs: 60000 });
+  let peak = 0; const before = process.memoryUsage().rss;
+  const sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss - before); }, 5);
+  await h.bash("head -c 1000000000 /dev/zero", true);
+  await until(() => h.messages.length > 0, 60000); clearInterval(sampler);
+  expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("exit 0");
+  expect(peak).toBeLessThan(300_000_000);
+}, 90000);

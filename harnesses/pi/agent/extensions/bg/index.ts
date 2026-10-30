@@ -136,11 +136,14 @@ export default function bg(pi: ExtensionAPI) {
           starting--; reserved = false;
           let timedOut = false;
           let failure: Error | undefined;
-          const data = (chunk: Buffer) => {
-            job.writes = job.writes.then(() => file.write(chunk)).catch(error => { failure = error; signalGroup(job, "SIGKILL"); });
+          // Pause the pipe while a write is pending, so a fast producer waits on the disk instead of filling memory.
+          let pending = 0;
+          const data = (stream: NodeJS.ReadableStream) => (chunk: Buffer) => {
+            if (++pending > 16) stream.pause();
+            job.writes = job.writes.then(() => file.write(chunk)).catch(error => { failure = error; signalGroup(job, "SIGKILL"); }).finally(() => { if (--pending <= 16) stream.resume(); });
             if (!job.background) execution.onData(chunk);
           };
-          child.stdout!.on("data", data); child.stderr!.on("data", data);
+          child.stdout!.on("data", data(child.stdout!)); child.stderr!.on("data", data(child.stderr!));
           const hard = setTimeout(() => signalGroup(job, "SIGKILL"), maximum);
           const timeout = execution.timeout === undefined ? undefined : setTimeout(() => { timedOut = true; signalGroup(job, "SIGKILL"); }, execution.timeout * 1000);
           const abort = () => signalGroup(job, "SIGKILL");
