@@ -114,6 +114,7 @@ empty_drop = "deny"
 cfg_not_test = "deny"
 ignore_without_reason = "deny"
 non_zero_suggestions = "deny"
+string_add = "deny"
 
 [profile.release]
 overflow-checks = true   # keep arithmetic checks in release builds

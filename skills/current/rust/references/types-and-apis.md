@@ -8,7 +8,7 @@ Read before changing domain models, signatures, traits, modules, crates, or publ
 - MUST parse boundary input into refined types instead of returning `Result<(), E>` and discarding the validation proof. [self-check]
 - MUST separate boundary parsing from core execution on validated values. Strengthen parameter types before making core operations partial. [self-check]
 - MUST use enums for mutually exclusive states, typestate for lifecycle transitions, and `NonZero*` or non-empty wrappers for structural invariants. [non_zero_suggestions; self-check]
-- MUST replace behavior-switch `bool` parameters and three-state `Option<bool>` with named enums. Clippy's excessive-bool thresholds do not catch every single switch. [fn_params_excessive_bools; struct_excessive_bools; self-check]
+- MUST replace `bool` parameters and three-state `Option<bool>` with named enums or separate methods. Trait implementations keep the trait's signature. [fn_params_excessive_bools; struct_excessive_bools; self-check]
 - MUST use integer newtypes or `bitflags` for independent combinable flags, rather than Rust enums that cannot represent every bit combination. [self-check]
 - MUST match owned enums exhaustively without wildcard arms. For external `#[non_exhaustive]` enums, handle known variants explicitly and give the required fallback meaningful behavior. [wildcard_enum_match_arm; match_wildcard_for_single_variants; self-check]
 - MUST derive or implement `Debug` on public types, with non-empty output that redacts secrets. [missing_debug_implementations; self-check]

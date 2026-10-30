@@ -110,6 +110,12 @@ Maintainer reference. Each entry states the current decision, why it holds, and 
 - Why: `redundant_pub_crate` conflicts directly with the rustc `unreachable_pub` lint; `mod_module_files` enforces the standard Rust 2018 module structure of `foo.rs` alongside `foo/` rather than legacy `foo/mod.rs`.
 - Evidence: `async`, `library`, and `ffi` tasks in `evals/evals.json`; astral-sh/uv and astral-sh/ruff configuration files.
 
+### Zero bool parameters and no string addition
+
+- Decision: Set `max-fn-params-bools = 0` in `assets/clippy.toml` and deny `string_add` in `assets/workspace-lints.toml`.
+- Why: Clippy's default threshold of three let single behavior-switch bools pass, so the enum rule was self-check only. The lint skips trait implementations, closures, and non-Rust ABIs, so foreign trait signatures stay legal.
+- Evidence: BeautifulRust `lints/clippy.toml`; Clippy `clippy_lints/src/excessive_bools.rs`.
+
 ### Scoped standard library replacements in supply-chain checks
 
 - Decision: Avoid global bans on `once_cell` or `lazy_static` in `assets/deny.toml`, scoping `[bans.std-replacements]` to workspace dependencies.

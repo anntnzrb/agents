@@ -8,6 +8,7 @@ avoid-breaking-exported-api = false   # apply lints to public APIs too
 too-many-lines-threshold = 80
 too-many-arguments-threshold = 5
 cognitive-complexity-threshold = 20
+max-fn-params-bools = 0               # any bool parameter is a switch; trait impls and closures are exempt
 disallowed-methods = [
   { path = "std::thread::sleep", reason = "Inject a clock, or use the async runtime's sleep." },
 ]
