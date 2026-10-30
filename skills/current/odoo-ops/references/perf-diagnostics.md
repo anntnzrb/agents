@@ -30,8 +30,19 @@ Compare round-trip times. A delta exceeding 0.5s for 80 records indicates an N+1
 
 ### Remediation
 1. In Python addon code: optimize the compute method to fetch batch data in one query (e.g. `env['model'].search([('res_id', 'in', self.ids)])`) instead of looping inside `for record in self`.
-2. Where values remain static after creation, configure `store=True` with appropriate `@api.depends`.
-3. In Studio views: adjust field XML to `optional="hide"` so Odoo omits the field from initial dataset fetches.
+2. Replace per-record `search_count` in a compute with one `_read_group` over the whole recordset. In 17 it returns tuples (`odoo/models.py`, `_read_group(domain, groupby, aggregates, ...)`):
+
+   ```python
+   counts = dict(self.env["crm.lead"]._read_group(
+       [("partner_id", "in", self.partner_id.ids)], ["partner_id"], ["__count"],
+   ))
+   for record in self:
+       record.lead_count = counts.get(record.partner_id, 0)
+   ```
+
+   Keep records in one recordset: `browse(ids)` once, not per ID, so prefetch loads each field for the batch in one query.
+3. Where values remain static after creation, configure `store=True` with appropriate `@api.depends`.
+4. In Studio views: adjust field XML to `optional="hide"` so Odoo omits the field from initial dataset fetches.
 
 ## Discuss and Notification Overload
 
