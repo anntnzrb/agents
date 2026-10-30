@@ -12,7 +12,7 @@ Follow these situational reading rules before taking action:
 - If `profiles/<profile>.md` exists for the active CLI profile (`--profile`, default `etech`), you MUST read it completely before acting. Its project rules override this skill's general rules.
 - Before any production RPC, you MUST read [references/safety-model.md](references/safety-model.md).
 - Before local DB or shell work, you MUST read [references/db-recipes.md](references/db-recipes.md).
-- Before SQL on Odoo tables, crons, QUnit, or debugging, you MUST read [references/gotchas.md](references/gotchas.md).
+- Before SQL on Odoo tables, savepoints or commits, crons, tests, or debugging, you MUST read [references/gotchas.md](references/gotchas.md).
 - Before auditing slow views, chat saturation, or pre-deploy field removals, you MUST read [references/perf-diagnostics.md](references/perf-diagnostics.md).
 - Before inspecting routes, you MUST read [references/route-safety.md](references/route-safety.md).
 - Before auditing or fixing XML views, you MUST read [references/xml-view-rules.md](references/xml-view-rules.md).
@@ -65,7 +65,7 @@ In examples below, `odoo-ops` represents this exact command.
 | Local paths and database identity | [Runtime discovery](references/runtime-discovery.md) | Before local runtime or database operations |
 | Local SQL, ORM shell, and cloning | [Database recipes](references/db-recipes.md) | Querying or rebuilding a replica |
 | One replica per agent, sizing, and current limits | [Parallel work](references/parallel-work.md) | Only when splitting work across agents with separate replicas |
-| Technical facts and environment quirks | [Gotchas](references/gotchas.md) | Writing SQL, crons, tests, or debugging |
+| Technical facts and environment quirks | [Gotchas](references/gotchas.md) | Writing SQL, ORM code, transactions, crons, tests, or debugging |
 | Performance and pre-deploy auditing | [Performance diagnostics](references/perf-diagnostics.md) | Auditing slow views, notifications, or field removals |
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
 | XML view rules and AST linting | [XML view rules](references/xml-view-rules.md) | Auditing or fixing XML views and QWeb templates |

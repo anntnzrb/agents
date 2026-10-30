@@ -18,6 +18,21 @@ Technical facts, environment behaviors, and runtime quirks in Odoo 17.
 - Import batches roll back entirely on any validation or constraint error. In addition, `base_import.import` caches field mappings across calls within the session.
 - `@api.constrains` methods run only when a create or write touches a field they declare (`odoo/models.py`, `_validate_fields`). Editing other fields of a record that already violates the rule does not re-check it.
 - Writing a field's current value does not update that column: `Field.write` in `odoo/fields.py` drops records whose cached value is unchanged. On models with `_log_access`, `BaseModel.write` still sets `write_date` and `write_uid`, so the first write in a transaction emits an `UPDATE`; a repeat write in the same transaction, or any same-value write on a model without `_log_access`, emits none. Never use a same-value write as a touch to lock a row; lock explicitly with `SELECT ... FOR UPDATE` through `self.env.cr`.
+- `with self.env.cr.savepoint():` rolls back only when an exception leaves the block (`odoo/sql_db.py`, `Savepoint.__exit__`). Catching a database error inside the block makes the exit run `RELEASE SAVEPOINT` on an aborted transaction, which raises `InFailedSqlTransaction`. Put the `try` outside the `with`:
+
+```python
+import psycopg2
+
+try:
+    with self.env.cr.savepoint():
+        record = self.create(vals)
+except psycopg2.errors.UniqueViolation:
+    record = self.search([("code", "=", vals["code"])], limit=1)
+```
+
+- Search-then-create races under concurrent requests. Back uniqueness with an `_sql_constraints` entry, then handle the violation as above.
+- Never call `self.env.cr.commit()` in model or controller code: the request owns the transaction, and a partial commit survives its later rollback. In a cron, commit only as a deliberate checkpoint after a complete, self-consistent batch.
+- `Command.unlink(id)` on a One2many deletes the child record when the inverse many2one has `ondelete='cascade'`; otherwise it sets the inverse to `False` (`odoo/fields.py`, `Command.unlink`). `Command.delete(id)` always deletes.
 - Writing a `translate=True` field updates only the context language (`lang`, default `en_US`), plus `en_US` when that language is inactive (`odoo/fields.py`, `_String.write`). To rename a record in every language, call `update_field_translations(field_name, {lang: value, ...})`; over RPC it is a `call`, so it produces a plan. A later module upgrade rewrites only the fields the module's data file declares, so it does not restore a name the XML record omits.
 
 ## Modules and Data Loading
@@ -70,6 +85,8 @@ except Exception:
 ## Testing and QUnit
 
 - Test files omitted from `tests/__init__.py` are never discovered or executed by Odoo test runners.
+- Test classes default to tags `standard` and `at_install` (`odoo/tests/common.py`, `MetaCase`). `HttpCase` and tour tests need `@tagged("post_install", "-at_install")` so every module is loaded first.
+- `odoo.tests.common.Form` is deprecated since 17.0; import `Form` from `odoo.tests`.
 - Odoo 17 bundles QUnit 2.9.1. Modern assertion helpers like `assert.true()` and `assert.false()` do not exist; use `assert.ok()` or strict equality checks.
 - A database neutralization banner in the test environment alters DOM layout and can break positional selectors in the first executed test.
 - `sessionStorage` state is not cleared between individual QUnit tests, which can reorder test expectations or leak mock state.
