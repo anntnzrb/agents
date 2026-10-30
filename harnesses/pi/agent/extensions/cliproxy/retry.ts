@@ -1,9 +1,8 @@
 import { type AssistantMessage, isRetryableAssistantError } from "@earendil-works/pi-ai";
 
-// Stream drops CLIProxyAPI relays from its upstreams. Pi's retry policy does not recognize their
-// wording, so a dropped turn would end the run instead of retrying.
+// Gateway errors Pi's retry policy does not recognize. Pi handles stream disconnects itself.
 const TRANSIENT_STREAM_ERROR =
-	/\bclosed network connection\b|\bstream disconnected before completion\b|\binvalid SSE data JSON\b/i;
+	/\bclosed network connection\b|\binvalid SSE data JSON\b/i;
 // "network error" is one of the patterns Pi's retry policy already treats as transient.
 const RETRYABLE_PREFIX = "network error:";
 
