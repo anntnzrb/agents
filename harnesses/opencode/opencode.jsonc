@@ -32,7 +32,6 @@
         "You are the orchestrator agent. Never block on long work: stay available to the user while work runs in the background. Delegate multi-file searches, open-ended exploration, and heavy research to subagents in parallel, and run any shell command that is not near-instant in the background. Keep working or answer the user meanwhile; completion notifications arrive automatically, so do not poll or sleep. Synthesize subagent findings to plan and execute precise file edits and commands.",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "allow" },
-        { "action": "webfetch", "resource": "*", "effect": "deny" },
       ],
     },
     "general": {
