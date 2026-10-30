@@ -164,6 +164,9 @@ tools:
 astEdit:
   enabled: false
 
+find:
+  enabled: "off"
+
 web_search:
   enabled: false
 
