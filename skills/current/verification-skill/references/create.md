@@ -20,7 +20,7 @@ Write `.agents/skills/verify-<app>/SKILL.md` with YAML frontmatter: `name: verif
 
 Include these sections. Ground each one in what the interview found. Leave no placeholders.
 
-- **Launch:** the exact command that starts the app for verification, how to tell it is ready (a log line, a port answering, a prompt), and teardown. A short-lived CLI or TUI has no server to keep alive. There, launch means build the binary or install dependencies once, then start each drive in its own isolated PTY or tmux session.
+- **Launch:** the exact command that starts the app for verification, how to tell it is ready, and teardown. Launch must reach a usable state from an empty data directory, including migrations and seed data. A responding port or healthy database alone does not prove initialization is complete. A short-lived CLI or TUI has no server to keep alive. There, launch means build the binary or install dependencies once, then start each drive in its own isolated PTY or tmux session.
 - **Doctor:** one read-only check that answers "is this instance worth driving?" Check that the process is up, the version or build is right, the port is ours, and auth is valid. An agent runs this first whenever anything looks off.
 - **Drive:** the harness recipe with real selectors and commands from this repo, not examples. Prefer stable handles (ARIA labels, data attributes, prompt strings, route paths) over coordinates and tab order.
 - **Evidence:** what to capture for a proof and where it goes. State the proof standards:
@@ -54,11 +54,15 @@ Each feature file answers, from the user's point of view, what the feature is, h
 3. `Driving it with <harness>`
 4. `Gotchas`
 
+If seed data lacks a precondition for a journey, report the failure and record the reason in that feature's `Gotchas`. Do not weaken the journey to make it pass.
+
 The map is the repo's maintained verification source. A proof that drives one convenient entry point is incomplete when the map lists others.
 
 ## 4. Prove the generated skill before handing it over
 
 Run its own instructions end to end once: launch, doctor, drive one mapped feature, capture evidence, clean up. One feature is enough, because the map exists so later runs can cover the rest. After cleanup, confirm the evidence still exists at the named location. A cleanup that deletes the proof fails this step.
+
+If a stand-in was used for the real target, list each setup step the stand-in performed that the target will not. Those steps remain unverified until tested on the real target.
 
 Fix what fails. Run the generated cleanup after every failed iteration too, so broken attempts do not leave processes and ports behind.
 
