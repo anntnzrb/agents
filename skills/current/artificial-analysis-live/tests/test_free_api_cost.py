@@ -184,3 +184,32 @@ def test_free_api_rejects_inconsistent_pagination() -> None:
         pytest.raises(rsc.ExtractionError, match="pagination"),
     ):
         _ = rsc.fetch_all_models("key")
+
+
+def test_free_api_rejects_repeated_model_across_pages() -> None:
+    responses = [
+        rsc.FetchResult(
+            json.dumps(
+                {
+                    "tier": "free",
+                    "intelligence_index_version": 5,
+                    "pagination": {
+                        "page": page,
+                        "total_pages": 2,
+                        "has_more": page == 1,
+                    },
+                    "data": [{"slug": "repeated-model"}],
+                }
+            ),
+            200,
+            {},
+            "2026-01-01T00:00:00+00:00",
+        )
+        for page in (1, 2)
+    ]
+    with (
+        patch.object(rsc, "fetch_models", side_effect=responses),
+        pytest.raises(rsc.ExtractionError, match="Duplicate model slug"),
+    ):
+        _ = rsc.fetch_all_models("key")
+

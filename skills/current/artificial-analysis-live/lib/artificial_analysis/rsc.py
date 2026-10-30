@@ -379,6 +379,7 @@ def fetch_all_models(api_key: str, *, timeout_seconds: float = 60.0) -> FetchRes
     parts = urlsplit(base)
     query = [(key, value) for key, value in parse_qsl(parts.query) if key != "page"]
     rows: list[object] = []
+    seen_slugs: set[str] = set()
     pages: list[dict[str, object]] = []
     page = 1
     first: FetchResult | None = None
@@ -401,27 +402,22 @@ def fetch_all_models(api_key: str, *, timeout_seconds: float = 60.0) -> FetchRes
             payload = parse_json(result.body)
         except json.JSONDecodeError as exc:
             _raise_extraction_error("Official model API returned invalid JSON.", exc)
-        if (
-            not is_str_dict(payload)
-            or not is_object_list(payload.get("data"))
-            or not is_str_dict(payload.get("pagination"))
-        ):
+        if not is_str_dict(payload):
             _raise_extraction_error("Official model API requires data and pagination.")
         pagination = payload.get("pagination")
         data = payload.get("data")
         if not is_str_dict(pagination) or not is_object_list(data):
             _raise_extraction_error("Official model API requires data and pagination.")
         current_version = payload.get("intelligence_index_version")
-        if page == 1:
-            version = current_version
         total_pages = pagination.get("total_pages")
         has_more = pagination.get("has_more")
-        if (
-            page == 1
-            and isinstance(total_pages, int)
-            and not isinstance(total_pages, bool)
-        ):
-            expected_pages = total_pages
+        if page == 1:
+            version = current_version
+            expected_pages = (
+                total_pages
+                if isinstance(total_pages, int) and not isinstance(total_pages, bool)
+                else None
+            )
         if (
             payload.get("tier") != "free"
             or not isinstance(current_version, int)
@@ -438,6 +434,16 @@ def fetch_all_models(api_key: str, *, timeout_seconds: float = 60.0) -> FetchRes
             _raise_extraction_error(
                 "Official model API pagination or index version is inconsistent."
             )
+        page_slugs = [
+            slug
+            for row in data
+            if is_str_dict(row) and isinstance(slug := row.get("slug"), str)
+        ]
+        if seen_slugs.intersection(page_slugs) or len(page_slugs) != len(
+            set(page_slugs)
+        ):
+            _raise_extraction_error("Duplicate model slug in API pages.")
+        seen_slugs.update(page_slugs)
         rows.extend(data)
         pages.append(
             {
