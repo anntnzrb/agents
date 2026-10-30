@@ -1,8 +1,8 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "ea32d9562a1c9f077d7cdd3be53d07383eb18866",
+  "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
   "trees": {
-    "pstack/skills/unslop": "d6a803c02b716b6562412c9bf749b36968986c3c"
+    "pstack/skills/unslop": "4e572dd70e5557f490e3991c52ea58f0dcee8936"
   }
 }
