@@ -112,9 +112,6 @@ compaction:
 branchSummary:
   enabled: true
 
-snapcompact:
-  toolResults: true
-
 ttsr:
   repeatMode: after-gap
   repeatGap: 40
