@@ -1,54 +1,59 @@
 # Background Bash
 
-> **Archived.** Not loaded: Pi does not auto-discover `legacy/`, sync does not publish it, and CI does not test it. Kept as a reference for nonblocking Bash on Pi (threshold backgrounding, turn-boundary delivery, `jobs wait` that yields to queued user messages). Relative links and validation paths refer to its former location, `harnesses/pi/agent/extensions/bg/`.
+Overrides `bash` using Pi's own definition and result formatter so the main agent is never blocked
+by a long command. A command still running after the threshold (default five seconds) moves to the
+background with its process group intact; fast commands return the ordinary Bash result. No
+widgets, dependencies, persistent PID adoption, or polling loop are involved.
 
-Overrides `bash` using Pi's own definition and result formatter. Long commands return a job notice
-while their process group continues running; fast commands return the ordinary Bash result.
-Completions arrive as coalesced `bg-result` follow-ups, never steering messages.
-No widgets, dependencies, persistent PID adoption, or polling loop are involved.
+The short threshold is deliberate. A command that runs long is often the wrong approach (a per-line
+shell loop, a scan of a binary); handing control back after five seconds lets the agent judge it
+and replace it instead of blocking on it.
 
 ## Use
 
-Let Bash run normally, or add `background: true` to start immediately. The result includes the
-session-local job ID and full log path. A background acknowledgement has Bash's normal result
-shape; its exit code describes the acknowledgement, not the still-running command.
-The completion reports the actual exit code, duration, and head/tail output with exact omitted
-byte and newline counts. Process output is fenced as untrusted data.
+Let Bash run normally, or add `background: true` to start immediately. A backgrounded call returns
+Bash's normal result shape: the output so far, the session-local job ID, the full log path, and
+the output size, with an instruction to judge the command and stop it if a faster approach exists.
+Its exit code describes the acknowledgement, not the still-running command.
+
+When a job exits, its report is sent as a `bg-result` steering message: it reaches a working agent
+at its next turn boundary and starts a new turn when the agent is idle. Reports that settle together
+are coalesced. A report carries the actual exit code, duration, and head/tail output with exact
+omitted byte and newline counts. Process output is fenced as untrusted data.
 
 `jobs` accepts `action: "list" | "output" | "kill" | "wait"` and an optional `id`:
 
-- `list`: running and settled jobs in this extension runtime.
+- `list`: running and settled jobs with their runtime, output size, command, and log path.
 - `output`: requires an ID; optional byte `offset` starts a bounded read. The result's
   `details.offset` and text report the next byte offset. Advance it to read only new bytes.
 - `kill`: requires an ID; sends SIGTERM to the process group and SIGKILL after three seconds.
-- `wait`: blocks without inference until the named job, or any unconsumed job, settles. It returns
-  early when a user message is queued (steering or follow-up), so waiting never holds the user off;
-  the jobs keep running.
-  Optional `timeout` is in seconds, bounded to ten minutes. Cancellation does not consume a result.
-  A result returned by wait, or a job stopped with `kill`, is not also delivered automatically.
+- `wait`: blocks without inference until the named job, or any unconsumed job, settles. Optional
+  `timeout` is in seconds, default 30, at most 120; on timeout it returns each job's runtime and
+  output size so the agent can re-judge it. It returns early when a user message is queued
+  (steering or follow-up); the jobs keep running. Cancellation does not consume a result.
 
-Automatic delivery happens only between runs: completions that land while the agent is working are
-held until Pi reports `agent_settled`, then sent as one follow-up that starts a new turn. A follow-up
-queued mid-run cannot be withdrawn, so delivering earlier would duplicate a result that `wait`
-reads in the same run.
+Each result reaches the agent once: a result returned by `wait`, or a job stopped with `kill`, is
+not also delivered automatically, and `wait` on an already delivered job returns a short notice
+instead of the report.
 
 Foreground commands beginning with `sleep` of five seconds or longer are rejected: use `jobs wait`
-when blocked, or do other work while automatic delivery is pending.
+when blocked, or do other work while the result is pending.
 
 ## Settings and lifetime
 
 Pi's merged settings supply optional `bg.thresholdMs` (how long a command runs in the foreground
 before it moves to the background) and `bg.maxJobMs` (hard limit per job). The defaults live in
-[`index.ts`](index.ts); this repository overrides the threshold in
-[`../../settings.json`](../../settings.json). Set only values that differ from the defaults; a
-project `.pi/settings.json` can override them in trusted projects. Each call reads the merged
-settings, so a change applies after sync and `/reload`. This extension never writes settings. Pi's shell path and command prefix remain respected.
+[`index.ts`](index.ts). Set only values that differ from the defaults; a project
+`.pi/settings.json` can override them in trusted projects. Each call reads the merged settings, so a
+change applies after sync and `/reload`. This extension never writes settings. Pi's shell path and
+command prefix remain respected.
 
 Commands are captured from launch into private temporary logs. Eight live managed commands fill
-capacity; further calls use Pi's ordinary foreground executor. Print/JSON/no-UI sessions also
-use the ordinary executor, and reject explicit background requests because those sessions may
-exit before completion delivery (upstream #10029). Background execution requires POSIX process
-groups and an interactive or RPC context with UI support.
+capacity; further calls use Pi's ordinary foreground executor. Print/JSON/no-UI sessions also use
+the ordinary executor, and reject explicit background requests because those sessions may exit
+before completion delivery (upstream #10029). Nested calls, such as Bash run from a codemode
+script, stay in the foreground because the caller needs the command's own result. Background
+execution requires POSIX process groups and an interactive or RPC context with UI support.
 
 The hard maximum kills the process group. Session shutdown kills active groups, waits for process
 closure, and removes the log directory. Logs and IDs are session-local; reload/resume never adopts

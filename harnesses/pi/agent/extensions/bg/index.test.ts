@@ -27,38 +27,42 @@ function load(settings: Record<string, unknown> | null = {}, mode = "rpc", hasUI
   cleanups.push(() => shutdown());
   const pending = { value: false };
   const ctx = { cwd: process.cwd(), mode, hasUI, hasPendingMessages: () => pending.value, sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } } as unknown as ExtensionContext;
-  const run = (name: string, args: unknown, signal?: AbortSignal) => tools.get(name)!.execute("test", args, signal, undefined, ctx);
+  const run = (name: string, args: unknown, signal?: AbortSignal, callId = "test") => tools.get(name)!.execute(callId, args, signal, undefined, ctx);
   const bash = (command: string, background = false, signal?: AbortSignal, timeout?: number) => run("bash", { command, background, timeout }, signal);
   const jobs = (action: string, id?: string, extra = {}, signal?: AbortSignal) => run("jobs", { action, id, ...extra }, signal);
   const text = (r: Awaited<ReturnType<typeof run>>) => r.content.map(c => c.type === "text" ? c.text : "").join("");
   const id = (r: Awaited<ReturnType<typeof run>>) => text(r).match(/bg-\d+/)![0];
   const emit = async (name: string) => { await handlers.get(name)?.(); };
-  return { bash, jobs, text, id, messages, emit, pending, shutdown: () => shutdown() };
+  return { run, bash, jobs, text, id, messages, emit, pending, shutdown: () => shutdown() };
 }
 
 test("threshold backgrounds, streams to disk, and delivers automatically", async () => {
   const h = load(); const start = Date.now();
   const r = await h.bash("printf start; sleep 0.2; printf end");
   expect(Date.now() - start).toBeLessThan(5000);
-  expect(h.text(r)).not.toContain("end");
-  expect(h.text(r)).toContain("polling is unnecessary");
+  expect(h.text(r)).not.toContain("startend");
+  expect(h.text(r)).toContain("do not poll");
+  expect(h.text(r)).toContain("jobs kill");
   expect(h.text(r)).toContain("start");
   await until(() => h.messages.length > 0);
   expect(h.messages).toHaveLength(1);
   expect(h.messages[0].content).toContain("startend");
-  expect(h.messages[0].options).toEqual({ deliverAs: "followUp", triggerTurn: true });
+  expect(h.messages[0].options).toEqual({ deliverAs: "steer", triggerTurn: true });
 });
-test("defaults to a 60 second threshold when settings omit bg", async () => {
+test("defaults to a 5 second threshold when settings omit bg", async () => {
   const h = load(null); const start = Date.now();
-  // Longer than the old 5 second default, far shorter than 60 seconds.
-  const r = await h.bash("printf a; sleep 5.5; printf b");
-  expect(h.text(r)).toBe("ab");
-  expect(Date.now() - start).toBeGreaterThan(5400);
+  const fast = await h.bash("sleep 4; printf fg");
+  expect(h.text(fast)).toBe("fg");
+  const r = await h.bash("echo $$; sleep 8; printf late");
+  expect(h.text(r)).toMatch(/Still running after 5s with \d+ bytes of output/);
+  expect(h.text(r)).toContain("jobs kill");
+  expect(Date.now() - start).toBeLessThan(11000);
+  await h.jobs("kill", h.id(r));
 }, 20000);
 test("user threshold setting overrides the default", async () => {
   const h = load({ thresholdMs: 100 }); const start = Date.now();
   const r = await h.bash("sleep 1; printf late");
-  expect(h.text(r)).toContain("polling is unnecessary");
+  expect(h.text(r)).toContain("moved to the background");
   expect(Date.now() - start).toBeLessThan(900);
 });
 test("fast command preserves built-in shape and output", async () => {

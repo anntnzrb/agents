@@ -65,28 +65,27 @@ export default function bg(pi: ExtensionAPI) {
   let delivery: ReturnType<typeof setTimeout> | undefined;
   let shutdown: Promise<void> | undefined;
   let starting = 0;
-  // Deliver only between runs: a queued follow-up cannot be withdrawn if wait later reads the result.
-  let busy = false;
   const settings = () => {
     const all = pi.getSettings();
     const config = (all as typeof all & { bg?: { thresholdMs?: number; maxJobMs?: number } }).bg;
     const number = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 2147483647 ? value : fallback;
-    return { all, threshold: number(config?.thresholdMs, 60000), maximum: number(config?.maxJobMs, 1800000) };
+    return { all, threshold: number(config?.thresholdMs, 5000), maximum: number(config?.maxJobMs, 1800000) };
   };
   const output = async (job: Job) => { await job.writes; return readFile(job.path, "utf8"); };
+  const progress = async (job: Job) => `${await stat(job.path).then(s => s.size, () => 0)} bytes of output`;
   const report = async (job: Job, count = 1) => `${job.id}: ${JSON.stringify(job.command.slice(0, 160))}, exit ${job.code}, duration ${((job.ended! - job.started) / 1000).toFixed(1)}s\nLog: ${job.path}\n${fenced(middle(await output(job), Math.floor(DEFAULT_MAX_BYTES / count / 3) - 1024, Math.floor(DEFAULT_MAX_LINES / count) - 20))}`;
   const schedule = () => {
     if (closing || delivery) return;
     delivery = setTimeout(async () => {
       delivery = undefined;
-      if (busy) return;
       const ready = [...jobs.values()].filter(j => j.background && j.ended !== undefined && !j.consumed && !j.watchers).slice(0, 8);
       const reports = await Promise.all(ready.map(j => report(j, ready.length)));
       // Wait/shutdown may have won while reading the logs.
       const eligible = ready.filter(j => !j.consumed && !j.watchers && !closing);
       if (!eligible.length) return;
       eligible.forEach(j => { j.consumed = true; });
-      pi.sendMessage({ customType: "bg-result", content: eligible.map(j => reports[ready.indexOf(j)]).join("\n\n"), display: true }, { deliverAs: "followUp", triggerTurn: true });
+      // Steer reaches a running agent at its next turn boundary; an idle agent starts a turn.
+      pi.sendMessage({ customType: "bg-result", content: `Background job finished.\n${eligible.map(j => reports[ready.indexOf(j)]).join("\n\n")}`, display: true }, { deliverAs: "steer", triggerTurn: true });
       if ([...jobs.values()].some(j => j.background && j.ended !== undefined && !j.consumed && !j.watchers)) schedule();
     }, 1000);
   };
@@ -199,23 +198,25 @@ export default function bg(pi: ExtensionAPI) {
         }
         return textResult(await report(job));
       }
+      if (job?.consumed) return textResult(`${job.id} already finished and its result was delivered. Log: ${job.path}`);
       const watched = job ? [job] : visible.filter(j => !j.consumed);
       if (!watched.length) return textResult("No jobs to wait for.");
       watched.forEach(j => { j.watchers++; });
       try {
         let poll: ReturnType<typeof setInterval> | undefined;
         const message = new Promise<"message">(resolve => { poll = setInterval(() => { if (ctx.hasPendingMessages?.()) resolve("message"); }, 200); });
-        const settled = await race(Promise.race([...watched.map(j => j.done.then(() => j)), message]), (args.timeout ?? 600) * 1000, signal).finally(() => clearInterval(poll));
+        const settled = await race(Promise.race([...watched.map(j => j.done.then(() => j)), message]), (args.timeout ?? 30) * 1000, signal).finally(() => clearInterval(poll));
         if (settled === "message") return textResult("Stopped waiting: a new user message is queued. Jobs continue running; results are delivered automatically.");
-        if (!settled) return textResult("Wait timed out; jobs continue running.");
+        if (!settled) {
+          const states = await Promise.all(watched.map(async j => `${j.id}: ${status(j)}, ${await progress(j)}`));
+          return textResult(`Wait timed out; jobs continue running.\n${states.join("\n")}\nJudge whether each is progressing as it should; stop a stuck or wasteful one with jobs kill.`);
+        }
         const result = await report(settled);
         if (signal?.aborted) throw new Error("aborted");
         settled.consumed = true; return textResult(result);
       } finally { watched.forEach(j => { j.watchers--; }); schedule(); }
     },
   });
-  pi.on("agent_start", () => { busy = true; });
-  pi.on("agent_settled", () => { busy = false; schedule(); });
   pi.on("session_shutdown", () => {
     shutdown ??= (async () => {
       closing = true; clearTimeout(delivery);
