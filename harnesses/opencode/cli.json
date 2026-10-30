@@ -3,9 +3,7 @@
   "keybinds": {
     "leader": "ctrl+x",
     "session.compact": false,
-    "session.share": false,
-    "agent.cycle": false,
-    "agent.cycle.reverse": false
+    "agent.cycle": false
   },
   "prompt": {
     "paste": "full"
