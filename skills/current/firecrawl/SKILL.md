@@ -44,6 +44,7 @@ Match the intent to a command listed by live `--help`:
 - Track page changes on a schedule.
 - Find structured records or listings through a ready-made Alexandria workflow, data API, or index, then execute it.
 - Look up error strings, GitHub issues and PRs, READMEs, or library docs in the developer index.
+- Find US legal or regulatory sources in the government index.
 - Search and read scientific papers in the research index.
 - Check credit balance; diagnose failed runs.
 
@@ -62,3 +63,5 @@ Match the intent to a command listed by live `--help`:
 - Cap PDF parsing with the scrape page-limit option; each parsed page costs a credit.
 - When an `agent` run stops on a pending approval, ask the user before approving the paid provider call. Accept a provider's data terms only after the user explicitly agrees to the terms shown by the CLI. Approving a call does not accept terms.
 - The developer command takes a free-form query. For strict filters (repositories, artifact types, doc sources, language, stars), call the REST developer search endpoint; read its current fields in the Firecrawl API reference before building the request.
+- For US law or regulations, use `gov` with the question, jurisdiction, and date. Use `--limit` for result count; `-k` sets the API key. Read a supplied source URL with `scrape`.
+- Before citing governing law, verify the issuer, jurisdiction, enacted and effective status, and version. Ask for a missing jurisdiction before identifying a rule. Use general search for non-US questions or missing coverage; no results do not prove that no applicable law exists.
