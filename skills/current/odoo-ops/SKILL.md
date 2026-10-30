@@ -16,6 +16,7 @@ Follow these situational reading rules before taking action:
 - Before auditing slow views, chat saturation, or pre-deploy field removals, you MUST read [references/perf-diagnostics.md](references/perf-diagnostics.md).
 - Before inspecting routes, you MUST read [references/route-safety.md](references/route-safety.md).
 - Before auditing or fixing XML views, you MUST read [references/xml-view-rules.md](references/xml-view-rules.md).
+- Before writing or reviewing module code that adds public methods, `sudo()`, related fields, ACLs, record rules, or multi-company fields, you MUST read [references/module-security.md](references/module-security.md).
 - Before interpreting CLI inspection JSON, you MUST read [references/output-contracts.md](references/output-contracts.md).
 - Before preparing imports, classifying CRM batches, recovering partial writes, or exporting offline fixtures, read [references/import-and-audit-workflow.md](references/import-and-audit-workflow.md).
 - Before writing Server Action templates for user UI execution, you MUST read [references/server-action-capabilities.md](references/server-action-capabilities.md), [references/server-action-playbook.md](references/server-action-playbook.md), [references/server-action-safe-eval.md](references/server-action-safe-eval.md), [references/server-action-sql-safety.md](references/server-action-sql-safety.md), and [references/server-action-templates.md](references/server-action-templates.md).
@@ -68,6 +69,7 @@ In examples below, `odoo-ops` represents this exact command.
 | Performance and pre-deploy auditing | [Performance diagnostics](references/perf-diagnostics.md) | Auditing slow views, notifications, or field removals |
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
 | XML view rules and AST linting | [XML view rules](references/xml-view-rules.md) | Auditing or fixing XML views and QWeb templates |
+| Access control in module code | [Module security](references/module-security.md) | Writing or reviewing public methods, `sudo()`, related fields, ACLs, or record rules |
 | Command results | [Output contracts](references/output-contracts.md) | Interpreting inspection output |
 | Imports, classification, and offline examples | [Import and audit workflow](references/import-and-audit-workflow.md) | Preparing data imports, CRM corrections, partial-apply recovery, or sanitized handoffs |
 | Action selection | [Server Action capabilities](references/server-action-capabilities.md) | Choosing UI actions, automation, or addons |
