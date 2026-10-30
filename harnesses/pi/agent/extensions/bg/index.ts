@@ -114,7 +114,8 @@ export default function bg(pi: ExtensionAPI) {
       // Nested calls (codemode scripts) expect the command's own result, so they never background.
       const enabled = ctx.hasUI && (ctx.mode === "tui" || ctx.mode === "rpc") && process.platform !== "win32" && !id.includes("/");
       if (params.background && !enabled) throw new Error("Background bash is unavailable outside interactive/RPC POSIX sessions and nested tool calls; run in the foreground.");
-      if (!params.background && /^\s*sleep\s+(\d+(?:\.\d+)?)(?=\s|;|$)/.test(params.command) && Number(params.command.match(/^\s*sleep\s+(\d+(?:\.\d+)?)/)![1]) >= 5) throw new Error("Use jobs wait instead of foreground sleep >= 5 seconds.");
+      const nap = params.command.match(/^\s*sleep\s+(\d+(?:\.\d+)?)([smhd]?)(?=\s|;|&|\||$)/);
+      if (!params.background && nap && Number(nap[1]) * ({ s: 1, m: 60, h: 3600, d: 86400 }[nap[2]] ?? 1) >= 5) throw new Error("Use jobs wait instead of foreground sleep >= 5 seconds.");
       const options = { shellPath: all.shellPath, commandPrefix: all.shellCommandPrefix };
       if (!enabled || starting + [...jobs.values()].filter(j => j.ended === undefined).length >= 8) return createBashToolDefinition(ctx.cwd, options).execute(id, params, signal, onUpdate, ctx);
       starting++;

@@ -37,8 +37,14 @@ Each result reaches the agent once: a result returned by `wait`, or a job stoppe
 not also delivered automatically, and `wait` on an already delivered job returns a short notice
 instead of the report.
 
-Foreground commands beginning with `sleep` of five seconds or longer are rejected: use `jobs wait`
-when blocked, or do other work while the result is pending.
+Foreground commands beginning with `sleep` of five seconds or longer (including `s`, `m`, `h`, and
+`d` suffixes) are rejected: use `jobs wait` when blocked, or do other work while the result is
+pending.
+
+To wait on an external condition such as CI, run a watcher with `background: true` that exits when
+the condition holds (`gh pr checks <pr> --watch --fail-fast >/dev/null; gh pr checks <pr>`, or
+`until <check>; do sleep 30; done`) and end the turn. The shell polls; the agent spends tokens only
+when the watcher exits.
 
 ## Settings and lifetime
 

@@ -250,3 +250,8 @@ test("a fast producer does not buffer its output in memory", async () => {
   expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("exit 0");
   expect(peak).toBeLessThan(300_000_000);
 }, 90000);
+test("foreground sleep guard reads unit suffixes", async () => {
+  const h = load({ thresholdMs: 2000 });
+  for (const command of ["sleep 5s", "sleep 1m", "sleep 0.1h"]) await expect(h.bash(command)).rejects.toThrow("jobs wait");
+  expect(h.text(await h.bash("sleep 0.1s; printf ok"))).toBe("ok");
+});
