@@ -1,9 +1,10 @@
-import { Model, Plugin, Provider } from "@opencode/plugin";
-import type { ProviderRecord } from "@opencode/plugin/promise/provider";
+import { Model, Plugin, Provider } from "@opencode/plugin/effect";
+import type { ProviderRecord } from "@opencode/plugin/effect/provider";
+import { Effect, Option, Schema } from "effect";
 
 const PROVIDER_ID = Provider.ID.make("cliproxy");
-const GATEWAY_TIMEOUT_MS = 5000;
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const GATEWAY_TIMEOUT = "5 seconds";
+const REFRESH_INTERVAL = "5 minutes";
 
 // Gateway ids may carry a thinking-level qualifier the catalog does not use.
 const QUALIFIER_PATTERN = /-(minimal|low|medium|high|xhigh|max|thinking)$/i;
@@ -19,6 +20,18 @@ interface GatewayModel {
 	id: string;
 	ownedBy: string | undefined;
 }
+
+class GatewayError extends Schema.TaggedError<GatewayError>()("cliproxy.GatewayError", {
+	message: Schema.String,
+	cause: Schema.optional(Schema.Defect()),
+}) {}
+
+// Only the envelope is strict; malformed entries are dropped one by one instead of failing the inventory.
+const GatewayPayload = Schema.Struct({ data: Schema.optional(Schema.Array(Schema.Unknown)) });
+const decodeEntry = Schema.decodeUnknownOption(
+	Schema.Struct({ id: Schema.NonEmptyString, owned_by: Schema.optional(Schema.Unknown) }),
+);
+const decodeNonEmpty = Schema.decodeUnknownOption(Schema.NonEmptyString);
 
 interface Catalog {
 	exact: Map<string, Model.Info>;
@@ -106,41 +119,52 @@ function toModel(model: GatewayModel, entry: Model.Info | undefined): Model.Info
 	};
 }
 
-async function fetchGatewayModels(baseURL: string): Promise<GatewayModel[] | undefined> {
-	const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
-		signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
-	});
-	if (!response.ok) return undefined;
-	const payload = (await response.json()) as { data?: Array<{ id?: unknown; owned_by?: unknown }> };
-	return (payload.data ?? []).flatMap((model) =>
-		typeof model.id === "string" && model.id.length > 0
-			? [{ id: model.id, ownedBy: typeof model.owned_by === "string" && model.owned_by ? model.owned_by : undefined }]
-			: [],
-	);
-}
+const fetchInventory = Effect.fn("cliproxy.fetchInventory")(
+	function* (url: string) {
+		const response = yield* Effect.tryPromise({
+			try: (signal) => fetch(url, { signal }),
+			catch: (cause) => new GatewayError({ message: `GET ${url} failed`, cause }),
+		});
+		if (!response.ok) return yield* new GatewayError({ message: `GET ${url} returned HTTP ${response.status}` });
+		const body = yield* Effect.tryPromise({
+			try: () => response.json(),
+			catch: (cause) => new GatewayError({ message: `GET ${url} returned invalid JSON`, cause }),
+		});
+		const payload = yield* Schema.decodeUnknownEffect(GatewayPayload)(body).pipe(
+			Effect.mapError((cause) => new GatewayError({ message: `GET ${url} returned an unexpected payload`, cause })),
+		);
+		return (payload.data ?? []).flatMap((raw): GatewayModel[] =>
+			Option.match(decodeEntry(raw), {
+				onNone: () => [],
+				onSome: (entry) => [{ id: entry.id, ownedBy: Option.getOrUndefined(decodeNonEmpty(entry.owned_by)) }],
+			}),
+		);
+	},
+	Effect.timeout(GATEWAY_TIMEOUT),
+);
 
 export default Plugin.define({
 	id: "cliproxy",
-	async setup(ctx) {
-		const baseURL = ctx.options.baseURL;
-		if (typeof baseURL !== "string") {
-			console.warn("cliproxy requires the baseURL plugin option");
-			return;
-		}
+	effect: Effect.fn("cliproxy")(function* (ctx) {
+		const baseURL = Option.getOrUndefined(decodeNonEmpty(ctx.options.baseURL));
+		if (baseURL === undefined) return yield* Effect.logWarning("cliproxy requires the baseURL plugin option");
+		const url = `${baseURL.replace(/\/+$/, "")}/models`;
+
+		// Written only by the refresh below; read by the synchronous transform on every replay.
 		let inventory: readonly GatewayModel[] = [];
-		const refresh = async () => {
-			const next = await fetchGatewayModels(baseURL).catch((error: unknown) => {
-				console.warn("cliproxy model discovery failed", error);
-				return undefined;
-			});
-			// A failed or empty response keeps the last known inventory.
-			if (!next?.length || JSON.stringify(next) === JSON.stringify(inventory)) return false;
+		const refresh = Effect.gen(function* () {
+			const next = yield* fetchInventory(url);
+			// An empty response keeps the last known inventory.
+			if (next.length === 0 || JSON.stringify(next) === JSON.stringify(inventory)) return false;
 			inventory = next;
 			return true;
-		};
+		}).pipe(
+			// A failed refresh keeps the last known inventory.
+			Effect.catch((error) => Effect.logWarning("cliproxy model discovery failed", error).pipe(Effect.as(false))),
+		);
 
-		await refresh();
-		await ctx.provider.transform((editor) => {
+		yield* refresh;
+		yield* ctx.provider.transform((editor) => {
 			if (inventory.length === 0) return;
 			const index = catalog(editor.list());
 			editor.add({
@@ -149,11 +173,12 @@ export default Plugin.define({
 			});
 		});
 
-		const timer = setInterval(() => {
-			void refresh()
-				.then((changed) => (changed ? ctx.provider.reload() : undefined))
-				.catch((error: unknown) => console.warn("cliproxy provider reload failed", error));
-		}, REFRESH_INTERVAL_MS);
-		return () => clearInterval(timer);
-	},
+		// The plugin scope interrupts the poller on unload or reload.
+		yield* refresh.pipe(
+			Effect.flatMap((changed) => (changed ? ctx.provider.reload() : Effect.void)),
+			Effect.delay(REFRESH_INTERVAL),
+			Effect.forever,
+			Effect.forkScoped,
+		);
+	}),
 });

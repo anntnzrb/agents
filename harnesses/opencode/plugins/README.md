@@ -33,8 +33,9 @@ bun x --package typescript tsc --noEmit --strict --skipLibCheck --types node \
 ```
 
 Tests exercise the continuation hook and model discovery with mocked HTTP responses, validate model
-records against the v2 schema, check transform replay, recover from a gateway outage at startup, keep inventory on refresh failure, and
-check the backgrounding threshold and session scoping with fake timers.
+records against the v2 schema, check transform replay, recover from a gateway outage at startup, keep inventory on refresh failure,
+bound and abort a hung gateway request, and stop polling when the plugin scope closes. Discovery runs on Effect's `TestClock`;
+the backgrounding threshold and session scoping use fake timers.
 
 Run the same isolated test command as CI from the repository root:
 

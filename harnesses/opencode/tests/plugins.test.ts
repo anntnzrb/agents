@@ -3,7 +3,8 @@ import { Model } from "@opencode/plugin";
 // Deliberately undeclared: this resolves to the single `effect` copy that `@opencode/plugin`
 // installs. Declaring a version here installs a second copy whenever the two disagree, and a
 // second copy owns a different Schema class, so decoding an @opencode schema with it fails.
-import { Schema } from "effect";
+import { Effect, Exit, Fiber, Schema, Scope } from "effect";
+import { TestClock } from "effect/testing";
 import discovery from "../plugins/cliproxy";
 import tmap from "../plugins/tmap";
 import autobg from "../plugins/autobg/tui";
@@ -18,7 +19,6 @@ const catalogModel = (id: string, fields: Partial<Model.Info>): Model.Info => ({
 });
 
 test("discovery enriches gateway models from the models.dev provider records", async () => {
-  jest.useFakeTimers();
   let down = true;
   let gateway: Array<{ id: unknown; owned_by?: string }> = [
     { id: "gemini-3.8-flash-high", owned_by: "antigravity" },
@@ -58,70 +58,102 @@ test("discovery enriches gateway models from the models.dev provider records", a
   };
   let reloads = 0;
   const ctx = { options: { baseURL: "http://gateway/v1/" }, provider: {
-    transform: async (callback: (editor: unknown) => void) => {
+    transform: (callback: (editor: unknown) => void) => Effect.sync(() => {
       transforms.push(callback);
       callback(editor);
-    },
-    reload: async () => {
+      return { dispose: Effect.void };
+    }),
+    reload: () => Effect.sync(() => {
       reloads++;
       for (const transform of transforms) transform(editor);
-    },
+    }),
   } };
-  const cleanup = await discovery.setup(ctx as never);
+  // Fire the poller on virtual time, then let its real fetch promise settle.
+  const tick = TestClock.adjust("5 minutes").pipe(Effect.andThen(Effect.promise(flush)));
   try {
-    expect(adds).toBe(0); // A gateway outage at boot publishes nothing.
-    down = false;
-    jest.advanceTimersByTime(5 * 60 * 1000);
-    await flush();
-    expect(reloads).toBe(1);
-    expect(models).toHaveLength(2);
-    for (const model of models) Schema.decodeUnknownSync(Model.Info)(model);
-    expect(models[0]).toMatchObject({
-      id: "gemini-3.8-flash-high", modelID: "gemini-3.8-flash-high", providerID: "cliproxy",
-      name: "Gemini Flash (antigravity)", limit: { context: 1000000, output: 64000 },
-      capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
-      cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }],
-      variants: [
-        { id: "minimal", settings: { reasoningEffort: "minimal", reasoningSummary: "auto" } },
-        { id: "low", settings: { reasoningEffort: "low" } },
-        { id: "medium", settings: { reasoningEffort: "medium" } },
-        { id: "high", settings: { reasoningEffort: "high" } },
-      ],
-    });
-    expect(models[0].variants[0].settings).not.toHaveProperty("thinkingLevel");
-    expect(models[1]).toMatchObject({ name: "pool/vendor/unknown (pool)", limit: { context: 200000, output: 32000 } });
-    // Unknown ids without catalog data fall back to the Responses effort ladder so cycling works.
-    expect(models[1].variants.map((variant) => variant.id)).toEqual(
-      ["none", "minimal", "low", "medium", "high", "xhigh"],
-    );
-    const before = models;
-    const requestCount = requests.length;
-    transforms[0](editor);
-    expect(models).toEqual(before);
-    expect(requests).toHaveLength(requestCount); // Replaying transforms never performs I/O.
-    jest.advanceTimersByTime(5 * 60 * 1000);
-    await flush();
-    expect(reloads).toBe(1); // An unchanged inventory does not reload providers.
-    down = true;
-    jest.advanceTimersByTime(5 * 60 * 1000);
-    await flush();
-    expect(reloads).toBe(1); // A failed refresh keeps the last inventory.
-    expect(models).toEqual(before);
-    down = false;
-    gateway = [{ id: "gemini-3.8-flash-high", owned_by: "antigravity" }];
-    jest.advanceTimersByTime(5 * 60 * 1000);
-    await flush();
-    expect(reloads).toBe(2);
-    expect(models.map((model) => model.id)).toEqual(["gemini-3.8-flash-high"]);
-    expect(transforms).toHaveLength(1);
-    (cleanup as () => void)();
-    const count = requests.length;
-    jest.advanceTimersByTime(5 * 60 * 1000);
-    await flush();
-    expect(requests).toHaveLength(count); // Cleanup stops the refresh timer.
+    await Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      yield* discovery.effect(ctx as never).pipe(Scope.provide(scope));
+      expect(adds).toBe(0); // A gateway outage at boot publishes nothing.
+      down = false;
+      yield* tick;
+      expect(reloads).toBe(1);
+      expect(models).toHaveLength(2);
+      for (const model of models) Schema.decodeUnknownSync(Model.Info)(model);
+      expect(models[0]).toMatchObject({
+        id: "gemini-3.8-flash-high", modelID: "gemini-3.8-flash-high", providerID: "cliproxy",
+        name: "Gemini Flash (antigravity)", limit: { context: 1000000, output: 64000 },
+        capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
+        cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0 } }],
+        variants: [
+          { id: "minimal", settings: { reasoningEffort: "minimal", reasoningSummary: "auto" } },
+          { id: "low", settings: { reasoningEffort: "low" } },
+          { id: "medium", settings: { reasoningEffort: "medium" } },
+          { id: "high", settings: { reasoningEffort: "high" } },
+        ],
+      });
+      expect(models[0].variants[0].settings).not.toHaveProperty("thinkingLevel");
+      expect(models[1]).toMatchObject({ name: "pool/vendor/unknown (pool)", limit: { context: 200000, output: 32000 } });
+      // Unknown ids without catalog data fall back to the Responses effort ladder so cycling works.
+      expect(models[1].variants.map((variant) => variant.id)).toEqual(
+        ["none", "minimal", "low", "medium", "high", "xhigh"],
+      );
+      const before = models;
+      const requestCount = requests.length;
+      transforms[0](editor);
+      expect(models).toEqual(before);
+      expect(requests).toHaveLength(requestCount); // Replaying transforms never performs I/O.
+      yield* tick;
+      expect(reloads).toBe(1); // An unchanged inventory does not reload providers.
+      down = true;
+      yield* tick;
+      expect(reloads).toBe(1); // A failed refresh keeps the last inventory.
+      expect(models).toEqual(before);
+      down = false;
+      gateway = [{ id: "gemini-3.8-flash-high", owned_by: "antigravity" }];
+      yield* tick;
+      expect(reloads).toBe(2);
+      expect(models.map((model) => model.id)).toEqual(["gemini-3.8-flash-high"]);
+      expect(transforms).toHaveLength(1);
+      yield* Scope.close(scope, Exit.void);
+      const count = requests.length;
+      yield* tick;
+      expect(requests).toHaveLength(count); // Closing the plugin scope interrupts the poller.
+    }).pipe(Effect.provide(TestClock.layer()), Effect.runPromise);
   } finally {
-    (cleanup as () => void)();
-    jest.useRealTimers();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("discovery bounds a hung gateway at boot and aborts its request", async () => {
+  let aborted = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = ((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+    init.signal!.addEventListener("abort", () => {
+      aborted++;
+      reject(init.signal!.reason);
+    });
+  })) as typeof fetch;
+  let adds = 0;
+  const ctx = { options: { baseURL: "http://gateway/v1" }, provider: {
+    transform: (callback: (editor: unknown) => void) => Effect.sync(() => {
+      callback({ list: () => [], add: () => adds++ });
+      return { dispose: Effect.void };
+    }),
+    reload: () => Effect.void,
+  } };
+  try {
+    await Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const setup = yield* discovery.effect(ctx as never).pipe(Scope.provide(scope), Effect.forkChild);
+      yield* Effect.promise(flush);
+      yield* TestClock.adjust("5 seconds");
+      yield* Fiber.join(setup);
+      expect(aborted).toBe(1);
+      expect(adds).toBe(0);
+      yield* Scope.close(scope, Exit.void);
+    }).pipe(Effect.provide(TestClock.layer()), Effect.runPromise);
+  } finally {
     globalThis.fetch = originalFetch;
   }
 });

@@ -1,6 +1,8 @@
 # CLIProxyAPI model discovery
 
 Populates the `cliproxy` provider's source inventory using the OpenCode v2 provider transform API.
+It is an Effect plugin (`@opencode/plugin/effect`): the plugin scope owns the transform registration
+and the refresh fiber, so unloading or reloading the plugin releases both.
 Setup reads the `baseURL` plugin option, fetches the gateway inventory, and registers a synchronous
 `editor.add` transform with the provider endpoint and model inventory. Replaying the transform
 performs no network requests. The option is the endpoint's single source of truth: sync renders it
@@ -13,9 +15,12 @@ configuration supplies its name, runtime package, and API key.
 Discovery:
 
 1. `GET {baseURL}/models` lists the gateway's current model ids at setup and every five minutes.
-   A failed or empty response keeps the last inventory; a changed inventory calls
-   `ctx.provider.reload()`. A gateway that is down at startup therefore gains its models on the first
-   successful refresh without a restart. Setup returns a cleanup function that stops the timer.
+   Each request is bounded at five seconds; the timeout aborts the in-flight `fetch`, so a hung
+   gateway delays plugin setup by at most that long. The response envelope is decoded with `Schema`;
+   entries without a non-empty string `id` are dropped individually. A failed or empty response keeps
+   the last inventory and logs a warning through the Effect logger into the OpenCode server log; a
+   changed inventory calls `ctx.provider.reload()`. A gateway that is down at startup therefore gains
+   its models on the first successful refresh without a restart.
 2. Metadata comes from OpenCode's own models.dev plugin, which adds every catalog provider to the
    provider editor before this transform runs and reloads providers when its snapshot refreshes.
    Deprecated and non-text catalog models are absent. Lookups try the exact id, the segment after the
