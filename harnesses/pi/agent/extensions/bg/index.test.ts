@@ -163,21 +163,34 @@ test("signal and timeout foreground failures preserve built-in behavior", async 
   await expect(h.bash("echo nope", false, undefined, -1)).rejects.toThrow("Invalid timeout");
   await expect(h.jobs("output", "missing")).rejects.toThrow("Unknown");
 });
-test("completions during a run wait for the run to settle, then arrive once", async () => {
+test("completions during a run steer into it once, without waiting for the run to settle", async () => {
   const h = load(); await h.emit("agent_start");
-  await h.bash("echo held", true);
-  await pause(1500); expect(h.messages).toHaveLength(0);
-  await h.emit("agent_settled");
+  await h.bash("echo live", true);
   await until(() => h.messages.length > 0); await pause(1200);
-  expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("held");
+  expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("live");
+  expect(h.messages[0].options).toEqual({ deliverAs: "steer", triggerTurn: true });
 });
-test("a result read by wait during the run is never delivered again", async () => {
-  const h = load(); await h.emit("agent_start");
-  const id = h.id(await h.bash("echo once", true));
-  await pause(1500);
+test("a result read by wait is never delivered again, and a delivered result is not waited on", async () => {
+  const h = load();
+  const id = h.id(await h.bash("sleep 0.2; echo once", true));
   expect(h.text(await h.jobs("wait", id))).toContain("once");
-  await h.emit("agent_settled"); await pause(1500);
-  expect(h.messages).toHaveLength(0);
+  await pause(1500); expect(h.messages).toHaveLength(0);
+  const other = h.id(await h.bash("echo pushed", true));
+  await until(() => h.messages.length > 0);
+  expect(h.text(await h.jobs("wait", other))).toContain("already finished");
+});
+test("list reports runtime, log size, and command for judging a running job", async () => {
+  const h = load(); const id = h.id(await h.bash("echo noisy; exec sleep 20", true));
+  await pause(200);
+  const listed = h.text(await h.jobs("list"));
+  expect(listed).toMatch(new RegExp(`${id}: running \\d+s, 6 bytes of output, "echo noisy; exec sleep 20"`));
+  await h.jobs("kill", id);
+});
+test("nested tool calls stay in the foreground", async () => {
+  const h = load({ thresholdMs: 50 }); const start = Date.now();
+  const r = await h.run("bash", { command: "sleep 0.3; printf nested" }, undefined, "parent/1");
+  expect(h.text(r)).toBe("nested"); expect(Date.now() - start).toBeGreaterThan(250);
+  await expect(h.run("bash", { command: "echo x", background: true }, undefined, "parent/2")).rejects.toThrow("unavailable");
 });
 test("a job stopped with jobs kill is not delivered", async () => {
   const h = load(); const id = h.id(await h.bash("exec sleep 20", true));
