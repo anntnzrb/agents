@@ -231,10 +231,11 @@ export default function bg(pi: ExtensionAPI) {
         if (job.ended === undefined) {
           job.terminating = true;
           signalGroup(job, "SIGTERM");
-          // Always escalate: descendants may outlive a terminated shell.
-          await new Promise<void>(resolve => setTimeout(resolve, 3000));
+          // Escalate unless the group already left; descendants may outlive a terminated shell.
+          await race(job.done, 3000);
           signalGroup(job, "SIGKILL"); await job.done;
         }
+        if (closing) return textResult(`${job.id} stopped; the session is shutting down.`);
         return textResult(await report(job));
       }
       if (job?.consumed) return textResult(`${job.id} already finished and its result was delivered. Log: ${job.path}`);

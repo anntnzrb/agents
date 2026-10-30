@@ -27,7 +27,8 @@ output is fenced as untrusted data, with terminal escape sequences and control b
 - `list`: running and settled jobs with their runtime, output size, command, and log path.
 - `output`: requires an ID; optional byte `offset` starts a bounded read. The result's
   `details.offset` and text report the next byte offset. Advance it to read only new bytes.
-- `kill`: requires an ID; sends SIGTERM to the process group and SIGKILL after three seconds.
+- `kill`: requires an ID; sends SIGTERM to the process group, then SIGKILL once the group exits or
+  after three seconds.
 - `wait`: blocks without inference until the named job, or any unconsumed job, settles. Optional
   `timeout` is in seconds, default 30, at most 120; on timeout it returns each job's runtime and
   output size so the agent can re-judge it. It returns early when a user message is queued

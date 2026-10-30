@@ -255,3 +255,13 @@ test("foreground sleep guard reads unit suffixes", async () => {
   for (const command of ["sleep 5s", "sleep 1m", "sleep 0.1h"]) await expect(h.bash(command)).rejects.toThrow("jobs wait");
   expect(h.text(await h.bash("sleep 0.1s; printf ok"))).toBe("ok");
 });
+test("kill returns as soon as the group exits after SIGTERM", async () => {
+  const h = load(); const id = h.id(await h.bash("exec sleep 20", true));
+  const start = Date.now(); await h.jobs("kill", id);
+  expect(Date.now() - start).toBeLessThan(1000);
+});
+test("kill racing session shutdown resolves instead of failing on the removed log", async () => {
+  const h = load(); const id = h.id(await h.bash("trap '' TERM; while :; do sleep 0.1; done", true));
+  const kill = h.jobs("kill", id); await pause(100); await h.shutdown();
+  await expect(kill).resolves.toBeDefined();
+});
