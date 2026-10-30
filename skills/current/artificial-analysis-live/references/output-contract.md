@@ -14,7 +14,7 @@ Default artifacts write to `<temp-dir>/artifacts/artificial-analysis/{full-data.
 
 Snapshot v2 sets `meta.schema_version: 2` and exposes top-level `models`, `hosts`, and `hosts_models`. The `hosts_models` table joins canonical models by `model_slug`.
 
-Model and API scopes record `price_1m_blended_3_to_1`. Endpoint and RSC scopes record `price_1m_blended_7_to_2_to_1`. Keep these pricing fields separate.
+Free API model pricing records input, output, cache-hit, and cache-write rates per million tokens. Endpoint prices belong to the provider RSC scope; keep the scopes separate.
 
 Reject malformed source envelopes and rows. Running `fetch --strict` disables fallbacks. Schema reconciliation MUST be versioned and additive.
 
@@ -63,7 +63,7 @@ Snapshot JSON v2 structures data under four top-level keys: `meta`, `models`, `h
 
 `meta` contains `schema_version: 2`, `counts`, and `sources`. Fields under `sources.rsc` and `sources.official_api` record the source URL, HTTP status code, fetch timestamp, ETag, and optional `reused_cached_payload`. Exclude credentials and raw response bodies from metadata. `counts` records totals for unique canonical `models`, `hosts`, `hosts_models`, and provider sanity checks.
 
-`models` contains canonical model rows indexed by `slug`. This table records official API identity, benchmark evaluations, and API pricing.
+`models` contains canonical model rows indexed by `slug`. This table records official API identity, capability indices, performance, and pricing. The free API does not provide individual benchmark scores; use `evaluation` for those page-scoped values.
 
 `hosts_models` is a provider-endpoint table. Each row includes `model_slug` to join the canonical model and contains endpoint pricing, speed, latency, context size, features, and classifications. Rows in `hosts_models` MUST NOT embed full `model` objects.
 

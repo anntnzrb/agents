@@ -83,9 +83,10 @@ from .rsc import (
     extract_evaluation_manifest,
     extract_evaluation_rows,
     extract_lists,
+    fetch_all_models,
     fetch_manifest_models,
-    fetch_models,
     fetch_page,
+    fetch_provider_manifest,
     fetch_rsc,
     load_cache_metadata,
     load_cached_artifact,
@@ -754,14 +755,37 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
         response_etag = result_etag(result) or sent_etag
         response_last_modified = result_last_modified(result) or sent_last_modified
         official_result = materialize_fetch_result(
-            fetch_models(api_key, timeout_seconds=timeout_seconds),
+            fetch_all_models(api_key, timeout_seconds=timeout_seconds),
             fallback_url=(
                 os.environ.get("ARTIFICIAL_ANALYSIS_API_BASE_URL") or MODEL_API_URL
             ),
         )
         body = result.body
         frames = parse_json_frames(body)
-        raw_models, raw_hosts, raw_hosts_models = extract_lists(frames)
+        provider_manifest_source: dict[str, object] | None = None
+        provider_page_source: dict[str, object] | None = None
+        try:
+            raw_models, raw_hosts, raw_hosts_models = extract_lists(frames)
+        except ExtractionError as exc:
+            if "Missing sections in RSC payload: hostsModels" not in str(exc):
+                raise
+            page = fetch_page(BASE_URL, timeout_seconds=timeout_seconds)
+            provider_page_source = {
+                "url": BASE_URL,
+                "sha256": result_sha256(page),
+                "fetched_at": result_fetched_at(page),
+            }
+            frames = parse_next_payload(page.body)
+            manifest = extract_evaluation_manifest(frames)
+            if manifest is None:
+                _raise_extraction_error(
+                    "Provider page is missing its endpoint manifest"
+                )
+            provider_rows, provider_manifest_source = fetch_provider_manifest(
+                manifest, base_url=BASE_URL, timeout_seconds=timeout_seconds
+            )
+            frames.append(("provider_manifest", {"rows": provider_rows}))
+            raw_models, raw_hosts, raw_hosts_models = extract_lists(frames)
         models = _as_list(raw_models)
         hosts = _as_list(raw_hosts)
         hosts_models = _as_list(raw_hosts_models)
@@ -784,6 +808,13 @@ def _fetch_payload(args: argparse.Namespace) -> dict[str, object]:
             official_models=official_models,
             rsc_freshness=freshness,
         )
+        if provider_manifest_source is not None:
+            meta = as_dict(payload.get("meta"))
+            sources = as_dict(meta.get("sources"))
+            sources["provider_manifest"] = provider_manifest_source
+            sources["provider_page"] = provider_page_source
+            meta["sources"] = sources
+            payload["meta"] = meta
     except (ExtractionError, OSError) as exc:
         if not _stale_allowed(args):
             raise

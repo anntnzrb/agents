@@ -291,7 +291,7 @@ class TestCliDefaultPaths(unittest.TestCase):
                     "fetch_rsc",
                     return_value=SimpleNamespace(status_code=200, headers={}, body=""),
                 ),
-                patch.object(cli, "fetch_models", side_effect=OSError("HTTP 503")),
+                patch.object(cli, "fetch_all_models", side_effect=OSError("HTTP 503")),
             ):
                 payload = _fetch_payload(args)
         fallback = as_dict(payload["fallback"])

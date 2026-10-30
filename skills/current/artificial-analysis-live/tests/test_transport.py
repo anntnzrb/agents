@@ -75,9 +75,11 @@ class QueueOpener:
         self.responses = list(responses)
         self.requests = []
 
-    def __call__(self, request: object, *, timeout: float) -> Response:
+    def __call__(
+        self, request: object, *, timeout: float, context: object = None
+    ) -> Response:
         """Record a request and return the next queued response."""
-        del timeout
+        del timeout, context
         self.requests.append(request)
         return self.responses.pop(0)
 

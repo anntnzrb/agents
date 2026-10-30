@@ -24,7 +24,7 @@ This tool extracts data from the Artificial Analysis model catalog and provider 
 Live `fetch` combines two required sources:
 
 - Provider endpoints from `https://artificialanalysis.ai/leaderboards/providers` with header `RSC: 1`
-- Canonical models from `https://artificialanalysis.ai/api/v2/data/llms/models`
+- Canonical models from `https://artificialanalysis.ai/api/v2/language/models/free`
 
 ## Fetch credentials
 
@@ -90,7 +90,7 @@ Cache and ETag behavior:
 
 `models` is the canonical unique model table. `hosts_models` contains provider and endpoint observations, joining each record to `models` using `model_slug` without repeating model metrics. Model identity, official evaluations, and the official API pricing object belong to canonical models. Provider speed, latency, context, features, classification, and RSC pricing belong to endpoints.
 
-The official API uses a 3:1 model pricing blend. The RSC endpoint feed uses a 7:2:1 endpoint pricing blend. Retain both blends: model pricing applies to the canonical model, and endpoint pricing applies to the provider endpoint.
+The free API supplies model identity, nine capability indices, Intelligence Index cost, token prices, and performance medians. Its paginated response does not supply individual benchmark scores. The snapshot records the API index version and page hashes. Provider endpoint observations come from the leaderboard, including its full endpoint manifest when present. Keep provider endpoint prices separate from canonical model prices. Use `evaluation` for published individual benchmark scores; those page populations are not merged into the snapshot. Missing benchmark values stay missing.
 
 ## Stats
 

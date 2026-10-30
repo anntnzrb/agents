@@ -462,7 +462,7 @@ class TestRscExtraction(unittest.TestCase):
         assert set(models) == {"api-only", "shared"}
         assert models["shared"]["name"] == "API name"
         assert models["shared"]["coding_index"] == 42
-        assert models["shared"]["intelligence_index"] == 11
+        assert models["shared"]["intelligence_index"] is None
         pricing = as_dict(models["shared"]["pricing"])
         assert pricing["price_1m_blended_3_to_1"] == 3
         hosts_models_list = as_list(payload["hosts_models"])
