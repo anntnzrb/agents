@@ -151,15 +151,26 @@ export default function bg(pi: ExtensionAPI) {
           if (execution.signal?.aborted) abort();
           job.done = new Promise<void>(resolve => {
             child.once("error", error => { failure = error; });
-            child.once("exit", () => { if (!job.terminating) signalGroup(job, "SIGKILL"); });
-            child.once("close", async (code, sig) => {
-              clearTimeout(hard); clearTimeout(timeout);
+            let settled = false;
+            let idle: ReturnType<typeof setTimeout> | undefined;
+            const settle = async (code: number | null, sig: NodeJS.Signals | null) => {
+              if (settled) return;
+              settled = true; clearTimeout(idle); clearTimeout(hard); clearTimeout(timeout);
               execution.signal?.removeEventListener("abort", abort);
+              // A descendant outside the group may still hold the pipes; stop reading them.
+              child.stdout!.destroy(); child.stderr!.destroy();
               job.code = sig ? 128 + constants.signals[sig] : code ?? 1;
               if (failure) job.code = 1;
               await job.writes; await file.close(); job.ended = Date.now();
               resolve(); if (job.background) schedule();
+            };
+            child.once("exit", (code, sig) => {
+              if (!job.terminating) signalGroup(job, "SIGKILL");
+              // Settle once the pipes go quiet after exit, as Pi's own executor does.
+              const arm = () => { clearTimeout(idle); idle = setTimeout(() => settle(code, sig), 100); };
+              arm(); child.stdout!.on("data", arm); child.stderr!.on("data", arm);
             });
+            child.once("close", (code, sig) => settle(code, sig));
           });
           try {
             const finished = await race(job.done.then(() => true), params.background ? 0 : threshold, execution.signal);

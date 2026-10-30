@@ -1,5 +1,6 @@
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import bg, { middle } from "./index.ts";
 
@@ -204,6 +205,26 @@ test("wait returns as soon as a user message is queued", async () => {
   expect(h.text(await h.jobs("wait", id))).toContain("new user message");
   expect(Date.now() - start).toBeLessThan(2000);
   await h.jobs("kill", id);
+});
+// perl prints its own PID after leaving the job's process group; the pipe stays open on its stdout.
+const daemon = `perl -e 'use POSIX; setsid(); print "daemon $$\\n"; sleep 30' & sleep 0.2; echo shell-done`;
+// The daemon escapes every ownership boundary by design, so tests reap it by its unique command line.
+const reapDaemons = () => new Promise(resolve => spawn("pkill", ["-f", "setsid\\(\\); print \"daemon"]).once("exit", resolve));
+test("a detached descendant holding the pipe does not hang kill or shutdown", async () => {
+  const h = load(); const id = h.id(await h.bash(daemon, true));
+  let out = ""; for (const end = Date.now() + 5000; !out.includes("shell-done") && Date.now() < end; await pause(50)) out = h.text(await h.jobs("output", id));
+  const start = Date.now();
+  try {
+    expect(h.text(await h.jobs("kill", id))).toContain("shell-done");
+    await h.shutdown();
+    expect(Date.now() - start).toBeLessThan(6000);
+  } finally { await reapDaemons(); }
+});
+test("a job reports and settles once its shell exits even if a detached descendant keeps the pipe", async () => {
+  const h = load(); await h.bash(daemon, true);
+  await until(() => h.messages.length > 0, 6000);
+  try { expect(h.messages).toHaveLength(1); expect(h.messages[0].content).toContain("shell-done"); }
+  finally { await reapDaemons(); }
 });
 test("reports strip terminal control sequences and binary bytes from process output", async () => {
   const h = load(); await h.bash(String.raw`printf '\033[31mred\033[0m\033]0;title\007\001\002ok'`, true);

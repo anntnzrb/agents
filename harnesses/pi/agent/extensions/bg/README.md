@@ -56,10 +56,14 @@ before completion delivery (upstream #10029). Nested calls, such as Bash run fro
 script, stay in the foreground because the caller needs the command's own result. Background
 execution requires POSIX process groups and an interactive or RPC context with UI support.
 
-The hard maximum kills the process group. Session shutdown kills active groups, waits for process
-closure, and removes the log directory. Logs and IDs are session-local; reload/resume never adopts
-old PIDs. Normal shell exit also cleans up residual descendants in its group. Commands that
-deliberately detach into a different process group are outside this ownership boundary.
+Output is written to the log with backpressure, so a fast producer waits on the disk instead of
+growing Pi's memory. The hard maximum kills the process group. Session shutdown, including Pi's
+SIGTERM and SIGHUP handling, kills active groups, waits for them, and removes the log directory.
+SIGKILL of Pi leaves jobs running because no handler can run. Logs and IDs are session-local;
+reload/resume never adopts old PIDs. Normal shell exit also cleans up residual descendants in its
+group. Commands that deliberately detach into a different process group are outside this ownership
+boundary: they keep running, but a job whose shell exited settles once its pipes go quiet even if
+such a descendant still holds them.
 After publishing, `/reload` or restart Pi to load changes; reload stops existing managed jobs.
 
 ## Validate
