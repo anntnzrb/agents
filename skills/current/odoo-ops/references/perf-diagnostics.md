@@ -33,9 +33,13 @@ Compare round-trip times. A delta exceeding 0.5s for 80 records indicates an N+1
 2. Replace per-record `search_count` in a compute with one `_read_group` over the whole recordset. In 17 it returns tuples (`odoo/models.py`, `_read_group(domain, groupby, aggregates, ...)`):
 
    ```python
-   counts = dict(self.env["crm.lead"]._read_group(
-       [("partner_id", "in", self.partner_id.ids)], ["partner_id"], ["__count"],
-   ))
+   counts = dict(
+       self.env["crm.lead"]._read_group(
+           [("partner_id", "in", self.partner_id.ids)],
+           ["partner_id"],
+           ["__count"],
+       )
+   )
    for record in self:
        record.lead_count = counts.get(record.partner_id, 0)
    ```
