@@ -1,0 +1,1 @@
+"""Weather skill tests."""
