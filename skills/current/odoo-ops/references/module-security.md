@@ -15,6 +15,7 @@ Access-control facts and review checks for custom Odoo 17 module code. Paths are
 - `sudo()` does not skip `_check_company`: with `_check_company_auto = True`, `create` and `write` still reject cross-company links.
 - Elevate the narrowest recordset for the shortest span. Validate inputs and the caller's access before `sudo()`, never after.
 - Never pass caller-supplied domains, field names, or values into a sudo call without a whitelist.
+- x2many `Command` values in a sudo `write` or `create` also run as superuser on the comodel. A comodel that sets `_allow_sudo_commands = False` runs them as the original user instead (`odoo/fields.py`, `_check_sudo_commands`). Whitelist command lists from request input like other values.
 - Never return sudo-read data to a caller who could not read it directly.
 
 ## Related and computed fields
@@ -22,6 +23,14 @@ Access-control facts and review checks for custom Odoo 17 module code. Paths are
 - Related fields compute as superuser by default: `compute_sudo` defaults to `related_sudo`, which defaults to `True` (`odoo/fields.py`, `Field._get_attrs`). A related field exposes the target value to every user who can read the source record, even without access to the target model.
 - Stored computed fields also default to `compute_sudo=True`; non-stored computed fields default to `False`.
 - When a related field exposes sensitive data, restrict it with `groups=` or set `related_sudo=False`, then test as a user without access to the target model.
+- `groups=fields.NO_ACCESS` hides a field from every ORM caller except sudo code (`odoo/fields.py`, `NO_ACCESS`).
+
+## Raw SQL and QWeb output
+
+- Build raw SQL with `odoo.tools.SQL`: pass values as `%s` arguments and table or column names through `SQL.identifier(name)`. Never format request values into a query string.
+- Raw SQL skips ACLs, record rules, and the `active` filter. Prefer the ORM when the caller's access matters.
+- Render QWeb output with `t-out`, which escapes unless the value is `Markup`. `t-esc` and `t-raw` are deprecated in 17; `t-raw` does not escape and logs a deprecation warning (`odoo/addons/base/models/ir_qweb.py`).
+- Wrap a value in `markupsafe.Markup` only after you build or sanitize that HTML yourself.
 
 ## Record rules and multi-company
 
