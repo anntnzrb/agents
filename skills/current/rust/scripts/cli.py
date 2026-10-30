@@ -101,73 +101,19 @@ def run(
     return result.stdout
 
 
-DIFF_FLAGS = (
-    "--text",
-    "--no-textconv",
-    "--no-ext-diff",
-    "--no-renames",
-    "--src-prefix=a/",
-    "--dst-prefix=b/",
-)
-
-
-def workspace_diff(path: Path, base: str) -> tuple[str, bool]:
-    """Diff explicit tracked and untracked paths without changing the index."""
+def workspace_changed(path: Path, base: str) -> bool:
+    """Detect tracked or untracked changes without changing the index."""
     tracked = run(
         ["git", "diff", "--no-renames", "--name-only", "-z", base],
         path,
         display=False,
     )
-    untracked = set(
-        run(
-            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-            path,
-            display=False,
-        ).split("\0")
+    untracked = run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        path,
+        display=False,
     )
-    names = (set(tracked.split("\0")) | untracked) - {""}
-    patches: list[str] = []
-    for name in sorted(names):
-        governed = (
-            name.endswith(".rs")
-            or Path(name).name
-            in {
-                "Cargo.toml",
-                "Cargo.lock",
-                ".gitattributes",
-                ".gitmodules",
-                "deny.toml",
-                "clippy.toml",
-                ".clippy.toml",
-                "rustfmt.toml",
-                ".rustfmt.toml",
-                "rust-toolchain",
-                "rust-toolchain.toml",
-            }
-            or name.startswith((".gate/", ".github/", ".cargo/", ".config/"))
-        )
-        if not governed:
-            continue
-        command = ["git", "diff", *DIFF_FLAGS]
-        command.extend(
-            ["--no-index", "--", "/dev/null", name]
-            if name in untracked
-            else [base, "--", name]
-        )
-        result = subprocess.run(
-            command,
-            cwd=path,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode not in ((0, 1) if name in untracked else (0,)):
-            raise subprocess.CalledProcessError(
-                result.returncode, command, result.stdout, result.stderr
-            )
-        patches.append(result.stdout)
-    return "".join(patches), bool(names)
+    return bool((set(tracked.split("\0")) | set(untracked.split("\0"))) - {""})
 
 
 def json_object(value: object) -> dict[str, object]:
@@ -254,7 +200,7 @@ def gate(path: Path, base: str) -> int:
                 print(f"[{number}/9] {step}", flush=True)
                 _ = run(command, path, docs=step == "docs")
             step = "prepare diff"
-            _, changed = workspace_diff(path, base)
+            changed = workspace_changed(path, base)
             step = "governance"
             print(f"[8/9] {step}", flush=True)
             # Execute the trusted base copy, never the branch's editable checker.
