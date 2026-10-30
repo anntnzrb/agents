@@ -70,5 +70,6 @@
   "websearch": false,
   "experimental": {
     "subagent_depth": 2,
+    "background_compaction": true,
   },
 }
