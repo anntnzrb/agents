@@ -9,9 +9,8 @@ import discovery from "../plugins/cliproxy";
 import tmap from "../plugins/tmap";
 import autobg from "../plugins/autobg/tui";
 
-const flush = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-};
+// One macrotask turn drains every pending microtask, however many hops the fiber takes.
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 const catalogModel = (id: string, fields: Partial<Model.Info>): Model.Info => ({
   ...Model.Info.default("google" as never, id as never),
@@ -151,6 +150,32 @@ test("discovery bounds a hung gateway at boot and aborts its request", async () 
       yield* Fiber.join(setup);
       expect(aborted).toBe(1);
       expect(adds).toBe(0);
+      yield* Scope.close(scope, Exit.void);
+    }).pipe(Effect.provide(TestClock.layer()), Effect.runPromise);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("discovery keeps polling after a provider reload dies", async () => {
+  let version = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => Response.json({ data: [{ id: `model-${version++}` }] })) as typeof fetch;
+  let reloads = 0;
+  const ctx = { options: { baseURL: "http://gateway/v1" }, provider: {
+    transform: () => Effect.succeed({ dispose: Effect.void }),
+    reload: () => Effect.sync(() => {
+      if (++reloads === 1) throw new Error("reload exploded");
+    }),
+  } };
+  const tick = TestClock.adjust("5 minutes").pipe(Effect.andThen(Effect.promise(flush)));
+  try {
+    await Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      yield* discovery.effect(ctx as never).pipe(Scope.provide(scope));
+      yield* tick;
+      yield* tick;
+      expect(reloads).toBe(2); // The defect in the first reload did not end the poller.
       yield* Scope.close(scope, Exit.void);
     }).pipe(Effect.provide(TestClock.layer()), Effect.runPromise);
   } finally {

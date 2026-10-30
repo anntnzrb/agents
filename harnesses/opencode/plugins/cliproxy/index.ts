@@ -160,7 +160,7 @@ export default Plugin.define({
 			return true;
 		}).pipe(
 			// A failed refresh keeps the last known inventory.
-			Effect.catch((error) => Effect.logWarning("cliproxy model discovery failed", error).pipe(Effect.as(false))),
+			Effect.catch((cause) => Effect.logWarning("cliproxy model discovery failed", { cause }).pipe(Effect.as(false))),
 		);
 
 		yield* refresh;
@@ -173,9 +173,11 @@ export default Plugin.define({
 			});
 		});
 
-		// The plugin scope interrupts the poller on unload or reload.
+		// The plugin scope interrupts the poller on unload or reload. `reload` cannot fail, so only a
+		// defect reaches the catch; logging it keeps one bad reload from ending discovery for good.
 		yield* refresh.pipe(
 			Effect.flatMap((changed) => (changed ? ctx.provider.reload() : Effect.void)),
+			Effect.catchDefect((defect) => Effect.logError("cliproxy provider reload failed", { defect })),
 			Effect.delay(REFRESH_INTERVAL),
 			Effect.forever,
 			Effect.forkScoped,

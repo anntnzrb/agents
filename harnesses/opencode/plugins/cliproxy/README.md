@@ -20,7 +20,7 @@ Discovery:
    gateway delays plugin setup by at most that long. The response envelope is decoded with `Schema`;
    entries without a non-empty string `id` are dropped individually. A failed or empty response keeps
    the last inventory and logs a warning through the Effect logger into the OpenCode server log; a
-   changed inventory calls `ctx.provider.reload()`. A gateway that is down at startup therefore gains
+   changed inventory calls `ctx.provider.reload()`; a reload that dies is logged and polling continues. A gateway that is down at startup therefore gains
    its models on the first successful refresh without a restart.
 2. Metadata comes from OpenCode's own models.dev plugin, which adds every catalog provider to the
    provider editor before this transform runs and reloads providers when its snapshot refreshes.
