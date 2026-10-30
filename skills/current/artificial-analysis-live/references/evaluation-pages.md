@@ -6,9 +6,11 @@ Use this guide for dedicated benchmark pages at `/evaluations/<slug>`.
 
 Query provider endpoint speed, latency, and price by running `fetch` on `/leaderboards/providers`, then running `query`.
 
-Query published model benchmark metrics (`intelligence`, `coding`, `agentic`, `math`) from the official models API by running `fetch`, then running `query`.
+Query published capability indices from the free models API by running `fetch`, then running `query`. The free API does not supply individual benchmark scores.
 
 Query dedicated benchmark leaderboards at `/evaluations/<slug>` with `evaluation <url>`.
+
+Use `eval-cost` for derived per-variant evaluation costs. Read [Evaluation cost](../README.md#evaluation-cost) for pricing sources, cache assumptions, and the rollout denominator.
 
 Dedicated evaluation pages remain separate from official model snapshot metrics.
 
