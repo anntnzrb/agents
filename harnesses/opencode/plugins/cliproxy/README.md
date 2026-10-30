@@ -3,7 +3,8 @@
 Populates the `cliproxy` provider's source inventory using the OpenCode v2 provider transform API.
 It is an Effect plugin (`@opencode/plugin/effect`): the plugin scope owns the transform registration
 and the refresh fiber, so unloading or reloading the plugin releases both.
-Setup reads the `baseURL` plugin option, fetches the gateway inventory, and registers a synchronous
+Setup reads the `baseURL` plugin option (a non-empty string; otherwise the plugin logs a warning and
+stays inactive), fetches the gateway inventory, and registers a synchronous
 `editor.add` transform with the provider endpoint and model inventory. Replaying the transform
 performs no network requests. The option is the endpoint's single source of truth: sync renders it
 from the deployment configuration.
@@ -15,7 +16,7 @@ configuration supplies its name, runtime package, and API key.
 Discovery:
 
 1. `GET {baseURL}/models` lists the gateway's current model ids at setup and every five minutes.
-   Each request is bounded at five seconds; the timeout aborts the in-flight `fetch`, so a hung
+   Each request, including its body, is bounded at five seconds; the timeout aborts it, so a hung
    gateway delays plugin setup by at most that long. The response envelope is decoded with `Schema`;
    entries without a non-empty string `id` are dropped individually. A failed or empty response keeps
    the last inventory and logs a warning through the Effect logger into the OpenCode server log; a

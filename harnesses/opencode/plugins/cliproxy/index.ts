@@ -121,14 +121,14 @@ function toModel(model: GatewayModel, entry: Model.Info | undefined): Model.Info
 
 const fetchInventory = Effect.fn("cliproxy.fetchInventory")(
 	function* (url: string) {
-		const response = yield* Effect.tryPromise({
-			try: (signal) => fetch(url, { signal }),
-			catch: (cause) => new GatewayError({ message: `GET ${url} failed`, cause }),
-		});
-		if (!response.ok) return yield* new GatewayError({ message: `GET ${url} returned HTTP ${response.status}` });
+		// One request so the abort signal covers a gateway that stalls after sending headers.
 		const body = yield* Effect.tryPromise({
-			try: () => response.json(),
-			catch: (cause) => new GatewayError({ message: `GET ${url} returned invalid JSON`, cause }),
+			try: async (signal) => {
+				const response = await fetch(url, { signal });
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return (await response.json()) as unknown;
+			},
+			catch: (cause) => new GatewayError({ message: `GET ${url} failed`, cause }),
 		});
 		const payload = yield* Schema.decodeUnknownEffect(GatewayPayload)(body).pipe(
 			Effect.mapError((cause) => new GatewayError({ message: `GET ${url} returned an unexpected payload`, cause })),
