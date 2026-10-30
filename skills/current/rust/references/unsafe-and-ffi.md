@@ -9,7 +9,7 @@ Read before changing unsafe code, foreign bindings, raw ownership, or safe code 
 - MUST reserve unsafe contracts for undefined-behavior hazards, not arbitrary business preconditions or privilege checks. [self-check]
 - MUST put exactly one unsafe operation in each block, with a `// SAFETY:` comment explaining why every precondition holds at that call site. [multiple_unsafe_ops_per_block; undocumented_unsafe_blocks; unnecessary_safety_comment; self-check]
 - MUST use explicit unsafe blocks inside unsafe functions and document caller obligations under `# Safety` on unsafe functions and traits. [unsafe_op_in_unsafe_fn; missing_safety_doc; unnecessary_safety_doc]
-- MUST run gate step 10 (Miri) on executable pure-Rust unsafe paths. Do not run a bare `cargo +nightly miri test`. [Miri; self-check]
+- MUST run gate step 9 (Miri) on executable pure-Rust unsafe paths. Do not run a bare `cargo +nightly miri test`. [Miri; self-check]
 - MUST keep tests of pure-Rust logic in FFI crates runnable under Miri; mark only tests that call foreign code with `#[cfg_attr(miri, ignore = "Miri cannot execute foreign functions")]`. [Miri; governance-check]
 - MUST guard foreign calls in doctests with a hidden `# #[cfg(not(miri))]` line, only inside escape-hatch paths, so the doctest still compiles under Miri. [Miri; governance-check]
 - MUST justify every manual `unsafe impl Send` or `Sync` with a safety argument and a Miri or loom test. [undocumented_unsafe_blocks; Miri; loom; self-check]

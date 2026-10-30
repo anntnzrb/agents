@@ -76,24 +76,6 @@ def run(
 ) -> str:
     """Run a checked command, retaining diagnostics for fixture assertions."""
     env = dict(os.environ)
-    if tuple(command[:2]) == ("cargo", "mutants"):
-        output = Path(command[command.index("--output") + 1])
-        if os.name == "nt":
-            raise RuntimeError("mutation mode requires a POSIX host")
-        wrapper = output / "cap-lints-rustc"
-        _ = wrapper.write_text(
-            f"""#!{sys.executable}
-import os
-import sys
-os.execvp(sys.argv[1], [sys.argv[1], *sys.argv[2:], "--cap-lints=warn"])
-""",
-            encoding="utf-8",
-        )
-        wrapper.chmod(0o700)
-        env |= {
-            "CARGO_TARGET_DIR": str(output / "mutants-target"),
-            "RUSTC_WORKSPACE_WRAPPER": str(wrapper),
-        }
     if docs:
         env["RUSTDOCFLAGS"] = f"{env.get('RUSTDOCFLAGS', '')} -D warnings".strip()
     if miri:
@@ -264,33 +246,17 @@ def miri_packages(path: Path, base: str) -> list[str]:
 
 
 def gate(path: Path, base: str) -> int:
-    """Run the ten ordered steps and stop at the first failed command."""
+    """Run the nine ordered steps and stop at the first failed command."""
     step = "prepare diff"
     try:
         with tempfile.TemporaryDirectory(prefix="rust-gate-") as temporary:
             for number, (step, command) in enumerate(COMMANDS, 1):
-                print(f"[{number}/10] {step}", flush=True)
+                print(f"[{number}/9] {step}", flush=True)
                 _ = run(command, path, docs=step == "docs")
-            step = "mutation tests"
-            diff, changed = workspace_diff(path, base)
-            patch = Path(temporary) / "diff.patch"
-            _ = patch.write_text(diff, encoding="utf-8")
-            print(f"[8/10] {step}", flush=True)
-            _ = run(
-                [
-                    "cargo",
-                    "mutants",
-                    "--in-diff",
-                    str(patch),
-                    "--test-tool",
-                    "nextest",
-                    "--output",
-                    temporary,
-                ],
-                path,
-            )
+            step = "prepare diff"
+            _, changed = workspace_diff(path, base)
             step = "governance"
-            print(f"[9/10] {step}", flush=True)
+            print(f"[8/9] {step}", flush=True)
             # Execute the trusted base copy, never the branch's editable checker.
             checker = run(
                 ["git", "show", f"{base}:.gate/governance-check.py"],
@@ -303,15 +269,15 @@ def gate(path: Path, base: str) -> int:
             step = "Miri"
             packages = miri_packages(path, base) if changed else []
             if packages:
-                print(f"[10/10] {step}", flush=True)
+                print(f"[9/9] {step}", flush=True)
                 command = ["cargo", "+nightly", "miri", "test", "--all-features"]
                 for package in packages:
                     command.extend(["-p", package])
                 _ = run(command, path, miri=True)
             elif changed:
-                print("[10/10] Miri: no packages in escape-hatch paths", flush=True)
+                print("[9/9] Miri: no packages in escape-hatch paths", flush=True)
             else:
-                print("[10/10] Miri: no changes", flush=True)
+                print("[9/9] Miri: no changes", flush=True)
     except FileNotFoundError as error:
         print(f"{step} failed: missing executable {error}", file=sys.stderr)
         return 127

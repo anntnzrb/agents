@@ -52,10 +52,10 @@ Maintainer reference. Each entry states the current decision, why it holds, and 
 - Why: Workspace-wide `cargo test --doc --workspace` fails on binary-only crates; ordered fail-fast execution provides immediate feedback.
 - Evidence: `verify-fixtures` binary-only control fixture.
 
-### Mutation testing on diff with capped lints and isolated target directory
+### CI-only mutation testing on the diff with capped lints and isolated target directory
 
-- Decision: Run mutation testing strictly on the diff using `cargo-mutants`, capping lints via compiler wrapper configuration and isolating the mutation build target directory.
-- Why: Denied workspace lints caused body-replacement mutants to fail during compilation as unviable rather than caught by tests; sharing a build target directory polluted subsequent gate steps with stale mutated artifacts.
+- Decision: Run mutation testing on the diff using `cargo-mutants` only in the CI `mutants` job, on pull requests and pushes to main, capping lints via compiler wrapper configuration and isolating the mutation build target directory. The local gate does not run mutants.
+- Why: A local run builds mutants in a fresh isolated target directory, so it rebuilds the whole dependency graph before testing any mutant. That cost made the local loop too slow. CI keeps the only check that detects tautological tests. The job runs on pushes too because direct pushes to main are the default integration path. Denied workspace lints caused body-replacement mutants to fail during compilation as unviable rather than caught by tests; sharing a build target directory polluted subsequent gate steps with stale mutated artifacts.
 - Evidence: `retrofit` and `async` tasks in `evals/evals.json` demonstrating unviable mutants without lint capping; `ffi` task in `evals/evals.json` exposing stale build artifacts. `assets/ci.yml` `mutants` job applies the same wrapper and target directory; cargo-mutants 27.0.0 does not cap lints by default.
 
 ### Equivalent mutants reporting and human exclusion

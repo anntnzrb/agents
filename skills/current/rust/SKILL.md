@@ -38,7 +38,7 @@ MUST read every `Always` row in full before writing or reviewing code. MUST read
 1. MUST complete the required reads above, then inspect `Cargo.lock`, `Cargo.toml`, the toolchain pin, and installed gates. The target repository's toolchain pin and lockfile win over example values in `assets/`; report drift and never change gate policy to match it. Read each crate API's exact locked-version docs or source before using it. [self-check]
 2. MUST model domain values, states, ownership, and typed failures before writing logic. [self-check]
 3. MUST iterate with `cargo check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, and tests. [cargo check; clippy; nextest]
-4. MUST write behavior tests that detect broken implementations. Run mutation testing only through the gate (testing.md). Improve tests for missed mutants. [cargo-mutants; scripts/cli.py gate]
+4. MUST write behavior tests that detect broken implementations. Mutation testing runs in the CI `mutants` job, not the local gate (testing.md). Improve tests for missed mutants that CI reports. [cargo-mutants; CI]
 5. MUST run the public `gate` command in the target workspace with the intended base. It runs the ordered checks below and stops at the first failure. [scripts/cli.py gate]
 6. MUST complete every definition-of-done item before reporting success. [self-check; CI]
 7. If a gate seems wrong, MUST stop and report the lint, location, and reason. NEVER suppress it, edit gate configuration without the user's request, or preserve the defect behind a lint-evading rewrite. [governance-check; self-check]
@@ -51,7 +51,7 @@ MUST read every `Always` row in full before writing or reviewing code. MUST read
 - [ ] MUST leave gate files, `[workspace.lints]`, `[lints]`, and `[profile.*]` unchanged unless the user asked to install or change them. Agents may edit root `members`, `[workspace.package]`, and `[workspace.dependencies]`. [governance-check; repository rulesets]
 - [ ] MUST document new public items, including `# Errors` on public functions returning `Result`. [missing_docs; missing_errors_doc]
 - [ ] MUST justify new dependencies and use only needed features. [cargo-deny; cargo-machete; self-check]
-- [ ] MUST have no missed mutants in changed code, or report each equivalent mutant as testing.md requires. [cargo-mutants]
+- [ ] MUST have no missed mutants in changed code in the CI `mutants` job, or report each equivalent mutant as testing.md requires. Without CI, report mutation testing as unrun. [cargo-mutants; CI]
 - [ ] MUST report which references were read and which conditional triggers fired. [self-check]
 - [ ] MUST check every applicable rule tagged `self-check` in the loaded references against the final diff. [self-check]
 
@@ -110,8 +110,7 @@ Gate order:
 5. `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --locked`
 6. `cargo deny --locked check`
 7. `cargo machete`
-8. Mutation testing on the diff (`cargo mutants --in-diff`), which the gate runs with capped lints and an isolated target directory
-9. `uv run --script <trusted-base-checker> <base> --inventory`
-10. When the diff is non-empty, `cargo +nightly miri test --all-features -p <package>` for each workspace package containing an escape-hatch path, with the Miri flags and proptest case count that gates-and-ci.md step 10 defines
+8. `uv run --script <trusted-base-checker> <base> --inventory`
+9. When the diff is non-empty, `cargo +nightly miri test --all-features -p <package>` for each workspace package containing an escape-hatch path, with the Miri flags and proptest case count that gates-and-ci.md step 9 defines
 
-`<trusted-base-checker>` is a temporary copy of `<base>:.gate/governance-check.py`, which runs gate step 9 governance inventory. Read [gates-and-ci.md](references/gates-and-ci.md) for inventory baselines and the installed helper's invocation.
+`<trusted-base-checker>` is a temporary copy of `<base>:.gate/governance-check.py`, which runs gate step 8 governance inventory. Read [gates-and-ci.md](references/gates-and-ci.md) for inventory baselines and the installed helper's invocation.

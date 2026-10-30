@@ -30,7 +30,7 @@ Read before writing or reviewing tests, interpreting mutants, or adding verifica
 
 ## Mutation and anti-gaming
 
-- MUST run mutation testing only through the gate, never a bare `cargo mutants` run. [cargo-mutants; scripts/cli.py gate]
+- MUST read mutation results from the CI `mutants` job; the local gate does not run mutants. When the repository has no CI, report mutation testing as unrun. [cargo-mutants; CI]
 - MUST have no missed mutants in changed code. Improve the behavior test that should detect each missed mutation. NEVER delete the mutated code merely to obtain green output. [cargo-mutants; self-check]
 - MUST kill each missed mutant with a behavior test. When a mutant is equivalent because code is redundant, such as a dead branch or a constructor that duplicates `Default`, delete the redundancy. Otherwise report its exact cargo-mutants name; only a human may exclude it through `exclude_re` in the protected `.cargo/mutants.toml`. NEVER rewrite non-redundant code solely to dodge a mutant, and NEVER add `#[mutants::skip]` outside escape-hatch paths. [cargo-mutants; governance-check]
 - MAY remove `#[ignore]` from an existing test that passes, because that strengthens it; newly ignored tests remain rejected. [governance-check]

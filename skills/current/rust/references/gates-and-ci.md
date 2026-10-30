@@ -16,9 +16,10 @@ Read before running the full gate, installing gates, auditing a Rust repository,
 ## Execute the installed gate
 
 - MUST run `uv run --script <skill-dir>/scripts/cli.py gate --base <base-ref> --path <workspace>` with the intended review base. [scripts/cli.py gate]
-- MUST let the gate run step 8: it writes the diff to `<temp-dir>/diff.patch`, caps lints through a rustc workspace wrapper, and builds mutants in an isolated target directory. NEVER substitute a bare `cargo mutants` run; the CI `mutants` job applies the same wrapper and target directory. [cargo-mutants; scripts/cli.py gate; CI]
+- MUST leave mutation testing to the CI `mutants` job. It tests mutants in the pull request or pushed diff, caps lints through a rustc workspace wrapper, and builds in an isolated target directory. The local gate does not run mutants. [cargo-mutants; CI]
+- MAY reproduce a CI-reported mutant locally only with the CI job's wrapper and isolated target directory. A bare `cargo mutants` run reports mutants that fail on denied lints as unviable instead of testing them. [cargo-mutants; self-check]
 - MUST stop at the first failing step, repair code or tests, and rerun the gate. If the gate appears wrong, report its diagnostic, location, and reason. NEVER suppress it or change configuration. [scripts/cli.py gate; governance-check; self-check]
-- MUST use the gate to include tracked changes and untracked, non-ignored files in mutation, Miri, and governance checks. The gate builds textual diffs without modifying the index. [scripts/cli.py gate; governance-check]
+- MUST use the gate to include tracked changes and untracked, non-ignored files in Miri and governance checks. The gate builds textual diffs without modifying the index. [scripts/cli.py gate; governance-check]
 - MUST NOT use `--no-verify`, skip flags, mutation exclusions, or environment overrides to weaken verification. [self-check]
 
 The ordered gate is:
@@ -32,9 +33,8 @@ The ordered gate is:
 | 5 | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --locked` | rustdoc |
 | 6 | `cargo deny --locked check` | cargo-deny |
 | 7 | `cargo machete` | cargo-machete |
-| 8 | Mutation testing on the diff (`cargo mutants --in-diff`), run by the gate with capped lints and an isolated target directory | cargo-mutants |
-| 9 | `uv run --script <trusted-base-checker> <base-ref> --inventory` | governance-check |
-| 10 | `MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance"` `PROPTEST_CASES=16` `cargo +nightly miri test --all-features -p <package in an escape-hatch path>` | Miri |
+| 8 | `uv run --script <trusted-base-checker> <base-ref> --inventory` | governance-check |
+| 9 | `MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance"` `PROPTEST_CASES=16` `cargo +nightly miri test --all-features -p <package in an escape-hatch path>` | Miri |
 
 `<trusted-base-checker>` is a temporary copy of `<base-ref>:.gate/governance-check.py`, read with `git show`. The installed file's direct invocation is `uv run --script .gate/governance-check.py <base-ref> --inventory`; the trusted-base copy prevents a change from rewriting its own judge.
 
@@ -42,8 +42,8 @@ The CLI defaults to `--base origin/main` and `--path` set to the current directo
 
 The standalone checker defaults its base to `origin/main`. Exit codes match SKILL.md. `--doctests` selects library packages through Cargo metadata and returns success without a doctest command for a binary-only workspace. The local gate uses the bundled helper for this step; CI runs `uv run --script .gate/governance-check.py --doctests`.
 
-- MUST run Miri on executable unsafe logic in an approved escape-hatch path. Step 10 selects packages by path, which is a trigger, not a soundness proof. [Miri; self-check]
-- MUST expect gate step 10 to run Miri, on any change, for every workspace package containing files in escape-hatch paths. The gate sets the Miri flags and proptest case count. [scripts/cli.py gate; Miri]
+- MUST run Miri on executable unsafe logic in an approved escape-hatch path. Step 9 selects packages by path, which is a trigger, not a soundness proof. [Miri; self-check]
+- MUST expect gate step 9 to run Miri, on any change, for every workspace package containing files in escape-hatch paths. The gate sets the Miri flags and proptest case count. [scripts/cli.py gate; Miri]
 - MUST pass the local gate before reporting done. When the repository has CI, obtain green CI too. Otherwise report CI as unrun. Report every blocked or unrun check explicitly. [CI; self-check]
 
 ## Install assets
@@ -106,7 +106,7 @@ identities = ["nextest:package:binary:module::test_name"]
 - MUST keep every changed path belonging to a package with `proc-macro = true` inside escape-hatch paths. [governance-check]
 - MUST have a human allowlist every existing or new symlink in the proposed tree: tracked links, links in submodule working trees, symlinked parent directories, and untracked, non-ignored links. Ignored build output such as a `nix build` `result` link is not proposed. Unchanged source links can expose changed non-Rust target content. [governance-check]
 - MUST treat the merge base's `.gate/governance-check.py` as authoritative for gate step 9 governance checks; the local gate runs bundled `assets/governance-check.py --doctests` for step 4, while target repositories install `.gate/governance-check.py` from the template. [governance-check]
-- MUST treat a missing `.gate/escape-hatch-paths` as approving no paths: every escape hatch is then rejected and gate step 10 selects no packages. [governance-check; scripts/cli.py gate]
+- MUST treat a missing `.gate/escape-hatch-paths` as approving no paths: every escape hatch is then rejected and gate step 9 selects no packages. [governance-check; scripts/cli.py gate]
 
 Binary-only packages have no doctest command.
 

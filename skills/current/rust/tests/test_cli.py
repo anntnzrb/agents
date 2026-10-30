@@ -1,7 +1,6 @@
 # Copyright (c) 2026 anntnzrb
 """Check ordered gate behavior without Rust or external sockets."""
 
-import json
 import os
 import runpy
 import subprocess
@@ -116,25 +115,16 @@ def workspace(tmp_path: Path) -> Path:
         "    pathlib.Path('proptest-cases.txt').write_text(cases)\n"
         "if sys.argv[1] == 'doc':\n"
         "    assert '-D warnings' in os.environ['RUSTDOCFLAGS']\n"
-        "if name == 'cargo' and sys.argv[1] != 'mutants':\n"
+        "if name == 'cargo':\n"
         "    actual_target = os.environ['CARGO_TARGET_DIR']\n"
         "    assert actual_target == os.environ['GATE_PARENT_TARGET']\n"
-        "if sys.argv[1] == 'mutants':\n"
-        "    patch = pathlib.Path(sys.argv[sys.argv.index('--in-diff') + 1])\n"
-        "    assert patch.is_file()\n"
-        "    output = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])\n"
-        "    assert not output.resolve().is_relative_to(pathlib.Path.cwd().resolve())\n"
-        "    target = pathlib.Path(os.environ['CARGO_TARGET_DIR']).resolve()\n"
-        "    assert target == output.resolve() / 'mutants-target'\n"
-        "    assert not target.is_relative_to(pathlib.Path.cwd().resolve())\n"
-        "    assert str(target) != os.environ['GATE_PARENT_TARGET']\n"
     )
     for name in ("cargo", "uv"):
         file = tools / name
         _ = file.write_text(fake, encoding="utf-8")
         file.chmod(0o755)
     _ = (tmp_path / ".gitignore").write_text(
-        "commands.log\nmiri-flags.txt\nproptest-cases.txt\ncaptured.patch\n",
+        "commands.log\nmiri-flags.txt\nproptest-cases.txt\n",
         encoding="utf-8",
     )
     gate = tmp_path / ".gate"
@@ -200,16 +190,19 @@ def test_full_gate_order(workspace: Path) -> None:
         "doc",
         "deny",
         "machete",
-        "mutants",
         "run",
     ]
     assert "test --doc --all-features --locked --package fixture" in commands[3]
-    assert "[10/10] Miri: no changes" in result.stdout
+    assert "[9/9] Miri: no changes" in result.stdout
 
 
 @pytest.mark.parametrize(
     ("failure", "name", "count"),
-    [("fmt", "format", 1), ("clippy", "clippy", 2), ("mutants", "mutation tests", 8)],
+    [
+        ("fmt", "format", 1),
+        ("clippy", "clippy", 2),
+        ("machete", "unused dependencies", 7),
+    ],
 )
 def test_stop_on_failure(workspace: Path, failure: str, name: str, count: int) -> None:
     """Failures identify the step and prevent all subsequent gates."""
@@ -289,22 +282,8 @@ def test_invalid_workspace_path(tmp_path: Path, name: str) -> None:
     assert "existing directory" in result.stderr
 
 
-def test_untracked_rust_reaches_mutants_and_miri(workspace: Path) -> None:
-    """Untracked Rust appears in the actual mutation patch and Miri decision."""
-    cargo = workspace / "tools/cargo"
-    content = cargo.read_text(encoding="utf-8")
-    _ = cargo.write_text(
-        content
-        + "\nif sys.argv[1] == 'mutants':\n"
-        + "    pathlib.Path('captured.patch').write_text(patch.read_text())\n",
-        encoding="utf-8",
-    )
-    _ = subprocess.run(["git", "add", "tools/cargo"], cwd=workspace, check=True)
-    _ = subprocess.run(
-        ["git", "commit", "--quiet", "-m", "capture mutation input"],
-        cwd=workspace,
-        check=True,
-    )
+def test_untracked_rust_reaches_miri(workspace: Path) -> None:
+    """Untracked Rust reaches the Miri decision without changing the index."""
     before = subprocess.run(
         ["git", "ls-files", "--stage", "-z"],
         cwd=workspace,
@@ -316,10 +295,7 @@ def test_untracked_rust_reaches_mutants_and_miri(workspace: Path) -> None:
     )
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    patch = (workspace / "captured.patch").read_text(encoding="utf-8")
-    assert "+// unsafe untracked adapter" in patch
-    assert "src/new.rs" in patch
-    assert "[10/10] Miri\n" in result.stdout
+    assert "[9/9] Miri\n" in result.stdout
     after = subprocess.run(
         ["git", "ls-files", "--stage", "-z"],
         cwd=workspace,
@@ -343,7 +319,7 @@ def test_binary_attributes_cannot_hide_miri_input(workspace: Path) -> None:
     )
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "[10/10] Miri\n" in result.stdout
+    assert "[9/9] Miri\n" in result.stdout
 
 
 def test_non_rust_changes_trigger_approved_miri_packages(workspace: Path) -> None:
@@ -361,7 +337,7 @@ def test_non_rust_changes_trigger_approved_miri_packages(workspace: Path) -> Non
     )
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "[10/10] Miri\n" in result.stdout
+    assert "[9/9] Miri\n" in result.stdout
 
 
 @pytest.mark.parametrize("staged", [False, True])
@@ -374,7 +350,7 @@ def test_binary_image_does_not_enter_rust_patch(
         _ = subprocess.run(["git", "add", "image.png"], cwd=workspace, check=True)
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "[10/10] Miri\n" in result.stdout
+    assert "[9/9] Miri\n" in result.stdout
 
 
 def test_invalid_utf8_rust_fails_cleanly(workspace: Path) -> None:
@@ -475,7 +451,7 @@ def test_miri_body_only_edit_and_property_budget(
     )
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "[10/10] Miri\n" in result.stdout
+    assert "[9/9] Miri\n" in result.stdout
     assert (workspace / "proptest-cases.txt").read_text(encoding="utf-8") == (
         "16" if existing_cases is None else existing_cases
     )
@@ -495,7 +471,7 @@ def test_miri_empty_trusted_selection(workspace: Path) -> None:
     _ = (workspace / "src/lib.rs").write_text("// ordinary change\n", encoding="utf-8")
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "[10/10] Miri: no packages in escape-hatch paths" in result.stdout
+    assert "[9/9] Miri: no packages in escape-hatch paths" in result.stdout
     assert "miri test" not in (workspace / "commands.log").read_text(encoding="utf-8")
 
 
@@ -511,52 +487,6 @@ def test_miri_trusted_selection_ignores_proposed_allowlist(workspace: Path) -> N
         patch.setattr(os, "environ", monkey_environment)
         _ = (workspace / ".gate/escape-hatch-paths").write_text("", encoding="utf-8")
         assert select(workspace, "HEAD") == ["fixture"]
-
-
-def test_mutants_isolates_build_cache(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Mutation builds override the inherited target while other steps retain it."""
-    inherited = str(workspace / "inherited-target")
-    monkeypatch.setenv("CARGO_TARGET_DIR", inherited)
-    result = invoke(workspace)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert os.environ["CARGO_TARGET_DIR"] == inherited
-
-
-def test_mutants_caps_lints_with_executable_workspace_wrapper(workspace: Path) -> None:
-    """The mutation rustc wrapper preserves arguments and appends its lint cap."""
-    cargo = workspace / "tools/cargo"
-    with cargo.open("a", encoding="utf-8") as stream:
-        _ = stream.write(
-            """
-if sys.argv[1] == 'mutants':
-    import subprocess
-    wrapper = pathlib.Path(os.environ['RUSTC_WORKSPACE_WRAPPER'])
-    assert wrapper.parent == output
-    assert wrapper.stat().st_mode & 0o777 == 0o700
-    compiler = pathlib.Path('tools/rustc').resolve()
-    subprocess.run([str(wrapper), str(compiler), '--cfg',
-        'feature=with spaces', '--cap-lints=deny'], check=True)
-"""
-        )
-    compiler = workspace / "tools/rustc"
-    _ = compiler.write_text(
-        f"""#!{sys.executable}
-import json, pathlib, sys
-pathlib.Path('rustc-argv.json').write_text(json.dumps(sys.argv[1:]))
-""",
-        encoding="utf-8",
-    )
-    compiler.chmod(0o700)
-    result = invoke(workspace)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads((workspace / "rustc-argv.json").read_text(encoding="utf-8")) == [
-        "--cfg",
-        "feature=with spaces",
-        "--cap-lints=deny",
-        "--cap-lints=warn",
-    ]
 
 
 def test_miri_rejects_ambiguous_member_directories(

@@ -36,7 +36,7 @@ The table names each tool or crate the skill relies on and why. It records no cu
 | cargo-nextest | Required tests | |
 | cargo-deny | Required supply-chain checks | 0.20, for `[bans.std-replacements]` |
 | cargo-machete | Required unused-dependency checks | |
-| cargo-mutants | Required mutation checks | |
+| cargo-mutants | Required CI mutation checks | |
 | cargo-llvm-cov | Optional coverage floor | |
 | cargo-semver-checks | Public libraries | |
 | cargo-hack | Feature combinations | |
@@ -125,20 +125,20 @@ Evals live in `evals/evals.json` with seeds in `evals/files/`.
 Run from the repository root:
 
 ```text
-nix shell nixpkgs#rustup nixpkgs#cargo-nextest nixpkgs#cargo-deny nixpkgs#cargo-machete nixpkgs#cargo-mutants nixpkgs#zizmor
+nix shell nixpkgs#rustup nixpkgs#cargo-nextest nixpkgs#cargo-deny nixpkgs#cargo-machete nixpkgs#zizmor
 uv run --script skills/current/rust/scripts/cli.py verify-fixtures
 zizmor skills/current/rust/assets/ci.yml
 ```
 
 `verify-fixtures` copies `assets/rust-toolchain.toml` into each temporary fixture repository, and rustup installs that pinned toolchain. The conditional unsafe check also needs nightly Miri when exercised. Nixpkgs tools can lag upstream releases, especially cargo-deny; an older version is not evidence that a schema newer than it is invalid.
 
-- MUST record `rustc --version`, `cargo clippy --version`, `cargo fmt --version`, `cargo nextest --version`, `cargo deny --version`, `cargo machete --version`, `cargo mutants --version`, and `zizmor --version` with fixture results in the maintenance report. [self-check]
+- MUST record `rustc --version`, `cargo clippy --version`, `cargo fmt --version`, `cargo nextest --version`, `cargo deny --version`, `cargo machete --version`, and `zizmor --version` with fixture results in the maintenance report. [self-check]
 - MUST meet every floor in the stack table; install a current release in a temporary tool directory if the Nix package is older. Do not remove policy keys to accommodate an older tool. [cargo-deny; self-check]
 - MUST observe the good fixture pass inventory mode, the bad fixture fail with expected lint names, and real inventory cases reject an ancestor `cfg(any())` and `[lib] test = false`. Verify temporary baseline worktrees are removed. Also verify binary-only inventory/doctest execution, a merge base with only a package-free root manifest, a merge base with lint debt, and mixed ignored/enabled doctests moved by a comment. [verify-fixtures; pytest]
 - MUST check all macro-definition delimiters and whitespace forms, approved controls, ordinary tt passthroughs, unchanged symlinks, and procedural-macro package ownership when changing governance. [pytest]
 - MUST keep fixture execution outside pytest. Repository pytest runs without a Rust toolchain and verifies command orchestration with a fake Cargo, inventory comparison with recorded Nextest JSON, and governance against real temporary Git repositories. [pytest]
 - MUST stop any process started for verification before handoff. [self-check]
-- MUST check that the good fixture's mutation summary reports few unviable mutants; a high unviable count means lint capping for mutation builds is broken. [cargo-mutants; verify-fixtures]
+- MUST check that a CI `mutants` run on a pull request reports few unviable mutants; a high unviable count means lint capping for mutation builds is broken. [cargo-mutants; CI]
 
 ## Verify the package
 

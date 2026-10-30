@@ -11,7 +11,7 @@
         "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
         "No files under the skill directory or protected gate files are changed.",
         "No license or repository metadata values are invented; missing human-owned metadata is reported.",
-        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "Mutation testing is reported as unrun because the eval repository has no CI; no code is rewritten or test weakened to dodge mutants.",
         "The layout follows references/types-and-apis.md: a virtual workspace root and crates/* members, with a -core library and thin binary where the task includes a CLI.",
         "A tokio TCP service shout with configurable address, concurrency and idle timeout, bounded graceful shutdown, and real loopback behavior tests."
       ]
@@ -26,7 +26,7 @@
         "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
         "No files under the skill directory or protected gate files are changed.",
         "No license or repository metadata values are invented; missing human-owned metadata is reported.",
-        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "Mutation testing is reported as unrun because the eval repository has no CI; no code is rewritten or test weakened to dodge mutants.",
         "The layout follows references/types-and-apis.md: a virtual workspace root and one library crate at crates/slugkit/, held to the core rules.",
         "A publishable, documented slugkit library with typed option errors, an extensible builder API, runnable examples, and property tests."
       ]
@@ -44,7 +44,7 @@
         "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
         "No files under the skill directory or protected gate files are changed.",
         "No license or repository metadata values are invented; missing human-owned metadata is reported.",
-        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "Mutation testing is reported as unrun because the eval repository has no CI; no code is rewritten or test weakened to dodge mutants.",
         "The layout follows references/types-and-apis.md: a virtual workspace root and crates/* members, with a -core library and thin binary where the task includes a CLI.",
         "The Miri step runs only the -ffi package, and only foreign-calling tests carry cfg_attr(miri, ignore = ...) with a reason.",
         "A safe Rust wrapper over the vendored C implementation, a pure Rust implementation, equivalence property tests, and the adler file checksum CLI."
@@ -67,7 +67,7 @@
         "The agent reads SKILL.md and all five Always references in full: errors-and-panics.md, types-and-apis.md, ownership-and-failure-modes.md, testing.md, and gates-and-ci.md.",
         "No files under the skill directory or protected gate files are changed.",
         "No license or repository metadata values are invented; missing human-owned metadata is reported.",
-        "Equivalent mutants are reported with evidence rather than dodged through code rewrites or weakened tests.",
+        "Mutation testing is reported as unrun because the eval repository has no CI; no code is rewritten or test weakened to dodge mutants.",
         "The layout follows references/types-and-apis.md: the existing crate layout is preserved.",
         "The legacy tally crate passes the full gate while preserving library and CLI behavior and every existing compiled test identity with assertions at least as strong."
       ]
