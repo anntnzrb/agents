@@ -1,7 +1,7 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
+  "commit": "f713f14203cd6420cec13cd7c55c32d598dbab68",
   "trees": {
     "pstack/skills/benchmark-checklist": "7c402481a0934533cb49cdce811b362cf99ef641",
     "pstack/skills/principle-attack-the-premise": "0b0de55b1f1e7a989a10dd8680f01a67ef378ebc",
@@ -16,7 +16,7 @@
     "pstack/skills/principle-guard-the-context-window": "bf09c18e975ded9dc137631c6529db941dda24a2",
     "pstack/skills/principle-laziness-protocol": "cb8aa817489838fe615d0dfe321d263e8a3f1faa",
     "pstack/skills/principle-make-operations-idempotent": "5111ac1acc6584dad178af96174140ee5b29bca4",
-    "pstack/skills/principle-migrate-callers-then-delete-legacy-apis": "7b49b9000c86ea1ae142af47d0ff5f9f95199c34",
+    "pstack/skills/principle-migrate-callers-then-delete-legacy-apis": "cf45195158110569ac6a97d0e8dbed04531373ed",
     "pstack/skills/principle-minimize-reader-load": "f64929f93ffd334f36699b83f53ee7155c4a2063",
     "pstack/skills/principle-model-the-domain": "6ea2f64ebf635cb2eb8391197e40f32e5f841557",
     "pstack/skills/principle-never-block-on-the-human": "d2578043c77706411c48c5b7cfe03dc3d45e3b15",
@@ -27,7 +27,7 @@
     "pstack/skills/principle-sequence-verifiable-units": "c1b345dcea21e3d58e7012f8e6547974d295fb3a",
     "pstack/skills/principle-subtract-before-you-add": "760f5b131e920c0e9914a0ef8cb4b875918af31a",
     "pstack/skills/principle-test-behavior-not-implementation": "7fa3d5dba8496dcd08278a99903a2dfb58a2e179",
-    "pstack/skills/principle-type-system-discipline": "d7369475f3516094c0a3509cb9e37c6ad5200d07"
+    "pstack/skills/principle-type-system-discipline": "32850aaddd70478a6dacb153bbcef8532bf7d626"
   },
   "watch": {
     "pstack/skills": [
