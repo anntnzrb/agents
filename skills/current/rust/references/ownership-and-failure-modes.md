@@ -45,6 +45,7 @@ Read when resolving borrow errors, reviewing clones or lifetime bounds, or desig
 | Needless async or detached tasks | Use synchronous code or retain and join task handles. | `unused_async`, self-check |
 | Tautological tests or fewer assertions | Assert observable behavior and catch missed mutants. | cargo-mutants, governance-check |
 | Test exclusion or snapshot acceptance | Restore checks and report a blocked gate. | `ignore_without_reason`, governance-check, `INSTA_UPDATE=no`, self-check |
+| Behavior changed during a refactor | Keep outputs, ordering, and failure semantics identical unless the change is the task. Pin them with characterization tests first and report unexplained quirks instead of fixing them. | self-check |
 | Unrequested gate configuration edit | Leave gate configuration unchanged unless the user asked to install or change it; report the required work. | governance-check, repository rulesets |
 | Raw arithmetic or casts | Choose checked arithmetic and typed conversions. | `arithmetic_side_effects`, `as_conversions` |
 

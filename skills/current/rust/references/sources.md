@@ -57,6 +57,17 @@ Read date: 2026-10-16. Status: read in full.
 - Deliberate override: boxed runtime errors and anyhow-based library runtime APIs are rejected. Libraries retain concrete typed errors.
 - Deliberate override: new crates use edition 2024 rather than the guide's Rust 2021 target.
 
+### BeautifulRust
+
+URL: https://github.com/morganlinton/BeautifulRust (commit `40db61c6fee84bd121cf288755f0e2f22a50e995`)
+Read date: 2026-10-30. Status: read in full (skills, lints, benchmark).
+
+- The porting skill supplies the port-tests-first procedure, construct mapping, proportionality limits, and porting notes in porting.md.
+- Characterization tests before refactoring and quirk preservation shape the refactor rules.
+- `max-fn-params-bools = 0` and `string_add` turn single bool switches and `+` string building into lint failures.
+- Deliberate override: its `expect_used = "allow"`, panic-on-bug policy, and local `#[expect]` suppressions are rejected; zero panics and escape-hatch-only expectations remain.
+- Its cross-agent benchmark shows the largest gains on review and porting tasks, and one regression caused by an ambiguous reference example.
+
 ### RustEvo
 
 URL: https://github.com/SYSUSELab/RustEvo

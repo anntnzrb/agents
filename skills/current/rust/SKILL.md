@@ -25,6 +25,7 @@ MUST read every `Always` row in full before writing or reviewing code. MUST read
 | Scheduling and synchronization | [references/concurrency-and-async.md](references/concurrency-and-async.md) | Task or diff touches `async`, threads, locks, atomics, channels, or an async runtime |
 | Untrusted data and secrets | [references/security.md](references/security.md) | Code reads files, network, environment, arguments, or deserializes external input, or runs subprocesses |
 | Cargo and supply chain | [references/dependencies.md](references/dependencies.md) | Diff changes dependencies, features, or publishing settings in a `Cargo.toml` |
+| Behavior-preserving ports | [references/porting.md](references/porting.md) | Task ports, translates, or rewrites code from another language into Rust |
 | Measured optimization | [references/performance.md](references/performance.md) | A benchmark or profile motivates the change |
 | Reading evidence and policy overrides | [references/sources.md](references/sources.md) | Only to check provenance or resolve conflicting guidance; not a coding read |
 | Gate templates | [assets/](assets/) | Creating a Rust project, or the user asks to install, copy, or scaffold gates |

@@ -5,6 +5,7 @@ Read before writing or reviewing tests, interpreting mutants, or adding verifica
 ## Test the contract
 
 - MUST test observable behavior through a public contract. Tests must still make sense if the implementation becomes a black box. [self-check]
+- MUST pin current behavior with characterization tests before refactoring code that lacks behavior tests. [cargo test; self-check]
 - MUST NOT restate constants, mirror implementation branches, or add assertion-free tests for coverage. Assert ordering, failure behavior, state transitions, and round-trip properties. [cargo-mutants; self-check]
 - NEVER add `#[should_panic]` tests. Non-test code does not panic, so tests assert `Result` and `Option` values. [governance-check]
 - MUST give every assertion a useful failure message, including assertions in shared test helpers. [missing_assert_message]
