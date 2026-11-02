@@ -5,6 +5,7 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -422,7 +423,7 @@ def _run_smoke(worktree: Path, command: str, ref: str, before: str) -> None:
     """Run one opt-in validation command inside the temporary worktree."""
     try:
         completed = subprocess.run(
-            shlex.split(command),
+            command if sys.platform == "win32" else shlex.split(command),
             cwd=worktree,
             check=False,
             capture_output=True,

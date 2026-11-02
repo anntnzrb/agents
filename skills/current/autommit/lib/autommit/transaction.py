@@ -3,6 +3,8 @@
 import contextlib
 import json
 import os
+import socket
+import sys
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -315,6 +317,9 @@ def describe_operation_lock(git_dir: Path) -> str | None:
         return f"operation lock is unreadable at {lock_path}; remove it if no autommit run is active."
     if not isinstance(pid, int) or pid <= 0:
         return f"operation lock at {lock_path} has no usable PID; remove it if no autommit run is active."
+    if sys.platform == "win32":
+        # Unlike POSIX, os.kill(pid, 0) terminates the process on Windows.
+        return f"operation lock at {lock_path} belongs to process {pid}; remove it only after confirming no autommit run is active."
     alive = True
     try:
         os.kill(pid, 0)
@@ -337,7 +342,7 @@ def operation_lock(git_dir: Path) -> Generator[None]:
             "unsafe_lock_file",
             f"Autommit operation lock must not be a symlink: {lock_path}",
         )
-    payload = json.dumps({"pid": os.getpid(), "host": os.uname().nodename}).encode(
+    payload = json.dumps({"pid": os.getpid(), "host": socket.gethostname()}).encode(
         "utf-8"
     )
     temp_path = directory / f"lock.{os.getpid()}.tmp"

@@ -83,6 +83,7 @@ def _rung_patch(work: CommitWork, group: CommitGroup) -> str:
     _ = target.write_text(
         build_commit_patch(group.changes, work.staged_diff, work.zero_diff),
         encoding="utf-8",
+        newline="",
     )
     return _apply_patch(work.worktree, target)
 
@@ -93,6 +94,7 @@ def _rung_per_file(work: CommitWork, group: CommitGroup) -> str:
         _ = target.write_text(
             build_commit_patch((change,), work.staged_diff, work.zero_diff),
             encoding="utf-8",
+            newline="",
         )
         detail = _apply_patch(work.worktree, target)
         if detail:

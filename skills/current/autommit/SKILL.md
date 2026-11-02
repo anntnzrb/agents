@@ -14,6 +14,8 @@ An explicit request to `autommit`, automatically commit, or run the unattended a
 
 ## Public entrypoint
 
+Requires uv and Git 2.36 or newer on Windows, macOS, or Linux.
+
 ```text
 uv run --script <skill-dir>/scripts/cli.py [options] [context ...]
 ```
