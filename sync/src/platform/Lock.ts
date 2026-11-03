@@ -40,7 +40,7 @@ const close = (fd: number): void => {
   try {
     closeSync(fd)
   } catch {
-    /* Closing is best-effort, as in the Python implementation. */
+    /* Closing is best-effort; the kernel drops the lock with the descriptor. */
   }
 }
 

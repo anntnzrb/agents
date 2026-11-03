@@ -13,7 +13,7 @@ export type FingerprintEntry =
 export const shouldSkipFingerprintEntry = (name: string): boolean =>
   Str.startsWith(".")(name) || isIgnoredSyncEntry(name)
 
-/** Python compares Unicode code points, not UTF-16 code units. */
+/** Orders names by Unicode code point, not UTF-16 code unit, so astral characters sort stably. */
 export const compareCodePoints = (left: string, right: string): -1 | 0 | 1 => {
   const a = Array.from(left, (character) => Option.getOrElse(Str.codePointAt(character, 0), () => 0))
   const b = Array.from(right, (character) => Option.getOrElse(Str.codePointAt(character, 0), () => 0))

@@ -5,7 +5,7 @@ import { fingerprintTree, shouldSkipFingerprintEntry } from "#domain/Fingerprint
 const bytes = (value: string): Uint8Array => new TextEncoder().encode(value)
 
 describe("tree fingerprints", () => {
-  test("matches Python SHA-256 golden vectors", () => {
+  test("matches SHA-256 golden vectors", () => {
     expect(fingerprintTree(null)).toBe("ffa63583dfa6706b87d284b86b0d693a161e4840aad2c5cf6b5d27c3b9621f7d")
     expect(fingerprintTree([])).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
     expect(

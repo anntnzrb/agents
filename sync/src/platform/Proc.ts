@@ -215,9 +215,9 @@ const run = Effect.fn("Proc.run")(function* (command: readonly string[], options
   )
 })
 
-// Runs a command that shares this process's stdio and process group, like
-// Python's subprocess.run without capture: output streams live and terminal
-// signals reach it. Returns its exit status; interruption kills the child.
+// Runs a command that shares this process's stdio and process group: output
+// streams live and terminal signals reach it. Returns its exit status;
+// interruption kills the child.
 const runAttached = (command: readonly string[], env: Readonly<Record<string, string>>) => {
   const [executable, ...args] = command
   if (executable === undefined || executable === "") {

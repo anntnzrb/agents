@@ -94,7 +94,7 @@ const readBinding = (reader: Reader): [string | null, string | null] | undefined
   return [key, value]
 }
 
-// Matches python-dotenv's parser with interpolation disabled.
+// Dotenv syntax without variable interpolation; empty values are omitted.
 export const decodeRootEnv = (content: string | null): Record<string, string> => {
   if (content === null) {
     return {}
