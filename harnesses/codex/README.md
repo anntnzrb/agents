@@ -24,7 +24,7 @@ for groups in data["hooks"].values():
                 hook["command"] = runtime + command[len(source):]
 path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
-uv run --project sync sync
+bun run --cwd sync sync
 herdr integration status
 ```
 

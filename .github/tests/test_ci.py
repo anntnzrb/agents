@@ -377,7 +377,7 @@ def required(
             "outputs": {"skills": json.dumps(selected), "harnesses": "[]"},
         },
         "repository-checks": {"result": "success"},
-        "sync-gates": {"result": "success"},
+        "sync-checks": {"result": "success"},
         "skills": {"result": skill_result},
         "harnesses": {"result": "skipped"},
     }

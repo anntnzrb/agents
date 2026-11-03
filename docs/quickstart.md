@@ -6,7 +6,7 @@ Sync supports macOS and Linux.
 
 ## Install the required commands
 
-Sync itself requires Python 3.12+ via `uv`. Managed packages and extensions additionally use `bun`, `node`, and `npm`.
+Sync requires Bun. Managed packages and extensions additionally use Node.js and npm.
 
 Install `uv`, `python3`, `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
 
@@ -60,7 +60,7 @@ The repository root `.env` provides default environment variables that `sync` fo
 Run sync from the repository root:
 
 ```bash
-uv run --project sync sync
+bun run --cwd sync sync
 ```
 
 Sync creates the self-hosted runtime link, harness configuration files, tool configs, and launch wrappers in `~/.local/bin/`.
@@ -78,6 +78,6 @@ curl -fsS "$base_url/models" | jq -e '.data | type == "array" and length > 0'
 
 ## Start a harness
 
-Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its `launcher.bin` value in `sync/src/sync/core/harness_adapters.py`, then run that wrapper command (for example `codex`, `pi`, or `omp`).
+Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its launcher in `sync/src/domain/HarnessAdapters.ts`, then run that wrapper command (for example `codex`, `pi`, or `omp`).
 
 The wrapper runs sync, prepares the cached harness package, forwards arguments, and returns the harness exit status.

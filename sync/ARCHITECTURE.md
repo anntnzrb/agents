@@ -7,15 +7,15 @@ Sync is a Bun + TypeScript + Effect v4 command-line application. It reconciles t
 
 ```
 sync/src/
-  main.ts            process boundary: BunRuntime.runMain(cli)
-  cli/               effect/cli Command tree; help text; exit-code mapping
-  domain/            pure TypeScript + Schema. No services, no I/O.
-  platform/          Context.Service per OS capability; one Posix Layer each
-  services/          app capabilities built on platform: SyncEnv, Http, Registry, Output
-  packages/          PackageSource = Npm | StaticRelease: prepare, refresh, prune, launch
-  jobs/              one handler per Job tag; exhaustive dispatch
-  programs/          runSync, launch, update, job refresh-packages, job npm-cache-clean
-sync/test/           bun:test; mirrors src/ layout; support/ holds fixtures and test Layers
+  main.ts            process boundary: assemble Layers and run the CLI
+  cli/               command parsing, help text, and exit-code mapping
+  domain/            domain values, Schemas, and pure transformations
+  platform/          operating-system capability services and live Layers
+  services/          application services: environment, planning, state, HTTP, output
+  packages/          npm and static release preparation, refresh, pruning, and launch
+  jobs/              reconciliation job handlers and dispatch
+  programs/          sync, launch, update, and maintenance programs
+sync/test/           bun:test suites organized by source area
 ```
 
 Subpath imports (`#domain/*`, `#platform/*`, ...) are declared in `package.json`. Never use `../` across
@@ -33,7 +33,7 @@ top-level `src/` directories.
   `fetch` outside a platform Layer.
 - Resources (locks, staging directories, child processes, temp files) use `Effect.acquireRelease` and a
   `Scope`. Cleanup must run on success, failure, and interruption.
-- Timeouts use `Effect.timeout*`; deadlines are `Duration`s from `domain/Constants.ts`.
+- Use Effect timeouts for effectful operations and the configured deadlines at process boundaries.
 - Use `Effect.fn("Module.name")` for every named effectful function.
 
 ## Platform services (`src/platform/`)

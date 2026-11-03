@@ -12,7 +12,6 @@ updates:
 
   - package-ecosystem: uv
     directories:
-      - /sync
       - /skills/current/*
     schedule:
       interval: weekly
@@ -35,5 +34,16 @@ updates:
       # Must equal the exact effect version @opencode/plugin depends on; a different
       # version installs a second effect copy whose Schema rejects @opencode schemas.
       - dependency-name: effect
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: bun
+    directory: /sync
+    schedule:
+      interval: weekly
+    groups:
+      # effect, @effect/platform-bun, and @effect/tsgo's supported oxlint range move together.
+      sync:
+        patterns: ["*"]
     commit-message:
       prefix: deps

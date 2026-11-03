@@ -1,6 +1,6 @@
 # Harness adapter reference
 
-`HARNESS_ADAPTERS` in `sync/src/sync/core/harness_adapters.py` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
+`HARNESS_ADAPTERS` in `sync/src/domain/HarnessAdapters.ts` defines the adapters that sync understands. A matching directory under `harnesses/` enables an adapter when the current platform appears in its `platforms` field.
 
 Harness-specific values, such as package names, default launch arguments, environment variables, manager setting keys, install paths, and preserved JSON paths, live in the adapter definitions and in `harnesses/<id>/`. This page describes mechanisms only; read the harness source for the values it owns.
 
@@ -11,20 +11,20 @@ Sync supports macOS and Linux.
 | Field | Meaning |
 | --- | --- |
 | `id` | Adapter ID, source directory name, package-cache name, and launch argument |
-| `home_segments` | Path components from the user home to the generated harness home |
-| `platforms` | Host platforms on which sync enables the adapter; every adapter declares both `darwin` and `linux`, and static release `targets` cover `arm64` and `x64` on each |
+| `homeSegments` | Path components from the user home to the generated harness home |
+| `platforms` | Host platforms on which sync enables the adapter |
 | `launcher` | npm or static release launcher specification |
-| `launcher.default_args` | Arguments that sync places in the wrapper before caller arguments |
-| `launcher.env` | Environment variables baked into the wrapper as `export` lines and applied to every launch; they override both the parent environment and `.env` |
-| `instruction_file` | Harness instruction filename when it differs from `AGENTS.md` |
-| `runtime_subdir` | Subdirectory appended to the source and generated roots |
-| `preserve_json_keys` | Source JSON files sync copies over the generated file, re-injecting only the listed dot-paths from the previous file |
-| `cliproxy_templates` | Source-relative paths whose `${CLIPROXY_CLIENT_BASE_URL}` or `${CLIPROXY_CLIENT_ORIGIN}` placeholders sync replaces; only declared paths that actually contain a placeholder are replaced |
-| `cliproxy_preserve_top_levels` | Per-template TOML table names re-injected from the previous generated file during endpoint publication |
-| `python_env_segments` | Home-relative segments of the uv-managed Python environment sync bootstraps before reconciliation |
+| `launcher.defaultArgs` | Arguments passed before caller arguments |
+| `launcher.env` | Environment overrides applied to every launch, taking precedence over the parent environment and `.env` |
+| `instructionFile` | Harness instruction filename when it differs from `AGENTS.md` |
+| `runtimeSubdir` | Subdirectory appended to the source and generated roots |
+| `preserveJsonKeys` | Source JSON files sync copies over the generated file, re-injecting only the listed dot-paths from the previous file |
+| `cliproxyTemplates` | Source-relative paths whose endpoint placeholders sync replaces |
+| `cliproxyPreserveTopLevels` | Per-template TOML table names re-injected from the previous generated file during endpoint publication |
+| `pythonEnvSegments` | Home-relative segments of a Python environment bootstrapped before reconciliation |
 | `hooks` | Extension-dependency jobs |
 
-Without `runtime_subdir`, the source root is `harnesses/<id>/` and the generated root comes from `home_segments`. With `runtime_subdir`, sync appends that value to both roots.
+Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated root comes from `homeSegments`. With `runtimeSubdir`, sync appends that value to both roots.
 
 ## Published configuration
 
@@ -34,12 +34,12 @@ Sync publishes the repository's `HARNESS.md` as the harness instruction file (`A
 
 Sync supports two launcher kinds, discriminated by the adapter's `launcher` value.
 
-- `NpmLauncherSpec` installs a versioned npm package. `package` and `bin` describe it. Sync resolves `latest` and checks installs with `--version`.
-- `StaticReleaseLauncherSpec` installs a versioned archive from a static JSON manifest that its `release` field (`StaticReleaseSpec`) describes. `manifest_url` points at the manifest, `targets` maps `<platform>-<arch>` keys to the manifest's platform keys, `install_segments` is the home-relative install root, and `executable_segments` is the path to the binary inside the extracted version directory.
+- `Npm` installs a versioned npm package. `package` and `bin` describe it. Sync resolves `latest` and checks installs with `--version`.
+- `StaticRelease` installs a versioned archive from a static JSON manifest described by `release`. `manifestUrl` points at the manifest, `targets` maps `<platform>-<arch>` keys to the manifest's platform keys, `installSegments` is the home-relative install root, and `executableSegments` is the path to the binary inside the extracted version directory.
 
 A static release manifest has the shape `{"version": "1.2.3", "platforms": {"<platform-key>": {"url": "...", "sha256": "..."}}}`. Sync resolves the manifest, verifies the archive SHA-256, extracts it into `<install root>/_versions/<version>/`, writes the distribution marker, and rotates the `current` and `previous` symlinks. An already installed version is reused without re-downloading, and a failed manifest lookup or installation falls back to the current cached install.
 
-When `man_segments` and `man_dest_segments` are set, sync also publishes versioned man page symlinks into the destination directory and removes owned stale links whose target points into the install root. It never removes unrelated entries in the shared man directory.
+When `manSegments` and `manDestSegments` are set, sync also publishes versioned man page symlinks into the destination directory and removes owned stale links whose target points into the install root. It never removes unrelated entries in the shared man directory.
 
 Adapters can declare these hooks:
 
@@ -49,14 +49,14 @@ Adapters can declare these hooks:
 
 A harness uses the model gateway when its committed source defines a `cliproxy` provider or points its API base URL at an endpoint placeholder. Sync does not inject a provider or manage client credentials, and it probes the gateway without authorization.
 
-Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` in the committed harness source with `gateway.base_url` from `agents.toml`, and `${CLIPROXY_CLIENT_ORIGIN}` with the same URL without its `/v1` path, for clients that append the version path themselves (Claude Code's `ANTHROPIC_BASE_URL`). A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxy_templates`; sync checks each declared path for either placeholder, so a stale declaration without one is inert. When publishing those targets, `cliproxy_preserve_top_levels` re-injects the named TOML tables from the previous generated file. It is TOML-table scoped and distinct from `preserve_json_keys`, which re-injects JSON dot-paths.
+Sync replaces `${CLIPROXY_CLIENT_BASE_URL}` with `gateway.base_url` from `agents.toml`, and `${CLIPROXY_CLIENT_ORIGIN}` with the same URL without its `/v1` path. A provider that requires a non-empty client key uses a static placeholder, which the gateway ignores. The replacement targets are the adapter's `cliproxyTemplates`; a declaration without a placeholder is inert. During publication, `cliproxyPreserveTopLevels` re-injects named TOML tables from the previous generated file. This is distinct from `preserveJsonKeys`, which preserves JSON dot-paths.
 
 Harnesses use their native model discovery or configured model definitions against the gateway endpoint.
 ## Launch wrappers
 
 Sync writes wrappers under `~/.local/bin/` and expects that directory on `PATH`.
 
-Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli` with `launch`, prepares the harness launcher, and replaces itself with the harness, forwarding all arguments. The harness exit status is the wrapper's exit status.
+Each wrapper calls the installed sync runtime at `~/.local/share/agents/sync-current/sync` with `launch`, prepares the harness launcher, and replaces itself with the harness, forwarding all arguments. The harness exit status is the wrapper's exit status.
 
 When the installed sync runtime is missing, the wrapper prints a hint to run sync from the agents repository and exits with status `127`.
 
@@ -66,7 +66,7 @@ Wrapper state lives at `~/.local/share/agents/sync-managed/wrappers.json`. Sync 
 
 ## Preserved JSON keys
 
-`preserve_json_keys` maps each source JSON filename to the dot-paths allowed to survive from the previous generated file. Sync copies the source file verbatim over the destination, then re-injects each declared path's previous value only where the source leaves it undefined: the source wins collisions, paths absent from the destination are skipped, and undeclared destination keys are removed. An empty path list is a pure copy, and a missing source file is a sync error.
+`preserveJsonKeys` maps each source JSON filename to the dot-paths allowed to survive from the previous generated file. Sync copies the source file verbatim over the destination, then re-injects each declared path's previous value only where the source leaves it undefined: the source wins collisions, paths absent from the destination are skipped, and undeclared destination keys are removed. An empty path list is a pure copy, and a missing source file is a sync error.
 
 ## Package cache
 
