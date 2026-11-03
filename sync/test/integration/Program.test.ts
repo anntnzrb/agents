@@ -252,3 +252,13 @@ test("SIGTERM sent to the launch PID reaches the cached tool", async () => {
     await child.exited
   }
 }, 20_000)
+
+test("the launched tool inherits default SIGPIPE and SIGXFSZ dispositions", async () => {
+  const home = homeFixture()
+  seedCache(
+    home,
+    "#!/usr/bin/perl\nprint 'PIPE=', ($SIG{PIPE} // 'DEFAULT'), ' XFSZ=', ($SIG{XFSZ} // 'DEFAULT'), \"\\n\";\n",
+  )
+  const result = await run(home, ["launch", "mcporter"])
+  expect(result.stdout).toBe("PIPE=DEFAULT XFSZ=DEFAULT\n")
+})

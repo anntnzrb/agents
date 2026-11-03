@@ -1,4 +1,15 @@
+import { dlopen, FFIType } from "bun:ffi"
+
 import { Context, Effect, Layer, Schema } from "effect"
+
+// The runtime ignores SIGPIPE and SIGXFSZ, and ignored dispositions survive
+// execve. Restore SIG_DFL (a null handler) so the harness dies on a closed pipe
+// like any process started from a shell. Both numbers match on Darwin and Linux.
+const SIGPIPE = 13
+const SIGXFSZ = 25
+const libc = dlopen(process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6", {
+  signal: { args: [FFIType.i32, FFIType.ptr], returns: FFIType.ptr },
+})
 
 export interface ExecPlan {
   readonly executable: string
@@ -42,6 +53,9 @@ export const PosixLayer = Layer.succeed(
         try: () => {
           if (process.execve === undefined) {
             throw new Error("process.execve is unavailable")
+          }
+          for (const signal of [SIGPIPE, SIGXFSZ]) {
+            libc.symbols.signal(signal, null)
           }
           return process.execve(plan.executable, [plan.executable, ...plan.args], plan.env)
         },

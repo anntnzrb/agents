@@ -129,24 +129,22 @@ export const runSync = Effect.fn("RunSync.runSync")(function* (env: SyncEnvValue
   return success
 })
 
+// The 15-minute budget interrupts the sync fiber and allows 30 seconds for scoped
+// cleanup (process-group kills, stage removal) before giving up on it. An external
+// interruption (SIGINT/SIGTERM via runMain) gets the same cleanup window.
 export const runSyncWithDeadline = Effect.fn("RunSync.runSyncWithDeadline")(function* (env: SyncEnvValue) {
   const output = yield* Output
   const fiber = yield* Effect.forkDetach(runSync(env))
+  const interruptWithGrace = Fiber.interrupt(fiber).pipe(Effect.timeoutOption("30 seconds"))
   const completed = yield* Fiber.await(fiber).pipe(
     Effect.timeoutOption("15 minutes"),
-    Effect.onInterrupt(() =>
-      Effect.gen(function* () {
-        const cleanup = yield* Fiber.interrupt(fiber).pipe(Effect.forkDetach)
-        yield* Fiber.await(cleanup).pipe(Effect.timeoutOption("30 seconds"))
-      }),
-    ),
+    Effect.onInterrupt(() => interruptWithGrace),
   )
   if (Option.isSome(completed)) {
     return (yield* Fiber.join(fiber)) ? 0 : 1
   }
   yield* output.err("timed out after 900s")
-  const cleanup = yield* Fiber.interrupt(fiber).pipe(Effect.forkDetach)
-  const finished = yield* Fiber.await(cleanup).pipe(Effect.timeoutOption("30 seconds"))
+  const finished = yield* interruptWithGrace
   if (Option.isNone(finished)) {
     return yield* DeadlineCleanupOverrun.make({})
   }
