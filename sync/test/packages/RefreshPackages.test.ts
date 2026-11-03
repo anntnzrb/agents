@@ -48,6 +48,7 @@ const fixture = () => {
   }
   const output = Output.of({
     write: () => Effect.void,
+    writeError: () => Effect.void,
     err: () => Effect.void,
     warn: (message) =>
       Effect.sync(() => {
@@ -87,6 +88,7 @@ const fixture = () => {
     Layer.succeed(
       Proc,
       Proc.of({
+        runAttached: () => Effect.succeed(0),
         run: (command) =>
           Effect.sync(() => {
             attempted.push(command[2] ?? "")

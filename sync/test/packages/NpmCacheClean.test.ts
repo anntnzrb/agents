@@ -50,6 +50,7 @@ test("clean skips a busy launcher and runs after its lock is released", async ()
           Effect.sync(() => {
             lines.push(s)
           }),
+        writeError: () => Effect.void,
         err: () => Effect.void,
         warn: () => Effect.void,
       }),
@@ -59,6 +60,7 @@ test("clean skips a busy launcher and runs after its lock is released", async ()
       Proc.of({
         commandExists: () => Effect.succeed(true),
         resolveExecutable: () => Effect.succeedSome("npm"),
+        runAttached: () => Effect.succeed(0),
         run: (command) =>
           Effect.sync(() => {
             mutableCalls.push([...command])

@@ -47,6 +47,7 @@ const output = Layer.succeed(
   Output,
   Output.of({
     write: () => Effect.void,
+    writeError: () => Effect.void,
     err: () => Effect.void,
     warn: (message) =>
       Effect.sync(() => {

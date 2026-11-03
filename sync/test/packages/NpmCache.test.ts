@@ -39,6 +39,7 @@ test("installs, rotates versions, and falls back to the healthy cache", async ()
   let fail = false
   const commands: string[][] = []
   const proc = Proc.of({
+    runAttached: () => Effect.succeed(0),
     run: (args) =>
       Effect.sync(() => {
         commands.push([...args])
@@ -85,7 +86,12 @@ test("installs, rotates versions, and falls back to the healthy cache", async ()
     Layer.succeed(RunningExecutables, running),
     Layer.succeed(
       Output,
-      Output.of({ write: () => Effect.void, err: () => Effect.void, warn: () => Effect.void }),
+      Output.of({
+        write: () => Effect.void,
+        writeError: () => Effect.void,
+        err: () => Effect.void,
+        warn: () => Effect.void,
+      }),
     ),
   )
   const run = <A, E>(

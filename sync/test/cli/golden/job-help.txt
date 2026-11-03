@@ -1,0 +1,12 @@
+usage: sync job [-h] {npm-cache-clean,refresh-packages} ...
+
+Run scheduled maintenance jobs driven by the machine configuration.
+
+positional arguments:
+  {npm-cache-clean,refresh-packages}
+    npm-cache-clean     Empty npm cache while respecting npm-tools locks.
+    refresh-packages    Refresh cached harness and tool packages without
+                        waiting on busy locks.
+
+options:
+  -h, --help            show this help message and exit

@@ -214,6 +214,28 @@ const run = Effect.fn("Proc.run")(function* (command: readonly string[], options
     }),
   )
 })
+
+// Runs a command that shares this process's stdio and process group, like
+// Python's subprocess.run without capture: output streams live and terminal
+// signals reach it. Returns its exit status; interruption kills the child.
+const runAttached = (command: readonly string[], env: Readonly<Record<string, string>>) => {
+  const [executable, ...args] = command
+  if (executable === undefined || executable === "") {
+    return Effect.succeed(127)
+  }
+  return Effect.callback<number, ProcError>((resume) => {
+    const child = spawn(executable, args, { env: { ...process.env, ...env }, stdio: "inherit" })
+    child.once("error", (cause) => {
+      resume(Effect.fail(ProcError.make({ command, cause })))
+    })
+    child.once("close", (code) => {
+      resume(Effect.succeed(code ?? 1))
+    })
+    return Effect.sync(() => {
+      child.kill("SIGTERM")
+    })
+  })
+}
 export class Proc extends Context.Service<
   Proc,
   {
@@ -221,6 +243,10 @@ export class Proc extends Context.Service<
       command: readonly string[],
       options?: RunProcessOptions,
     ) => Effect.Effect<ProcessResult, ProcError>
+    readonly runAttached: (
+      command: readonly string[],
+      env: Readonly<Record<string, string>>,
+    ) => Effect.Effect<number, ProcError>
     readonly resolveExecutable: (
       command: string,
       cwd?: string,
@@ -271,6 +297,6 @@ export class Proc extends Context.Service<
       }
       return { _tag: "Failure", detail: detailFromOutput(result.stdout, result.stderr) }
     })
-    return Proc.of({ run, resolveExecutable, commandExists, outcome })
+    return Proc.of({ run, runAttached, resolveExecutable, commandExists, outcome })
   })
 }

@@ -23,11 +23,13 @@ test("python bootstrap skips an existing environment and warns if uv is missing"
   const proc = Proc.of({
     commandExists: () => Effect.succeed(false),
     resolveExecutable: () => Effect.succeedNone,
+    runAttached: () => Effect.succeed(0),
     run: () => Effect.succeed({ exitCode: 0, stdout: "", stderr: "", timedOut: false, outputLimited: false }),
     outcome: () => Effect.succeed({ _tag: "Success" }),
   })
   const output = Output.of({
     write: () => Effect.void,
+    writeError: () => Effect.void,
     err: () => Effect.void,
     warn: (message) =>
       Effect.sync(() => {

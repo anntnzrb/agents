@@ -7,6 +7,7 @@ test("output writes plain text and prefixed diagnostics to their streams", async
     await Effect.runPromise(Effect.gen(function* () {
       const output = yield* Output;
       yield* output.write("hello\\n");
+      yield* output.writeError("raw\\n");
       yield* output.err("failed");
       yield* output.warn("careful");
     }).pipe(Effect.provide(PosixLayer)));
@@ -23,5 +24,5 @@ test("output writes plain text and prefixed diagnostics to their streams", async
   ])
   expect(code).toBe(0)
   expect(stdout).toBe("hello\n")
-  expect(stderr).toBe("sync: failed\nsync: warning: careful\n")
+  expect(stderr).toBe("raw\nsync: failed\nsync: warning: careful\n")
 })

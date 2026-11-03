@@ -84,7 +84,12 @@ test("installs, rotates and reuses releases; failed refresh preserves current an
       return Effect.succeed(archive)
     },
   })
-  const output = Output.of({ write: () => Effect.void, err: () => Effect.void, warn: () => Effect.void })
+  const output = Output.of({
+    write: () => Effect.void,
+    writeError: () => Effect.void,
+    err: () => Effect.void,
+    warn: () => Effect.void,
+  })
   const layer = Layer.mergeAll(
     BunServices.layer,
     LinksPosix,
@@ -159,7 +164,12 @@ test("rejects an archive containing an escaping symbolic link", async () => {
     now: Effect.succeed(0),
     isPidAlive: () => Effect.succeed(true),
   })
-  const output = Output.of({ write: () => Effect.void, err: () => Effect.void, warn: () => Effect.void })
+  const output = Output.of({
+    write: () => Effect.void,
+    writeError: () => Effect.void,
+    err: () => Effect.void,
+    warn: () => Effect.void,
+  })
   const layer = Layer.mergeAll(
     BunServices.layer,
     LinksPosix,
@@ -194,7 +204,12 @@ test("reports malformed JSON separately from an invalid manifest", async () => {
     isPidAlive: () => Effect.succeed(true),
   })
   const http = Http.of({ getOk: () => Effect.succeed(new TextEncoder().encode(body)) })
-  const output = Output.of({ write: () => Effect.void, err: () => Effect.void, warn: () => Effect.void })
+  const output = Output.of({
+    write: () => Effect.void,
+    writeError: () => Effect.void,
+    err: () => Effect.void,
+    warn: () => Effect.void,
+  })
   const layer = Layer.mergeAll(
     BunServices.layer,
     LinksPosix,

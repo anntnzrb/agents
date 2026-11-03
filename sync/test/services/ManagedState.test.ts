@@ -52,6 +52,7 @@ const layer = Layer.mergeAll(
     Output,
     Output.of({
       write: () => Effect.void,
+      writeError: () => Effect.void,
       warn: (message) =>
         Effect.sync(() => {
           messages.push(message)
