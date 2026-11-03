@@ -11,7 +11,7 @@ modelRoles:
   smol: "@gem"
   vision: "@gem"
   commit: "@gem"
-  task: "@sol"
+  task: "@terra"
   advisor: "@gem"
   tiny: local/lfm2.5-230m,@gem
   web: web/parallel
