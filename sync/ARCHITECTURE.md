@@ -38,14 +38,14 @@ top-level `src/` directories.
 
 ## Platform services (`src/platform/`)
 
-| Service              | Capability                                                                                                                   |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `Lock`               | non-blocking exclusive `flock` on a path via `bun:ffi`; scoped acquisition returning `Option`; pid write                     |
-| `Links`              | read symlink target (fails when path exists but is not a link), atomic replace via temp + rename                             |
-| `Exec`               | replace the process (`process.execve`) after flushing stdout/stderr                                                          |
-| `Proc`               | run a command in its own session with timeout, combined 10 MiB output cap, process-group kill, executable resolution on PATH |
-| `RunningExecutables` | real paths of executables the current user runs: `/proc/*/exe` on Linux, `lsof` on macOS, `None` when unknown                |
-| `Host`               | platform (`darwin` / `linux`), arch, pid, uid, home, environment snapshot, clock                                             |
+| Service              | Capability                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Lock`               | non-blocking exclusive `flock` on a path via `bun:ffi`; scoped acquisition returning `Option`; pid write                                                                     |
+| `Links`              | read symlink target (fails when path exists but is not a link), atomic replace via temp + rename                                                                             |
+| `Exec`               | replace the process (`process.execve`) after flushing stdout/stderr and restoring default `SIGPIPE`/`SIGXFSZ` dispositions                                                   |
+| `Proc`               | run a command in its own session with timeout, combined 10 MiB output cap, process-group kill, executable resolution on PATH; run an attached child that shares the terminal |
+| `RunningExecutables` | real paths of executables the current user runs: `/proc/*/exe` on Linux, `lsof` on macOS, `None` when unknown; callers scan once per run                                     |
+| `Host`               | platform (`darwin` / `linux`), arch, pid, uid, home, environment snapshot, clock, process liveness                                                                           |
 
 The Posix Layer is the only implementation. Windows is out of scope; the service seam is where it would go.
 

@@ -28,7 +28,7 @@ Without `runtimeSubdir`, the source root is `harnesses/<id>/` and the generated 
 
 ## Published configuration
 
-Sync publishes the repository's `HARNESS.md` as the harness instruction file (`AGENTS.md` unless the adapter sets `instruction_file`) and `skills/current/` as `skills/` to every enabled harness. Sync never publishes `tools/` into a harness home; it copies or renders selected tool files into each tool's own home, as the [Sync reference](sync.md#tool-launchers) describes.
+Sync publishes the repository's `HARNESS.md` as the harness instruction file (`AGENTS.md` unless the adapter sets `instructionFile`) and `skills/current/` as `skills/` to every enabled harness. Sync never publishes `tools/` into a harness home; it copies or renders selected tool files into each tool's own home, as the [Sync reference](sync.md#tool-launchers) describes.
 
 ## Launchers
 
@@ -74,7 +74,7 @@ Each npm harness has a versioned cache under `<cache-home>/npm-tools/`. `<cache-
 
 The cache keeps the current and previous known-good package versions, and any older version a running process still executes (see [Launch behavior](sync.md#launch-behavior)). Newly installed packages pass the `--version` smoke check before promotion. Cached packages are checked for package identity and an executable before promotion. Changing an adapter's npm package selects a separate package-key cache; it does not reuse the previous package's `current` install. The wrapper name and generated home can remain unchanged during that migration.
 
-Static release harnesses install one directory per resolved manifest version under the adapter's `install_segments` root instead of the npm cache. Those installs also keep the current and previous versions.
+Static release harnesses install one directory per resolved manifest version under the adapter's `installSegments` root instead of the npm cache. Those installs also keep the current and previous versions.
 
 ## Shared harness environment
 

@@ -26,7 +26,7 @@ Validate every active skill's metadata, and check repository Markdown outside `s
 uv run --script .github/scripts/ci.py metadata
 ```
 
-Run a selected skill's gates using [Manage shared skills](skills.md#validate-python-skills-standard). Run sync checks using [Develop the sync application](sync/development.md#run-the-full-checks). Harness validation stays beside its source.
+Run a selected skill's gates using [Manage shared skills](skills.md#validate-python-skills-standard). Run sync checks using [Develop the sync application](sync/development.md#run-checks). Harness validation stays beside its source.
 
 The `repository-checks` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) also lints, formats, type-checks, and tests `.github/` with pinned `uvx` commands. Run the same commands locally after changing that directory.
 

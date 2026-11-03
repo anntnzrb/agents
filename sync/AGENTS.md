@@ -12,10 +12,10 @@ This is the sync application. See [sync architecture](ARCHITECTURE.md) and [deve
 ## Contracts
 
 - Keep behavior changes deliberate. Use TDD.
-- The public entrypoint is `src/main.ts`. From the repository root, run `bun run --cwd sync sync`.
+- The public entrypoint is `src/main.ts`; run it as documented in [development](../docs/sync/development.md#run-sync-from-source).
 - Sync supports macOS and Linux only.
 - A supported `../harnesses/<harness>/` directory opts into that harness; `src/domain/HarnessAdapters.ts` owns its adapter metadata.
-- Use the package subpath imports across top-level source directories.
+- Follow the module rules in [ARCHITECTURE.md](ARCHITECTURE.md).
 - Sync owns generated launch wrappers under `~/.local/bin` and assumes that directory is on `PATH`.
 
 ## Managed Tool Contract
@@ -34,8 +34,7 @@ This is the sync application. See [sync architecture](ARCHITECTURE.md) and [deve
 ## Launch Wrapper Contract
 
 - A manual sync creates or reconciles wrappers before returning.
-- Sync installs its runtime under `~/.local/share/agents/sync-releases/<releaseId>/` with a `sync-current` symlink to the latest release.
-- Generated wrappers execute `~/.local/share/agents/sync-current/sync launch <harness> -- ...`. A valid cached package launches immediately; a cold launch performs best-effort sync and blocking package preparation before replacing itself with the harness.
+- Sync installs its runtime and generates wrappers as described in the [sync reference](../docs/sync/sync.md#installed-runtime). A valid cached package launches immediately; a cold launch performs best-effort sync and blocking package preparation before replacing itself with the harness.
 - Runtime consumers read installed state under `~/.local/share/agents/`, not files under the SSOT.
 - Cold-launch sync failures are warnings; package preparation still runs. Cached launches skip sync, so managed SSOT edits require manual sync or a scheduled update reconciliation.
 - Wrapper ownership is marker- and state-based. Stale generated wrappers are removed only when still owned; unmanaged conflicts are preserved.
@@ -46,7 +45,6 @@ From `sync/`, run `bun run check` for static checks, `bun test` for tests, or `b
 
 ### Code Quality and Typing Policies
 
-- Use strict typing and validate external data at boundaries.
 - Fix underlying problems rather than weakening gates or adding unjustified suppressions.
 - Keep tests deterministic, isolated, and focused on observable contracts.
 

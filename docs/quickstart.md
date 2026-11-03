@@ -6,18 +6,17 @@ Sync supports macOS and Linux.
 
 ## Install the required commands
 
-Sync requires Bun. Managed packages and extensions additionally use Node.js and npm.
+Sync requires Bun. Managed packages and extensions additionally use Node.js and npm; skills and harness Python environments use `uv`.
 
-Install `uv`, `python3`, `bun`, `node`, `npm`, `git`, `tar`, `curl`, and `jq`.
+Install `bun`, `node`, `npm`, `uv`, `git`, `tar`, `curl`, and `jq`.
 
 Confirm that each command is available:
 
 ```bash
-uv --version
-python3 --version
 bun --version
 node --version
 npm --version
+uv --version
 git --version
 tar --version
 curl --version
@@ -63,14 +62,14 @@ Run sync from the repository root:
 bun run --cwd sync sync
 ```
 
-Sync creates the self-hosted runtime link, harness configuration files, tool configs, and launch wrappers in `~/.local/bin/`.
+Sync installs its own runtime under `~/.local/share/agents/`, publishes harness configuration files and tool configs, and generates launch wrappers in `~/.local/bin/`.
 
 ## Verify gateway connectivity
 
 Sync checks `gateway.base_url` in `agents.toml` before publishing endpoint templates to harnesses. Query the model endpoint directly:
 
 ```bash
-base_url="$(python3 -c 'import tomllib; print(tomllib.load(open("agents.toml", "rb"))["gateway"]["base_url"])')"
+base_url="$(bun -e 'console.log(Bun.TOML.parse(await Bun.file("agents.toml").text()).gateway.base_url)')"
 curl -fsS "$base_url/models" | jq -e '.data | type == "array" and length > 0'
 ```
 
@@ -80,4 +79,4 @@ curl -fsS "$base_url/models" | jq -e '.data | type == "array" and length > 0'
 
 Choose an adapter whose source directory exists under `harnesses/` and whose `platforms` field includes your host. Read its launcher in `sync/src/domain/HarnessAdapters.ts`, then run that wrapper command (for example `codex`, `pi`, or `omp`).
 
-The wrapper runs sync, prepares the cached harness package, forwards arguments, and returns the harness exit status.
+The wrapper hands the command to the installed sync runtime, which launches the cached harness package with your arguments; a first launch also syncs and installs the package. The wrapper exits with the harness exit status.

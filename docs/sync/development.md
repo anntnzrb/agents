@@ -1,6 +1,6 @@
 # Develop the sync application
 
-Sync is a Bun TypeScript application under `sync/`. See the [sync architecture](../../sync/ARCHITECTURE.md) for the Effect design and source layout, and [Manage shared skills](../skills.md) for the shared-skill workflow.
+Sync is a Bun TypeScript application under `sync/`. See the [sync architecture](../../sync/ARCHITECTURE.md) for the Effect design, source layout, and module rules, and [Manage shared skills](../skills.md) for the shared-skill workflow.
 
 ## Run sync from source
 
@@ -13,7 +13,7 @@ bun run --cwd sync sync
 
 Sync reads its sources from `~/src/agents`, not the current directory. From another checkout or worktree, the command runs that checkout's code against `~/src/agents`; its local skill, harness, and tool changes are not published. After the changes merge, each host's [background updater](sync.md#background-updates) fast-forwards the source checkout.
 
-The source entrypoint is `sync/src/main.ts`. The installed executable is `~/.local/share/agents/sync-current/sync`.
+See the [sync reference](sync.md#installed-runtime) for the installed executable.
 
 ## Run checks
 
@@ -24,13 +24,13 @@ bun install --cwd sync --frozen-lockfile
 bun run --cwd sync gates
 ```
 
-The `gates` script runs `check`, then `bun test`. The `check` script runs TypeScript type checking, Effect diagnostics, type-aware Oxlint, and the Oxfmt formatting check. To run static checks alone, use `bun run --cwd sync check`. For an individual gate, use the corresponding script in `sync/package.json`.
+The `gates` script runs `check`, then `bun test`. The `check` script runs TypeScript type checking (`tsconfig.json`), Effect diagnostics (`effect-tsgo diagnostics`, configured by the `@effect/language-service` plugin in `tsconfig.json`), type-aware Oxlint with the Effect rules (`effect-tsgo oxlint`, configured by `.oxlintrc.json`), and the Oxfmt formatting check (`.oxfmtrc.json`). Those files own every rule and severity; fix findings instead of weakening a rule or adding a suppression. To run static checks alone, use `bun run --cwd sync check`. For an individual gate, use the corresponding script in `sync/package.json`.
 
-To run a focused test, pass its path to Bun:
+To run a focused test, pass its path relative to `sync/`; the `#domain/*`-style imports resolve from `sync/package.json`:
 
 ```bash
-bun test sync/test/domain/ImportScan.test.ts
-bun test sync/test/jobs/Wrappers.test.ts
+bun test --cwd sync test/domain/ImportScan.test.ts
+bun test --cwd sync test/jobs/Wrappers.test.ts
 ```
 
 Coverage is diagnostic, not a gate. Do not duplicate process-level scenarios in unit tests to raise coverage.
@@ -55,7 +55,7 @@ Coverage is diagnostic, not a gate. Do not duplicate process-level scenarios in 
 4. Run `git diff --check` from the repository root.
 5. Update the related page under `docs/sync/` when commands, paths, lifecycle, platforms, or generated behavior change.
 
-Keep wrapper generation inside sync, validate external data at its boundary, make filesystem operations safe to retry, and preserve unmanaged files unless recorded ownership permits cleanup.
+Keep wrapper generation inside sync, make filesystem operations safe to retry, and preserve unmanaged files unless recorded ownership permits cleanup.
 
 ## Change harness configuration
 
@@ -92,4 +92,4 @@ Document tool operation on a focused page under `docs/` and link it from `docs/i
 
 JSONC input accepts comments and trailing commas. Deployment settings reject unknown fields. Dotenv defaults do not expand variables and omit empty values. Endpoint publication preserves designated TOML tables without rewriting unrelated content.
 
-Preserve deterministic fingerprint bytes and matching destination inode and modification time when changing filesystem work. See the [runtime and hook fingerprint reference](sync.md#installed-runtime).
+Preserve deterministic fingerprint bytes and matching destination inode and modification time when changing filesystem work. See the [runtime release id](sync.md#installed-runtime) and the [extension hook fingerprint](sync.md#extension-hook-state).

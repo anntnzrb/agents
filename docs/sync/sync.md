@@ -26,11 +26,11 @@ A manual sync runs these stages in order:
 5. Record managed harness entries.
 6. Run extension-dependency hooks.
 
-The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes and exits with status `124` on timeout. Pre-launch sync runs only without a valid package cache and uses the same budget; a timeout warns and continues to package preparation. The launched harness session is never killed by an expired sync timer.
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync prints `sync: another sync is already running; skipping` and exits with status `0` without changing targets; `sync update` skips the round silently. A manual sync requests cancellation after 15 minutes and exits with status `124` on timeout. Cancellation gives scoped cleanup (process-group kills, stage removal) 30 seconds; when cleanup outlasts that window, the process still exits `124`. Pre-launch sync runs only without a valid package cache and uses the same budget; a timeout warns and continues to package preparation. The launched harness session is never killed by an expired sync timer.
 
 ## File reconciliation
 
-Sync compares file content and modes before replacement. An unchanged run leaves matching files in place (inode and mtime preserved). Secrets and new state files use mode `0600`; existing state files keep their regular-file mode; executable wrappers use `0755`. Subprocess stdout/stderr share a 10 MiB retained-byte limit; overflow terminates the process group and fails explicitly without parsing partial stdout.
+Sync compares a managed file with its source before replacing it. Every copy stamps the source modification time onto the destination, so a destination with the source's size, permission bits, and modification time (to the millisecond) is that copy and is left alone. Any other destination, including one edited in place, is compared by content and replaced when it differs. An unchanged run leaves matching files in place (inode and mtime preserved). Secrets and new state files use mode `0600`; existing state files keep their regular-file mode; executable wrappers use `0755`. Subprocess stdout/stderr share a 10 MiB retained-byte limit; overflow terminates the process group and fails explicitly without parsing partial stdout.
 
 Directory jobs use one of two scopes:
 
@@ -53,11 +53,11 @@ Cold-launch sync treats reconciliation failures as warnings and continues to pac
 
 The readiness job checks `gateway.base_url` + `/models` without authentication. The response must contain a non-empty `data` array. When the endpoint is unavailable, sync preserves the existing harness endpoint files.
 
-Endpoint publication replaces the `${CLIPROXY_CLIENT_BASE_URL}` and `${CLIPROXY_CLIENT_ORIGIN}` placeholders in every configured harness target as one transaction. Publication preserves the Codex-owned `[hooks.state]` and `[projects]` tables in `~/.codex/config.toml`. A write failure restores every target's previous content and mode.
+Endpoint publication replaces the `${CLIPROXY_CLIENT_BASE_URL}` and `${CLIPROXY_CLIENT_ORIGIN}` placeholders in every configured harness target as one transaction. Each adapter's `cliproxyPreserveTopLevels` names the TOML tables publication keeps from the existing target, such as tables the harness itself owns. A write failure restores every target's previous content and mode.
 
 ## Installed runtime
 
-Sync stages `sync/src/`, `sync/package.json`, and `sync/bun.lock` under `~/.local/share/agents/sync-releases/`. It runs `bun install --frozen-lockfile --production`, then `bun build --compile src/main.ts --outfile sync`, and smoke-checks the executable with `--help`. A complete release lives at `~/.local/share/agents/sync-releases/<releaseId>/` and contains the compiled `sync` executable and `.release-complete` marker. Sync atomically points `~/.local/share/agents/sync-current` at the release; generated wrappers execute `sync-current/sync`.
+Sync stages `sync/src/`, `sync/package.json`, and `sync/bun.lock` under `~/.local/share/agents/sync-releases/`. It runs `bun install --frozen-lockfile --production`, then `bun build --compile src/main.ts --outfile sync`, and smoke-checks the executable with `--help`. The compiled executable embeds its sources and dependencies, so sync then removes the build inputs. A complete release at `~/.local/share/agents/sync-releases/<releaseId>/` contains only the `sync` executable and the `.release-complete` marker. Sync atomically points `~/.local/share/agents/sync-current` at the release; generated wrappers execute `sync-current/sync`.
 
 The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 
@@ -71,13 +71,19 @@ Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>
 
 ## Runtime handoff
 
-Every sync entrypoint except the first install runs from an installed runtime, so a run whose own sync code changed executes every job with the previous code. Manual sync, `sync update`, and cold-launch sync detect when their run published a different `sync-current` release, release the process lock, and run the same command again with the new runtime. The rerun logs `sync runtime changed; reconciling again with the new runtime`, and its exit status becomes the command's exit status. A rerun process never hands off again, so one change costs at most one extra reconcile. A cold launch whose rerun fails warns and continues to the harness.
+Every sync entrypoint except the first install runs from an installed runtime, so a run whose own sync code changed executes every job with the previous code. Manual sync, `sync update`, and cold-launch sync detect when their run published a different `sync-current` release, release the process lock, and reconcile again with the new runtime:
 
-The release fingerprint and copy skip the same ignored directory names; see `sync/src/jobs/RuntimeRelease.ts` for the exact traversal.
+- Manual sync reruns `sync`; its exit status becomes the command's exit status.
+- `sync update` reruns `update`, which records the commit once the new runtime reconciles it.
+- A cold launch reruns `sync`, then continues to the harness; a failed rerun warns and still launches.
+
+The rerun logs `sync runtime changed; reconciling again with the new runtime` and carries `AGENTS_SYNC_HANDOFF=1` in its environment. A process started with that variable never hands off again, so one change costs at most one extra reconcile. When `sync update` itself runs as a handoff and the runtime changes again, it logs `update: sync runtime changed; reconciling again on the next run` and leaves the commit unrecorded for the next round.
+
+The release fingerprint skips the names listed in `sync/src/domain/EntryNames.ts`; see `sync/src/jobs/RuntimeRelease.ts` for the exact traversal.
 
 ## Extension hook state
 
-Extension dependency hooks compute a content fingerprint in `sync/src/services/HookState.ts` and `sync/src/domain/Fingerprint.ts` to skip redundant installation when inputs have not changed:
+Extension dependency hooks fingerprint their source tree to skip redundant installation when inputs have not changed. `sync/src/services/HookState.ts` walks the tree and `sync/src/domain/Fingerprint.ts` hashes it. This fingerprint is separate from the runtime release id:
 
 - Produces a SHA-256 digest over the directory tree. A missing root hashes the UTF-8 bytes of `missing`.
 - Traverses directory entries in deterministic Unicode code-point order.
@@ -95,27 +101,29 @@ Local SSOT edits to managed configuration, skills, and instructions take effect 
 
 When no valid cache exists, launch runs best-effort sync if the SSOT is available, then resolves and installs the package synchronously under its cache lock. A failed sync, a busy sync lock, or an unavailable repository does not prevent package preparation. If preparation cannot produce a valid executable, launch fails.
 
-After preparing the harness, the wrapper process is replaced by the harness executable (`execve`). The harness keeps the wrapper's PID, session, process group, and controlling terminal, so terminal resizes, `^C`, job control, and a service manager's `SIGTERM` reach the harness directly, and its exit status is the wrapper's exit status. Captured subprocesses that sync runs itself (npm installs, smoke checks, hooks) still run in their own session so timeouts can kill the whole process group.
+After preparing the harness, the wrapper process is replaced by the harness executable (`execve`). The harness keeps the wrapper's PID, session, process group, and controlling terminal, so terminal resizes, `^C`, job control, and a service manager's `SIGTERM` reach the harness directly, and its exit status is the wrapper's exit status. The Bun runtime ignores `SIGPIPE` and `SIGXFSZ`, and an ignored disposition survives `execve`, so sync restores both to their defaults first; a harness piped into `head` then exits on the closed pipe like any process started from a shell. Captured subprocesses that sync runs itself (npm installs, smoke checks, hooks) still run in their own session so timeouts can kill the whole process group.
 
 Cold launches and package refreshes resolve npm's `latest` tag and install the resolved version into a versioned cache. The cache keeps the current and previous known-good versions, plus any older version whose executable a running process still uses: a long-lived process such as the Amp runner keeps running the version it started from until it restarts, so an update never deletes it underneath that process. Running executables come from `/proc` on Linux and `lsof` on macOS; when they cannot be determined, pruning is skipped for that preparation. Each install stages into `versions/.stage-<pid>-<token>` and removes it on exit; a stage survives only when its installer was killed, and the next prune removes it once that PID is no longer alive. Failed resolution, installation, or smoke checks leave the current known-good cache available.
 
-Cold launches and package refreshes for static releases resolve the adapter's manifest, verify the archive SHA-256, and install the version under the adapter's home-relative install root. The cache keeps the current and previous versions and reuses an installed version without re-downloading. Failed preparation leaves the current cached install available.
+Cold launches and package refreshes for static releases resolve the adapter's manifest, verify the archive SHA-256, and install the version under the adapter's home-relative install root. The cache keeps the current and previous versions, plus any older version a running process still executes, under the same running-executable rule as npm packages. An installed version is reused without re-downloading. Failed preparation leaves the current cached install available.
 
 ## Maintenance jobs
 
 The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Run jobs with the installed `~/.local/share/agents/sync-current/sync` executable:
 
-- `sync job refresh-packages`: refreshes npm and static release packages for host-supported harnesses enabled in the SSOT or represented by installed managed wrappers, plus every registered tool launcher. It resolves npm packages from `latest`, verifies and smoke-checks npm installs, verifies static archive checksums and executables, rotates `current`/`previous`, and prunes using the same preparation functions as cold launch. Each package holds its existing cache lock across resolution and installation; a busy lock logs a skip without waiting or making a network request. Per-package failures log and continue, keeping the cached version available. The job exits `0` for a successful or skipped round, including no work and partial failures; it exits nonzero only when every package fails or the job itself breaks. The machine configuration owns its schedule.
-- `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed. It exits `0` when there is nothing to do.
+- `sync job refresh-packages`: refreshes npm and static release packages for host-supported harnesses enabled in the SSOT or represented by installed managed wrappers, plus every registered tool launcher. It resolves npm packages from `latest`, verifies and smoke-checks npm installs, verifies static archive checksums and executables, rotates `current`/`previous`, and prunes using the same preparation functions as cold launch. Each package holds its own cache lock across resolution and installation; a busy lock logs a skip without waiting or making a network request. Per-package failures log and continue, keeping the cached version available. The job exits `0` for a successful or skipped round, including no work and partial failures; it exits nonzero only when every package fails or the job itself breaks.
+
+  Per run, the job reads the npm registry configuration once (`npm config get`, so npmrc files, `npm_config_*` variables, and `@scope:registry` overrides apply) and scans running executables once. It refreshes up to four packages concurrently. Each npm package resolves `latest` from the registry's `<registry>/<package>/latest` document, a few kilobytes. On any registry failure, such as authentication, a proxy, or an outage, it falls back to `npm view`, which applies the complete npm configuration. Cold launches resolve with `npm view`. Installation always uses `npm install`.
+- `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `<cache>/npm-tools/*/lock` (`<cache>` is `$XDG_CACHE_HOME` or `~/.cache`); skips when busy or if npm is not installed. It exits `0` when there is nothing to do. Static releases lock `<install root>/lock` under their home-relative install root instead.
 
 ## Background updates
 
 Every machine converges on `origin/main`: commit and push from any machine, and the others pick the change up on their own. Pushing stays manual; pulling and reconciling are automatic. The git hooks stay pure quality gates, so only commits that passed the `pre-push` tests reach `origin/main`.
 
-The machine configuration schedules `sync update` every few minutes on each host; this repository installs no updater of its own. Each run:
+The machine configuration schedules `sync update` on each host; this repository installs no updater of its own and assumes nothing about the interval. Each run:
 
 1. Skips the round if another sync holds the process lock; it never waits.
-2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout. Each of these cases logs a `sync: warning: update: …` line naming the blocker (the changed files, the branch, or the local and upstream commit counts), so a host that stops converging shows why in its updater log; an up-to-date run logs nothing.
+2. Fast-forwards only a clean checkout on `main`. Uncommitted tracked changes, another branch, or local commits missing from `origin/main` mean someone is working there: the checkout is left as is and nothing is merged, stashed, or reset. A failed fetch (offline) keeps the local checkout. Each of these cases logs a `sync: warning: update: …` line naming the blocker (the changed files, the branch, or the local and upstream commit counts), so a host that stops converging shows why in its updater log; an up-to-date run logs nothing. An up-to-date checkout costs one fetch and one `rev-parse`; merge checks run only when `origin/main` moved.
 3. Reconciles only when the checked-out commit differs from the last one it reconciled successfully (`sync-managed/update.json`). A failed reconcile is retried on the next run.
 
 The updater runs from the installed runtime, so a pulled change to sync's own code is reconciled first by the previous runtime, which cannot know about anything the new code adds or removes, such as a new harness adapter. When that reconcile installs a new runtime, the updater does not record the commit and reruns `update` with the new runtime in the same round; see [Runtime handoff](#runtime-handoff).
@@ -130,4 +138,4 @@ A host stuck behind `origin/main` repeats the same warning on every run. Commit 
 
 `TOOL_LAUNCHERS` in `sync/src/domain/ToolLaunchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and immediate cached launch with best-effort sync only on a cold launch. Tools have no harness home, instruction file, or skills.
 
-Sync copies `tools/mcporter/mcporter.jsonc` to `~/.mcporter/mcporter.json` and `tools/summarize/config.json` to `~/.summarize/config.json`, replacing the endpoint placeholders in the second file. `configJobs` in `sync/src/services/Planner.ts` declares these jobs.
+`configJobs` in `sync/src/services/Planner.ts` declares the tool configuration files sync publishes and which of them receive the endpoint placeholders.
