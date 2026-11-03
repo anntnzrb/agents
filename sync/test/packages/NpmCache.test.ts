@@ -20,6 +20,7 @@ import type { Lock } from "#platform/Lock"
 import { LockPosix } from "#platform/Lock"
 import { Proc } from "#platform/Proc"
 import { RunningExecutables } from "#platform/RunningExecutables"
+import { Http, HttpError, Live as HttpLive } from "#services/Http"
 import { Output } from "#services/Output"
 
 const dirs: string[] = []
@@ -85,6 +86,10 @@ test("installs, rotates versions, and falls back to the healthy cache", async ()
     Layer.succeed(Proc, proc),
     Layer.succeed(RunningExecutables, running),
     Layer.succeed(
+      Http,
+      Http.of({ getOk: (url) => Effect.fail(HttpError.make({ url, message: "offline" })) }),
+    ),
+    Layer.succeed(
       Output,
       Output.of({
         write: () => Effect.void,
@@ -98,7 +103,7 @@ test("installs, rotates versions, and falls back to the healthy cache", async ()
     effect: Effect.Effect<
       A,
       E,
-      Host | Proc | RunningExecutables | Output | Lock | Links | FileSystem.FileSystem | Path.Path
+      Host | Http | Proc | RunningExecutables | Output | Lock | Links | FileSystem.FileSystem | Path.Path
     >,
   ) => Effect.runPromise(effect.pipe(Effect.provide(layer)))
   const first = await run(prepareNpmPackage(spec, options))
@@ -115,6 +120,97 @@ test("installs, rotates versions, and falls back to the healthy cache", async ()
   writeFileSync(path.join(first.layout.versionsDir, "2.0.0/node_modules/@scope/tool/package.json"), "{}")
   const invalid = await run(currentCachedPackage(spec, options))
   expect(Option.isNone(invalid)).toBe(true)
+})
+
+test("resolves latest from the registry document and falls back to npm view", async () => {
+  const home = mkdtempSync(path.join(tmpdir(), "npm-cache-"))
+  dirs.push(home)
+  const requested: string[] = []
+  let registryUp = true
+  const server = Bun.serve({
+    port: 0,
+    fetch: (request) => {
+      requested.push(new URL(request.url).pathname)
+      return registryUp
+        ? Response.json({ name: "@scope/tool", version: "3.1.4" })
+        : new Response("", { status: 503 })
+    },
+  })
+  const commands: string[][] = []
+  const proc = Proc.of({
+    runAttached: () => Effect.succeed(0),
+    run: (args) =>
+      Effect.sync(() => {
+        commands.push([...args])
+        if (args[1] === "view") {
+          return { ...ok, stdout: "3.1.5\n" }
+        }
+        const stage = args[3] ?? ""
+        const binary = path.join(stage, "node_modules/.bin/tool")
+        const pkg = path.join(stage, "node_modules/@scope/tool")
+        mkdirSync(path.dirname(binary), { recursive: true })
+        mkdirSync(pkg, { recursive: true })
+        writeFileSync(binary, "#!/bin/sh\nexit 0\n")
+        chmodSync(binary, 0o755)
+        const requestedSpec = args.at(-1) ?? ""
+        const version = /@([^@]+)$/u.exec(requestedSpec)?.[1] ?? ""
+        writeFileSync(path.join(pkg, "package.json"), `{ "name": "@scope/tool", "version": "${version}" }`)
+        return ok
+      }),
+    resolveExecutable: () => Effect.succeedNone,
+    commandExists: () => Effect.succeed(true),
+    outcome: () => Effect.succeed({ _tag: "Success" }),
+  })
+  const host = Host.of({
+    platform: "darwin",
+    arch: "arm64",
+    pid: 123,
+    uid: 1,
+    home,
+    cacheHome: path.join(home, "cache"),
+    env: {},
+    now: Effect.succeed(0),
+    isPidAlive: () => Effect.succeed(true),
+  })
+  const layer = Layer.mergeAll(
+    BunServices.layer,
+    LinksPosix,
+    LockPosix,
+    HttpLive,
+    Layer.succeed(Host, host),
+    Layer.succeed(Proc, proc),
+    Layer.succeed(RunningExecutables, RunningExecutables.of({ get: Effect.succeedNone })),
+    Layer.succeed(
+      Output,
+      Output.of({
+        write: () => Effect.void,
+        writeError: () => Effect.void,
+        err: () => Effect.void,
+        warn: () => Effect.void,
+      }),
+    ),
+  )
+  const options = {
+    home,
+    cacheHome: path.join(home, "cache"),
+    registry: `http://127.0.0.1:${server.port}/npm`,
+    running: Option.none(),
+  }
+  try {
+    const fromRegistry = await Effect.runPromise(
+      refreshNpmPackage(spec, options).pipe(Effect.as(true), Effect.provide(layer)),
+    )
+    expect(fromRegistry).toBe(true)
+    expect(requested).toEqual(["/npm/@scope%2ftool/latest"])
+    expect(Arr.some<string[]>((cmd) => cmd[1] === "view")(commands)).toBe(false)
+    expect(readlinkSync(npmCacheLayout(spec, options).currentLink)).toBe("versions/3.1.4")
+    registryUp = false
+    await Effect.runPromise(refreshNpmPackage(spec, options).pipe(Effect.provide(layer)))
+    expect(Arr.some<string[]>((cmd) => cmd[1] === "view")(commands)).toBe(true)
+    expect(readlinkSync(npmCacheLayout(spec, options).currentLink)).toBe("versions/3.1.5")
+  } finally {
+    await server.stop(true)
+  }
 })
 
 test("cache keys distinguish packages and malformed current links are ignored", async () => {

@@ -5,6 +5,7 @@ import { StaticReleaseManifest } from "#domain/ReleaseManifest"
 import { Host } from "#platform/Host"
 import { Links } from "#platform/Links"
 import { Lock } from "#platform/Lock"
+import { RunningExecutables } from "#platform/RunningExecutables"
 import { Http } from "#services/Http"
 import { Output } from "#services/Output"
 
@@ -266,6 +267,7 @@ const publish = Effect.fn("StaticRelease.publish")(function* (
   release: StaticRelease,
   home: string,
   version: string,
+  running: Option.Option<ReadonlySet<string>> | undefined,
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -279,11 +281,21 @@ const publish = Effect.fn("StaticRelease.publish")(function* (
     }
     yield* links.replaceLink(current, version)
   }
-  const previous = yield* links.readLinkTarget(path.join(versions, "previous"))
-  const keep = new Set([version, ...(Option.isSome(previous) ? [path.basename(previous.value)] : [])])
-  for (const entry of yield* fs.readDirectoryEntries(versions)) {
-    if (entry.type === "Directory" && numericVersion.test(entry.name) && !keep.has(entry.name)) {
-      yield* fs.remove(path.join(versions, entry.name), { recursive: true, force: true })
+  // Prune only with a complete process listing: an unknown listing keeps every version,
+  // and a version some process is executing from survives until it exits.
+  const processes = running ?? (yield* (yield* RunningExecutables).get)
+  if (Option.isSome(processes)) {
+    const previous = yield* links.readLinkTarget(path.join(versions, "previous"))
+    const keep = new Set([version, ...(Option.isSome(previous) ? [path.basename(previous.value)] : [])])
+    for (const entry of yield* fs.readDirectoryEntries(versions)) {
+      if (entry.type !== "Directory" || !numericVersion.test(entry.name) || keep.has(entry.name)) {
+        continue
+      }
+      const candidate = path.join(versions, entry.name)
+      const real = yield* fs.realPath(candidate).pipe(Effect.orElseSucceed(() => candidate))
+      if (!Arr.some([...processes.value], (p) => p === real || Str.startsWith(`${real}/`)(p))) {
+        yield* fs.remove(candidate, { recursive: true, force: true })
+      }
     }
   }
   yield* publishMan(release, home, version)
@@ -342,6 +354,7 @@ const locked = Effect.fn("StaticRelease.locked")(function* (
   release: StaticRelease,
   home: string,
   timeoutMs: number,
+  running?: Option.Option<ReadonlySet<string>>,
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -383,7 +396,7 @@ const locked = Effect.fn("StaticRelease.locked")(function* (
   if (!(yield* isExecutable(executable))) {
     return yield* failure(`static release ${manifest.version} has no executable ${executable}`)
   }
-  yield* publish(release, home, manifest.version)
+  yield* publish(release, home, manifest.version, running)
   return executable
 })
 
@@ -391,6 +404,7 @@ export const refreshStaticRelease = Effect.fn("StaticRelease.refresh")(function*
   release: StaticRelease,
   home: string,
   timeoutMs: number,
+  running?: Option.Option<ReadonlySet<string>>,
 ) {
   const path = yield* Path.Path
   const lock = yield* Lock
@@ -403,7 +417,7 @@ export const refreshStaticRelease = Effect.fn("StaticRelease.refresh")(function*
         yield* output.warn(`refresh-packages: ${release.manifestUrl}: cache lock busy; skipping`)
         return false
       }
-      yield* locked(release, home, timeoutMs)
+      yield* locked(release, home, timeoutMs, running)
       return true
     }),
   )

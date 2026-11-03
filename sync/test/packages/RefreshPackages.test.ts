@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { BunServices } from "@effect/platform-bun"
-import { Array as Arr, Effect, Layer, Option, String as Str } from "effect"
+import { Array as Arr, Effect, Layer, Option, Order, String as Str } from "effect"
 
 import { harnessFromAdapter, syncEnvPaths } from "#domain/Harness"
 import type { Harness } from "#domain/Harness"
@@ -91,7 +91,9 @@ const fixture = () => {
         runAttached: () => Effect.succeed(0),
         run: (command) =>
           Effect.sync(() => {
-            attempted.push(command[2] ?? "")
+            if (command[1] === "view") {
+              attempted.push(command[2] ?? "")
+            }
             return { exitCode: 1, stdout: "", stderr: "offline", timedOut: false, outputLimited: false }
           }),
         resolveExecutable: () => Effect.succeedNone,
@@ -114,14 +116,16 @@ const fixture = () => {
 test("continues after each failed package and fails only when the entire round fails", async () => {
   const f = fixture()
   expect(await f.run()).toBe(1)
-  expect(f.attempted).toEqual([
-    "mcporter@latest",
+  expect(Arr.sort(f.attempted, Order.String)).toEqual([
     "@getpaseo/cli@latest",
-    "@steipete/summarize@latest",
     "@openai/codex@latest",
+    "@steipete/summarize@latest",
+    "mcporter@latest",
   ])
   expect(f.warnings).toHaveLength(4)
-  expect(f.warnings[3]).toContain("refresh-packages: codex:")
+  expect(Arr.some<string>((warning) => Str.includes("refresh-packages: codex:")(warning))(f.warnings)).toBe(
+    true,
+  )
 })
 
 test("a busy package makes a partially failed round successful", async () => {

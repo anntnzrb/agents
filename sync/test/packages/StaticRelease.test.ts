@@ -22,8 +22,15 @@ import { currentStaticRelease, prepareStaticRelease, refreshStaticRelease } from
 import { Host } from "#platform/Host"
 import { LinksPosix } from "#platform/Links"
 import { LockPosix } from "#platform/Lock"
+import { RunningExecutables } from "#platform/RunningExecutables"
 import { Http, HttpError } from "#services/Http"
 import { Output } from "#services/Output"
+
+const noRunningExecutables: ReadonlySet<string> = new Set()
+const runningLayer = Layer.succeed(
+  RunningExecutables,
+  RunningExecutables.of({ get: Effect.succeedSome(noRunningExecutables) }),
+)
 
 const roots: string[] = []
 afterEach(() => {
@@ -97,6 +104,7 @@ test("installs, rotates and reuses releases; failed refresh preserves current an
     Layer.succeed(Host, host),
     Layer.succeed(Http, http),
     Layer.succeed(Output, output),
+    runningLayer,
   )
   const prepare = () =>
     Effect.runPromise(prepareStaticRelease(spec, home, 10_000).pipe(Effect.provide(layer)))
@@ -177,6 +185,7 @@ test("rejects an archive containing an escaping symbolic link", async () => {
     Layer.succeed(Host, host),
     Layer.succeed(Http, http),
     Layer.succeed(Output, output),
+    runningLayer,
   )
   const failureResult = await Effect.runPromise(
     Effect.result(refreshStaticRelease(spec, home, 10_000)).pipe(Effect.provide(layer)),
@@ -217,6 +226,7 @@ test("reports malformed JSON separately from an invalid manifest", async () => {
     Layer.succeed(Host, host),
     Layer.succeed(Http, http),
     Layer.succeed(Output, output),
+    runningLayer,
   )
   const first = await Effect.runPromise(
     Effect.result(refreshStaticRelease(spec, home, 10_000)).pipe(Effect.provide(layer)),

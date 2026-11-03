@@ -6,6 +6,7 @@ import { Links } from "#platform/Links"
 import { Lock } from "#platform/Lock"
 import { Proc } from "#platform/Proc"
 import { RunningExecutables } from "#platform/RunningExecutables"
+import { Http } from "#services/Http"
 import { Output } from "#services/Output"
 
 export interface NpmPackageSpec {
@@ -18,6 +19,10 @@ export interface PreparePackageOptions {
   readonly home: string
   readonly cacheHome?: string | undefined
   readonly timeoutMs?: number | undefined
+  /** Registry base URL from npm config, resolved once per run; absent means `npm view` resolves. */
+  readonly registry?: string | undefined
+  /** Real paths of running executables, scanned once per run by the caller; scanned here when absent. */
+  readonly running?: Option.Option<ReadonlySet<string>> | undefined
 }
 export interface NpmCacheLayout {
   readonly toolCache: string
@@ -216,11 +221,11 @@ const ensureInstalled = Effect.fn("NpmCache.ensureInstalled")(function* (
 const rotateAndPrune = Effect.fn("NpmCache.rotateAndPrune")(function* (
   layout: NpmCacheLayout,
   version: string,
+  running: Option.Option<ReadonlySet<string>> | undefined,
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const links = yield* Links
-  const running = yield* RunningExecutables
   const target = path.join("versions", version)
   const old = yield* links.readLinkTarget(layout.currentLink)
   if (Option.isNone(old) || old.value !== target) {
@@ -229,7 +234,7 @@ const rotateAndPrune = Effect.fn("NpmCache.rotateAndPrune")(function* (
     }
     yield* links.replaceLink(layout.currentLink, target)
   }
-  const processes = yield* running.get
+  const processes = running ?? (yield* (yield* RunningExecutables).get)
   if (Option.isSome(processes)) {
     yield* reclaimStages(layout)
     const previous = yield* links.readLinkTarget(layout.previousLink)
@@ -249,23 +254,50 @@ const rotateAndPrune = Effect.fn("NpmCache.rotateAndPrune")(function* (
   }
 })
 
+const Latest = Schema.Struct({ version: Schema.String })
+const decodeLatest = Schema.decodeUnknownEffect(Schema.fromJsonString(Latest))
+
+const viewLatest = Effect.fn("NpmCache.viewLatest")(function* (spec: NpmPackageSpec, timeoutMs: number) {
+  const proc = yield* Proc
+  const resolved = yield* proc.run(["npm", "view", `${spec.package}@latest`, "version"], { timeoutMs })
+  if (resolved.exitCode !== 0 || resolved.timedOut || resolved.outputLimited) {
+    return yield* fail(`could not resolve ${spec.package}@latest`)
+  }
+  return Str.trim(Str.replaceAll(/[\r\n]/gu, "")(resolved.stdout))
+})
+
+// The registry's `/<package>/latest` document is a few kilobytes; `npm view` boots npm and
+// downloads the full packument. Any registry failure (auth, proxy, outage) falls back to
+// `npm view`, which applies the complete npm configuration.
+const resolveLatest = Effect.fn("NpmCache.resolveLatest")(function* (
+  spec: NpmPackageSpec,
+  registry: string | undefined,
+  timeoutMs: number,
+) {
+  if (registry === undefined) {
+    return yield* viewLatest(spec, timeoutMs)
+  }
+  const http = yield* Http
+  const url = `${Str.replace(/\/*$/u, "/")(registry)}${Str.replace("/", "%2f")(spec.package)}/latest`
+  return yield* http.getOk(url, timeoutMs, `could not resolve ${spec.package}@latest`).pipe(
+    Effect.flatMap((bytes) => decodeLatest(new TextDecoder().decode(bytes))),
+    Effect.map((latest) => latest.version),
+    Effect.catch(() => viewLatest(spec, timeoutMs)),
+  )
+})
+
 const prepareLocked = Effect.fn("NpmCache.prepareLocked")(function* (
   spec: NpmPackageSpec,
   options: PreparePackageOptions,
   layout: NpmCacheLayout,
 ) {
-  const proc = yield* Proc
   const timeoutMs = options.timeoutMs ?? 120_000
-  const resolved = yield* proc.run(["npm", "view", `${spec.package}@latest`, "version"], { timeoutMs })
-  if (resolved.exitCode !== 0 || resolved.timedOut || resolved.outputLimited) {
-    return yield* fail(`could not resolve ${spec.package}@latest`)
-  }
-  const version = Str.trim(Str.replaceAll(/[\r\n]/gu, "")(resolved.stdout))
+  const version = yield* resolveLatest(spec, options.registry, timeoutMs)
   if (!versionPattern.test(version)) {
     return yield* fail(`invalid resolved version: ${version}`)
   }
   yield* ensureInstalled(spec, layout, version, timeoutMs)
-  yield* rotateAndPrune(layout, version)
+  yield* rotateAndPrune(layout, version, options.running)
   const currentBin = binPath(layout.currentLink, spec.bin)
   if (!(yield* executable(currentBin))) {
     return yield* fail(`current package has no executable bin: ${spec.bin}`)
