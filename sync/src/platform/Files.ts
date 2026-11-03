@@ -117,6 +117,12 @@ const identical = (src: string, metadata: Stats, dst: string, cache?: SourceCont
   if (metadata.size === 0) {
     return true
   }
+  // Every copy stamps the source mtime onto the destination (utimes keeps milliseconds), so a
+  // matching size, mode, and millisecond mtime means this destination is that copy, as in rsync's
+  // quick check. A changed source or a destination edited in place moves its mtime and is compared.
+  if (Math.trunc(metadata.mtimeMs) === Math.trunc(target.mtimeMs)) {
+    return true
+  }
   const cached = cache?.get(src)
   const old = cached?.metadata
   const content =

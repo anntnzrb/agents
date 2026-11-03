@@ -8,6 +8,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -155,6 +156,7 @@ test("file comparison checks contents and mode; atomic text preserves matching f
   writeFileSync(dst, "abc")
   chmodSync(src, 0o640)
   chmodSync(dst, 0o640)
+  utimesSync(dst, 1_000, 1_000)
   await run(
     Effect.gen(function* () {
       const files = yield* Files
@@ -162,6 +164,7 @@ test("file comparison checks contents and mode; atomic text preserves matching f
       const identical = yield* files.isIdenticalFile(src, statSync(src), dst, cache)
       expect(identical).toBe(true)
       writeFileSync(dst, "xyz")
+      utimesSync(dst, 2_000, 2_000)
       const changed = yield* files.isIdenticalFile(src, statSync(src), dst, cache)
       expect(changed).toBe(false)
       yield* files.syncTextFile(dst, "hello", 0o750)
@@ -177,4 +180,18 @@ test("file comparison checks contents and mode; atomic text preserves matching f
     }),
   )
   expect(readFileSync(dst, "utf8")).toBe("hello")
+})
+
+test("a synced copy is trusted by metadata; editing it in place forces a restore", async () => {
+  const root = fixture()
+  const src = join(root, "src")
+  const dst = join(root, "dst")
+  mkdirSync(src)
+  writeFileSync(join(src, "skill.md"), "source")
+  utimesSync(join(src, "skill.md"), 1_000, 1_000)
+  await run(Effect.flatMap(Files, (files) => files.syncManagedTree(src, dst)))
+  expect(statSync(join(dst, "skill.md")).mtimeMs).toBe(1_000_000)
+  writeFileSync(join(dst, "skill.md"), "edited")
+  await run(Effect.flatMap(Files, (files) => files.syncManagedTree(src, dst)))
+  expect(readFileSync(join(dst, "skill.md"), "utf8")).toBe("source")
 })
