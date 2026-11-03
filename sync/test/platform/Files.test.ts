@@ -189,7 +189,7 @@ test("a synced copy is trusted by metadata; editing it in place forces a restore
   mkdirSync(src)
   writeFileSync(join(src, "skill.md"), "source")
   utimesSync(join(src, "skill.md"), 1000, 1000)
-  const sync = Effect.flatMap(Files, (files) => files.syncManagedTree(src, dst))
+  const sync = Files.use((files) => files.syncManagedTree(src, dst))
   await run(sync)
   expect(statSync(join(dst, "skill.md")).mtimeMs).toBe(1_000_000)
   writeFileSync(join(dst, "skill.md"), "edited")
