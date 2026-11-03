@@ -179,6 +179,10 @@ const buildRelease = Effect.fn("RuntimeRelease.buildRelease")(function* (
       yield* fs.copyFile(path.join(job.sourceRoot, "package.json"), path.join(stage, "package.json"))
       yield* fs.copyFile(path.join(job.sourceRoot, "bun.lock"), path.join(stage, "bun.lock"))
       yield* compileStage(stage, job.timeoutMs)
+      // The compiled executable embeds its sources and dependencies; a release keeps only it.
+      for (const input of ["src", "node_modules", "package.json", "bun.lock"]) {
+        yield* fs.remove(path.join(stage, input), { recursive: true, force: true })
+      }
       yield* fs.writeFileString(path.join(stage, ".release-complete"), `${id}\n`)
       if (!(yield* complete(stage))) {
         return yield* RuntimeReleaseError.make({

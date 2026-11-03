@@ -64,6 +64,7 @@ test("installs a compiled release, reuses it, and publishes changed sources atom
   const first = realpathSync(job.currentLink)
   expect(existsSync(path.join(first, "sync"))).toBe(true)
   expect(readFileSync(path.join(first, ".release-complete"), "utf8")).toBe(`${path.basename(first)}\n`)
+  expect(new Set(readdirSync(first))).toEqual(new Set([".release-complete", "sync"]))
   await Effect.runPromise(installRuntimeRelease(job).pipe(Effect.provide(layer)))
   expect(realpathSync(job.currentLink)).toBe(first)
   writeFileSync(path.join(job.sourceRoot, "src", "main.ts"), 'console.log("changed")\n')

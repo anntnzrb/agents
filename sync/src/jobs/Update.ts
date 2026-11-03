@@ -15,57 +15,70 @@ const git = Effect.fn("Update.git")(function* (home: string, ...args: string[]) 
   return { ok, text: Str.trim(ok ? result.stdout : result.stderr) }
 })
 
-export const fastForwardSsot = Effect.fn("Update.fastForwardSsot")(function* (home: string) {
+// A checkout on another branch or with tracked edits belongs to whoever is working in it.
+const checkoutIsClean = Effect.fn("Update.checkoutIsClean")(function* (home: string) {
   const output = yield* Output
   const branch = yield* git(home, "symbolic-ref", "--short", "-q", "HEAD")
   if (!branch.ok || branch.text !== "main") {
     yield* output.warn(
       `update: skipped; checkout is on ${branch.ok ? branch.text : "detached HEAD"}, not main`,
     )
-    return null
+    return false
   }
   const status = yield* git(home, "status", "--porcelain", "--untracked-files=no")
   if (!status.ok) {
     yield* output.warn(`update: skipped; git status failed (${status.text})`)
-    return null
+    return false
   }
   if (status.text !== "") {
     const names = yield* git(home, "diff", "--name-only", "HEAD")
     yield* output.warn(
       `update: skipped; uncommitted tracked changes block pull: ${Arr.join(Str.split(names.text, /\r?\n/u), ", ") || status.text}`,
     )
+    return false
+  }
+  return true
+})
+
+// Fast-forwards to origin/main when HEAD is behind; warns on divergence.
+const advance = Effect.fn("Update.advance")(function* (home: string) {
+  const output = yield* Output
+  const ancestor = yield* git(home, "merge-base", "--is-ancestor", "HEAD", "origin/main")
+  if (ancestor.ok) {
+    const merged = yield* git(home, "merge", "--ff-only", "--quiet", "origin/main")
+    if (!merged.ok) {
+      yield* output.warn(`update: fast-forward failed; keeping local checkout (${merged.text})`)
+    }
+    return
+  }
+  const counts = yield* git(home, "rev-list", "--left-right", "--count", "HEAD...origin/main")
+  const [local, remote] = counts.ok ? Str.split(counts.text, /\s+/u) : []
+  if (remote !== undefined && remote !== "0") {
+    yield* output.warn(
+      `update: diverged from origin/main (${local} local, ${remote} upstream); push or rebase`,
+    )
+  }
+})
+
+export const fastForwardSsot = Effect.fn("Update.fastForwardSsot")(function* (home: string) {
+  const output = yield* Output
+  if (!(yield* checkoutIsClean(home))) {
     return null
   }
   const fetched = yield* git(home, "fetch", "--quiet", "origin", "main")
   if (!fetched.ok) {
     yield* output.warn(`update: fetch failed; keeping local checkout (${fetched.text})`)
   }
+  // Up to date (the common case) costs one fetch and one rev-parse; merges run only when behind.
   const revisions = yield* git(home, "rev-parse", "HEAD", "origin/main")
   const [head, upstream] = revisions.ok ? Str.split(revisions.text, /\s+/u) : []
-  // Up to date (the common case) costs one fetch and one rev-parse; a merge only runs when needed.
-  if (fetched.ok && head !== undefined && upstream !== undefined && head !== upstream) {
-    const ancestor = yield* git(home, "merge-base", "--is-ancestor", "HEAD", "origin/main")
-    if (ancestor.ok) {
-      const merged = yield* git(home, "merge", "--ff-only", "--quiet", "origin/main")
-      if (!merged.ok) {
-        yield* output.warn(`update: fast-forward failed; keeping local checkout (${merged.text})`)
-      }
-      const advanced = yield* git(home, "rev-parse", "HEAD")
-      return advanced.ok ? advanced.text : null
-    }
-    const counts = yield* git(home, "rev-list", "--left-right", "--count", "HEAD...origin/main")
-    const [local, remote] = counts.ok ? Str.split(counts.text, /\s+/u) : []
-    if (remote !== undefined && remote !== "0") {
-      yield* output.warn(
-        `update: diverged from origin/main (${local} local, ${remote} upstream); push or rebase`,
-      )
-    }
-  }
-  if (head !== undefined) {
+  if (fetched.ok && head !== undefined && head !== upstream) {
+    yield* advance(home)
+  } else if (head !== undefined) {
     return head
   }
-  const fallback = yield* git(home, "rev-parse", "HEAD")
-  return fallback.ok ? fallback.text : null
+  const current = yield* git(home, "rev-parse", "HEAD")
+  return current.ok ? current.text : null
 })
 
 export const readSyncedCommit = Effect.fn("Update.readSyncedCommit")(function* (stateHome: string) {
