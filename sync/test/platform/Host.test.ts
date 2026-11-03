@@ -27,3 +27,13 @@ test("host captures the process environment and exposes the clock", async () => 
   expect(result.now).toBeGreaterThanOrEqual(before)
   expect(result.now).toBeLessThanOrEqual(Date.now())
 })
+
+test("host probes process liveness", async () => {
+  const alive = await Effect.runPromise(
+    Effect.gen(function* () {
+      const host = yield* Host
+      return yield* host.isPidAlive(process.pid)
+    }).pipe(Effect.provide(PosixLayer)),
+  )
+  expect(alive).toBe(true)
+})

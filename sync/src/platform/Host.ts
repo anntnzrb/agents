@@ -12,6 +12,7 @@ export interface HostService {
   readonly cacheHome: string
   readonly env: Readonly<Record<string, string | undefined>>
   readonly now: Effect.Effect<number>
+  readonly isPidAlive: (pid: number) => Effect.Effect<boolean>
 }
 
 export class Host extends Context.Service<Host, HostService>()("agents-sync/platform/Host") {}
@@ -34,6 +35,15 @@ export const PosixLayer = Layer.sync(Host, () => {
         ? env["XDG_CACHE_HOME"]
         : path.join(home, ".cache"),
     env,
+    isPidAlive: (pid) =>
+      Effect.sync(() => {
+        try {
+          process.kill(pid, 0)
+          return true
+        } catch (error) {
+          return !(typeof error === "object" && error !== null && "code" in error && error.code === "ESRCH")
+        }
+      }),
     now: Effect.sync(() => Date.now()),
   })
 })
