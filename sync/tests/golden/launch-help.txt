@@ -1,3 +1,0 @@
-Usage: sync launch <name> [-- <args...>]
-
-Launch a managed harness or tool by name with optional forwarded arguments.
