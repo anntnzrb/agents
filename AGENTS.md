@@ -6,8 +6,8 @@
 - `skills/current/`: SSOT for shared skills synced to every harness
 - `skills/legacy/`: archived skills; repo-only, not synced
 - `tools/`: repo-only managed-tool sources
-- `sync/`: isolated Python (uv) sync application; owns all sync configuration, launcher wrappers, dependencies, and `sync/tests/`
-- `sync/tests/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
+- `sync/`: Bun, TypeScript, and Effect sync application; owns sync configuration, launcher wrappers, dependencies, and `sync/test/`
+- `sync/test/`: tests sync behavior only; harness names and paths MAY appear as fixtures or adapter boundaries, but tests MUST NOT import harness implementations or assert harness-local behavior; skill and harness changes MUST NOT add tests here
 - `docs/`: repository setup, operation, and workflow documentation indexed by `docs/index.md`
 - `docs/sync/`: sync application documentation; adapter boundaries MAY be described, but harness-local behavior and configuration belong under `harnesses/`
 - Harness-specific tests and documentation stay beside their owning source under `harnesses/`
@@ -21,7 +21,7 @@ Generated homes are overwritten on every sync, so an edit there is lost and the 
 
 - NEVER edit generated synced homes unless the user asks and the SSOT impact is clear
 - Sync reads the SSOT to reconcile installed state. Generated wrappers, harness configuration, skills, and runtime adapters must consume installed state, not load their configuration or code from the checkout.
-- The machine configuration owns every long-running service and its update logic, including services that run sync-managed wrappers; this repository ships no service code. It may schedule `sync job` with the installed runtime's Python.
+- The machine configuration owns every long-running service and its update logic, including services that run sync-managed wrappers; this repository ships no service code. It may schedule `sync job` with the installed runtime.
 - `agents.toml` holds settings shared by several harnesses and tools; sync validates it and installs a copy under the runtime root.
 
 ## Skills
@@ -38,8 +38,8 @@ Route documentation by owner:
 
 Boundaries:
 
-- A skill change MUST NOT add tests under `sync/tests/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
-- A change under `harnesses/` MUST NOT update `docs/` or `sync/tests/`. Adapter-contract changes in `sync/src/sync/core/harness_adapters.py` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
+- A skill change MUST NOT add tests under `sync/test/` or documentation under `docs/sync/`. The skill's own files carry its documentation and validation commands.
+- A change under `harnesses/` MUST NOT update `docs/` or `sync/test/`. Adapter-contract changes in `sync/src/domain/HarnessAdapters.ts` are sync changes; they follow the sync workflow and MAY update `docs/sync/`.
 
 Documentation describes the current system, not its history:
 
@@ -64,8 +64,8 @@ Documentation-only changes must still preserve navigation and factual accuracy. 
 
 ## Sync Contract
 
-- Public sync entrypoint: `sync/src/sync/cli.py` (`sync` console script)
-- Invoke it via `uv`, e.g. `uv run --project sync sync` from repository root
+- Public sync entrypoint: `sync/src/main.ts`
+- Invoke it with `bun run --cwd sync sync` from the repository root; installed runtime: `~/.local/share/agents/sync-current/sync`
 - NEVER add `bin/` shell trampolines for sync
 - Use TDD
 

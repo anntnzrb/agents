@@ -25,4 +25,4 @@ git diff --check
 ```
 
 The live diagnostic command sends public HTTPS probes and gateway ICMP. Tests replace the native-command boundary for repair scenarios so they cannot change the host network.
-No test under `sync/tests/` owns this skill's behavior.
+No test under `sync/test/` owns this skill's behavior.

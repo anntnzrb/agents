@@ -1,247 +1,95 @@
 # Develop the sync application
 
-The sync application is an isolated Python (uv) project under `sync/`. See [Repository layout](../repository-layout.md) for the module map. For the shared-skill workflow, see [Manage shared skills](../skills.md).
+Sync is a Bun TypeScript application under `sync/`. See the [sync architecture](../../sync/ARCHITECTURE.md) for the Effect design and source layout, and [Manage shared skills](../skills.md) for the shared-skill workflow.
 
 ## Run sync from source
 
-From the repository root, use the public entrypoint:
+From the repository root, install dependencies and invoke the public entrypoint:
 
 ```bash
-uv run --project sync sync
+bun install --cwd sync --frozen-lockfile
+bun run --cwd sync sync
 ```
 
-Sync always reads its sources from `~/src/agents`, not from the current directory. From another checkout or a worktree, this command runs that checkout's sync code against the sources in `~/src/agents`, so the checkout's skill, harness, and tool changes are not published. They reach harness homes after the change merges and each host's [background updater](sync.md#background-updates) fast-forwards `~/src/agents`.
+Sync reads its sources from `~/src/agents`, not the current directory. From another checkout or worktree, the command runs that checkout's code against `~/src/agents`; its local skill, harness, and tool changes are not published. After the changes merge, each host's [background updater](sync.md#background-updates) fast-forwards the source checkout.
 
-Keep `sync/src/sync/cli.py` as the public entrypoint. Do not add a `bin/` shell trampoline. Contributor gates live behind the dev-only `sync-gates` console script (`sync/src/sync/gates.py`), not the public CLI.
+The source entrypoint is `sync/src/main.ts`. The installed executable is `~/.local/share/agents/sync-current/sync`.
 
-## Run the full checks
+## Run checks
 
-Run the static checks and the test suite from `sync/` via the gate script:
+Run the complete contributor gates from the repository root:
 
 ```bash
-cd sync
-uv sync --frozen
-uv run sync-gates --tests
+bun install --cwd sync --frozen-lockfile
+bun run --cwd sync gates
 ```
 
-With `--tests`, the ruff gates run first and fail fast; basedpyright then runs alongside the test suite, and its buffered output prints after pytest finishes.
+The `gates` script runs `check`, then `bun test`. The `check` script runs TypeScript type checking, Effect diagnostics, type-aware Oxlint, and the Oxfmt formatting check. To run static checks alone, use `bun run --cwd sync check`. For an individual gate, use the corresponding script in `sync/package.json`.
 
-Run only the static gates (ruff check, ruff format check, basedpyright) with `uv run sync-gates`. When iterating on one tool, invoke it directly (`uv run ruff check .`, `uv run basedpyright`, ...).
-
-## Report code coverage
-
-In-process coverage is opt-in through the `pytest-cov` dev dependency:
+To run a focused test, pass its path to Bun:
 
 ```bash
-cd sync
-uv run pytest -n auto --cov=sync --cov-report=term-missing
+bun test sync/test/domain/ImportScan.test.ts
+bun test sync/test/jobs/Wrappers.test.ts
 ```
 
-Coverage is a diagnostic, not a gate. The contract tests in `tests/test_integration.py` drive the CLI through subprocesses, so process-boundary modules (`sync/src/sync/cli.py`) report lower in-process coverage than the suite actually exercises. Do not add in-process tests that repeat an integration scenario just to raise that number.
-
-`uv run pytest -n auto` already includes `tests/test_integration.py`. Run the explicit single-process integration command when you are iterating on process-level behavior:
-
-```bash
-cd sync
-uv run pytest tests/test_integration.py -q -o addopts=""
-```
-
-Pytest uses work-stealing scheduling so idle workers can take queued cases from
-busy workers. CLI help and syntax cases run independently without provisioning a
-runtime; pruning tests arrange release files directly, while installation tests
-still build real environments. Every push still runs all static gates and the
-full suite; successful validation results are not cached.
-
-Tests resolve `uv cache dir` and `uv python dir` before isolating `HOME` and
-`XDG_CACHE_HOME`, then preserve those paths in child processes. Workers reuse uv's
-dependency cache and managed Python installations; test homes and runtime releases
-remain temporary. `UV_CACHE_DIR` and `UV_PYTHON_INSTALL_DIR` overrides are honored.
-The suite does not delete these uv-owned caches. A cold cache still needs its
-initial downloads; subsequent runs reuse them.
-
-Tests run real reconciles, which call `systemctl --user`. That client finds the
-live user manager through `XDG_RUNTIME_DIR` or D-Bus, not `HOME`, so a temporary
-home alone does not isolate it. `tests/conftest.py` points the whole session at a
-nonexistent manager; without that, the suite reloads and restarts the host's real
-services.
-
-## Run a focused test
-
-Pass the test file to pytest:
-
-```bash
-cd sync
-uv run pytest tests/test_managed_tools.py
-uv run pytest tests/test_wrappers.py
-```
-
-Add the narrowest regression test that covers the changed sync contract.
-
-Add process-level integration coverage when a change creates a generated target or crosses a runtime boundary. Use harness names and paths as fixtures or adapter boundaries.
-
-Keep tests of harness implementations and harness-local behavior beside their source under `harnesses/`.
+Coverage is diagnostic, not a gate. Do not duplicate process-level scenarios in unit tests to raise coverage.
 
 ## Write useful tests
 
+- Add the narrowest regression test that covers the changed sync contract.
 - Test one behavior at the lowest layer that observes it. Do not repeat the same scenario in unit and process-level suites.
-- Test shared code once, beside the shared module. Do not copy identical tests into every consumer; a consumer test covers only its own wiring.
+- Test shared code once, beside the shared module. A consumer test covers only its own wiring.
 - Assert observable behavior and contracts, not fixtures, mocks, or implementation details.
-- Add a test only when it can fail on a real regression. Delete tests that duplicate coverage or re-prove what another test already covers.
-- Keep skill and harness tests beside their owning source. `sync/tests/` covers sync behavior only.
-- Process-tree tests must not race child startup. Publish readiness from the child, gate the cancelling assertion on that signal, and keep wall-clock ceilings as hang detectors derived from the configured timeout rather than as latency budgets. A ceiling below the fixture's own sleep duration must still detect an unenforced timeout.
+- Add a test only when it can fail on a real regression. Delete tests that duplicate coverage.
+- Add process-level integration coverage when a change creates a generated target or crosses a runtime boundary. Use harness names and paths as fixtures or adapter boundaries.
+- Keep skill and harness tests beside their owning source. `sync/test/` covers sync behavior only.
+- Process-tree tests must not race child startup. Publish readiness from the child and gate the cancelling assertion on that signal. Use wall-clock ceilings as hang detectors derived from the configured timeout, not latency budgets. A ceiling below the fixture's own sleep duration must still detect an unenforced timeout.
+- Isolate test homes and external services. A temporary home alone does not isolate `systemctl --user` from the host user manager; isolate its runtime directory and D-Bus environment when exercising it.
 
 ## Change sync behavior
 
-1. Find the owning module under `sync/src/sync/`.
-2. Add or update the focused test.
-3. Make the smallest implementation change.
-4. Run the focused test.
-5. Run `uv run sync-gates --tests` (or the individual gates when iterating on one tool).
-6. Run `git diff --check` from the repository root.
-7. Update the related page under `docs/sync/` when the change affects commands, paths, lifecycle, platforms, or generated behavior.
+1. Find the owning module under `sync/src/`.
+2. Add or update the focused test and make the smallest implementation change.
+3. Run the focused test and the complete contributor gates.
+4. Run `git diff --check` from the repository root.
+5. Update the related page under `docs/sync/` when commands, paths, lifecycle, platforms, or generated behavior change.
 
-Keep these contracts intact:
-
-- Keep `sync/src/sync/cli.py` as the public entrypoint (`sync-gates` is a contributor-only gate runner).
-- Keep wrapper generation inside the sync application.
-- Validate external files and network data at their boundary.
-- Keep filesystem operations safe to retry.
-- Preserve unmanaged files unless recorded ownership permits cleanup.
+Keep wrapper generation inside sync, validate external data at its boundary, make filesystem operations safe to retry, and preserve unmanaged files unless recorded ownership permits cleanup.
 
 ## Change harness configuration
 
-1. Edit the matching source under `harnesses/`.
-2. Run the harness's own validation from its README. Harnesses with bun test suites run them with `uv run --script .github/scripts/ci.py harness <name>`; `uv run --script .github/scripts/ci.py harness --help` lists them.
-3. Run `uv run --project sync sync` from `~/src/agents`; see [Run sync from source](#run-sync-from-source).
-4. Inspect the generated root derived from the adapter's `home_segments` and `runtime_subdir` fields.
-5. Run the wrapper with `--version`.
-6. Commit as `<harness>: ...` (see the Git Contract in `AGENTS.md`).
+1. Edit the matching source under `harnesses/` and run its own validation from its README.
+2. Run `bun run --cwd sync sync` from `~/src/agents`.
+3. Inspect the generated root derived from the adapter's `homeSegments` and `runtimeSubdir` fields.
+4. Run the wrapper with `--version`.
+5. Commit as `<harness>: ...` (see the Git Contract in `AGENTS.md`).
 
-Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not place them in `sync/tests/` or `docs/`.
-
-Do not edit a generated harness home. Sync replaces managed files on the next run.
+Keep harness-specific tests and documentation beside the owning source under `harnesses/`. Do not edit a generated harness home; sync replaces managed files on the next run.
 
 ## Add a harness adapter
 
-1. Append the adapter to `HARNESS_ADAPTERS` in `sync/src/sync/core/harness_adapters.py`. `harness_from_adapter` is the only place adapter metadata becomes a resolved harness, so a new field is declared once there.
-2. Add its source directory under `harnesses/<harness>/`.
-3. Add wrapper tests for every supported platform.
-4. Add integration coverage for generated files and hooks.
-5. Run the full checks.
-6. Update the [Harness adapter reference](harnesses.md) only when the adapter changes the shared workflow or requires a harness-specific user action.
+1. Append the adapter to `HARNESS_ADAPTERS` in `sync/src/domain/HarnessAdapters.ts` and add its source directory under `harnesses/<id>/`.
+2. Resolve adapter metadata through `harnessFromAdapter` in `sync/src/domain/Harness.ts`.
+3. Add wrapper tests for every supported platform and integration coverage for generated files and hooks.
+4. Run the full checks and update the [harness adapter reference](harnesses.md) when the shared workflow or a harness-specific user action changes.
 
-`tests/test_harness_adapters.py` enforces the registry invariants: `HarnessId` matches the adapter ids, ids and `home_segments` are safe path components, wrapper names are unique across harnesses and tools, every adapter declares supported platforms, and registration order stays stable. Append new adapters instead of reordering the table; order fixes discovery, plan, and wrapper reconciliation order.
-
-Store launcher metadata in the adapter. Do not repeat package names, target homes, or hook rules in user configuration.
-
-Do not add a supported-harness roster to the documentation. `HARNESS_ADAPTERS` owns that list.
+Keep launcher metadata in the adapter. Do not duplicate package names, target homes, hook rules, or the supported-harness roster in user configuration or documentation. Append adapters rather than reordering them: registry order determines discovery and planning order.
 
 ## Add a managed tool
 
-Tool sources live under `tools/<tool>/`. Sync reads them from `~/src/agents` and never publishes the directory itself. Wire a tool through the declaration that matches its need, following [Change sync behavior](#change-sync-behavior) for each:
+Tool sources live under `tools/<tool>/`. Sync reads them from `~/src/agents` and does not publish that directory itself.
 
-- To give an npm CLI a wrapper and a versioned cache, append it to `TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py`.
-- To copy a configuration file into the tool's home, add a `FileJob` to `_config_jobs` in `sync/src/sync/core/plan.py`.
-- To schedule cache or state maintenance for the machine configuration, add a subcommand under `sync job` in `sync/src/sync/maintenance/`. Long-running services and their update logic belong to the machine configuration, not here.
+- Add an npm launcher to `TOOL_LAUNCHERS` in `sync/src/domain/ToolLaunchers.ts` for a wrapper and versioned cache.
+- Add configuration publication jobs in `sync/src/services/Planner.ts`.
+- Add maintenance commands to the sync job programs. The machine configuration owns long-running services and their update logic.
 
-Document how to operate the tool on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
+Document tool operation on a focused page under `docs/` and link it from `docs/index.md`. Commit tool sources as `tools(<tool>): ...` and sync changes as `sync: ...`.
 
-## Parsing and format contracts
+## Parsing and filesystem contracts
 
-Sync parses configuration, environment files, and extension/skill sources across several formats. All implementations must uphold these parsing contracts:
+`sync/src/domain/ImportScan.ts` extracts runtime JavaScript and TypeScript imports, including literal dynamic imports and CommonJS `require` calls. Preserve comment and string immunity and type-only import handling; cover adversarial cases in `sync/test/domain/ImportScan.test.ts`. Package validation excludes relative paths, built-in modules, and `data:` URLs.
 
-### JavaScript and TypeScript import extraction
+JSONC input accepts comments and trailing commas. Deployment settings reject unknown fields. Dotenv defaults do not expand variables and omit empty values. Endpoint publication preserves designated TOML tables without rewriting unrelated content.
 
-- **Static and dynamic imports**: Extracts static ESM `import` statements, `export ... from` re-exports, dynamic `import()` expressions, and CommonJS `require()` calls.
-- **CommonJS calls**: Literal `require("...")` calls are scanned alongside ESM imports; no JavaScript runtime or AST dependency is needed.
-- **Comment and string immunity**: Import and require statements inside single-line comments (`//`), multiline block comments (`/* ... */`), string literals (single or double quotes), and template literals (`` `...` ``) are ignored.
-- **Type-only erasure**: Type-only imports (`import type { ... }`) are stripped during transpilation/scanning and excluded from runtime dependency specifiers.
-- **Specifier classification**: Downstream package validation (`missing_package_roots`) ignores relative paths (`.`, `./*`, `../*`), builtin modules (`node:*`, `bun:*`, `bun`), and `data:` URIs, validating only unresolved npm package roots and scoped package identifiers.
-
-### Python scanner note
-
-The Python implementation (`sync/src/sync/packages/validate.py`) performs import scanning with a comment/string-stripping state machine plus targeted patterns instead of a full JS/TS AST library. Any change to the scanner must preserve comment/string immunity: add adversarial cases (comments, multiline strings, template literals, type-only imports) to `sync/tests/test_package_validate.py`.
-
-### JSON with Comments (JSONC)
-
-- **Comment tolerance**: Accepts single-line (`//`) and multiline (`/* ... */`) comments across configuration files, manifests, hook states, and wrapper state.
-- **Trailing comma tolerance**: Permits trailing commas in objects and arrays.
-
-Deployment input is validated once by strict Pydantic models, including nested unknown-field rejection.
-
-### TOML preservation
-
-Endpoint publication uses Python's `tomllib` to recognize table headers, including quoted keys, Unicode escapes, and array tables. It retains the original text of owned sections rather than serializing the whole file, preserving comments and formatting.
-
-### Dotenv (`.env`)
-
-- **Variable expansion disabled**: `python-dotenv` decodes the file with `interpolate=False`; literal `$VAR` and `${VAR}` sequences remain unexpanded.
-- **Empty value omission**: Keys with empty or unset values are omitted from the decoded environment map.
-
-### Efficiency constraints
-
-- Resolve endpoint-template paths once per harness while building the plan.
-- Keep executable lookup in one worker-thread operation, rather than scheduling each `PATH` filesystem check separately.
-- Reuse the npm package-manifest validator; do not rebuild its schema on every cache check.
-- Tree and children jobs share traversal logic. Children scope preserves unrelated top-level entries; managed subdirectories still use tree pruning.
-- Preserve deterministic fingerprint bytes and unchanged destination inode/mtime when optimizing filesystem work.
-
-## Behavioral contract
-
-The integration test suite (`sync/tests/test_integration.py`) serves as the executable black-box specification for the sync system. Rather than testing internals, these scenarios assert observable system boundaries.
-
-Sync is compliant if and only if it satisfies all of the following black-box behavioral contracts:
-
-### 1. CLI syntax, help modes, and standard exit codes
-
-- **`0` (Success & Graceful Skip)**: Returned on successful synchronization, help inspection flags (`--help`, `-h`, `help`, `sync --help`, `launch --help`), and when a concurrent run gracefully skips due to lock contention.
-- **`1` (Runtime & Validation Failure)**: Returned on missing SSOT runtime source directories, invalid configuration schemas, unparseable deployment configurations, or hook execution failures.
-- **`2` (CLI Syntax Error)**: Returned when unrecognized commands, flags, or invalid argument separator syntax are passed (e.g., `sync launch` with no target, or `sync launch codex missing-separator`).
-- **`124` (Timeout)**: Returned when sync execution or launcher processes exceed configured deadlines.
-- **`127` (Missing Command / Missing Runtime)**: Returned when an unmanaged or missing command is executed, or when a generated launcher wrapper is invoked without a valid sync runtime.
-
-### 2. Missing source vs. malformed configuration
-
-- **Missing SSOT source tree**: When `src/agents/sync` (or required source manifests) is absent or unreadable, sync fails fast with exit code `1` and emits a descriptive diagnostic to stderr (`missing or unreadable runtime source`).
-- **Malformed configuration**: When structured configuration files (such as `agents.toml` or hook manifests) are invalid or fail schema decoding, sync fails with exit code `1` and logs a parse error identifying the offending file.
-
-### 3. Owned entry cleanup vs. unmanaged file preservation
-
-- **Pruning stale owned entries**: Stale managed files (entries recorded in previous state files but removed from current SSOT) are automatically removed upon synchronization.
-- **Preserving unmanaged user files**: Files placed in harness homes or tool directories by users (e.g., `~/.omp/agent/logs/user.log`, `~/.local/bin/my-script`) that were never managed by sync are strictly preserved.
-- **Unmanaged wrapper conflicts**: If an unmanaged file already exists at a desired wrapper path (e.g., `~/.local/bin/codex`), sync preserves the unmanaged binary without overwriting it, records the conflict, and emits a warning on stderr (`preserving unmanaged wrapper conflict`).
-
-### 4. Repeated reconciliation and within-run idempotency
-
-- Successive sync runs against an unchanged source of truth must produce identical filesystem state.
-- Idempotent runs must not touch, rewrite, or churn existing matching files: destination file inode numbers (`ino`) and modification timestamps (`mtime`) must remain stable.
-
-### 5. Transactional publication and failure recovery
-
-- When publishing endpoint configurations or rendered templates, sync verifies client endpoint readiness before modifying active harness configuration files.
-- If target endpoints are unreachable, existing files are preserved without partial overwrites or corruption.
-- In the event of a mid-publication failure, modified targets are rolled back to their pre-publication snapshots.
-- Once underlying failures are resolved, subsequent sync runs cleanly reconcile and publish all managed targets.
-
-### 6. Process lock contention and release
-
-- An exclusive non-blocking POSIX lock (`flock(LOCK_EX | LOCK_NB)` on `~/.local/share/agents/sync-managed/sync.lock`) guards synchronization.
-- If another sync process currently holds the lock, incoming runs exit cleanly with code `0` and write `another sync is already running; skipping` to stderr.
-- When the lock holder exits or terminates, the lock is immediately released and available for subsequent processes.
-
-### 7. Cached launch and offline resilience
-
-- `sync launch <tool> [-- <args...>]` executes a valid locally cached package immediately, forwarding all arguments without reconciliation, network requests, or waiting on package locks.
-- Without a valid cache, launch reconciles and installs synchronously. `sync job refresh-packages` performs later updates independently; see [Launch behavior](sync.md#launch-behavior).
-
-### 8. Wrapper runtime isolation and diagnostic hints
-
-- Generated launch wrappers in `~/.local/bin/<harness>` delegate execution to the managed sync runtime (`~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli`).
-- If the sync runtime is missing or removed, invoking the wrapper must immediately exit with status code `127` and output `agents: sync runtime is missing; run sync from the agents repository` to stderr.
-
-### 9. Environment variable precedence cascade
-
-Subprocess environments during launch are resolved according to strict hierarchical precedence:
-1. **Base defaults**: Loaded from `~/src/agents/.env` in the SSOT.
-2. **Parent process environment**: Overrides values from `.env`.
-3. **Adapter overrides**: Configured in adapter launcher specifications (`harness.launcher.env`), taking precedence over both parent process environment and `.env`.
+Preserve deterministic fingerprint bytes and matching destination inode and modification time when changing filesystem work. See the [runtime and hook fingerprint reference](sync.md#installed-runtime).

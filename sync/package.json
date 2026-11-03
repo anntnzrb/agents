@@ -1,0 +1,44 @@
+{
+  "name": "agents-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reconcile AI agent configurations, skills, and harness environments from SSOT",
+  "license": "AGPL-3.0-or-later",
+  "bin": {
+    "sync": "./src/main.ts"
+  },
+  "type": "module",
+  "imports": {
+    "#domain/*": "./src/domain/*.ts",
+    "#platform/*": "./src/platform/*.ts",
+    "#services/*": "./src/services/*.ts",
+    "#jobs/*": "./src/jobs/*.ts",
+    "#packages/*": "./src/packages/*.ts",
+    "#programs/*": "./src/programs/*.ts",
+    "#cli/*": "./src/cli/*.ts",
+    "#test/*": "./test/support/*.ts"
+  },
+  "scripts": {
+    "sync": "bun run src/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "effect:diagnostics": "effect-tsgo diagnostics --project tsconfig.json",
+    "lint": "effect-tsgo oxlint --type-aware --deny-warnings --report-unused-disable-directives",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "check": "bun run typecheck && bun run effect:diagnostics && bun run lint && bun run format:check",
+    "gates": "bun run check && bun test"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.1.2",
+    "effect": "4.1.2"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.64.1",
+    "@types/bun": "1.4.4",
+    "oxfmt": "0.76.0",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "typescript": "7.0.2"
+  }
+}

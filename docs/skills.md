@@ -10,7 +10,7 @@ Use `skills/current/` for skills that sync publishes to enabled harnesses. Use `
 4. Run the checks that match the changed files: [Validate an executable skill](#validate-an-executable-skill) and [Validate skill metadata](#validate-skill-metadata).
 5. Complete the [Final authoring review](#final-authoring-review).
 6. Commit with the `autommit` skill; the subject starts with `skills(<name>):`. Follow the [repository integration policy](ci.md#integrate-and-publish-a-change) to integrate and publish the checked change. Use a pull request when requested or required.
-7. Run `uv run --project sync sync` from `~/src/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/src/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
+7. Run `bun run --cwd sync sync` from `~/src/agents` and inspect the generated skill in one harness home. Sync publishes only the checkout at `~/src/agents`; a change made in another checkout or a worktree reaches harness homes after it merges. See [Run sync from source](sync/development.md#run-sync-from-source).
 
 ## Create a skill
 
@@ -43,7 +43,7 @@ Keep development credentials in the root ignored `.env` file (`.env.example` at 
 
 ## Validate Python skills (standard)
 
-All new skills and changed Python skills use the central code-gate runner in `skill-creator`. Its implementation pins the gate toolchain for local runs and CI. Pytest rejects external sockets and permits loopback fixtures and Unix sockets. The runner executes Ruff format-check, Ruff strict linting (ALL with the sync exclusion set), Basedpyright in `all` type-checking mode, and optionally pytest. Basedpyright and pytest run on the interpreter allowed by `requires-python` in the `scripts/cli.py` PEP 723 block, with dependency environments derived from the same block. Python skill code follows the `python` skill (`skills/current/python/SKILL.md` and `cookbook/modern.md`) and targets Python 3.14.
+All new skills and changed Python skills use the central code-gate runner in `skill-creator`. Its implementation pins the gate toolchain for local runs and CI. Pytest rejects external sockets and permits loopback fixtures and Unix sockets. The runner executes Ruff format-check, Ruff strict linting, Basedpyright in `all` type-checking mode, and optionally pytest. Basedpyright and pytest run on the interpreter allowed by `requires-python` in the `scripts/cli.py` PEP 723 block, with dependency environments derived from the same block. Python skill code follows the `python` skill (`skills/current/python/SKILL.md` and `cookbook/modern.md`) and targets Python 3.14.
 
 Raise a skill to Python 3.15 only when it uses a 3.15 feature with a measured benefit, such as `lazy import` removing a slow import from every run. Change `requires-python` in `scripts/cli.py`, Ruff `target-version = "py315"`, and Basedpyright `pythonVersion = "3.15"` together, run `uv lock` if the skill has a `uv.lock`, then run the gates.
 
@@ -167,7 +167,7 @@ Move the complete directory into `skills/legacy/`:
 
 ```bash
 mv skills/current/<name> skills/legacy/<name>
-uv run --project sync sync
+bun run --cwd sync sync
 ```
 
 The next sync removes the managed copy from harness homes. Sync does not publish anything under `skills/legacy/`.

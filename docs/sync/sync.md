@@ -1,17 +1,17 @@
 # Sync reference
 
-Sync reconciles the repository at `~/src/agents` with harness homes and installed runtime state on macOS and Linux. The public entrypoint is `sync/src/sync/cli.py` (console script `sync`) and requires an explicit `uv` runner.
+Sync reconciles the repository at `~/src/agents` with harness homes and installed runtime state on macOS and Linux. The source entrypoint is `sync/src/main.ts`, run with Bun.
 
 ## Command syntax
 
 | Invocation | Behavior |
 | --- | --- |
-| `uv run --project sync sync` | Runs a normal reconciliation |
-| `uv run --project sync sync sync` | Runs the same normal reconciliation |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli launch <name> -- <arguments>` | Executes the valid cached package immediately; syncs and installs only when no valid cache exists |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job refresh-packages` | Refreshes harness and tool packages; see [Maintenance jobs](#maintenance-jobs) |
-| `~/.local/share/agents/sync-current/.venv/bin/python -m sync.cli job npm-cache-clean` | Runs the scheduled npm cache cleanup; see [Maintenance jobs](#maintenance-jobs) |
+| `bun run --cwd sync sync` | Runs a normal reconciliation from source |
+| `bun run --cwd sync sync sync` | Runs the same normal reconciliation |
+| `~/.local/share/agents/sync-current/sync launch <name> -- <arguments>` | Executes the valid cached package immediately; syncs and installs only when no valid cache exists |
+| `~/.local/share/agents/sync-current/sync update` | Fast-forwards the repository and reconciles a new commit; see [Background updates](#background-updates) |
+| `~/.local/share/agents/sync-current/sync job refresh-packages` | Refreshes harness and tool packages; see [Maintenance jobs](#maintenance-jobs) |
+| `~/.local/share/agents/sync-current/sync job npm-cache-clean` | Runs the scheduled npm cache cleanup; see [Maintenance jobs](#maintenance-jobs) |
 
 Unknown commands and invalid arguments exit with status `2`. A manual sync exits with status `1` after a fatal reconciliation error.
 
@@ -26,7 +26,7 @@ A manual sync runs these stages in order:
 5. Record managed harness entries.
 6. Run extension-dependency hooks.
 
-The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes, allows up to 30 seconds for process-group cleanup and stage `finally` blocks, then exits with status `124` (forced termination cannot promise Python-level cleanup). Pre-launch sync runs only without a valid package cache and uses the same 15-minute budget; a timeout warns and continues to package preparation. The launched harness session is never killed by an expired sync timer.
+The process lock is `~/.local/share/agents/sync-managed/sync.lock`. A second manual sync reports the lock and exits with status `0` without changing targets. A manual sync requests cancellation after 15 minutes and exits with status `124` on timeout. Pre-launch sync runs only without a valid package cache and uses the same budget; a timeout warns and continues to package preparation. The launched harness session is never killed by an expired sync timer.
 
 ## File reconciliation
 
@@ -57,7 +57,7 @@ Endpoint publication replaces the `${CLIPROXY_CLIENT_BASE_URL}` and `${CLIPROXY_
 
 ## Installed runtime
 
-Sync copies `sync/src/`, `sync/pyproject.toml`, and `sync/uv.lock` into a content-addressed release under `~/.local/share/agents/sync-releases/<releaseId>/`, then runs `uv sync --frozen --no-dev --no-editable` there. Installation explicitly selects the Python interpreter running sync, so uv's default interpreter and `UV_PYTHON` do not change the release's Python version. A `~/.local/share/agents/sync-current` symlink always points to the most recently published release. Generated wrappers execute this installed copy.
+Sync stages `sync/src/`, `sync/package.json`, and `sync/bun.lock` under `~/.local/share/agents/sync-releases/`. It runs `bun install --frozen-lockfile --production`, then `bun build --compile src/main.ts --outfile sync`, and smoke-checks the executable with `--help`. A complete release lives at `~/.local/share/agents/sync-releases/<releaseId>/` and contains the compiled `sync` executable and `.release-complete` marker. Sync atomically points `~/.local/share/agents/sync-current` at the release; generated wrappers execute `sync-current/sync`.
 
 The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 
@@ -65,31 +65,33 @@ The `<releaseId>` is a SHA-256 digest computed over the runtime sources:
 - Uses forward slashes (`/`) for all relative paths.
 - Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
 - Regular files and symlinks pointing to regular files are hashed as `file:<relativePath>\n` followed by the file content bytes and a trailing `\n`. Directory symlinks are rejected.
-- Appends the file contents of `sync/pyproject.toml` and `sync/uv.lock` in sequence.
+- Appends the file contents of `sync/package.json` and `sync/bun.lock` in sequence. The tree traversal skips names listed in `sync/src/domain/EntryNames.ts`.
 
-Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before the release is complete. A failed or aborted installation job cleans up its private staging directory in a `finally` block, leaving active and previous releases intact. During post-sync pruning, sync prunes completed, unreferenced releases and safely cleans up stale `.stage-<pid>-<nonce>` directories whose creating PID is no longer alive or is older than the install timeout, without deleting unrecognized user directories or active releases.
+Releases are staged in `~/.local/share/agents/sync-releases/.stage-<pid>-<nonce>` before publication. Scoped cleanup removes a failed or interrupted stage, leaving active releases intact. Pruning removes unreferenced releases and stale recognized stages without deleting unrecognized user directories or the active release.
+
 ## Runtime handoff
 
 Every sync entrypoint except the first install runs from an installed runtime, so a run whose own sync code changed executes every job with the previous code. Manual sync, `sync update`, and cold-launch sync detect when their run published a different `sync-current` release, release the process lock, and run the same command again with the new runtime. The rerun logs `sync runtime changed; reconciling again with the new runtime`, and its exit status becomes the command's exit status. A rerun process never hands off again, so one change costs at most one extra reconcile. A cold launch whose rerun fails warns and continues to the harness.
 
-The release id ignores Python bytecode (`__pycache__`, `*.pyc`, `*.pyo`), which the release copy also skips, so running the checkout's tests or sync from source does not create a new release.
+The release fingerprint and copy skip the same ignored directory names; see `sync/src/jobs/RuntimeRelease.ts` for the exact traversal.
 
 ## Extension hook state
 
-Extension dependency hooks compute a content fingerprint (`fingerprint_tree` in `sync/src/sync/core/hook_state.py`) of their source directory to skip redundant installation steps when dependencies and sources have not changed:
+Extension dependency hooks compute a content fingerprint in `sync/src/services/HookState.ts` and `sync/src/domain/Fingerprint.ts` to skip redundant installation when inputs have not changed:
 
-- Produces a SHA-256 digest over the directory tree (or `"missing"` if the target path does not exist).
-- Traverses directory entries in deterministic Unicode code-point (code-unit) order.
+- Produces a SHA-256 digest over the directory tree. A missing root hashes the UTF-8 bytes of `missing`.
+- Traverses directory entries in deterministic Unicode code-point order.
 - Uses forward slashes (`/`) for all relative paths.
 - Subdirectories are hashed as `dir:<relativePath>\n` before recursive descent.
 - Regular files and symlinks to regular files are hashed as `file:<relativePath>\n` followed by file content bytes and a trailing `\n`.
 - Broken symlinks are hashed as `broken:<relativePath>\n`. Symlinks pointing to directories are rejected with a diagnostic error.
-- Ignored entries: skips `node_modules`, `.git`, hidden entries (names starting with `.`), and Python bytecode/caches (`__pycache__`, `*.pyc`, `*.pyo`).
+- Skips hidden entries and names ignored by `isIgnoredSyncEntry`, including `node_modules` and bytecode files. Unreadable files have a distinct `file:<relativePath>\nbroken:<relativePath>\n` encoding.
+
 ## Launch behavior
 
 Harness and tool wrappers execute a valid `current` cache immediately. Cached launches do not reconcile the SSOT, resolve npm versions, fetch static release manifests, install packages, prune caches, or acquire package locks. An installer holding the package lock does not delay them.
 
-Local SSOT edits to managed configuration, skills, and instructions take effect after an explicit `uv run --project sync sync` from the repository or a scheduled `sync update` reconciliation, rather than on the next cached launch. `sync update` reconciles new commits; uncommitted local edits require manual sync. Host-local `.env` defaults are still read at launch. Package updates run through `sync job refresh-packages`.
+Local SSOT edits to managed configuration, skills, and instructions take effect after an explicit `bun run --cwd sync sync` from the repository or a scheduled `sync update` reconciliation, rather than on the next cached launch. `sync update` reconciles new commits; uncommitted local edits require manual sync. Host-local `.env` defaults are still read at launch. Package updates run through `sync job refresh-packages`.
 
 When no valid cache exists, launch runs best-effort sync if the SSOT is available, then resolves and installs the package synchronously under its cache lock. A failed sync, a busy sync lock, or an unavailable repository does not prevent package preparation. If preparation cannot produce a valid executable, launch fails.
 
@@ -101,7 +103,7 @@ Cold launches and package refreshes for static releases resolve the adapter's ma
 
 ## Maintenance jobs
 
-The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Run jobs with the installed runtime's Python:
+The machine configuration schedules jobs and owns every long-running service, including the update logic of services that run sync-managed wrappers. Run jobs with the installed `~/.local/share/agents/sync-current/sync` executable:
 
 - `sync job refresh-packages`: refreshes npm and static release packages for host-supported harnesses enabled in the SSOT or represented by installed managed wrappers, plus every registered tool launcher. It resolves npm packages from `latest`, verifies and smoke-checks npm installs, verifies static archive checksums and executables, rotates `current`/`previous`, and prunes using the same preparation functions as cold launch. Each package holds its existing cache lock across resolution and installation; a busy lock logs a skip without waiting or making a network request. Per-package failures log and continue, keeping the cached version available. The job exits `0` for a successful or skipped round, including no work and partial failures; it exits nonzero only when every package fails or the job itself breaks. The machine configuration owns its schedule.
 - `sync job npm-cache-clean`: cleans npm cache (`npm cache clean --force`) while holding exclusive locks on every `~/.cache/npm-tools/*/lock`; skips when busy or if npm is not installed. It exits `0` when there is nothing to do.
@@ -126,6 +128,6 @@ A host stuck behind `origin/main` repeats the same warning on every run. Commit 
 
 ## Tool launchers
 
-`TOOL_LAUNCHERS` in `sync/src/sync/core/tool_launchers.py` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and immediate cached launch with best-effort sync only on a cold launch. Tools have no harness home, instruction file, or skills.
+`TOOL_LAUNCHERS` in `sync/src/domain/ToolLaunchers.ts` lists npm tools that sync launches like harnesses: a wrapper under `~/.local/bin/`, a versioned package cache, and immediate cached launch with best-effort sync only on a cold launch. Tools have no harness home, instruction file, or skills.
 
-Sync copies `tools/mcporter/mcporter.jsonc` to `~/.mcporter/mcporter.json` and `tools/summarize/config.json` to `~/.summarize/config.json`, replacing the endpoint placeholders in the second file. `_config_jobs` in `sync/src/sync/core/plan.py` declares these jobs.
+Sync copies `tools/mcporter/mcporter.jsonc` to `~/.mcporter/mcporter.json` and `tools/summarize/config.json` to `~/.summarize/config.json`, replacing the endpoint placeholders in the second file. `configJobs` in `sync/src/services/Planner.ts` declares these jobs.

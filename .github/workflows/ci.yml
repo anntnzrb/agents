@@ -87,7 +87,7 @@ jobs:
       - run: uvx --python 3.14 pytest==9.1.1 .github/tests -q
       - run: uv run --script .github/scripts/ci.py metadata
 
-  sync-gates:
+  sync-checks:
     strategy:
       fail-fast: false
       matrix:
@@ -102,17 +102,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v10.3.2
-        with:
-          enable-cache: true
-          cache-suffix: sync-v2
-          cache-python: true
-          cache-dependency-glob: sync/uv.lock
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-      - run: uv sync --frozen
-      - run: uv run --no-sync sync-gates --tests
+          bun-version-file: sync/.bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run gates
 
   skills:
     name: skills (${{ matrix.os }}, shard ${{ matrix.shard.id }})
@@ -168,7 +162,7 @@ jobs:
 
   required:
     name: CI required
-    needs: [plan, repository-checks, sync-gates, skills, harnesses]
+    needs: [plan, repository-checks, sync-checks, skills, harnesses]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

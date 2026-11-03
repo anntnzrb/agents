@@ -202,7 +202,7 @@ def required(raw: str) -> None:
     outputs = planned.get("outputs")
     if not is_str_dict(outputs):
         raise ValueError("Missing plan outputs")
-    for name in ("repository-checks", "sync-gates", "skills", "harnesses"):
+    for name in ("repository-checks", "sync-checks", "skills", "harnesses"):
         job = needs.get(name)
         if not is_str_dict(job):
             raise ValueError(f"Missing job result: {name}")

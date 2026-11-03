@@ -18,7 +18,7 @@ Run metadata validation, then the selected skill and harness suites:
 uv run --script .github/scripts/ci.py local
 ```
 
-`local` defaults to `--base origin/main` and stops at the first failure. Each selected harness runs `bun install --frozen-lockfile` then `bun test` in a temporary copy. The `pre-push` hook runs this command from the repository root after the sync static gates and serial test suite.
+`local` defaults to `--base origin/main` and stops at the first failure. Each selected harness runs `bun install --frozen-lockfile` then `bun test` in a temporary copy. The `pre-push` hook runs this command from the repository root after the sync gates.
 
 Validate every active skill's metadata, and check repository Markdown outside `skills/` and `legacy/` for en and em dashes:
 
@@ -93,7 +93,7 @@ Follow the [ship skill's PR route](../skills/current/ship/SKILL.md). In T3, use 
 
 ## Update dependencies
 
-Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens one grouped weekly PR per ecosystem: GitHub Actions, uv lock files under `sync/` and `skills/current/*/`, and the bun harness packages. The `auto-merge` workflow waits for a successful `ci` workflow run. It merges only an associated open, non-draft Dependabot PR whose current head matches that run's head SHA. This gate does not rely on a required-status rule. Workflows reference actions by version tag, not commit SHA, so these PRs stay readable; tool versions that are pinned in commands, such as the `uvx` gate tools and the skill-creator gate pins, are updated by hand.
+Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens grouped weekly PRs for GitHub Actions, uv lock files under `skills/current/*/`, and Bun packages under `sync/` and the harnesses. The `auto-merge` workflow waits for a successful `ci` workflow run. It merges only an associated open, non-draft Dependabot PR whose current head matches that run's head SHA. This gate does not rely on a required-status rule. Workflows reference actions by version tag, not commit SHA, so these PRs stay readable; tool versions that are pinned in commands, such as the `uvx` gate tools and the skill-creator gate pins, are updated by hand.
 
 After a successful bot merge, the workflow explicitly dispatches `ci.yml` on `main` to check the integrated tree. Merges made with `GITHUB_TOKEN` suppress push-triggered workflows, but GitHub permits explicit `workflow_dispatch` events from that token. A rejected merge does not dispatch CI.
 
@@ -107,4 +107,4 @@ Server-side rulesets belong to the repository owner. Keep rules compatible with 
 
 Before relaxing required checks, inspect and explicitly disable pre-existing PR auto-merge requests. Changing the workflow does not cancel those requests; removing required checks can make them merge immediately. Deploy the workflow's successful-CI merge gate before changing the rules.
 
-The `repository-checks` and `sync-gates` jobs run on every CI event. The plan selects a skill only when a changed path is under `skills/current/<name>/` and that directory contains Python files; other skills get metadata validation only. Changes under `.github/` select every skill and harness suite. Changes under `skills/current/skill-creator/`, `docs/skills.md`, or `HARNESS.md` select every Python skill. Deleted or archived skills no longer produce code jobs; metadata validation still covers every published skill.
+The `repository-checks` and `sync-checks` jobs run on every CI event. The plan selects a skill only when a changed path is under `skills/current/<name>/` and that directory contains Python files; other skills get metadata validation only. Changes under `.github/` select every skill and harness suite. Changes under `skills/current/skill-creator/`, `docs/skills.md`, or `HARNESS.md` select every Python skill. Deleted or archived skills no longer produce code jobs; metadata validation still covers every published skill.

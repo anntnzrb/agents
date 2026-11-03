@@ -1,0 +1,3 @@
+export const MAX_OUTPUT_BYTES = 10 * 1024 * 1024
+export const MAX_DETAIL_CHARS = 2000
+export const RUNNING_EXECUTABLES_TIMEOUT_MS = 5000

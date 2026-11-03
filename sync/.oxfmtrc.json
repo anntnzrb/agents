@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 110,
+  "semi": false,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "arrowParens": "always",
+  "sortImports": {},
+  "sortPackageJson": true,
+  "ignorePatterns": ["test/fixtures/**"]
+}
