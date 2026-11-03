@@ -22,18 +22,18 @@ modelRoles:
   gem: cliproxy/gemini-3.8-flash-high:medium
   muse: cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh
   sol: cliproxy/gpt-6.1-sol:medium
+  terra: cliproxy/gpt-6.1-terra:high
   luna: cliproxy/gpt-6-luna:xhigh
-  swe: cliproxy/devin/swe-2:max
 
 cycleOrder:
   - default
   - opus
   - sonnet
   - sol
+  - terra
   - luna
   - muse
   - gem
-  - swe
 
 defaultThinkingLevel: auto
 hideThinkingBlock: true
