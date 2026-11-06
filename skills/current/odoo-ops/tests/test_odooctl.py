@@ -1976,6 +1976,8 @@ class TestBaselineComparison:
             "(odoo.addons.crm.tests.test_crm.TestLead.test_err)\n"
             "ERROR: TestShort.test_two\n"
             "2026-09-05 03:32:37,200 1 ERROR erptech: FAIL: TestShort.test_one\n"
+            "2026-09-05 03:32:37,300 1 ERROR erptech odoo.addons.crm.tests.test_crm: "
+            "FAIL: Subtest TestLead.test_sub (valores={'a': ' '})\n"
             "2026-09-05 03:28:49,475 1 ERROR erptech odoo.modules.registry: "
             "Model budget has no table.\n"
         )
@@ -1986,6 +1988,7 @@ class TestBaselineComparison:
             "TestShort.test_one",
             "TestLead.test_err",
             "TestShort.test_two",
+            "TestLead.test_sub",
         }
         assert parsed == expected
 

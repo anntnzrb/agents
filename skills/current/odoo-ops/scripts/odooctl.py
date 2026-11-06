@@ -1420,7 +1420,8 @@ def _cleanup_stale_test_containers() -> None:
 
 
 _FAILED_TEST_RE = re.compile(
-    r"\b(?:FAIL|ERROR):\s*"
+    # unittest prefixes failing subTest() iterations with "Subtest ".
+    r"\b(?:FAIL|ERROR):\s*(?:Subtest\s+)?"
     + r"(?:"
     + r"([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_.]+)\)"
     + r"|"
