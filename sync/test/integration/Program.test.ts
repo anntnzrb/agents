@@ -262,3 +262,42 @@ test("the launched tool inherits default SIGPIPE and SIGXFSZ dispositions", asyn
   const result = await run(home, ["launch", "mcporter"])
   expect(result.stdout).toBe("PIPE=DEFAULT XFSZ=DEFAULT\n")
 })
+
+test("the launched tool inherits blocking stdio and can fill a slow pipe", async () => {
+  const home = homeFixture()
+  seedCache(
+    home,
+    `#!/usr/bin/perl
+use Fcntl;
+for my $fh (*STDIN, *STDOUT, *STDERR) {
+  my $flags = fcntl($fh, F_GETFL, 0);
+  print STDERR "nonblocking fd ", fileno($fh), "\\n" if defined $flags && ($flags & O_NONBLOCK);
+}
+my $chunk = "x" x 65536;
+for (1 .. 16) {
+  my $off = 0;
+  while ($off < length $chunk) {
+    my $n = syswrite(STDOUT, $chunk, length($chunk) - $off, $off);
+    die "write failed: $!\\n" unless defined $n;
+    $off += $n;
+  }
+}
+`,
+  )
+  const child = Bun.spawn([process.execPath, "run", "src/main.ts", "launch", "mcporter"], {
+    cwd: syncRoot,
+    env: environment(home),
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  await Bun.sleep(1000)
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).arrayBuffer(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  expect(stderr).toBe("")
+  expect(stdout.byteLength).toBe(1024 * 1024)
+  expect(exitCode).toBe(0)
+}, 20_000)
