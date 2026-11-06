@@ -4,6 +4,7 @@ import argparse
 import base64
 import configparser
 import contextlib
+import dataclasses
 import email.message
 import fcntl
 import gzip
@@ -2218,6 +2219,120 @@ class TestBaselineComparison:
         assert "new failures (1):" in out
         assert "TestLead.test_new" in out
         assert "RESULT baseline=HEAD new=1 preexisting=0 fixed=0" in out
+
+    def test_baseline_unusable_run_exits_2(self, tmp_path: Path) -> None:
+        """A baseline that never ran its tests is an error, not a clean comparison."""
+        ctx = make_workspace_context(tmp_path)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+
+        def mock_subprocess_run(cmd: list[str], **kw: object) -> MagicMock:
+            _ = (cmd, kw)
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stdout = ""
+            proc.stderr = ""
+            return proc
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            _ = (cmd, json_mode)
+            if "base" in cname:
+                # Registry load failure: Odoo exits 0 and runs no test at all.
+                return 0, "PermissionError: [Errno 13] Permission denied\n"
+            return 0, "odoo.tests.result: 0 failed, 0 error(s) of 5 tests\n"
+
+        with (
+            patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+            patch.object(odooctl, "_ensure_runtime_pod"),
+            patch.object(odooctl, "_cleanup_stale_test_containers"),
+            patch.object(
+                odooctl,
+                "_resolve_test_targets",
+                return_value=("test_db", ["/crm"], ["crm"]),
+            ),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+            contextlib.redirect_stdout(io.StringIO()),
+            pytest.raises(
+                odooctl.CliError, match=r"baseline .* ran no tests"
+            ) as exc_info,
+        ):
+            _ = odooctl.cmd_test(args)
+
+        assert exc_info.value.code == 2
+
+    def test_baseline_checkout_readable_with_private_umask(
+        self, tmp_path: Path
+    ) -> None:
+        """With umask 0077 the real baseline checkout stays world-readable.
+
+        The checkout is mounted into a container that runs as a different user; a
+        private umask made it 0700 and the registry failed to load.
+        """
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+        _ = subprocess.run([*git, "init", "-q"], check=True)
+        (repo / "mod").mkdir()
+        _ = (repo / "mod" / "file.py").write_text("x = 1\n", encoding="utf-8")
+        _ = subprocess.run([*git, "add", "-A"], check=True)
+        _ = subprocess.run([*git, "commit", "-qm", "init"], check=True)
+        ctx = make_workspace_context(tmp_path)
+        ctx = dataclasses.replace(ctx, root=repo)
+        args = argparse.Namespace(
+            target="crm",
+            profile="etech",
+            json=False,
+            tags=None,
+            db=None,
+            parallel=False,
+            jobs=1,
+            baseline="HEAD",
+        )
+        modes: list[int] = []
+
+        def mock_run_test(
+            cmd: list[str], cname: str, *, json_mode: bool
+        ) -> tuple[int, str]:
+            _ = (cname, json_mode)
+            mount = next(a for a in cmd if a.endswith(":/mnt/custom-addons:z"))
+            checkout = Path(mount.removesuffix(":/mnt/custom-addons:z"))
+            modes.extend(
+                p.stat().st_mode & 0o777
+                for p in (checkout, checkout / "mod", checkout / "mod" / "file.py")
+            )
+            return 0, "odoo.tests.result: 0 failed, 0 error(s) of 5 tests\n"
+
+        old = os.umask(0o077)
+        try:
+            with (
+                patch.object(odooctl, "_resolve_workspace", return_value=ctx),
+                patch.object(odooctl, "_ensure_runtime_pod"),
+                patch.object(odooctl, "_cleanup_stale_test_containers"),
+                patch.object(
+                    odooctl,
+                    "_resolve_test_targets",
+                    return_value=("test_db", ["/crm"], ["crm"]),
+                ),
+                patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                assert odooctl.cmd_test(args) == 0
+        finally:
+            _ = os.umask(old)
+
+        # Baseline (first three) and current run both mounted; check the baseline.
+        assert modes[:3] == [0o755, 0o755, 0o644], [oct(m) for m in modes[:3]]
 
     def test_baseline_bad_ref_exits_2(self, tmp_path: Path) -> None:
         """Verify invalid git ref raises usage error with exit code 2."""

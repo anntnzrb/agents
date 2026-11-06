@@ -1491,9 +1491,11 @@ def _run_baseline_test_comparison(
     update_str = ",".join(update_mods)
 
     tmpdir = tempfile.mkdtemp(prefix="odoo-baseline-")
-    worktree_path = Path(tmpdir)
-    with contextlib.suppress(OSError):
-        worktree_path.rmdir()
+    # The test container runs as the image's odoo user. A private umask (0077) or
+    # mkdtemp's 0700 would leave the mounted checkout unreadable: the registry fails to
+    # load and no test runs. Open the directory and check out with a 022 umask.
+    Path(tmpdir).chmod(0o755)
+    worktree_path = Path(tmpdir) / "repo"
 
     try:
         add_res = subprocess.run(
@@ -1510,6 +1512,7 @@ def _run_baseline_test_comparison(
             capture_output=True,
             text=True,
             check=False,
+            umask=0o022,
         )
         if add_res.returncode != 0:
             err_msg = add_res.stderr.strip() or "git worktree add failed"
@@ -1547,6 +1550,15 @@ def _run_baseline_test_comparison(
             exit_base, output_base
         )
         baseline_failures = _parse_failed_tests(output_base)
+        if not _extract_test_counts(output_base):
+            # A baseline that never ran tests has no failures to compare against:
+            # reporting "0 pre-existing" would turn every current failure into "new"
+            # and every passing test into a false clean result.
+            msg = (
+                f"The baseline run on {baseline_ref!r} ran no tests "
+                "(registry or setup failure); see its output above."
+            )
+            raise CliError(msg, code=2)
 
         _cleanup_stale_test_containers()
 
@@ -1599,7 +1611,7 @@ def _run_baseline_test_comparison(
             text=True,
             check=False,
         )
-        shutil.rmtree(worktree_path, ignore_errors=True)
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
     new_failures = sorted(current_failures - baseline_failures)
     preexisting = sorted(current_failures & baseline_failures)
