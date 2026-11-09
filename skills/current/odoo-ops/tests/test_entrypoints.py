@@ -41,3 +41,21 @@ def test_executable_entrypoint_starts_under_its_declared_python(script: str) -> 
     assert result.returncode == 0, result.stderr[-2000:]
     assert "Traceback" not in result.stderr
 
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="entrypoints run through uv")
+def test_cli_dispatches_every_odooctl_command() -> None:
+    """Every odooctl subcommand reaches odooctl through cli.py, including 'rpc' as a value."""
+    for name in sorted(odooctl.command_names()):
+        result = run_script("cli.py", name, "--help")
+        assert result.returncode == 0, (name, result.stderr[-500:])
+        assert f"odooctl {name}" in result.stdout, name
+    shell = run_script("cli.py", "shell", "--file", "rpc")
+    assert "RPC flags go with the rpc command" not in shell.stderr
+
+
+def test_every_parser_command_has_a_handler() -> None:
+    """A subcommand the parser accepts but main() cannot dispatch prints help and exits 1."""
+    usage = odooctl.build_parser().format_usage()
+    listed = re.search(r"\{([^}]+)\}", usage)
+    assert listed is not None, usage
+    assert frozenset(listed.group(1).split(",")) == odooctl.command_names()

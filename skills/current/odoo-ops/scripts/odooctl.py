@@ -3705,39 +3705,45 @@ def _build_parser() -> argparse.ArgumentParser:
 build_parser = _build_parser
 
 
+_COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "dev": cmd_dev,
+    "test": cmd_test,
+    "lint": cmd_lint,
+    "fmt": cmd_fmt,
+    "lint-views": cmd_lint_views,
+    "stop": cmd_stop,
+    "logs": cmd_logs,
+    "env": cmd_env_inspect,
+    "addons": cmd_addons_list,
+    "module": cmd_module_inspect,
+    "routes": cmd_route_list,
+    "db-summary": cmd_db_summary,
+    "db-tables": cmd_db_tables,
+    "db-query": cmd_db_query,
+    "db-clone": cmd_db_clone,
+    "db-restore": cmd_db_restore,
+    "db-list": cmd_db_list,
+    "db-drop": cmd_db_drop,
+    "shell": cmd_shell,
+    "health": cmd_health,
+    "prune": cmd_prune,
+    "auth-temp": cmd_auth_temp,
+    "auth-restore": cmd_auth_restore,
+}
+
+
+def command_names() -> frozenset[str]:
+    """Subcommand names that main() dispatches."""
+    return frozenset(_COMMANDS)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entrypoint and command dispatcher for odooctl."""
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    cmd_map = {
-        "dev": cmd_dev,
-        "test": cmd_test,
-        "lint": cmd_lint,
-        "fmt": cmd_fmt,
-        "lint-views": cmd_lint_views,
-        "stop": cmd_stop,
-        "logs": cmd_logs,
-        "env": cmd_env_inspect,
-        "addons": cmd_addons_list,
-        "module": cmd_module_inspect,
-        "routes": cmd_route_list,
-        "db-summary": cmd_db_summary,
-        "db-tables": cmd_db_tables,
-        "db-query": cmd_db_query,
-        "db-clone": cmd_db_clone,
-        "db-restore": cmd_db_restore,
-        "db-list": cmd_db_list,
-        "db-drop": cmd_db_drop,
-        "shell": cmd_shell,
-        "health": cmd_health,
-        "prune": cmd_prune,
-        "auth-temp": cmd_auth_temp,
-        "auth-restore": cmd_auth_restore,
-    }
-
     command_name = _require_str(args, "command")
-    handler = cmd_map.get(command_name)
+    handler = _COMMANDS.get(command_name)
     if not handler:
         parser.print_help()
         return 1

@@ -12,26 +12,7 @@ import sys
 import odoo_rpc
 import odooctl
 
-_ODOOCTL_COMMANDS: frozenset[str] = frozenset(
-    {
-        "dev",
-        "test",
-        "lint",
-        "fmt",
-        "lint-views",
-        "stop",
-        "logs",
-        "env",
-        "addons",
-        "module",
-        "routes",
-        "db-summary",
-        "db-tables",
-        "db-query",
-        "db-clone",
-        "db-restore",
-    }
-)
+_ODOOCTL_COMMANDS: frozenset[str] = odooctl.command_names()
 
 _RPC_FLAGS: frozenset[str] = frozenset(
     {
