@@ -985,6 +985,35 @@ class TestDatabaseResolution:
         source_code = Path(odooctl.__file__).read_text(encoding="utf-8")
         assert "odoo_replica" not in source_code
 
+    def test_test_targets_update_every_workflow_module(self, tmp_path: Path) -> None:
+        """Verify tests upgrade loaded non-test modules but only tag test modules."""
+        _ = (tmp_path / "mockprof.json").write_text(
+            json.dumps(
+                {
+                    "workflows": {
+                        "crm": {
+                            "database": "work_db",
+                            "modules": ["budget", "crm_espol"],
+                            "test_modules": ["crm_espol"],
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        ctx = make_workspace_context(tmp_path)
+        (tmp_path / "crm_espol").mkdir()
+        with (
+            patch.object(odooctl, "PROFILE_DIR", tmp_path),
+            patch.object(odooctl, "_resolve_addons", return_value=tmp_path),
+        ):
+            for target in ("crm", "crm_espol"):
+                db, tags, update = odooctl._resolve_test_targets(
+                    ctx, target, "mockprof"
+                )
+                assert (db, tags) == ("work_db", ["/crm_espol"])
+                assert sorted(update) == ["budget", "crm_espol"]
+
 
 class TestDbQueryInputAndOutput:
     """Tests for db-query file/stdin input, mutation formatting, and JSON contracts."""

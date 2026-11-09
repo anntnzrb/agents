@@ -1663,7 +1663,11 @@ def _run_baseline_test_comparison(
 def _resolve_test_targets(
     ctx: WorkspaceContext, target: str, profile_name: str
 ) -> tuple[str, list[str], list[str]]:
-    """Resolve database, test tags, and update modules for test execution."""
+    """Resolve database, test tags, and update modules for test execution.
+
+    Updates every module the workflow loads, so a fresh replica also gets the
+    schema of non-test modules; tags still select only the tested modules.
+    """
     mod_path = ctx.root / target
     if mod_path.is_dir():
         pfile = PROFILE_DIR / f"{profile_name}.json"
@@ -1692,13 +1696,15 @@ def _resolve_test_targets(
                                     db = (
                                         str(db_val) if db_val else ctx.effective_db_name
                                     )
-                                    return db, [f"/{target}"], [target]
+                                    update = list(dict.fromkeys([*mods, target]))
+                                    return db, [f"/{target}"], update
             except json.JSONDecodeError, OSError:
                 pass
         return ctx.effective_db_name, [f"/{target}"], [target]
     profile = _load_workflow_profile(profile_name, target)
     test_tags = [f"/{m}" for m in profile.test_modules]
-    return profile.database, test_tags, profile.test_modules
+    update = list(dict.fromkeys([*profile.modules, *profile.test_modules]))
+    return profile.database, test_tags, update
 
 
 def _build_test_cmd(
@@ -1972,8 +1978,9 @@ def cmd_test(args: argparse.Namespace) -> int:
                 json_mode=json_mode,
             )
 
-        if (parallel or jobs > 1) and len(update_mods) > 1 and not explicit_tags:
-            return _run_parallel_tests(ctx, args, db_to_use, update_mods)
+        test_mods = [tag.removeprefix("/") for tag in test_tags]
+        if (parallel or jobs > 1) and len(test_mods) > 1 and not explicit_tags:
+            return _run_parallel_tests(ctx, args, db_to_use, test_mods)
         tags_str = explicit_tags or ",".join(test_tags)
         _ensure_runtime_pod(ctx)
         _cleanup_stale_test_containers()
