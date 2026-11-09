@@ -1,6 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
+# dependencies = [
+#     "lxml>=5.0",
+# ]
 # ///
 """Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."""
 

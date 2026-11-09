@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
-#     "pytest>=8",
 #     "lxml>=5.0",
-#     "lxml-stubs",
 # ]
 # ///
 """Public entrypoint and dispatcher for Odoo Ops."""
