@@ -1504,6 +1504,57 @@ class TestOpLockReentrancy:
             odooctl._ensure_runtime_pod(ctx)
         assert depths == [1]
 
+    def test_pod_with_dead_infra_is_recreated(self, tmp_path: Path) -> None:
+        """Verify a pod whose infra container exited is torn down and created again."""
+        ctx = make_workspace_context(tmp_path)
+        commands: list[list[str]] = []
+
+        def run(cmd: list[str], **_k: object) -> MagicMock:
+            commands.append(cmd)
+            if cmd[:3] == ["podman", "pod", "inspect"]:
+                return MagicMock(stdout="infra123\n")
+            if cmd[:3] == ["podman", "container", "inspect"]:
+                return MagicMock(stdout="exited\n")
+            return MagicMock(stdout="Up")
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", return_value="Degraded"),
+            patch.object(odooctl, "_run", side_effect=run),
+            patch("time.sleep"),
+        ):
+            odooctl._ensure_runtime_pod(ctx)
+        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.DEFAULT_POD_NAME])
+        pod_create = next(
+            i for i, c in enumerate(commands) if c[:3] == ["podman", "pod", "create"]
+        )
+        assert pod_rm < pod_create
+
+    def test_healthy_pod_is_reused(self, tmp_path: Path) -> None:
+        """Verify a pod whose infra is running is neither removed nor created."""
+        ctx = make_workspace_context(tmp_path)
+        commands: list[list[str]] = []
+
+        def run(cmd: list[str], **_k: object) -> MagicMock:
+            commands.append(cmd)
+            if cmd[:3] == ["podman", "pod", "inspect"]:
+                return MagicMock(stdout="infra123\n")
+            if cmd[:3] == ["podman", "container", "inspect"]:
+                return MagicMock(stdout="running\n")
+            return MagicMock(stdout="Up")
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_run", side_effect=run),
+        ):
+            odooctl._ensure_runtime_pod(ctx)
+        assert not [
+            c
+            for c in commands
+            if c[:3] in (["podman", "pod", "rm"], ["podman", "pod", "create"])
+        ]
+
     def test_db_lock_name_sanitizes_database_name(self) -> None:
         """Verify lock file names cannot escape the lock directory."""
         assert odooctl._db_lock_name("prod_work_20261015_a") == (

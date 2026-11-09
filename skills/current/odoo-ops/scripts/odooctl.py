@@ -1008,6 +1008,25 @@ def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
     return out or None
 
 
+def _pod_infra_down(pod_name: str = DEFAULT_POD_NAME) -> bool:
+    """Return True if the pod exists but its infra container has stopped.
+
+    The infra container owns the network namespace and the published ports, so
+    a pod without it keeps running containers that nothing outside can reach.
+    """
+    infra_id = _run(
+        ["podman", "pod", "inspect", pod_name, "--format", "{{.InfraContainerID}}"],
+        check=False,
+    ).stdout.strip()
+    if not infra_id:
+        return False
+    state = _run(
+        ["podman", "container", "inspect", infra_id, "--format", "{{.State.Status}}"],
+        check=False,
+    ).stdout.strip()
+    return state in {"exited", "stopped", "dead"}
+
+
 @dataclass
 class _HeldLock:
     depth: int
@@ -1132,6 +1151,11 @@ def _ensure_runtime_pod(
     with _pod_section(wait_for_db=wait_for_db, wait_for_all_runs=wait_for_all_runs):
         _ensure_podman()
         status = _get_pod_status()
+        if status and _pod_infra_down():
+            # Its containers keep the dead network namespace, so the pod cannot be
+            # repaired in place. Database data is bind-mounted and survives.
+            _remove_stack()
+            status = None
 
         if not status:
             # Create shared network Pod
@@ -1205,13 +1229,18 @@ def _stop_all() -> None:
         _file_lock(RUNS_LOCK_NAME, "a test run is in progress"),
         _op_lock(),
     ):
-        _ensure_podman()
-        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
-        _ = _run(
-            ["podman", "rm", "-f", "-t", str(DB_STOP_TIMEOUT), DEFAULT_DB_CONTAINER],
-            check=False,
-        )
-        _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
+        _remove_stack()
+
+
+def _remove_stack() -> None:
+    """Remove the web and database containers and the pod; the caller holds the pod lock."""
+    _ensure_podman()
+    _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+    _ = _run(
+        ["podman", "rm", "-f", "-t", str(DB_STOP_TIMEOUT), DEFAULT_DB_CONTAINER],
+        check=False,
+    )
+    _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
