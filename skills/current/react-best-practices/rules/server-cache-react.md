@@ -24,3 +24,5 @@ export const getCurrentUser = cache(async () => {
 ```
 
 Within a single request, multiple calls to `getCurrentUser()` execute the query only once.
+
+Arguments are compared with `Object.is`. Reuse the same object reference or pass primitive arguments to avoid cache misses from newly allocated objects. Next.js may memoize matching `fetch` requests within a render; use `cache` for other work such as database queries or authentication.

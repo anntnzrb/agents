@@ -25,6 +25,7 @@ React/Next.js performance-optimization guidance from Vercel Engineering. Apply t
 | --- | --- | --- |
 | Pick a rule category by impact | `rules/_sections.md` | Before selecting optimization rules |
 | Apply a specific optimization | Matching `rules/<rule-id>.md` | After identifying the bottleneck |
+| Newer upstream guidance and corrections | `references/upstream-updates.md` | Before applying a rule or reviewing a category |
 | Expanded Vercel guidance | `references/vercel-guide.md` | A broad review, or rule detail is insufficient |
 | Secure Next.js Server Actions | `rules/server-auth-actions.md` | Creating or reviewing Server Actions |
 | Human-facing package context | `README.md` | When needed |
@@ -44,8 +45,8 @@ React/Next.js performance-optimization guidance from Vercel Engineering. Apply t
 
 1. Start from the user-visible outcome or observed bottleneck.
 2. Load `rules/_sections.md` to choose the relevant category.
-3. Load only the matching rule files needed for the change.
-4. Use `references/vercel-guide.md` only when a rule file is insufficient or a broad review requires the full compiled guide.
+3. Read `references/upstream-updates.md` for new rules and corrections.
+4. Load only the matching rule files needed for the change. Use `references/vercel-guide.md` for a broad review, subject to the corrections in `references/upstream-updates.md`.
 
 ## Maintenance
 

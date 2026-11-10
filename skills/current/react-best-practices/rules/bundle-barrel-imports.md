@@ -24,13 +24,9 @@ import { Button, TextField } from "@mui/material";
 // Loads 2,225 modules, takes ~4.2s extra in dev
 ```
 
-**Correct (imports only what you need):**
+**Correct (import only what you need where the package exposes typed subpaths):**
 
 ```tsx
-import Check from "lucide-react/dist/esm/icons/check";
-import X from "lucide-react/dist/esm/icons/x";
-import Menu from "lucide-react/dist/esm/icons/menu";
-// Loads only 3 modules (~2KB vs ~1MB)
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -51,6 +47,8 @@ module.exports = {
 import { Check, X, Menu } from "lucide-react";
 // Automatically transformed to direct imports at build time
 ```
+
+Next.js optimizes some popular packages by default. Check the Next.js version and configuration before adding `optimizePackageImports`. Some deep paths, including paths in `lucide-react`, lack TypeScript declarations or are not public exports. Prefer an optimized package import when available, or verify the package exports and types before using a deep import.
 
 Direct imports provide 15-70% faster dev boot, 28% faster builds, 40% faster cold starts, and significantly faster HMR.
 

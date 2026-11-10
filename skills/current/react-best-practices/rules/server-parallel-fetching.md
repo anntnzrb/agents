@@ -54,14 +54,13 @@ export default function Page() {
 **Alternative with children prop:**
 
 ```tsx
-async function Layout({ children }: { children: ReactNode }) {
+async function Header() {
   const header = await fetchHeader();
-  return (
-    <div>
-      <div>{header}</div>
-      {children}
-    </div>
-  );
+  return <div>{header}</div>;
+}
+
+function Layout({ children }: { children: ReactNode }) {
+  return <div><Header />{children}</div>;
 }
 
 async function Sidebar() {
