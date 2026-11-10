@@ -1,6 +1,6 @@
 # Delegation workflows
 
-Each workflow launches agents with zero context. Their prompt is the whole briefing. Choose settings as `SKILL.md` describes before launching.
+Each workflow launches agents with zero context. Their prompt is the whole briefing. Use the user's request, current conversation, and any skill invocation arguments. Choose settings as `SKILL.md` describes before launching.
 
 ## Handoff
 
@@ -56,7 +56,7 @@ One agent gives a judgment on the current work; you keep driving.
 
 - Brief it with the sharp question, what you considered and ruled out, and relevant file paths for it to read. Do not paste file contents.
 - Ask for a recommendation with its justification. End with the no-edits suffix.
-- If the user forwards a skill, such as `/paseo-advisor /unslop`, tell the advisor to load and run that skill against the task.
+- If the user forwards a skill, such as `/unslop`, `/skill:unslop`, or `$unslop`, tell the advisor to load and run that skill against the task. Exclude the advisor skill's own invocation.
 - Title it `[Advisor] <topic>`. Wait for its reply, then report its verdict next to your own recommendation.
 - Keep the advisor for follow-ups only when the user asks; archive it when the topic changes.
 

@@ -1,12 +1,12 @@
 {
   "repo": "getpaseo/paseo",
-  "release": "v0.13.2",
-  "commit": "d2941157a8f91512daf54fc688241d416e8f5ebd",
+  "release": "v0.15.4",
+  "commit": "1c00b365c9e0b74c1580eba33d905d693125ae21",
   "trees": {
     "skills/paseo": "eb9b4918c091894d0d3985ef5dc3681c00a2341d",
-    "skills/paseo-advisor": "fe95db83e0de5cef4817fa7bd70064902bf9c470",
-    "skills/paseo-committee": "eda139e47b498bbe29227f1c30b54abe6c5305ae",
-    "skills/paseo-handoff": "34d24a9a5f2c9f4132b27a2bb9f0027d708e912e"
+    "skills/paseo-advisor": "21f0d1581554cf031a5d2a85d3422b792ea16e17",
+    "skills/paseo-committee": "25681860b927497f250bb30a34574980306becb4",
+    "skills/paseo-handoff": "7d2e381f530056bb07dc715329b4f677426563e1"
   },
   "watch": {
     "skills": [
