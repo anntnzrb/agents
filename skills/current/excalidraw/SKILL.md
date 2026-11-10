@@ -2,7 +2,7 @@
 name: excalidraw
 description: "Use when drawing, editing, or exporting Excalidraw diagrams on a live local canvas, not image generation."
 license: AGPL-3.0-or-later
-compatibility: Requires uv and bun. Screenshots and Mermaid need the canvas open in a browser tab.
+compatibility: Requires uv and bun. Mermaid needs the canvas open in a browser tab.
 metadata:
   author: anntnzrb
   upstream: https://github.com/yctimlin/mcp_excalidraw
@@ -35,7 +35,7 @@ Any canvas command starts the server. A watchdog stops it after 30 minutes with 
 ## Workflow
 
 1. Run `status`. If the user wants to watch, give them the canvas URL.
-2. Run `describe` before editing an existing scene. Target elements by `id`, never by coordinates.
+2. Run `describe` before editing an existing scene. If the user refers to selected elements, run `selection` to get their IDs. Target elements by `id`, never by coordinates.
 3. The browser tab syncs user edits to the server after a short delay. Run `describe` again after the user says they changed something.
 4. Create shapes with custom ids first, then arrows bound to those ids, in one batch call.
 5. After each batch, run `describe` and fix overlap, truncated labels, and arrows crossing unrelated shapes before adding more.
@@ -44,11 +44,11 @@ Any canvas command starts the server. A watchdog stops it after 30 minutes with 
 
 ## Durable rules
 
-- The scene lives in server memory. Stopping the server empties it except for the watchdog's recovery export. Snapshots live in the same memory and do not survive a stop.
-- After an idle stop, `import` the newest file from the recovery directory to continue the previous scene.
+- By default, the scene and snapshots live in server memory and do not survive a stop, except for the watchdog's recovery export. Set `EXCALIDRAW_DATA_DIR` on the canvas server to persist elements, image files, and named snapshots across restarts. Only one process can own the directory.
+- After an idle stop, if persistence is not enabled, `import` the newest file from the recovery directory to continue the previous scene.
 - Clearing, replacing on import, and restoring a snapshot overwrite the user's canvas. Save a snapshot first unless the user asked for a fresh canvas.
 - When a command reports that a browser tab is required, ask the user to open the canvas URL, then retry. Do not open it yourself.
-- `share` uploads the scene to excalidraw.com. Run it only when the user asks for a share link.
+- `share` uploads the scene to excalidraw.com or a configured self-hosted target. Run it only when the user asks for a share link.
 
 ## Maintenance
 

@@ -1,9 +1,9 @@
 {
   "repo": "yctimlin/mcp_excalidraw",
-  "release": "v2.1.2",
-  "commit": "1df6f8eba395cb2eb0a998ffba3237182a878197",
+  "release": "v2.2.0",
+  "commit": "81720ac819d2325177cd6137c6ad41d52d0f5374",
   "trees": {
-    "skills/excalidraw-skill": "376b142d789f28fea9a43d6441de2e47b81f1284",
-    "src": "4efb24cd7e337240c0d38bc1aa51a47ddefa98df"
+    "skills/excalidraw-skill": "d7a5de3c8523b9ecc26874bfeef5389d530935f8",
+    "src": "1ab6070afa6ff8c6ac2922ecc9ab390a36ac1bc6"
   }
 }
