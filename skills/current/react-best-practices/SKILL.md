@@ -46,3 +46,7 @@ React/Next.js performance-optimization guidance from Vercel Engineering. Apply t
 2. Load `rules/_sections.md` to choose the relevant category.
 3. Load only the matching rule files needed for the change.
 4. Use `references/vercel-guide.md` only when a rule file is insufficient or a broad review requires the full compiled guide.
+
+## Maintenance
+
+Review upstream changes against the commit in `UPSTREAM.json`. Port applicable changes, then update the commit and tree hash together. See `docs/skills.md` in the source repository for the drift workflow.

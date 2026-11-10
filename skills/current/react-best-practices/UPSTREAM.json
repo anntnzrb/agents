@@ -1,0 +1,8 @@
+{
+  "repo": "vercel-labs/agent-skills",
+  "branch": "main",
+  "commit": "42ecbef87d26daa782f5ee8c77b91e149228e9de",
+  "trees": {
+    "skills/react-best-practices": "7c6aa09f2af50874c0fb982053b4abceb86b0488"
+  }
+}
