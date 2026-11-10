@@ -1,6 +1,6 @@
 # Parallel Workflow Recipes
 
-Note: Command and flag spellings in this document are illustrative and subject to CLI evolution. Always confirm exact options and syntax with `uvx --from "parallel-web-tools[cli]" parallel-cli <command> --help` before execution.
+Note: Command and flag spellings in this document are illustrative and subject to CLI evolution. Always confirm exact options and syntax with `uv run --script <skill-dir>/scripts/cli.py <command> --help` before execution.
 
 ## Recipe 1: Fast web search and source extraction
 
@@ -9,7 +9,7 @@ Answer a specific technical or factual question by retrieving relevant web pages
 
 ### Steps
 1. Inspect search options:
-   Run `uvx --from "parallel-web-tools[cli]" parallel-cli search --help` to confirm available filters (such as mode, date cutoffs, domain inclusions, and output flags).
+   Run `uv run --script <skill-dir>/scripts/cli.py search --help` to confirm available filters (such as mode, date cutoffs, domain inclusions, and output flags).
 2. Execute focused search:
    Run short, specific queries covering distinct angles rather than one long, overloaded prompt. Request a small result count (for example 3 to 5 results). Save output to a file to keep context compact.
 3. Review matches:
@@ -20,10 +20,10 @@ Answer a specific technical or factual question by retrieving relevant web pages
 ### Illustrative commands
 ```bash
 # Verify search options
-uvx --from "parallel-web-tools[cli]" parallel-cli search --help
+uv run --script <skill-dir>/scripts/cli.py search --help
 
 # Run fast search with a tight result set and save to disk
-uvx --from "parallel-web-tools[cli]" parallel-cli search "<focused query>" \
+uv run --script <skill-dir>/scripts/cli.py search "<focused query>" \
   --mode fast \
   --max-results 3 \
   -o <temp-dir>/search_results.json
@@ -32,7 +32,7 @@ uvx --from "parallel-web-tools[cli]" parallel-cli search "<focused query>" \
 jq -r '.results[] | "\(.title)\n\(.url)\n"' <temp-dir>/search_results.json
 
 # Extract full page content only for the top authoritative URL
-uvx --from "parallel-web-tools[cli]" parallel-cli extract "<top-url>" \
+uv run --script <skill-dir>/scripts/cli.py extract "<top-url>" \
   --full-content \
   -o <temp-dir>/extracted_doc.json
 ```
@@ -44,7 +44,7 @@ Synthesize an open-ended technical or industry question into a comprehensive rep
 
 ### Steps
 1. Check processor tiers:
-   Run `uvx --from "parallel-web-tools[cli]" parallel-cli research processors` to review available tiers, execution times, and depth trade-offs.
+   Run `uv run --script <skill-dir>/scripts/cli.py research processors` to review available tiers, execution times, and depth trade-offs.
 2. Select the right tier:
    Choose the lowest tier suited to the task. Use fast or lite tiers for quick lookups and moderate research; reserve higher tiers for difficult multi-source synthesis.
 3. Launch research task:
@@ -55,10 +55,10 @@ Synthesize an open-ended technical or industry question into a comprehensive rep
 ### Illustrative commands
 ```bash
 # List available processor tiers
-uvx --from "parallel-web-tools[cli]" parallel-cli research processors
+uv run --script <skill-dir>/scripts/cli.py research processors
 
 # Run research with a lightweight processor and save markdown report to disk
-uvx --from "parallel-web-tools[cli]" parallel-cli research run \
+uv run --script <skill-dir>/scripts/cli.py research run \
   "<research question>" \
   --processor <cheapest-fitting-tier> \
   --text \
@@ -75,7 +75,7 @@ Discover a structured list of entities matching descriptive natural language cri
 
 ### Steps
 1. Check findall and enrich options:
-   Run `uvx --from "parallel-web-tools[cli]" parallel-cli findall --help` and `uvx --from "parallel-web-tools[cli]" parallel-cli enrich --help`.
+   Run `uv run --script <skill-dir>/scripts/cli.py findall --help` and `uv run --script <skill-dir>/scripts/cli.py enrich --help`.
 2. Discover entities:
    Run FindAll with an objective describing target entities (such as companies or software tools) and desired criteria.
 3. Poll to completion:
@@ -86,14 +86,14 @@ Discover a structured list of entities matching descriptive natural language cri
 ### Illustrative commands
 ```bash
 # Discover entities matching criteria
-uvx --from "parallel-web-tools[cli]" parallel-cli findall run \
+uv run --script <skill-dir>/scripts/cli.py findall run \
   "<entity criteria>"
 
 # Check status or poll run to completion
-uvx --from "parallel-web-tools[cli]" parallel-cli findall poll <run_id> -o <temp-dir>/entities.json
+uv run --script <skill-dir>/scripts/cli.py findall poll <run_id> -o <temp-dir>/entities.json
 
 # Enrich results with targeted attributes
-uvx --from "parallel-web-tools[cli]" parallel-cli enrich run \
+uv run --script <skill-dir>/scripts/cli.py enrich run \
   --input <temp-dir>/entities.json \
   -o <temp-dir>/enriched_entities.json
 ```
@@ -105,7 +105,7 @@ Track a dynamic web topic, product category, or documentation site for changes o
 
 ### Steps
 1. Inspect monitor options:
-   Run `uvx --from "parallel-web-tools[cli]" parallel-cli monitor --help`.
+   Run `uv run --script <skill-dir>/scripts/cli.py monitor --help`.
 2. Create monitor:
    Define the target topic, query, or site to watch along with the polling cadence.
 3. Check events:
@@ -114,14 +114,14 @@ Track a dynamic web topic, product category, or documentation site for changes o
 ### Illustrative commands
 ```bash
 # Verify monitor creation options
-uvx --from "parallel-web-tools[cli]" parallel-cli monitor create --help
+uv run --script <skill-dir>/scripts/cli.py monitor create --help
 
 # Create topic monitor
-uvx --from "parallel-web-tools[cli]" parallel-cli monitor create \
+uv run --script <skill-dir>/scripts/cli.py monitor create \
   --query "<topic to watch>"
 
 # List detected events
-uvx --from "parallel-web-tools[cli]" parallel-cli monitor events <monitor_id>
+uv run --script <skill-dir>/scripts/cli.py monitor events <monitor_id>
 ```
 
 ## Recipe 5: Recalling past research from memory
@@ -131,7 +131,7 @@ Check saved interactions, tasks, or monitor events before launching duplicate qu
 
 ### Steps
 1. Inspect memory commands:
-   Run `uvx --from "parallel-web-tools[cli]" parallel-cli memory --help`.
+   Run `uv run --script <skill-dir>/scripts/cli.py memory --help`.
 2. Search memory:
    Run memory query with relevant keywords to locate past task outputs or findings.
 3. Continue research:
@@ -140,10 +140,10 @@ Check saved interactions, tasks, or monitor events before launching duplicate qu
 ### Illustrative commands
 ```bash
 # Search memory for earlier work
-uvx --from "parallel-web-tools[cli]" parallel-cli memory "<keywords>"
+uv run --script <skill-dir>/scripts/cli.py memory "<keywords>"
 
 # Continue research using context from earlier interaction
-uvx --from "parallel-web-tools[cli]" parallel-cli research run \
+uv run --script <skill-dir>/scripts/cli.py research run \
   "<follow-up question>" \
   --previous-interaction-id <interaction_id> \
   --processor <cheapest-fitting-tier> \

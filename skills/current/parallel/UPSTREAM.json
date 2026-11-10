@@ -1,0 +1,8 @@
+{
+  "repo": "parallel-web/parallel-web-tools",
+  "release": "v0.9.4",
+  "commit": "161cbda9df1c0d305c02f9503f15b36ddc410f4d",
+  "trees": {
+    "parallel_web_tools/cli": "2baeccdd02e32ce4f47fcde27fc1551eaaf324e4"
+  }
+}
