@@ -256,9 +256,6 @@ tui:
 # 11. EXTENSIBILITY & SYSTEM
 # ─────────────────────────────────────────────────────────────────────────────
 
-disabledExtensions:
-  - extension-module:smolui
-
 mcp:
   enableProjectConfig: false
   renderMarkdownResults: false
