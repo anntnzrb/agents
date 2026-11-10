@@ -1,7 +1,7 @@
 # Upstream notices
 
 This skill adapts workflow guidance from the Summarize agent skill at
-https://github.com/steipete/summarize/tree/v0.25.2/.agents/skills/summarize.
+https://github.com/steipete/summarize/tree/v0.26.0/.agents/skills/summarize.
 Local integration is licensed under AGPL-3.0-or-later.
 
 ## Summarize

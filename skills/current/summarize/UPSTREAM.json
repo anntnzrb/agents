@@ -1,7 +1,7 @@
 {
   "repo": "steipete/summarize",
-  "release": "v0.25.2",
-  "commit": "01fee3e50dc33122c698e9b31cb291bfb69119ba",
+  "release": "v0.26.0",
+  "commit": "aaccb7c9c30e9d7a4440fe3a2aa6e8c28c777507",
   "trees": {
     ".agents/skills/summarize": "224ba7c850a44b919bb3a7d5b85a153a32de8924"
   }
