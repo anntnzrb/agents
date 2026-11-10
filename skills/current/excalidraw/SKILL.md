@@ -18,7 +18,7 @@ Drive a live Excalidraw canvas from the shell. The CLI talks to a local canvas s
 uv run --script <skill-dir>/scripts/cli.py <command> [args]
 ```
 
-Set `<skill-dir>` to this skill directory. The wrapper forwards canvas commands unchanged to `bun x mcp-excalidraw-server@latest`, preserves their exit code, and attaches an idle watchdog to the canvas server. It answers `-h` and `--help` itself with wrapper help; use the `help` command for upstream help. NEVER call `bun x mcp-excalidraw-server` directly: commands that bypass the wrapper do not count as activity, so the watchdog may stop the server mid-task.
+Set `<skill-dir>` to this skill directory. The wrapper forwards canvas commands to the pinned `mcp-excalidraw-server`, preserves their exit code, and attaches an idle watchdog to the canvas server. It answers `-h` and `--help` itself with wrapper help; use the `help` command for upstream help. NEVER call `bun x mcp-excalidraw-server` directly: commands that bypass the wrapper do not count as activity, so the watchdog may stop the server mid-task.
 
 Live help is the only authority for commands, flags, and output shapes. This skill carries no command reference, so upstream releases need no edits here.
 
@@ -49,3 +49,7 @@ Any canvas command starts the server. A watchdog stops it after 30 minutes with 
 - Clearing, replacing on import, and restoring a snapshot overwrite the user's canvas. Save a snapshot first unless the user asked for a fresh canvas.
 - When a command reports that a browser tab is required, ask the user to open the canvas URL, then retry. Do not open it yourself.
 - `share` uploads the scene to excalidraw.com. Run it only when the user asks for a share link.
+
+## Maintenance
+
+To bump the CLI, review the upstream changes and update the release, commit, and tree hashes in `UPSTREAM.json`. Confirm the npm package version matches the release tag, then run the skill gates and smoke-test the wrapper's `help` command.

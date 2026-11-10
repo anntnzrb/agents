@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-UPSTREAM = ("bun", "x", "mcp-excalidraw-server@latest")
+PIN = Path(__file__).resolve().parents[1] / "UPSTREAM.json"
 SERVICE_NAME = "mcp-excalidraw-canvas"
 WATCHDOG_COMMAND = "__watchdog"
 DEFAULT_URL = "http://127.0.0.1:3000"
@@ -44,7 +44,9 @@ Usage:
   uv run --script <skill-dir>/scripts/cli.py <mcp-excalidraw-server-args>...
 
 Delegates to:
-  bun x mcp-excalidraw-server@latest <args>...
+  bun x mcp-excalidraw-server@<version> <args>...
+
+The version comes from the release in UPSTREAM.json.
 
 Idle shutdown:
   A detached watchdog stops the canvas server after EXCALIDRAW_IDLE_TIMEOUT
@@ -346,11 +348,28 @@ def ensure_watchdog(paths: Paths) -> None:
     spawn_watchdog(health.pid)
 
 
+def pinned_version() -> str | None:
+    """Return the pinned npm version, or None if the release is unreadable."""
+    try:
+        raw: object = json.loads(PIN.read_text(encoding="utf-8"))  # pyright: ignore[reportAny] - narrowed by match
+    except OSError, ValueError:
+        return None
+    match raw:
+        case {"release": str(release)} if release.removeprefix("v"):
+            return release.removeprefix("v")
+        case _:
+            return None
+
+
 def upstream(*args: str) -> subprocess.CompletedProcess[str]:
     """Run an upstream CLI command and capture its output."""
+    version = pinned_version()
+    if version is None:
+        return subprocess.CompletedProcess(args, 2, "", f"invalid release in {PIN}")
+    command = ["bun", "x", f"mcp-excalidraw-server@{version}", *args]
     try:
         return subprocess.run(
-            [*UPSTREAM, *args],
+            command,
             shell=False,
             check=False,
             capture_output=True,
@@ -359,7 +378,7 @@ def upstream(*args: str) -> subprocess.CompletedProcess[str]:
         )
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(
-            [*UPSTREAM, *args],
+            command,
             124,
             "",
             f"timed out after {UPSTREAM_TIMEOUT_SECONDS:g}s",
@@ -437,6 +456,10 @@ def run(argv: Sequence[str]) -> int:
     if not argv or argv[0] in {"-h", "--help"}:
         print(HELP)
         return 0
+    version = pinned_version()
+    if version is None:
+        print(f"error: invalid release in {PIN}", file=sys.stderr)
+        return 2
     if shutil.which("bun") is None:
         print("error: required executable not found: bun", file=sys.stderr)
         print("Install bun: https://bun.sh", file=sys.stderr)
@@ -444,7 +467,11 @@ def run(argv: Sequence[str]) -> int:
     paths = Paths(root=state_dir())
     paths.root.mkdir(parents=True, exist_ok=True)
     paths.marker.touch()
-    completed = subprocess.run([*UPSTREAM, *argv], shell=False, check=False)
+    completed = subprocess.run(
+        ["bun", "x", f"mcp-excalidraw-server@{version}", *argv],
+        shell=False,
+        check=False,
+    )
     paths.marker.touch()
     ensure_watchdog(paths)
     return completed.returncode
