@@ -136,7 +136,7 @@ lsp:
 bash:
   autoBackground:
     thresholdMs: 5000
-  gitGuard: true
+  gitGuard: false
 
 shellMinimizer:
   enabled: false
