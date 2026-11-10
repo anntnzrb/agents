@@ -4,10 +4,10 @@
     {
       "id": 1,
       "prompt": "I need to scrape the main article content from https://example.com/blog/ai-trends as clean markdown and save it to a file without headers, navigation bars, or footer clutter.",
-      "expected_output": "Checks `scrape --help` for available options, runs `bun x firecrawl-cli@latest scrape` with main content extraction, and saves output to a file under `.firecrawl/`.",
+      "expected_output": "Checks `scrape --help` for available options, runs `uv run --script <skill-dir>/scripts/cli.py scrape` with main content extraction, and saves output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help` or runs `scrape`",
         "Extracts main content without navigation or footer clutter",
         "Directs output to a file under `.firecrawl/` using `-o` or `--output`",
         "Quotes the URL to avoid shell expansion issues"
@@ -19,7 +19,7 @@
       "expected_output": "Checks `scrape --help` for hydration options, invokes `scrape` specifying wait delay to allow client-side JavaScript rendering, and saves output to a file.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help` or runs `scrape`",
         "Applies wait delay to allow client-side hydration",
         "Saves output to a file under `.firecrawl/` rather than streaming to stdout"
       ]
@@ -30,7 +30,7 @@
       "expected_output": "Checks `scrape --help` for action syntax, uses `scrape` with browser actions to click the selector and wait, saving output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help` or uses `scrape` actions",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help` or uses `scrape` actions",
         "Configures click on 'button.load-more-items' and wait delay",
         "Routes output to a file under `.firecrawl/`"
       ]
@@ -41,7 +41,7 @@
       "expected_output": "Checks `scrape --help` for schema and format options, invokes `scrape` with structured JSON extraction, and writes output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help` or uses `scrape`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help` or uses `scrape`",
         "Specifies structured JSON output with schema containing name, monthly_price, and features",
         "Saves structured JSON output to a file under `.firecrawl/`"
       ]
@@ -62,7 +62,7 @@
       "expected_output": "Checks `scrape --help` for screenshot and HTML options, runs `scrape`, and saves artifacts under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help` or runs `scrape`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help` or runs `scrape`",
         "Requests full-page screenshot and HTML format",
         "Saves output to `.firecrawl/`"
       ]
@@ -90,21 +90,21 @@
     {
       "id": 9,
       "prompt": "Before running a large batch scrape across hundreds of links, how do I check my remaining Firecrawl credits and team plan allowance?",
-      "expected_output": "Calls `bun x firecrawl-cli@latest credit-usage` (or `credits`) to inspect credit balance and billing period before executing large runs.",
+      "expected_output": "Calls `uv run --script <skill-dir>/scripts/cli.py credit-usage` (or `credits`) to inspect credit balance and billing period before executing large runs.",
       "files": [],
       "expectations": [
-        "Uses `bun x firecrawl-cli@latest credit-usage` or `credits`",
+        "Uses `uv run --script <skill-dir>/scripts/cli.py credit-usage` or `credits`",
         "Explains checking credit usage prior to launching expensive crawl or batch jobs"
       ]
     },
     {
       "id": 10,
       "prompt": "I'm hitting a weird bug with Bun: 'TSError: Cannot find module @effect/schema'. Search GitHub issues, merged PRs, and developer docs to find where this was fixed or discussed.",
-      "expected_output": "Checks `developer --help`, calls `bun x firecrawl-cli@latest developer` with the invariant error string, and saves output to a file under `.firecrawl/`.",
+      "expected_output": "Checks `developer --help`, calls `uv run --script <skill-dir>/scripts/cli.py developer` with the invariant error string, and saves output to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
         "Routes developer queries to `developer`",
-        "Checks `bun x firecrawl-cli@latest developer --help` or passes query to `developer`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py developer --help` or passes query to `developer`",
         "Passes the invariant error message as query text",
         "Saves output to `.firecrawl/`"
       ]
@@ -115,7 +115,7 @@
       "expected_output": "Checks `research --help`, uses `research search-papers` to query the research paper index, and saves results to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest research --help` or `research search-papers --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py research --help` or `research search-papers --help`",
         "Routes scientific literature queries to `research search-papers`",
         "Saves output under `.firecrawl/`"
       ]
@@ -126,7 +126,7 @@
       "expected_output": "Checks `research --help`, invokes `research related-papers` with seed IDs, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest research --help` or `research related-papers --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py research --help` or `research related-papers --help`",
         "Routes citation and similarity expansion to `research related-papers`",
         "Saves output under `.firecrawl/`"
       ]
@@ -137,7 +137,7 @@
       "expected_output": "Checks `research --help`, uses `research read-paper` to query specific in-body passages, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest research --help` or `research read-paper --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py research --help` or `research read-paper --help`",
         "Routes full-text passage reading to `research read-paper`",
         "Saves output under `.firecrawl/`"
       ]
@@ -148,7 +148,7 @@
       "expected_output": "Checks `map --help`, calls `map` with search filter, and saves discovered URLs to a file under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest map --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py map --help`",
         "Routes URL discovery without content fetching to `map`",
         "Saves discovered endpoints to a file under `.firecrawl/`"
       ]
@@ -159,7 +159,7 @@
       "expected_output": "Checks `crawl --help`, invokes `crawl` with path scoping, depth limits, and native wait flags, saving output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest crawl --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py crawl --help`",
         "Routes recursive site crawling to `crawl`",
         "Uses native wait flag instead of manual polling",
         "Saves results to a file under `.firecrawl/`"
@@ -171,7 +171,7 @@
       "expected_output": "Checks `crawl --help` for job status and cancellation options, invoking `crawl <job-id>`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest crawl --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py crawl --help`",
         "Uses `crawl` with the job ID and status/cancel options"
       ]
     },
@@ -181,7 +181,7 @@
       "expected_output": "Checks `interact --help` or `scrape --help`, scrapes URL to initialize session, then uses `interact` or scrape actions to drive the browser, saving results under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest interact --help` or `scrape --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py interact --help` or `scrape --help`",
         "Routes interactive form filling and browser actions to `interact` or `scrape` actions",
         "Saves output to a file under `.firecrawl/`"
       ]
@@ -192,7 +192,7 @@
       "expected_output": "Checks `interact --help`, uses `interact` with code execution, and saves output to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest interact --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py interact --help`",
         "Routes browser sandbox execution to `interact`",
         "Saves output to `.firecrawl/` and closes session when done"
       ]
@@ -203,7 +203,7 @@
       "expected_output": "Checks `scrape --help` for profile options, uses `scrape` with persistent profile, and saves artifacts to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest scrape --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py scrape --help`",
         "Uses persistent browser profile to preserve authentication across scrapes",
         "Saves output to `.firecrawl/`"
       ]
@@ -214,7 +214,7 @@
       "expected_output": "Checks `monitor create --help`, creates a recurring URL monitor with schedule and alert goal, saving definition under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest monitor create --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py monitor create --help`",
         "Routes recurring page checks to `monitor create`",
         "Saves monitor configuration or output under `.firecrawl/`"
       ]
@@ -225,7 +225,7 @@
       "expected_output": "Checks `monitor create --help`, calls `monitor create` with schedule and webhook destination, saving output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest monitor create --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py monitor create --help`",
         "Configures scheduled monitor check with webhook notification",
         "Saves output under `.firecrawl/`"
       ]
@@ -246,7 +246,7 @@
       "expected_output": "Checks `parse --help`, calls `parse` on local PDF with question answering, and saves output under `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest parse --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py parse --help`",
         "Routes local PDF parsing to `parse`",
         "Saves output to a file under `.firecrawl/`"
       ]
@@ -257,7 +257,7 @@
       "expected_output": "Checks `x download --help`, runs download with path scoping and non-interactive confirmation, saving to `.firecrawl/`.",
       "files": [],
       "expectations": [
-        "Checks `bun x firecrawl-cli@latest x download --help` or `experimental download --help`",
+        "Checks `uv run --script <skill-dir>/scripts/cli.py x download --help` or `experimental download --help`",
         "Routes site mirroring to `experimental download` or `x download`",
         "Passes non-interactive confirmation and path scoping",
         "Saves directory structure under `.firecrawl/`"
