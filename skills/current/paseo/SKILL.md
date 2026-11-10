@@ -8,7 +8,21 @@ license: AGPL-3.0-or-later
 
 Paseo is a daemon that runs coding agents in workspaces. Agents it launches can launch and steer other agents. Drive it through the injected Paseo tools when they are available, otherwise through the `paseo` CLI. Pi agents receive no injected tools; use the CLI.
 
-Paseo sets `PASEO_AGENT_ID` in every agent it launches. An agent you create from that session becomes your subagent; omit the workspace to share your files.
+Paseo sets `PASEO_AGENT_ID` in every agent it launches. An agent you create from that session becomes your subagent. On your own host, omit the workspace to share your files.
+
+## Connected hosts
+
+Call `list_hosts` to discover the calling daemon and registered destinations. Use a destination's `serverId`, not its display label, with `create_workspace`, `list_workspaces`, `create_agent`, `send_agent_prompt`, `get_agent_status`, `get_agent_activity`, or `list_agents`. Omit `serverId` for the calling daemon; other injected tools operate there.
+
+Keep each agent's `serverId` and `agentId` together. For a remote agent, first list or create a workspace on that host, then pass its `workspaceId` and `serverId` to `create_agent`. Paths and workspace IDs belong to the destination. Remote `list_agents` does not default to the caller's directory; pass `cwd` to filter it.
+
+Manage host registrations with `paseo host`; use the returned `registrationId` for updates and removal. Select the calling daemon with `--host <address>` when needed.
+
+## Workspaces
+
+For `create_workspace`, use `path` for a local directory or source checkout and `projectId` for the owning project. A worktree can resolve its source from `projectId` when `path` is omitted. Worktree checkout modes are `branch-off`, `checkout-branch`, and `checkout-pr`.
+
+Background workspaces remain durable but are hidden from default lists and the sidebar. When `background` is omitted, the new workspace inherits the calling workspace's value. Without a caller, the value defaults to `false`. Override it only at the user's request. Set `includeBackground: true` in `list_workspaces` or `list_agents` to include them.
 
 ## Choose settings before delegating
 
@@ -34,10 +48,11 @@ paseo heartbeat delete <heartbeat-id>
 - Pass `--base origin/main`, not `main`; Paseo fetches remote refs, while local `main` can be stale.
 - Give a worktree when parallel workers edit files; share the workspace for read-only workers.
 - Discover other commands with `paseo <command> --help`.
+- Agent-scoped `send_agent_prompt` and `paseo send` default to `steer`; top-level sends default to `interrupt`. Override with `activeTurnBehavior` or CLI `--behavior steer|interrupt`. Steering falls back to interruption when unavailable. Agent-scoped sends return a queued receipt; top-level sends return after dispatch acknowledgement.
 
 ## Waiting
 
-- Agents routinely take 10 to 30 minutes. Injected tools notify you when a subagent finishes; do not poll `list_agents` or `get_agent_status`.
+- Agents routinely take 10 to 30 minutes. Injected tools notify you on completion, errors, or permission requests, including across hosts. Do not poll `list_agents` or `get_agent_status`. When an explicit reply is needed instead of a callback, ask the sender to check `list_hosts` for the recipient's server before setting `notifyOnFinish: false`.
 - From the CLI, block with `paseo agent wait` only when your next step needs the result; otherwise keep working.
 
 ## Heartbeats
