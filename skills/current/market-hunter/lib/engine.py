@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urlsplit
 
@@ -110,16 +111,20 @@ def _scrape_with_sdk(
 
 
 def _cli_scrape_command(url: str) -> list[str] | None:
-    """Build the keyless scrape command: installed ``firecrawl``, else ``bun x``."""
+    """Build the keyless scrape command, preferring an installed CLI."""
     firecrawl_bin = shutil.which("firecrawl")
     if firecrawl_bin:
         return [firecrawl_bin, "scrape", url, "--only-main-content"]
-    bun_bin = shutil.which("bun")
-    if bun_bin:
+    uv_bin = shutil.which("uv")
+    if uv_bin:
+        wrapper = (
+            Path(__file__).resolve().parents[2] / "firecrawl" / "scripts" / "cli.py"
+        )
         return [
-            bun_bin,
-            "x",
-            "firecrawl-cli@latest",
+            uv_bin,
+            "run",
+            "--script",
+            str(wrapper),
             "scrape",
             url,
             "--only-main-content",
@@ -296,7 +301,9 @@ def execute_scan(options: ScanOptions) -> ScanResultData:
     has_firecrawl_key = bool(
         os.environ.get("FIRECRAWL_API_KEY") or os.environ.get("FIRECRAWL_API_URL")
     )
-    cli_fallback_available = bool(shutil.which("firecrawl") or shutil.which("bun"))
+    cli_fallback_available = bool(
+        shutil.which("firecrawl") or (shutil.which("uv") and shutil.which("bun"))
+    )
     warning_message = _resolve_warning(
         has_firecrawl_key=has_firecrawl_key,
         cli_fallback_available=cli_fallback_available,

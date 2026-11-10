@@ -28,7 +28,7 @@ Apply these on every recommendation:
 uv run --script skills/current/market-hunter/scripts/cli.py "<query>" [options]
 ```
 
-Requires `FIRECRAWL_API_KEY` for scraped marketplaces (G2A, Kinguin).
+For scraped marketplaces, configure `FIRECRAWL_API_KEY` for reliable coverage. Without it, the scan prefers an installed `firecrawl` executable, which is unversioned, or uses the sibling firecrawl skill's pinned wrapper. The wrapper requires `uv` and Bun.
 
 ## Workflow
 

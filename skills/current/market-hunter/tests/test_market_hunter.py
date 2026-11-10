@@ -372,30 +372,35 @@ class TestEngine:
         assert engine._scrape_with_cli("https://example.com", 5) == "scraped text"
         assert calls["command"][:2] == ["/usr/bin/firecrawl", "scrape"]
 
-    def test_scrape_with_cli_falls_back_to_bun(
+    def test_scrape_with_cli_falls_back_to_pinned_wrapper(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls: dict[str, list[str]] = {}
 
         def fake_which(name: str) -> str | None:
-            return "/usr/bin/bun" if name == "bun" else None
+            return "/usr/bin/uv" if name == "uv" else None
 
         monkeypatch.setattr(shutil, "which", fake_which)
 
         class _Proc:
-            stdout: bytes = b"scraped via bun"
+            stdout: bytes = b"scraped via wrapper"
 
         def fake_run(command: list[str], **_kwargs: object) -> _Proc:
             calls["command"] = command
             return _Proc()
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        assert engine._scrape_with_cli("https://example.com", 5) == "scraped via bun"
-        assert calls["command"][:4] == [
-            "/usr/bin/bun",
-            "x",
-            "firecrawl-cli@latest",
+        assert (
+            engine._scrape_with_cli("https://example.com", 5) == "scraped via wrapper"
+        )
+        assert calls["command"] == [
+            "/usr/bin/uv",
+            "run",
+            "--script",
+            str(Path(__file__).resolve().parents[2] / "firecrawl/scripts/cli.py"),
             "scrape",
+            "https://example.com",
+            "--only-main-content",
         ]
 
     def test_scrape_with_cli_returns_none_without_binaries(
