@@ -20,13 +20,12 @@ When a simple fetch or scrape returns an empty shell, hydration skeleton, or coo
 
 ### Steps
 1. Run `uv run --script <skill-dir>/scripts/cli.py scrape --help` to verify the latest hydration and delay flags.
-2. Run scrape specifying wait time (e.g. `--wait-for 3000`) and main content filtering, routing output to `.firecrawl/`.
+2. Run scrape specifying wait time (e.g. `--wait-for 3000`), routing output to `.firecrawl/`. Main content filtering is the default; use `--full-page` to include navigation and footers.
 3. Inspect the saved file locally with grep, head, or jq instead of dumping raw content into context.
 
 ### Illustrative command
 ```sh
 uv run --script <skill-dir>/scripts/cli.py scrape "<url>" \
-  --only-main-content \
   --wait-for 3500 \
   -o .firecrawl/<name>.md
 ```
