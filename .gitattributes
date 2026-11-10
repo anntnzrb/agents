@@ -9,3 +9,6 @@ skills/current/nix-clan-2605/references/NOTICE.md -whitespace
 skills/current/nix-clan-2605/references/embeds/** -whitespace
 skills/current/odoo-ops/scripts/sql/*.sql -whitespace
 skills/current/ui-ux-pro-max/data/*.csv -whitespace
+
+# Bulk upstream data: diff as binary so commit planning stays within model input limits.
+skills/current/ui-ux-pro-max/data/** -diff
