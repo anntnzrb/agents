@@ -14,21 +14,20 @@ Usage:
     )
 """
 
-import contextlib
 import csv
 import io
-import json
 import os
 import re
 import sys
-from collections.abc import Callable, Mapping, Sequence
+import tempfile
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeIs, final
 
 import core
+from reasoning_contract import apply_decision_rules, parse_decision_rules
 
-_json_loads: Callable[[str | bytes | bytearray], object] = json.loads
 DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
 
 
@@ -93,7 +92,7 @@ HEX_COLOR_LENGTH: int = 6
 SEARCH_CONFIG: dict[str, dict[str, int]] = {
     "product": {"max_results": 1},
     "style": {"max_results": 3},
-    "color": {"max_results": 2},
+    "color": {"max_results": 5},
     "landing": {"max_results": 2},
     "typography": {"max_results": 2},
 }
@@ -201,12 +200,18 @@ COLOR_ENTRIES: list[tuple[str, str, str]] = [
     ("Primary", "primary", "--color-primary"),
     ("On Primary", "on_primary", "--color-on-primary"),
     ("Secondary", "secondary", "--color-secondary"),
+    ("On Secondary", "on_secondary", "--color-on-secondary"),
     ("Accent/CTA", "accent", "--color-accent"),
+    ("On Accent/CTA", "on_accent", "--color-on-accent"),
     ("Background", "background", "--color-background"),
     ("Foreground", "foreground", "--color-foreground"),
+    ("Card", "card", "--color-card"),
+    ("Card Foreground", "card_foreground", "--color-card-foreground"),
     ("Muted", "muted", "--color-muted"),
+    ("Muted Foreground", "muted_foreground", "--color-muted-foreground"),
     ("Border", "border", "--color-border"),
     ("Destructive", "destructive", "--color-destructive"),
+    ("On Destructive", "on_destructive", "--color-on-destructive"),
     ("Ring", "ring", "--color-ring"),
 ]
 
@@ -277,17 +282,165 @@ def _resolve_dial(
     return None
 
 
+_DARK_PRIMARY_MARKERS = (
+    "dark mode primary",
+    "dark primary",
+    "dark-only",
+    "dark only",
+    "dark preferred",
+    "dark focused",
+    "dark-first",
+    "dark rich",
+    "light mode only as exception",
+)
+_DARK_QUERY_MARKERS = (
+    "dark mode",
+    "dark theme",
+    "dark ui",
+    "dark-mode",
+    "darkmode",
+    "night mode",
+    "midnight",
+    "oled",
+)
+_DARK_ANTI_PATTERN_MARKERS = ("dark mode", "dark modes", "dark theme")
+_SHORT_HEX_LENGTH = 3
+_MIN_RING_CONTRAST = 3
+_SRGB_LINEAR_THRESHOLD = 0.04045
+_DARK_LUMINANCE_THRESHOLD = 0.18
+
+
+def _relative_luminance(hex_color: str) -> float | None:
+    value = hex_color.strip().lstrip("#")
+    if len(value) == _SHORT_HEX_LENGTH:
+        value = "".join(c * 2 for c in value)
+    if len(value) != HEX_COLOR_LENGTH:
+        return None
+    try:
+        channels = [int(value[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+    except ValueError:
+        return None
+    linear = [
+        c / 12.92 if c <= _SRGB_LINEAR_THRESHOLD else ((c + 0.055) / 1.055) ** 2.4
+        for c in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(first: str, second: str) -> float | None:
+    first_luminance = _relative_luminance(first)
+    second_luminance = _relative_luminance(second)
+    if first_luminance is None or second_luminance is None:
+        return None
+    return (max(first_luminance, second_luminance) + 0.05) / (
+        min(first_luminance, second_luminance) + 0.05
+    )
+
+
+def _palette_is_dark(palette: dict[str, str]) -> bool:
+    luminance = _relative_luminance(palette.get("Background", ""))
+    return luminance is not None and luminance < _DARK_LUMINANCE_THRESHOLD
+
+
+def _style_is_dark_primary(style: dict[str, str]) -> bool:
+    preferred = style.get("Preferred Mode", "").strip().lower()
+    if preferred in {"dark", "light"}:
+        return preferred == "dark"
+    if (
+        style.get("Light Mode ✓") == "not-recommended"
+        and style.get("Dark Mode ✓") == "supported"
+    ):
+        return True
+    declared = f"{style.get('Light Mode ✓', '')} {style.get('Dark Mode ✓', '')}".lower()
+    return any(marker in declared for marker in _DARK_PRIMARY_MARKERS)
+
+
+def _resolve_color_mode(query: str, style: dict[str, str]) -> str:
+    return (
+        "dark"
+        if any(marker in query.lower() for marker in _DARK_QUERY_MARKERS)
+        or _style_is_dark_primary(style)
+        else "light"
+    )
+
+
+def _derive_dark_palette(palette: dict[str, str]) -> dict[str, str]:
+    derived = dict(palette)
+    background = "#0F172A"
+    candidates = (
+        palette.get("Ring", ""),
+        palette.get("Accent", ""),
+        palette.get("Primary", ""),
+        "#60A5FA",
+    )
+    ring = next(
+        (
+            candidate
+            for candidate in candidates
+            if (_contrast_ratio(candidate, background) or 0) >= _MIN_RING_CONTRAST
+        ),
+        "#60A5FA",
+    )
+    derived.update(
+        {
+            "Background": background,
+            "Foreground": "#F8FAFC",
+            "Card": "#111827",
+            "Card Foreground": "#F8FAFC",
+            "Muted": "#1E293B",
+            "Muted Foreground": "#CBD5E1",
+            "Border": "#334155",
+            "Ring": ring,
+            "_mode_derivation": "derived-dark",
+        }
+    )
+    return derived
+
+
+def _select_palette_for_mode(
+    palettes: list[dict[str, str]], mode: str, category: str
+) -> dict[str, str]:
+    if not palettes:
+        return {}
+    category_palette = next(
+        (p for p in palettes if p.get("Product Type") == category), None
+    )
+    if category_palette:
+        return (
+            _derive_dark_palette(category_palette)
+            if mode == "dark" and not _palette_is_dark(category_palette)
+            else category_palette
+        )
+    if mode == "dark":
+        return next((p for p in palettes if _palette_is_dark(p)), palettes[0])
+    return palettes[0]
+
+
+def _filter_anti_patterns_for_mode(anti_patterns: str, mode: str) -> str:
+    if mode != "dark" or not anti_patterns:
+        return anti_patterns
+    return " + ".join(
+        clause.strip()
+        for clause in anti_patterns.split("+")
+        if clause.strip()
+        and not any(marker in clause.lower() for marker in _DARK_ANTI_PATTERN_MARKERS)
+    )
+
+
 def _score_match(result: dict[str, str], priority_keywords: list[str]) -> int:
     """Score a result against priority keywords."""
     result_str = str(result).lower()
     score = 0
     for kw in priority_keywords:
-        kw_lower = kw.lower().strip()
-        if kw_lower in result.get("Style Category", "").lower():
+        tokens: set[str] = set(re.findall(r"[a-z0-9]+", kw.lower()))
+        name_tokens = set(
+            re.findall(r"[a-z0-9]+", result.get("Style Category", "").lower())
+        )
+        if tokens and tokens <= name_tokens:
             score += 10
-        elif kw_lower in result.get("Keywords", "").lower():
+        elif tokens & set(re.findall(r"[a-z0-9]+", result.get("Keywords", "").lower())):
             score += 3
-        elif kw_lower in result_str:
+        elif any(token in result_str for token in tokens):
             score += 1
     return score
 
@@ -302,6 +455,12 @@ class DesignSystemGenerator:
     def __init__(self) -> None:
         """Initialize the generator and load reasoning rules."""
         self.reasoning_data = self._load_reasoning()
+        self.style_lookup = self._load_lookup(
+            "styles.csv", ("Style ID", "Style Category")
+        )
+        self.landing_lookup = self._load_lookup(
+            "landing.csv", ("Pattern ID", "Pattern Name")
+        )
 
     def _load_reasoning(self) -> list[dict[str, str]]:
         """Load reasoning rules from CSV."""
@@ -311,53 +470,91 @@ class DesignSystemGenerator:
         with filepath.open(encoding="utf-8") as f:
             return list(csv.DictReader(f))
 
+    def _load_lookup(
+        self, filename: str, keys: tuple[str, str]
+    ) -> dict[str, dict[str, str]]:
+        filepath = DATA_DIR / filename
+        if not filepath.exists():
+            return {}
+        lookup: dict[str, dict[str, str]] = {}
+        with filepath.open(encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                identities = [row.get(key, "") for key in keys] + row.get(
+                    "Aliases", ""
+                ).split("|")
+                for identity in identities:
+                    if identity.strip():
+                        lookup[identity.strip().casefold()] = row
+        return lookup
+
+    def _resolve_style(self, reference: str) -> dict[str, str]:
+        style = self.style_lookup.get(reference.strip().casefold(), {})
+        seen: set[str] = set()
+        while style and style.get("Status", "active") == "deprecated":
+            style_id = style.get("Style ID", "")
+            parent_id = style.get("Parent Style ID", "")
+            if not parent_id or style_id in seen:
+                return {}
+            seen.add(style_id)
+            style = self.style_lookup.get(parent_id.casefold(), {})
+        return style
+
     def _multi_domain_search(
-        self, query: str, style_priority: list[str] | None = None
+        self,
+        query: str,
+        category: str,
+        reasoning: dict[str, object],
+        style_priority: list[str] | None = None,
     ) -> dict[str, dict[str, object]]:
         """Execute searches across multiple domains."""
         results: dict[str, dict[str, object]] = {}
+        constraints = " ".join(
+            item.replace("-", " ")
+            for item in _as_str_list(reasoning.get("constraints"))
+        )
+        resolved_query = " ".join(
+            part for part in (query, category, constraints) if part
+        )
         for domain, config in SEARCH_CONFIG.items():
             max_res = int(config.get("max_results", 3))
             if domain == "style" and style_priority:
-                # For style, also search with priority keywords
-                priority_query = (
-                    " ".join(style_priority[:2]) if style_priority else query
+                results[domain] = search(
+                    f"{resolved_query} {' '.join(style_priority[:2])}", domain, max_res
                 )
-                combined_query = f"{query} {priority_query}"
-                results[domain] = search(combined_query, domain, max_res)
+            elif domain == "color":
+                results[domain] = search(
+                    f"{reasoning.get('color_mood', '')} {resolved_query}",
+                    domain,
+                    max_res,
+                )
+            elif domain == "landing":
+                pattern = str(reasoning.get("pattern", ""))
+                landing_query = (
+                    pattern
+                    if pattern.casefold() in self.landing_lookup
+                    else f"{pattern} {resolved_query}"
+                )
+                results[domain] = search(landing_query or query, domain, max_res)
+            elif domain == "typography":
+                results[domain] = search(
+                    f"{reasoning.get('typography_mood', '')} {resolved_query}",
+                    domain,
+                    max_res,
+                )
             else:
                 results[domain] = search(query, domain, max_res)
         return results
 
     def _find_reasoning_rule(self, category: str) -> dict[str, str]:
         """Find matching reasoning rule for a category."""
-        category_lower = category.lower()
-
-        # Try exact match first
+        category_lower = category.strip().casefold()
         for rule in self.reasoning_data:
-            if rule.get("UI_Category", "").lower() == category_lower:
+            if rule.get("UI_Category", "").strip().casefold() == category_lower:
                 return rule
-
-        # Try partial match
-        for rule in self.reasoning_data:
-            ui_cat = rule.get("UI_Category", "").lower()
-            if ui_cat in category_lower or category_lower in ui_cat:
-                return rule
-
-        # Try keyword match
-        for rule in self.reasoning_data:
-            ui_cat = rule.get("UI_Category", "").lower()
-            keywords = ui_cat.replace("/", " ").replace("-", " ").split()
-            if any(kw in category_lower for kw in keywords):
-                return rule
-
         return {}
 
-    def _apply_reasoning(
-        self, category: str, _search_results: dict[str, object] | None = None
-    ) -> dict[str, object]:
-        """Apply reasoning rules to search results."""
-        _ = _search_results
+    def _apply_reasoning(self, category: str, query: str) -> dict[str, object]:
+        """Apply matching category and query decision rules."""
         rule = self._find_reasoning_rule(category)
 
         if not rule:
@@ -369,25 +566,33 @@ class DesignSystemGenerator:
                 "key_effects": "Subtle hover transitions",
                 "anti_patterns": "",
                 "decision_rules": {},
+                "activated_rules": [],
+                "constraints": [],
+                "preferred_mode": None,
+                "is_default": True,
                 "severity": "MEDIUM",
             }
 
-        # Parse decision rules JSON
-        decision_rules: object = {}
-        with contextlib.suppress(json.JSONDecodeError):
-            raw_rules = rule.get("Decision_Rules", "{}")
-            decision_rules = _json_loads(raw_rules)
+        decision_rules = parse_decision_rules(rule.get("Decision_Rules", "{}"))
+        applied = apply_decision_rules(decision_rules, query)
+        applied_styles = [
+            self._resolve_style(style_id).get("Style Category", style_id)
+            for style_id in applied["style_ids"]
+        ]
 
         return {
-            "pattern": rule.get("Recommended_Pattern", ""),
-            "style_priority": [
-                s.strip() for s in rule.get("Style_Priority", "").split("+")
-            ],
+            "pattern": applied["pattern"] or rule.get("Recommended_Pattern", ""),
+            "style_priority": applied_styles
+            + [s.strip() for s in rule.get("Style_Priority", "").split("+")],
             "color_mood": rule.get("Color_Mood", ""),
             "typography_mood": rule.get("Typography_Mood", ""),
             "key_effects": rule.get("Key_Effects", ""),
             "anti_patterns": rule.get("Anti_Patterns", ""),
             "decision_rules": decision_rules,
+            "activated_rules": applied["activated"],
+            "constraints": applied["constraints"],
+            "preferred_mode": applied["mode"],
+            "is_default": False,
             "severity": rule.get("Severity", "MEDIUM"),
         }
 
@@ -401,13 +606,10 @@ class DesignSystemGenerator:
         if not priority_keywords:
             return results[0]
 
-        # First: try exact style name match
         for priority in priority_keywords:
-            priority_lower = priority.lower().strip()
-            for result in results:
-                style_name = result.get("Style Category", "").lower()
-                if priority_lower in style_name or style_name in priority_lower:
-                    return result
+            resolved = self._resolve_style(priority)
+            if resolved and resolved.get("Status", "active") != "deprecated":
+                return dict(resolved)
 
         # Second: score by keyword match in all fields
         scored = [(_score_match(res, priority_keywords), res) for res in results]
@@ -446,7 +648,7 @@ class DesignSystemGenerator:
             category = product_results[0].get("Product Type", "General")
 
         # Step 2: Get reasoning rules for this category
-        reasoning = self._apply_reasoning(category, {})
+        reasoning = self._apply_reasoning(category, query)
         style_priority = _as_str_list(reasoning.get("style_priority"))
 
         # DESIGN_VARIANCE dial: bias style retrieval/selection toward
@@ -457,7 +659,9 @@ class DesignSystemGenerator:
             effective_style_priority = kw_list + style_priority
 
         # Step 3: Multi-domain search with style priority hints
-        search_results = self._multi_domain_search(query, effective_style_priority)
+        search_results = self._multi_domain_search(
+            query, category, reasoning, effective_style_priority
+        )
         search_results["product"] = product_raw  # Reuse product search
 
         # Step 4: Select best matches from each domain using priority
@@ -471,9 +675,19 @@ class DesignSystemGenerator:
         )
 
         best_style = self._select_best_match(style_results, effective_style_priority)
-        best_color = color_results[0] if color_results else {}
+        color_mode = str(
+            reasoning.get("preferred_mode") or _resolve_color_mode(query, best_style)
+        )
+        best_color = _select_palette_for_mode(color_results, color_mode, category)
         best_typography = typography_results[0] if typography_results else {}
-        best_landing = landing_results[0] if landing_results else {}
+        best_landing = next(
+            (
+                row
+                for row in landing_results
+                if row.get("Pattern Name") == reasoning.get("pattern")
+            ),
+            landing_results[0] if landing_results else {},
+        )
 
         # MOTION_INTENSITY dial: pull a matching GSAP skeleton from motion.csv
         # (domain key is "gsap", not "motion" - PR #296 already owns the "motion"
@@ -514,6 +728,7 @@ class DesignSystemGenerator:
                 "conversion": best_landing.get("Conversion Optimization", ""),
             },
             "style": {
+                "id": best_style.get("Style ID", "minimalism-and-swiss-style"),
                 "name": best_style.get("Style Category", "Minimalism"),
                 "type": best_style.get("Type", "General"),
                 "effects": style_effects,
@@ -528,17 +743,24 @@ class DesignSystemGenerator:
                 "primary": best_color.get("Primary", "#2563EB"),
                 "on_primary": best_color.get("On Primary", ""),
                 "secondary": best_color.get("Secondary", "#3B82F6"),
+                "on_secondary": best_color.get("On Secondary", ""),
                 "accent": best_color.get("Accent", "#F97316"),
+                "on_accent": best_color.get("On Accent", ""),
                 "background": best_color.get("Background", "#F8FAFC"),
                 "foreground": best_color.get("Foreground", "#1E293B"),
+                "card": best_color.get("Card", ""),
+                "card_foreground": best_color.get("Card Foreground", ""),
                 "muted": best_color.get("Muted", ""),
+                "muted_foreground": best_color.get("Muted Foreground", ""),
                 "border": best_color.get("Border", ""),
                 "destructive": best_color.get("Destructive", ""),
+                "on_destructive": best_color.get("On Destructive", ""),
                 "ring": best_color.get("Ring", ""),
                 "notes": best_color.get("Notes", ""),
                 # Keep legacy keys for backward compat in MASTER.md
                 "cta": best_color.get("Accent", "#F97316"),
                 "text": best_color.get("Foreground", "#1E293B"),
+                "on_cta": best_color.get("On Accent", ""),
             },
             "typography": {
                 "heading": best_typography.get("Heading Font", "Inter"),
@@ -552,8 +774,22 @@ class DesignSystemGenerator:
                 "css_import": best_typography.get("CSS Import", ""),
             },
             "key_effects": combined_effects,
-            "anti_patterns": str(reasoning.get("anti_patterns", "")),
+            "anti_patterns": _filter_anti_patterns_for_mode(
+                str(reasoning.get("anti_patterns", "")), color_mode
+            ),
             "decision_rules": reasoning.get("decision_rules", {}),
+            "activated_rules": reasoning.get("activated_rules", []),
+            "constraints": reasoning.get("constraints", []),
+            "reasoning_default": reasoning.get("is_default", False),
+            "source_identities": {
+                "product": category if product_results else None,
+                "reasoning": category if not reasoning.get("is_default") else None,
+                "style": best_style.get("Style ID") or best_style.get("Style Category"),
+                "color": best_color.get("Product Type"),
+                "typography": best_typography.get("Font Pairing Name"),
+                "landing": best_landing.get("Pattern Name"),
+            },
+            "source_derivations": {"color_mode": best_color.get("_mode_derivation")},
             "severity": str(reasoning.get("severity", "MEDIUM")),
             "dials": {
                 "variance": variance_info["value"] if variance_info else None,
@@ -649,7 +885,9 @@ def _format_ascii_dials(dials: dict[str, object]) -> list[str]:
 
 def _format_ascii_pattern(pattern: dict[str, str]) -> list[str]:
     """Format the pattern section for ASCII box output."""
-    sections = [s.strip() for s in pattern.get("sections", "").split(">") if s.strip()]
+    sections = [
+        s.strip() for s in pattern.get("sections", "").split(" > ") if s.strip()
+    ]
     lines = [
         section_header("PATTERN", BOX_WIDTH + 1),
         f"│  Name: {pattern.get('name', '')}".ljust(BOX_WIDTH) + "│",
@@ -1065,7 +1303,8 @@ def generate_design_system(  # noqa: PLR0913, PLR0917 - public API signature req
     variance: int | None = None,
     motion: int | None = None,
     density: int | None = None,
-) -> str:
+    force: bool = False,
+) -> dict[str, object]:
     """Main entry point for design system generation.
 
     Args:
@@ -1078,9 +1317,10 @@ def generate_design_system(  # noqa: PLR0913, PLR0917 - public API signature req
         variance: Optional 1-10 DESIGN_VARIANCE dial (1=centered, 10=bold)
         motion: Optional 1-10 MOTION_INTENSITY dial, pulls a GSAP snippet
         density: Optional 1-10 VISUAL_DENSITY dial, overrides spacing scale
+        force: Overwrite existing persisted files when True.
 
     Returns:
-        Formatted design system string.
+        Formatted text, raw design system, and optional persistence result.
 
     """
     generator = DesignSystemGenerator()
@@ -1092,21 +1332,56 @@ def generate_design_system(  # noqa: PLR0913, PLR0917 - public API signature req
         density=density,
     )
 
-    # Persist to files if requested
-    if persist:
-        _ = persist_design_system(design_system, page, output_dir, query)
-
-    if output_format == "markdown":
-        return format_markdown(design_system)
-    return format_ascii_box(design_system)
+    persistence = (
+        persist_design_system(design_system, page, output_dir, query, force=force)
+        if persist
+        else None
+    )
+    text = (
+        format_markdown(design_system)
+        if output_format == "markdown"
+        else format_ascii_box(design_system)
+    )
+    return {"text": text, "design_system": design_system, "persistence": persistence}
 
 
 # ============ PERSISTENCE FUNCTIONS ============
+def safe_slug(name: str, fallback: str = "default") -> str:
+    """Convert a name to a safe single path segment."""
+    return re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-") or fallback
+
+
+def _write_persisted_file(path: Path, content: str, force: bool) -> None:
+    temp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_name = handle.name
+            _ = handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if force:
+            _ = Path(temp_name).replace(path)
+            temp_name = None
+        else:
+            path.hardlink_to(temp_name)
+    finally:
+        if temp_name:
+            Path(temp_name).unlink(missing_ok=True)
+
+
 def persist_design_system(
     design_system: dict[str, object],
     page: str | None = None,
     output_dir: str | None = None,
     page_query: str | None = None,
+    force: bool = False,
 ) -> dict[str, object]:
     """Persist design system to design-system/<project>/ folder using Master pattern.
 
@@ -1115,6 +1390,7 @@ def persist_design_system(
         page: Optional page name for page-specific override file
         output_dir: Optional output directory (defaults to current directory)
         page_query: Optional query string for page override generation
+        force: Overwrite existing persisted files when True.
 
     Returns:
         dict with created file paths and status.
@@ -1126,7 +1402,7 @@ def persist_design_system(
     # (missing key, explicit None, or "") so the .lower() below can't crash.
     project_name_raw = design_system.get("project_name")
     project_name = str(project_name_raw) if project_name_raw else "default"
-    project_slug = project_name.lower().replace(" ", "-")
+    project_slug = safe_slug(project_name)
 
     design_system_dir = base_dir / "design-system" / project_slug
     pages_dir = design_system_dir / "pages"
@@ -1139,23 +1415,44 @@ def persist_design_system(
 
     master_file = design_system_dir / "MASTER.md"
 
-    # Generate and write MASTER.md
-    master_content = format_master_md(design_system)
-    with master_file.open("w", encoding="utf-8") as f:
-        _ = f.write(master_content)
-    created_files.append(str(master_file))
+    try:
+        _write_persisted_file(master_file, format_master_md(design_system), force)
+        created_files.append(str(master_file))
+    except FileExistsError:
+        if not page:
+            return {
+                "status": "skipped_exists",
+                "design_system_dir": str(design_system_dir),
+                "master_file": str(master_file),
+                "created_files": [],
+                "message": (
+                    f"{master_file} already exists and was not modified. "
+                    "Read it first to check for prior design decisions, then "
+                    "re-run with force=True / --force to overwrite."
+                ),
+            }
 
     # If page is specified, create page override file with intelligent content
     if page:
-        page_file = pages_dir / f"{page.lower().replace(' ', '-')}.md"
+        page_file = pages_dir / f"{safe_slug(page, 'page')}.md"
         page_content = format_page_override_md(design_system, page, page_query)
-        with page_file.open("w", encoding="utf-8") as f:
-            _ = f.write(page_content)
-        created_files.append(str(page_file))
+        try:
+            _write_persisted_file(page_file, page_content, force)
+            created_files.append(str(page_file))
+        except FileExistsError:
+            if not created_files:
+                return {
+                    "status": "skipped_exists",
+                    "design_system_dir": str(design_system_dir),
+                    "master_file": str(master_file),
+                    "created_files": [],
+                    "message": f"{page_file} already exists and was not modified.",
+                }
 
     return {
         "status": "success",
         "design_system_dir": str(design_system_dir),
+        "master_file": str(master_file),
         "created_files": created_files,
     }
 
@@ -1862,4 +2159,4 @@ if __name__ == "__main__":
     cli_format = str(args_dict.get("format", "ascii"))
 
     result_text = generate_design_system(cli_query, cli_project_name, cli_format)
-    print(result_text)
+    print(result_text["text"])

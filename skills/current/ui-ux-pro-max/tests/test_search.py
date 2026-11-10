@@ -45,18 +45,18 @@ def json_result(args: list[str]) -> Mapping[str, object]:
 
 def test_domain_search_returns_ranked_results() -> None:
     payload = json_result(
-        ["button", "--domain", "style", "--max-results", "2", "--json"]
+        ["glassmorphism", "--domain", "style", "--max-results", "2", "--json"]
     )
     assert payload["domain"] == "style"
-    assert payload["query"] == "button"
+    assert payload["query"] == "glassmorphism"
     results = payload["results"]
     if not _is_object_list(results):
         raise TypeError("expected results list")
-    assert len(results) == 2
+    assert len(results) == 1
     first = results[0]
     if not _is_str_mapping(first):
         raise TypeError("expected result object")
-    assert first["Style Category"] == "3D Product Preview"
+    assert first["Style Category"] == "Glassmorphism"
 
 
 def test_auto_domain_detection() -> None:
@@ -69,6 +69,15 @@ def test_stack_search() -> None:
         ["server components", "--stack", "nextjs", "--max-results", "1", "--json"]
     )
     assert payload["stack"] == "nextjs"
+
+
+def test_gsap_domain_search() -> None:
+    payload = json_result(["scroll reveal", "--domain", "gsap", "--json"])
+    assert payload["domain"] == "gsap"
+    results = payload["results"]
+    if not _is_object_list(results):
+        raise TypeError("expected results list")
+    assert results
 
 
 def test_human_output() -> None:

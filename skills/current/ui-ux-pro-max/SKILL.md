@@ -34,10 +34,12 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
    ```
 
 3. Add `--domain <domain>` for targeted evidence or `--stack <stack>` for
-   implementation guidance. Use `--variance`, `--motion`, and `--density` only
-   with `--design-system`.
-4. Add `--persist` only when the user wants `design-system/MASTER.md`; add
-   `--page <name>` for an override.
+   implementation guidance. Use `--rtl [full|partial|caveats]` with the `style`
+   or `product` domain to filter for right-to-left compatibility. Use `--full`
+   to show untruncated search fields.
+4. Use `--variance`, `--motion`, and `--density` only with `--design-system`.
+   To persist output, add `--persist --output-dir <project-root>`; add `--page`
+   for an override and `--force` to overwrite an existing master.
 5. You MUST reuse established tokens and components before hardcoding values or adding
    variants.
 6. For Web Interface Guidelines compliance audits, fetch upstream rules when needed:

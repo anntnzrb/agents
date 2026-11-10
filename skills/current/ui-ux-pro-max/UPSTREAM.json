@@ -1,10 +1,13 @@
 {
   "repo": "nextlevelbuilder/ui-ux-pro-max-skill",
-  "release": "v2.9.0",
-  "commit": "65e23199492fa911af32d9078e627ab4de01f4c8",
+  "release": "v2.15.0",
+  "commit": "a38d04c3d5c298c851dbe5e6ee1965ee3de42cb5",
   "trees": {
-    "src/ui-ux-pro-max/data": "eb5cc55ad4d7a380bfb49b5b991d07bd472dbfc3",
-    "src/ui-ux-pro-max/scripts": "2f35a1109b30d8ac42dfec29196df9f414497d4d",
-    "src/ui-ux-pro-max/templates/base": "d5e672c148ac22fff63f02a0fb3de69535c8250b"
+    "src/ui-ux-pro-max/data": "4c9162d84d41705f15d271b111e941338a2b85f5",
+    "src/ui-ux-pro-max/scripts": "3fc819fc1112221a397b9a16f2555d80766333f1",
+    "src/ui-ux-pro-max/templates/base": "cff2af254dc3030fba6d923fcfb110b11b22679e"
+  },
+  "watch": {
+    "src/ui-ux-pro-max": ["data", "scripts", "templates"]
   }
 }

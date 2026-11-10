@@ -10,8 +10,8 @@ Usage:
     python search.py "<query>" --design-system --variance 8 --motion 9
         --density 7
 
-Domains: style, prompt, color, chart, landing, product, ux, typography,
-    google-fonts, gsap
+Domains: style, color, chart, landing, product, ux, typography,
+    google-fonts, icons, gsap, react, web
 Stacks: react, nextjs, vue, svelte, astro, swiftui, react-native, flutter,
     nuxtjs, nuxt-ui, html-tailwind, shadcn, jetpack-compose, threejs, angular,
     laravel, javafx, wpf, winui, avalonia, uno, uwp
@@ -35,7 +35,14 @@ import sys
 from collections.abc import Mapping
 from typing import TypeIs
 
-from core import AVAILABLE_STACKS, CSV_CONFIG, MAX_RESULTS, search, search_stack
+from core import (
+    AVAILABLE_STACKS,
+    CSV_CONFIG,
+    MAX_RESULTS,
+    UNTRUNCATED_COLS,
+    search,
+    search_stack,
+)
 from design_system import generate_design_system
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
@@ -88,7 +95,7 @@ def _flag(args: argparse.Namespace, field: str) -> bool:
     return value if isinstance(value, bool) else False
 
 
-def format_output(result: Mapping[str, object]) -> str:
+def format_output(result: Mapping[str, object], full: bool = False) -> str:  # noqa: C901 - format handles all search result variants
     """Format results for Claude consumption (token-optimized)."""
     if "error" in result:
         return f"Error: {result['error']}"
@@ -99,10 +106,37 @@ def format_output(result: Mapping[str, object]) -> str:
         output.append(f"**Stack:** {result['stack']} | **Query:** {result['query']}")
     else:
         output.append("## UI Pro Max Search Results")
-        output.append(f"**Domain:** {result['domain']} | **Query:** {result['query']}")
+        domain_note = str(result["domain"])
+        if result.get("auto_detected"):
+            domain_note += " (auto-detected"
+            if result.get("runner_up_domain"):
+                domain_note += f", runner-up: {result['runner_up_domain']}"
+            domain_note += ")"
+        output.append(f"**Domain:** {domain_note} | **Query:** {result['query']}")
     output.append(
         f"**Source:** {result['file']} | **Found:** {result['count']} results\n",
     )
+    if result.get("count") == 0:
+        redirect = result.get("redirect")
+        if _is_str_mapping(redirect):
+            output.append(
+                "This legacy style label is now modeled in the "
+                + f"`{redirect['domain']}` domain as `{redirect['id']}`. "
+                + "Search that domain instead of treating a page composition "
+                + "as a visual style."
+            )
+            return "\n".join(output)
+        output.append(
+            "No matches. This is not a match with an empty value -- the query "
+            + "did not hit the database. Retry with broader/different keywords "
+            + "before falling back to general defaults, and say explicitly that "
+            + "no database match was found if you do fall back."
+        )
+        suggestions = result.get("suggestions")
+        if _is_object_list(suggestions) and suggestions:
+            terms = ", ".join(str(term) for term in suggestions)
+            output.append(f"**Closest known terms:** {terms}")
+        return "\n".join(output)
 
     rows = result.get("results")
     if not _is_object_list(rows):
@@ -113,7 +147,11 @@ def format_output(result: Mapping[str, object]) -> str:
         output.append(f"### Result {i}")
         for key, value in row.items():
             value_str = str(value)
-            if len(value_str) > _MAX_VALUE_CHARS:
+            if (
+                not full
+                and key not in UNTRUNCATED_COLS
+                and len(value_str) > _MAX_VALUE_CHARS
+            ):
                 value_str = value_str[:_MAX_VALUE_CHARS] + "..."
             output.append(f"- **{key}:** {value_str}")
         output.append("")
@@ -139,10 +177,15 @@ if __name__ == "__main__":
         "--max-results",
         "-n",
         type=int,
+        choices=range(1, 21),
+        metavar="1-20",
         default=MAX_RESULTS,
         help="Max results (default: 3)",
     )
     _ = parser.add_argument("--json", action="store_true", help="Output as JSON")
+    _ = parser.add_argument(
+        "--full", action="store_true", help="Do not truncate long field values"
+    )
     # Design system generation
     _ = parser.add_argument(
         "--design-system",
@@ -183,6 +226,9 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Output directory for persisted files (default: current directory)",
+    )
+    _ = parser.add_argument(
+        "--force", action="store_true", help="Overwrite an existing MASTER.md"
     )
     # Design dials (1-10), only applied with --design-system
     _ = parser.add_argument(
@@ -225,31 +271,47 @@ if __name__ == "__main__":
             variance=_opt_int(args, "variance"),
             motion=_opt_int(args, "motion"),
             density=_opt_int(args, "density"),
+            force=_flag(args, "force"),
         )
-        print(result)
-
-        # Print persistence confirmation
-        if _flag(args, "persist"):
-            project_name = _opt_str(args, "project_name")
-            project_slug = (project_name or query).lower().replace(" ", "-")
-            print("\n" + "=" * 60)
-            print(f"✅ Design system persisted to design-system/{project_slug}/")
+        if _flag(args, "json"):
             print(
-                f"   📄 design-system/{project_slug}/MASTER.md "
-                + "(Global Source of Truth)",
+                json.dumps(
+                    {
+                        "design_system": result["design_system"],
+                        "persistence": result["persistence"],
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
             )
-            page = _opt_str(args, "page")
-            if page:
-                page_filename = page.lower().replace(" ", "-")
-            print()
-            print(
-                f"📖 Usage: When building a page, check design-system/{project_slug}/"
-                + "pages/[page].md first.",
-            )
-            print(
-                "   If exists, its rules override MASTER.md. Otherwise, use MASTER.md.",
-            )
-            print("=" * 60)
+        else:
+            print(result["text"])
+            persistence = result.get("persistence")
+            if _flag(args, "persist") and _is_str_mapping(persistence):
+                print("\n" + "=" * 60)
+                if persistence.get("status") == "skipped_exists":
+                    message = persistence.get(
+                        "message", "MASTER.md already exists; not overwritten."
+                    )
+                    print(f"⚠️  {message}")
+                else:
+                    ds_dir = persistence.get(
+                        "design_system_dir", "design-system/<project>"
+                    )
+                    print(f"✅ Design system persisted to {ds_dir}/")
+                    created_files = persistence.get("created_files")
+                    if _is_object_list(created_files):
+                        for file in created_files:
+                            print(f"   📄 {file}")
+                    print(
+                        "\n📖 Usage: When building a page, check "
+                        + f"{ds_dir}/pages/[page].md first."
+                    )
+                    print(
+                        "   If it exists, its rules override MASTER.md. "
+                        + "Otherwise, use MASTER.md."
+                    )
+                print("=" * 60)
     # Stack search
     elif _opt_str(args, "stack"):
         result = search_stack(
@@ -260,7 +322,7 @@ if __name__ == "__main__":
         if _flag(args, "json"):
             print(json.dumps(result, indent=2, ensure_ascii=False))
         else:
-            print(format_output(result))
+            print(format_output(result, full=_flag(args, "full")))
     # Domain search
     else:
         result = search(
@@ -271,4 +333,4 @@ if __name__ == "__main__":
         if _flag(args, "json"):
             print(json.dumps(result, indent=2, ensure_ascii=False))
         else:
-            print(format_output(result))
+            print(format_output(result, full=_flag(args, "full")))

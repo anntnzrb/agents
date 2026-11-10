@@ -2,6 +2,8 @@
 
 This skill adapts data, scripts, and guidance from [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), licensed under the MIT License.
 
+The base templates are adapted: dash punctuation is normalized for local prose rules.
+
 Copyright (c) 2024 Next Level Builder
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
