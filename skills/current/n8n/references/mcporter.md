@@ -19,8 +19,14 @@ workflow/endpoint changes; MUST NOT preserve a catalog as timeless.
 
 ## Transport and Authentication Prerequisites
 
-`~/.mcporter/mcporter.json` starts `bun x supergateway`, bridges
+The managed registry starts the pinned `supergateway` package with `bun x`, bridges
 stdio to `N8N_MCP_URL`, and sends `N8N_MCP_TOKEN` as a bearer token.
+
+When updating the pin in `tools/mcporter/mcporter.jsonc`, review the upstream
+`src` drift tracked in `UPSTREAM.json`. Confirm that the npm package version
+and GitHub release tag point to the same commit and that the release is at
+least 14 days old. Review transport compatibility and secret handling before
+updating both the registry and the tracking pin.
 
 Before discovery:
 
