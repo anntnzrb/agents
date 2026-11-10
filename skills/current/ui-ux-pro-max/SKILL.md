@@ -64,3 +64,9 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
 | Full rules, domain map, examples, and delivery checklists | `references/design-guide.md` | Broad design/review work or a rule needs detail |
 | Live searchable design data | `data/*.csv`, `data/stacks/*.csv` via CLI | CLI search only; MUST NOT load all CSVs into context |
 | Internal search/generation behavior | `scripts/search.py`, `scripts/core.py`, `scripts/design_system.py` | Debugging the bundled CLI |
+
+## Maintenance
+
+`UPSTREAM.json` tracks the source data, scripts, and base templates. When the
+upstream workflow reports drift, review its upstream diff and port applicable
+changes. Update the release, commit, and all tree hashes after the review.

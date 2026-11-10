@@ -1,0 +1,10 @@
+{
+  "repo": "nextlevelbuilder/ui-ux-pro-max-skill",
+  "release": "v2.9.0",
+  "commit": "65e23199492fa911af32d9078e627ab4de01f4c8",
+  "trees": {
+    "src/ui-ux-pro-max/data": "eb5cc55ad4d7a380bfb49b5b991d07bd472dbfc3",
+    "src/ui-ux-pro-max/scripts": "2f35a1109b30d8ac42dfec29196df9f414497d4d",
+    "src/ui-ux-pro-max/templates/base": "d5e672c148ac22fff63f02a0fb3de69535c8250b"
+  }
+}
