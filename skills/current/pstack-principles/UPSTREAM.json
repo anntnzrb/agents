@@ -1,7 +1,7 @@
 {
   "repo": "cursor/plugins",
   "branch": "main",
-  "commit": "a6adec62aaf22cada0b5886ec1cce2193c9fd28c",
+  "commit": "de8ee15dd1194627d21eb5fcd41cb1873208dabb",
   "trees": {
     "pstack/skills/benchmark-checklist": "7c402481a0934533cb49cdce811b362cf99ef641",
     "pstack/skills/principle-attack-the-premise": "0b0de55b1f1e7a989a10dd8680f01a67ef378ebc",
@@ -10,7 +10,7 @@
     "pstack/skills/principle-encode-lessons-in-structure": "1e42cd4db78cc95d0297dc0264c1a74439c90be9",
     "pstack/skills/principle-exhaust-the-design-space": "3d93455dc2b3c0d9954e20384ed8569138bd1eb0",
     "pstack/skills/principle-experience-first": "2dbcf0d0d4473ca3a93d17e2167b587cfec7f6da",
-    "pstack/skills/principle-explain-the-number": "2f468162c9ce85478f1fb1198149646a2ef0f735",
+    "pstack/skills/principle-explain-the-number": "7d97b8efd90780774b38ccb9dad1aa232bd51ff9",
     "pstack/skills/principle-fix-root-causes": "f1075eead43f95cd9896381345ff28f0da7e1aea",
     "pstack/skills/principle-foundational-thinking": "5880f6577956b14ee4ee89cb72c03fd8bd82a5ac",
     "pstack/skills/principle-guard-the-context-window": "bf09c18e975ded9dc137631c6529db941dda24a2",
