@@ -4,8 +4,8 @@ Read this when exact read-only ast-grep flags, strictness, selectors, scope, or 
 
 ## Command choice
 
-- Prefer `sg` if available. Fallback `ast-grep run`. Last resort: `nix run nixpkgs#ast-grep -- run`
-- `ast-grep` requires the `run` subcommand for one-off searches; `sg` implies `run`
+- Use `uv run --script <skill-dir>/scripts/cli.py run <args>` for one-off searches.
+- The wrapper runs the pinned npm package through Bun. Install Bun from https://bun.sh if it is missing.
 
 ## Read-only mode
 

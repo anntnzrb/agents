@@ -6,7 +6,7 @@ Read-only recipes for fast code exploration.
 Find all `console.log` calls in TS:
 
 ```bash
-sg -p 'console.log($$$)' -l ts src
+uv run --script <skill-dir>/scripts/cli.py run -p 'console.log($$$)' -l ts src
 ```
 
 Quick file list: add `--files-with-matches`.
@@ -15,7 +15,7 @@ Quick file list: add `--files-with-matches`.
 Find `if ($A) { $B }` patterns in JS:
 
 ```bash
-sg -p 'if ($A) { $B }' -l js .
+uv run --script <skill-dir>/scripts/cli.py run -p 'if ($A) { $B }' -l js .
 ```
 
 Add `-C 2` for context.
@@ -24,7 +24,7 @@ Add `-C 2` for context.
 List JS/TS function declarations:
 
 ```bash
-sg -p 'function $NAME($$$) { $$$ }' -l ts src
+uv run --script <skill-dir>/scripts/cli.py run -p 'function $NAME($$$) { $$$ }' -l ts src
 ```
 
 Fast index: add `--files-with-matches`.
@@ -33,7 +33,7 @@ Fast index: add `--files-with-matches`.
 Find Python function definitions:
 
 ```bash
-sg -p 'def $NAME($$$): $$$' -l py src
+uv run --script <skill-dir>/scripts/cli.py run -p 'def $NAME($$$): $$$' -l py src
 ```
 
 See signature context: add `-C 1`.
@@ -42,7 +42,7 @@ See signature context: add `-C 1`.
 Pipe matches to another script:
 
 ```bash
-sg -p 'new $TYPE($$$)' -l ts --json=stream src
+uv run --script <skill-dir>/scripts/cli.py run -p 'new $TYPE($$$)' -l ts --json=stream src
 ```
 
 `--json=stream`: one JSON object per line.
@@ -51,7 +51,7 @@ sg -p 'new $TYPE($$$)' -l ts --json=stream src
 Search a snippet from stdin:
 
 ```bash
-cat snippet.ts | sg -p 'await $CALL($$$)' -l ts --stdin
+cat snippet.ts | uv run --script <skill-dir>/scripts/cli.py run -p 'await $CALL($$$)' -l ts --stdin
 ```
 
 `--lang` required for stdin.

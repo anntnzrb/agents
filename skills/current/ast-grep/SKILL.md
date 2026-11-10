@@ -11,13 +11,18 @@ metadata:
 
 ## Overview
 
-Read-only CLI search with `sg` or `ast-grep`. AST-aware grep for code exploration and SWE tasks.
+AST-aware, read-only search for code exploration.
+
+## Public entrypoint
+
+Run `uv run --script <skill-dir>/scripts/cli.py run <args>`. The wrapper requires Bun and runs the version pinned in `UPSTREAM.json`.
 
 ## Quick start
 
-- Prefer `sg`. Fallback `ast-grep run`. Last resort: `nix run nixpkgs#ast-grep -- run`
-- Example: `sg -p 'console.log($MSG)' -l ts src`
-- Files only: `sg -p 'console.log($$$)' -l ts --files-with-matches src`
+- Search: `uv run --script <skill-dir>/scripts/cli.py run -p 'console.log($MSG)' -l ts src`
+- Files only: add `--files-with-matches`.
+
+For maintenance, update `UPSTREAM.json` to a stable release at least 14 days old. Confirm the npm package version matches the upstream tag and review changes in the tracked npm directory.
 
 ## Guardrails
 

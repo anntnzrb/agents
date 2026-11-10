@@ -2,18 +2,12 @@
 
 Use when binary resolution, quoting, language parsing, or pattern searches fail.
 
-## `sg` not found
+## Binary resolution
 
-`sg` command missing.
-
-```bash
-ast-grep run -p 'pattern' -l ts src
-```
-
-If not installed:
+The wrapper requires Bun. Install it from https://bun.sh, then run:
 
 ```bash
-nix run nixpkgs#ast-grep -- run -p 'pattern' -l ts src
+uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts src
 ```
 
 ## No matches
@@ -21,7 +15,7 @@ nix run nixpkgs#ast-grep -- run -p 'pattern' -l ts src
 Expected matches absent:
 
 ```bash
-sg -p 'pattern' -l ts --debug-query=ast
+uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts --debug-query=ast
 ```
 
 Verify `--lang`; try `--strictness=relaxed`.
@@ -31,7 +25,7 @@ Verify `--lang`; try `--strictness=relaxed`.
 Files parsed as the wrong language:
 
 ```bash
-sg -p 'pattern' -l ts path/to/file
+uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts path/to/file
 ```
 
 Force `--lang` for generated or unusual extensions.
@@ -41,7 +35,7 @@ Force `--lang` for generated or unusual extensions.
 Pattern too broad:
 
 ```bash
-sg -p 'pattern' -l ts --selector identifier src
+uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts --selector identifier src
 ```
 
 Add structure or use `--strictness=cst`.
@@ -51,7 +45,7 @@ Add structure or use `--strictness=cst`.
 Search takes too long:
 
 ```bash
-sg -p 'pattern' -l ts --globs 'src/**/*.ts' --threads 4 .
+uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts --globs 'src/**/*.ts' --threads 4 .
 ```
 
 Limit paths; exclude large directories with `--globs '!**/dist/**'`.
@@ -61,7 +55,7 @@ Limit paths; exclude large directories with `--globs '!**/dist/**'`.
 Stdin search fails:
 
 ```bash
-cat file.ts | sg -p 'pattern' -l ts --stdin
+cat file.ts | uv run --script <skill-dir>/scripts/cli.py run -p 'pattern' -l ts --stdin
 ```
 
 `--lang` required; interactive mode incompatible with stdin.

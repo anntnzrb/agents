@@ -6,7 +6,7 @@ Higher-signal queries; structural selectors, relationships, precise scope contro
 Match a call expression inside a larger pattern:
 
 ```bash
-sg -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
+uv run --script <skill-dir>/scripts/cli.py run -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
 ```
 
 `--debug-query=ast` shows node kinds.
@@ -15,7 +15,7 @@ sg -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
 Pattern does not match → inspect structure:
 
 ```bash
-sg -p 'await $CALL($$$)' -l ts --debug-query=ast
+uv run --script <skill-dir>/scripts/cli.py run -p 'await $CALL($$$)' -l ts --debug-query=ast
 ```
 
 Punctuation matters → try `--debug-query=cst`.
@@ -24,7 +24,7 @@ Punctuation matters → try `--debug-query=cst`.
 Over- or under-matching:
 
 ```bash
-sg -p '$A && $A()' -l ts --strictness=ast src
+uv run --script <skill-dir>/scripts/cli.py run -p '$A && $A()' -l ts --strictness=ast src
 ```
 
 `relaxed` ignores comments; `cst` is strict.
@@ -33,7 +33,7 @@ sg -p '$A && $A()' -l ts --strictness=ast src
 Search only `src` TypeScript and exclude tests:
 
 ```bash
-sg -p 'new $TYPE($$$)' -l ts --globs 'src/**/*.ts' --globs '!**/*.test.ts' .
+uv run --script <skill-dir>/scripts/cli.py run -p 'new $TYPE($$$)' -l ts --globs 'src/**/*.ts' --globs '!**/*.test.ts' .
 ```
 
 Later globs override earlier ones.
@@ -42,14 +42,14 @@ Later globs override earlier ones.
 Restrict search to known files; cheap prefilter cuts parse cost:
 
 ```bash
-rg -l "console\\.log" src | xargs sg -p 'console.log($$$)' -l ts
+rg -l "console\\.log" src | xargs uv run --script <skill-dir>/scripts/cli.py run -p 'console.log($$$)' -l ts
 ```
 
 ## Compact JSON
 Emit minimal JSON for tooling:
 
 ```bash
-sg -p 'new $TYPE($$$)' -l ts --json=compact src
+uv run --script <skill-dir>/scripts/cli.py run -p 'new $TYPE($$$)' -l ts --json=compact src
 ```
 
 Pair with `--files-with-matches` when only paths are needed.
