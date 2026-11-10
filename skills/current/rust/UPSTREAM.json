@@ -1,0 +1,10 @@
+{
+  "repo": "morganlinton/BeautifulRust",
+  "release": "v1.5.0",
+  "commit": "40db61c6fee84bd121cf288755f0e2f22a50e995",
+  "trees": {
+    "skills": "121812ff5e8a792e9a8756aa277e6b12c610cd9c",
+    "lints": "74219d1b2a3cb9266ee0409039c552a5f7b0fc77",
+    "benchmarks": "36af0bb1a186109bbd6f05f5f7ec4c79c611af2c"
+  }
+}

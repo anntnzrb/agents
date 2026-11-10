@@ -59,7 +59,7 @@ Read date: 2026-10-16. Status: read in full.
 
 ### BeautifulRust
 
-URL: https://github.com/morganlinton/BeautifulRust (commit `40db61c6fee84bd121cf288755f0e2f22a50e995`)
+URL: https://github.com/morganlinton/BeautifulRust. The baseline commit is pinned in `UPSTREAM.json`.
 Read date: 2026-10-30. Status: read in full (skills, lints, benchmark).
 
 - The porting skill supplies the port-tests-first procedure, construct mapping, proportionality limits, and porting notes in porting.md.

@@ -12,7 +12,7 @@ Maintainer procedure, not loaded by SKILL.md. Use when refreshing Rust guidance,
 - [Playbook: sources and reference repositories](#playbook-sources-and-reference-repositories)
 - [Playbook: extending the skill](#playbook-extending-the-skill)
 - [Eval suite](#eval-suite)
-- [Verify fixtures with Nix](#verify-fixtures-with-nix)
+- [Verify fixtures](#verify-fixtures)
 - [Verify the package](#verify-the-package)
 
 ## Start here
@@ -95,7 +95,7 @@ Verify each tool against upstream updates:
    - `tokio`: Compare `.github/workflows/ci.yml` Miri and loom jobs.
    - `rust-analyzer`: Compare `xtask/src/tidy.rs`.
    - `rustls` and `ripgrep`: Compare listed options and entrypoints.
-4. Update the commit hash and takeaways in `references/sources.md`. Keep the step about recording read date, access path, and decisions per source.
+4. Update the commit hash and takeaways in `references/sources.md`. For BeautifulRust, update the pin and tree hashes in `UPSTREAM.json` instead of duplicating the commit. Keep the step about recording read date, access path, and decisions per source.
 5. Preserve settled overrides recorded in the first Policy entry of [DECISIONS.md](DECISIONS.md). Report conflicting new evidence instead of silently reversing policy.
 
 Maintainer-authorized skill refreshes may update bundled templates. Ordinary agents applying the Rust skill never edit bundled assets. They install assets into a target repository, or change its gate configuration, only on the user's explicit request.
@@ -120,20 +120,20 @@ Evals live in `evals/evals.json` with seeds in `evals/files/`.
 3. Check the expectations and the agent's actual `Read` tool calls (not its self-report).
 4. Turn every repeated friction into a rule, an asset fix, or a gate fix with a [DECISIONS.md](DECISIONS.md) entry.
 
-## Verify fixtures with Nix
+## Verify fixtures
 
-Run from the repository root:
+Install rustup from https://rustup.rs on your platform. Install the required Cargo tools and run the checks from the repository root:
 
 ```text
-nix shell nixpkgs#rustup nixpkgs#cargo-nextest nixpkgs#cargo-deny nixpkgs#cargo-machete nixpkgs#zizmor
+cargo install --locked cargo-nextest cargo-deny cargo-machete
 uv run --script skills/current/rust/scripts/cli.py verify-fixtures
-zizmor skills/current/rust/assets/ci.yml
+uvx zizmor skills/current/rust/assets/ci.yml
 ```
 
-`verify-fixtures` copies `assets/rust-toolchain.toml` into each temporary fixture repository, and rustup installs that pinned toolchain. The conditional unsafe check also needs nightly Miri when exercised. Nixpkgs tools can lag upstream releases, especially cargo-deny; an older version is not evidence that a schema newer than it is invalid.
+`verify-fixtures` copies `assets/rust-toolchain.toml` into each temporary fixture repository, and rustup installs that pinned toolchain. The conditional unsafe check also needs nightly Miri when exercised.
 
-- MUST record `rustc --version`, `cargo clippy --version`, `cargo fmt --version`, `cargo nextest --version`, `cargo deny --version`, `cargo machete --version`, and `zizmor --version` with fixture results in the maintenance report. [self-check]
-- MUST meet every floor in the stack table; install a current release in a temporary tool directory if the Nix package is older. Do not remove policy keys to accommodate an older tool. [cargo-deny; self-check]
+- MUST record `rustc --version`, `cargo clippy --version`, `cargo fmt --version`, `cargo nextest --version`, `cargo deny --version`, `cargo machete --version`, and `uvx zizmor --version` with fixture results in the maintenance report. [self-check]
+- MUST meet every floor in the stack table. Do not remove policy keys to accommodate an older tool. [cargo-deny; self-check]
 - MUST observe the good fixture pass inventory mode, the bad fixture fail with expected lint names, and real inventory cases reject an ancestor `cfg(any())` and `[lib] test = false`. Verify temporary baseline worktrees are removed. Also verify binary-only inventory/doctest execution, a merge base with only a package-free root manifest, a merge base with lint debt, and mixed ignored/enabled doctests moved by a comment. [verify-fixtures; pytest]
 - MUST check all macro-definition delimiters and whitespace forms, approved controls, ordinary tt passthroughs, unchanged symlinks, and procedural-macro package ownership when changing governance. [pytest]
 - MUST keep fixture execution outside pytest. Repository pytest runs without a Rust toolchain and verifies command orchestration with a fake Cargo, inventory comparison with recorded Nextest JSON, and governance against real temporary Git repositories. [pytest]
