@@ -1,0 +1,22 @@
+{
+  "repo": "vercel-labs/agent-desktop",
+  "release": "v1.2.0",
+  "commit": "2b0a7334fc111730454b726e6800aa41cdafc093",
+  "trees": {
+    "npm": "aa8b374cfbda97b317b0635b1d9a61b45699aa97",
+    "skills/agent-desktop": "4647b3cc9b929688002a9ae0f3bdd983898e049b",
+    "skills/agent-desktop-linux": "5ad18469b4410eaaf5788466185469e2a4e95ac2",
+    "skills/agent-desktop-macos": "d5a570ee0f368a03b077cfed4cc05c0506f1725d",
+    "skills/agent-desktop-windows": "e5b0e4462a6627999288952e17189f5a1b640bb0"
+  },
+  "watch": {
+    "skills": [
+      "agent-desktop",
+      "agent-desktop-ffi",
+      "agent-desktop-linux",
+      "agent-desktop-macos",
+      "agent-desktop-windows",
+      "jev-desktop"
+    ]
+  }
+}
