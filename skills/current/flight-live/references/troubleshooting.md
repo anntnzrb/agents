@@ -1,28 +1,14 @@
 # Troubleshooting
 
-## Hard fail: missing nix
-
-Symptom:
-
-- `error: Kiwi web scraper requires 'nix' in PATH ...`
-
-Fix:
-
-1. install Nix
-2. verify with `nix --version`
-3. rerun
-
 ## Hard fail: agent-browser wrapper unavailable
 
-Symptom:
+Confirm that `agent-browser` is installed beside `flight-live`, then run:
 
-- `error: agent-browser is unavailable through nix wrapper ...`
+```text
+uv run --script <agent-browser-skill-dir>/scripts/cli.py --version
+```
 
-Fix:
-
-1. run `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
-2. confirm flakes/nix-command enabled
-3. retry search
+Follow any error from the wrapper, then retry the search.
 
 ## Date window invalid
 
@@ -52,13 +38,13 @@ Fix order:
 
 Symptoms:
 
-- `error: agent-browser execution failed via nix wrapper ...`
+- `error: agent-browser execution failed via sibling wrapper ...`
 - `error: agent-browser command timed out ...`
 
 Fix:
 
 - retry (transient)
-- verify wrapper works: `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
+- verify the wrapper works: `uv run --script <agent-browser-skill-dir>/scripts/cli.py --version`
 - reduce window size
 
 ## RPC request errors

@@ -89,7 +89,7 @@ Error response example:
   "success": false,
   "error": {
     "code": "search_error",
-    "message": "Kiwi web scraper requires `nix` in PATH. Install Nix, then run: nix run github:numtide/llm-agents.nix#agent-browser -- --version"
+    "message": "Sibling agent-browser wrapper is missing. Install both skills together."
   }
 }
 ```

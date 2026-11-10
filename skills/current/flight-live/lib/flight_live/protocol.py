@@ -202,7 +202,7 @@ def get_schema_document() -> dict[str, object]:
             "modes": ["cli", "rpc"],
             "outputs": ["text", "json", "llm-json"],
             "providers": {
-                "planner": "Kiwi web scrape via agent-browser (nix run wrapper)",
+                "planner": "Kiwi web scrape via sibling agent-browser wrapper",
             },
             "credentials": {
                 "required": [],

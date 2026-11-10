@@ -2,7 +2,7 @@
 name: flight-live
 description: "Use when searching live flights, comparing airfare across dates, filtering nonstop routes, or ranking travel options."
 license: AGPL-3.0-or-later
-compatibility: Requires `uv` and `nix`. Uses bundled skill-local `scripts/cli.py`. Network access required.
+compatibility: Requires `uv` and the sibling `agent-browser` skill. Network access required.
 metadata:
   author: anntnzrb
 
@@ -45,19 +45,17 @@ uv run --script <skill-dir>/scripts/cli.py \
 
 Common failures:
 
-- missing `nix` in PATH (hard fail)
-- `agent-browser` unavailable via nix wrapper (hard fail)
+- missing `uv` or unavailable sibling `agent-browser` wrapper (hard fail)
 - provider execution/network failures (hard fail)
 - over-constrained filters (empty shortlist with guidance in `decision.actions`)
 
 Recovery order:
 
-1. verify `nix` works
-2. run `nix run github:numtide/llm-agents.nix#agent-browser -- --version`
-3. widen date window
-4. disable `--nonstop`
-5. raise/remove `--max-budget`
-6. relax `--stay-min/--stay-max`
+1. run `uv run --script <agent-browser-skill-dir>/scripts/cli.py --version`
+2. widen date window
+3. disable `--nonstop`
+4. raise/remove `--max-budget`
+5. relax `--stay-min/--stay-max`
 
 ## Evidence fields to trust most
 

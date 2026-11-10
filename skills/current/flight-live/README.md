@@ -2,7 +2,7 @@
 
 Read-only agent-first flight search CLI.
 
-Provider: Kiwi web search scrape via `agent-browser` (nix wrapper) + public `api.skypicker.com/locations` resolver.
+Provider: Kiwi web search scrape via the sibling `agent-browser` skill and the public `api.skypicker.com/locations` resolver.
 
 ## Entry point
 
@@ -73,7 +73,7 @@ Prefer `--llm-json` for agents.
 
 - Oneway window search is first-class
 - Roundtrip uses scraped date-pair buttons from Kiwi web results
-- Provider hard-fails with actionable errors when `nix` / `agent-browser` is unavailable
+- Provider hard-fails with actionable errors when `uv` or the sibling `agent-browser` wrapper is unavailable.
 
 ## RPC
 

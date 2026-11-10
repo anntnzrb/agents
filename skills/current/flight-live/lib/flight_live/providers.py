@@ -5,9 +5,11 @@ import json
 import re
 import shutil
 import subprocess
+import uuid
 from collections.abc import Callable, Mapping
 from datetime import date, timedelta
 from functools import lru_cache
+from pathlib import Path
 from typing import TypeIs
 from urllib.parse import quote_plus, urlencode, urlsplit
 
@@ -28,7 +30,9 @@ def _is_object_list(val: object) -> TypeIs[list[object]]:
 _IATA_RE = re.compile(r"^[A-Za-z]{3}$")
 
 _KIWI_LOCATIONS_URL = "https://api.skypicker.com/locations"
-_AGENT_BROWSER_FLAKE = "github:numtide/llm-agents.nix#agent-browser"
+_AGENT_BROWSER_CLI = (
+    Path(__file__).resolve().parents[3] / "agent-browser" / "scripts" / "cli.py"
+)
 
 _KIWI_PRICE_BUTTON_RE = re.compile(
     r'button\s+"\s*([A-Za-z]{3,9}\s+\d{1,2})\s*[-–]\s*([A-Za-z]{3,9}\s+\d{1,2})\s*\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)',  # noqa: RUF001 - pattern intentionally matches hyphen and en-dash
@@ -64,6 +68,7 @@ _MONTHS = {
 _MONTH_DAY_PARTS = 2
 _SEASON_ROLLOVER_MONTHS = 7
 _HTTP_ERROR_STATUS = 400
+_MISSING_EXECUTABLE = 127
 
 
 def resolve_place(
@@ -184,13 +189,15 @@ def scrape_kiwi_snapshot_text(url: str) -> str:
     """Scrape a Kiwi results page to snapshot text via agent-browser."""
     _ensure_agent_browser_available()
 
-    _ = _safe_close_agent_browser()
+    session = f"flight-live-{uuid.uuid4().hex}"
     try:
-        _ = _run_agent_browser(["open", url], timeout=150)
-        _ = _run_agent_browser(["wait", "--load", "networkidle"], timeout=150)
-        return _run_agent_browser(["snapshot", "-i"], timeout=150)
+        _ = _run_agent_browser(["open", url], session=session, timeout=150)
+        _ = _run_agent_browser(
+            ["wait", "--load", "networkidle"], session=session, timeout=150
+        )
+        return _run_agent_browser(["snapshot", "-i"], session=session, timeout=150)
     finally:
-        _ = _safe_close_agent_browser()
+        _ = _safe_close_agent_browser(session)
 
 
 def parse_kiwi_price_buttons(
@@ -358,15 +365,20 @@ def _lookup_kiwi_place(term: str, *, locale: str) -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def ensure_agent_browser_available() -> None:
-    """Ensure the agent-browser Nix flake can be run."""
-    if shutil.which("nix") is None:
+    """Ensure the sibling agent-browser wrapper can be run."""
+    if not _AGENT_BROWSER_CLI.is_file():
         message = (
-            "Kiwi web scraper requires `nix` in PATH. Install Nix, then run: "
-            + "nix run github:numtide/llm-agents.nix#agent-browser -- --version"
+            "Sibling agent-browser wrapper is missing. Install both skills together."
         )
-        raise MissingExecutableError(message)
+        raise FlightLiveError(message)
 
-    version_cmd = ["nix", "run", _AGENT_BROWSER_FLAKE, "--", "--version"]
+    version_cmd = [
+        _uv_executable(),
+        "run",
+        "--script",
+        str(_AGENT_BROWSER_CLI),
+        "--version",
+    ]
     try:
         result = subprocess.run(
             version_cmd,
@@ -377,44 +389,61 @@ def ensure_agent_browser_available() -> None:
             timeout=90,
         )
     except FileNotFoundError as exc:
-        message = "`nix` executable is missing. Install Nix and retry."
+        message = "`uv` executable is missing. Install uv and retry."
         raise MissingExecutableError(message) from exc
     except subprocess.TimeoutExpired as exc:
         message = (
-            "Timed out while validating agent-browser via nix. "
-            + "Check network/Nix setup, then retry."
+            "Timed out while validating agent-browser. Check connectivity and retry."
         )
         raise FlightLiveError(message) from exc
 
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()[:240]
         message = (
-            "agent-browser is unavailable through nix wrapper. "
-            + "Run `nix run github:numtide/llm-agents.nix#agent-browser "
-            + "-- --version` manually. "
-            + f"stderr: {stderr or 'no stderr'}"
+            "agent-browser is unavailable through its sibling wrapper. "
+            + "Run `uv run --script <agent-browser-skill-dir>/scripts/cli.py "
+            + "--version` "
+            + f"manually. stderr: {stderr or 'no stderr'}"
         )
+        if result.returncode == _MISSING_EXECUTABLE:
+            raise MissingExecutableError(message)
         raise FlightLiveError(message)
 
 
 _ensure_agent_browser_available = ensure_agent_browser_available
 
 
-def _safe_close_agent_browser() -> None:
+def _uv_executable() -> str:
+    uv = shutil.which("uv")
+    if uv is None:
+        message = "`uv` executable is missing. Install uv and retry."
+        raise MissingExecutableError(message)
+    return uv
+
+
+def _safe_close_agent_browser(session: str) -> None:
     try:
-        _ = _run_agent_browser(["close"], timeout=45)
+        _ = _run_agent_browser(["close"], session=session, timeout=45)
     except FlightLiveError:
         return
 
 
-def _maybe_close_browser(args: list[str]) -> None:
+def _maybe_close_browser(args: list[str], session: str) -> None:
     """Close the browser unless the issued command already closes it."""
     if len(args) == 0 or args[0] != "close":
-        _ = _safe_close_agent_browser()
+        _ = _safe_close_agent_browser(session)
 
 
-def _run_agent_browser(args: list[str], *, timeout: int) -> str:
-    cmd = ["nix", "run", _AGENT_BROWSER_FLAKE, "--", *args]
+def _run_agent_browser(args: list[str], *, session: str, timeout: int) -> str:
+    cmd = [
+        _uv_executable(),
+        "run",
+        "--script",
+        str(_AGENT_BROWSER_CLI),
+        "--session",
+        session,
+        *args,
+    ]
 
     last_error: FlightLiveError | None = None
     for attempt in range(2):
@@ -428,7 +457,7 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
                 timeout=timeout,
             )
         except FileNotFoundError as exc:
-            message = "`nix` executable is missing. Install Nix and retry."
+            message = "`uv` executable is missing. Install uv and retry."
             raise MissingExecutableError(message) from exc
         except subprocess.TimeoutExpired:
             last_error = FlightLiveError(
@@ -446,19 +475,22 @@ def _run_agent_browser(args: list[str], *, timeout: int) -> str:
             )
             diagnostic = stderr_text or stdout_text or "no output"
             transient = "Daemon process exited during startup" in diagnostic
-            last_error = FlightLiveError(
-                "agent-browser execution failed via nix wrapper. "
-                + "Check `nix run github:numtide/llm-agents.nix#agent-browser "
-                + "-- --version` and network access. "
+            message = (
+                "agent-browser execution failed via sibling wrapper. "
+                + "Check `uv run --script <agent-browser-skill-dir>/scripts/cli.py "
+                + "--version` and network access. "
                 + f"command={' '.join(args)}; output: {diagnostic}"
             )
+            if exc.returncode == _MISSING_EXECUTABLE:
+                raise MissingExecutableError(message) from exc
+            last_error = FlightLiveError(message)
             if not transient or attempt == 1:
                 break
-            _maybe_close_browser(args)
+            _maybe_close_browser(args, session)
         else:
             return completed.stdout
         if attempt == 0:
-            _maybe_close_browser(args)
+            _maybe_close_browser(args, session)
             continue
 
     if last_error is not None:

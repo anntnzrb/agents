@@ -1,13 +1,15 @@
+import subprocess
 from datetime import date
 from pathlib import Path
 
 import pytest
 
-from flight_live.models import FlightLiveError
+from flight_live.models import FlightLiveError, MissingExecutableError
 from flight_live.providers import (
     ensure_agent_browser_available,
     fetch_kiwi_web_calendar,
     parse_kiwi_price_buttons,
+    scrape_kiwi_snapshot_text,
 )
 
 _FIXTURES = Path(__file__).parent / "fixtures"
@@ -79,17 +81,70 @@ def test_fetch_kiwi_calendar_with_monkeypatched_sources(
     assert all(item.source == "kiwi_web_scrape" for item in offers)
 
 
-def test_provider_hard_error_when_nix_missing(
-    monkeypatch: pytest.MonkeyPatch,
+def fake_uv(_name: str) -> str:
+    """Provide a deterministic executable path."""
+    return "/tools/uv"
+
+
+def no_uv(_name: str) -> None:
+    """Simulate a missing executable."""
+
+
+def test_browser_commands_use_sibling_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(
+        args: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout="snapshot", stderr="")
+
+    monkeypatch.setattr("flight_live.providers.shutil.which", fake_uv)
+    monkeypatch.setattr("flight_live.providers.subprocess.run", fake_run)
+    ensure_agent_browser_available.cache_clear()
+    try:
+        assert scrape_kiwi_snapshot_text("https://example.com") == "snapshot"
+    finally:
+        ensure_agent_browser_available.cache_clear()
+
+    wrapper = Path(__file__).resolve().parents[2] / "agent-browser/scripts/cli.py"
+    assert all(
+        command[:4] == ["/tools/uv", "run", "--script", str(wrapper)]
+        for command in commands
+    )
+    assert commands[0][4:] == ["--version"]
+    session = commands[1][5]
+    assert session.startswith("flight-live-")
+    assert all(command[4:6] == ["--session", session] for command in commands[1:])
+    assert any(command[6:] == ["open", "https://example.com"] for command in commands)
+    assert any(command[6:] == ["snapshot", "-i"] for command in commands)
+    assert commands[-1][6:] == ["close"]
+
+
+@pytest.mark.parametrize(
+    ("returncode", "error"), [(127, MissingExecutableError), (1, FlightLiveError)]
+)
+def test_browser_validation_failure(
+    monkeypatch: pytest.MonkeyPatch, returncode: int, error: type[FlightLiveError]
 ) -> None:
+    def fake_run(
+        args: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args, returncode, stdout="", stderr="unavailable"
+        )
+
+    monkeypatch.setattr("flight_live.providers.shutil.which", fake_uv)
+    monkeypatch.setattr("flight_live.providers.subprocess.run", fake_run)
+    ensure_agent_browser_available.cache_clear()
+    with pytest.raises(error, match="unavailable"):
+        ensure_agent_browser_available()
     ensure_agent_browser_available.cache_clear()
 
-    def fake_which(_: str) -> None:
-        return None
 
-    monkeypatch.setattr("flight_live.providers.shutil.which", fake_which)
-
-    with pytest.raises(FlightLiveError, match="requires `nix` in PATH"):
+def test_browser_missing_uv(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flight_live.providers.shutil.which", no_uv)
+    ensure_agent_browser_available.cache_clear()
+    with pytest.raises(MissingExecutableError, match="uv"):
         ensure_agent_browser_available()
-
     ensure_agent_browser_available.cache_clear()
