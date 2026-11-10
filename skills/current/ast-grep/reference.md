@@ -51,7 +51,7 @@ Use strictness when patterns under/over-match.
 
 - Paths: pass directories or files
 - Globs: `--globs 'src/**/*.ts' --globs '!**/*.test.ts'`
-- Ignore control: `--no-ignore` (hidden, dot, vcs, etc.)
+- Ignore control: `--no-ignore <FILE_TYPE>` accepts `hidden`, `dot`, `exclude`, `global`, `parent`, or `vcs`; repeat it for multiple types.
 - Follow symlinks: `--follow`
 - Threads: `--threads 0` for auto
 

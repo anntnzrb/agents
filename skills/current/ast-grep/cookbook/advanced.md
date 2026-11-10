@@ -52,4 +52,4 @@ Emit minimal JSON for tooling:
 uv run --script <skill-dir>/scripts/cli.py run -p 'new $TYPE($$$)' -l ts --json=compact src
 ```
 
-Pair with `--files-with-matches` when only paths are needed.
+For paths only, use `--files-with-matches` instead of `--json`; the flags conflict.
