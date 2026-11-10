@@ -77,6 +77,7 @@ def test_runs_pinned_release_and_preserves_exit_code(tmp_path: Path) -> None:
     assert completed.returncode == CHILD_EXIT, completed.stderr
     assert json.loads(log.read_text(encoding="utf-8")) == [
         "x",
+        "--trust",
         "agent-desktop@9.8.7",
         "snapshot",
         "--app",
@@ -93,6 +94,7 @@ def test_leading_separator_is_dropped(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stderr
     assert json.loads(log.read_text(encoding="utf-8")) == [
         "x",
+        "--trust",
         "agent-desktop@1.0.0",
         "--version",
     ]

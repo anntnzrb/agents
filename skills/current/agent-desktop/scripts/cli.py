@@ -23,7 +23,7 @@ Usage:
   uv run --script <skill-dir>/scripts/cli.py <agent-desktop-args>...
 
 Delegates to:
-  bun x {PACKAGE}@<version> <agent-desktop-args>...
+  bun x --trust {PACKAGE}@<version> <agent-desktop-args>...
 
 <version> is the `release` in {PIN.name}, without its leading `v`.
 Use `help` or `<command> --help` for agent-desktop's own help.
@@ -64,8 +64,10 @@ def run(argv: Sequence[str]) -> int:
         print("error: required executable not found: bun", file=sys.stderr)
         print("Install bun: https://bun.sh", file=sys.stderr)
         return 127
+    # --trust runs the package postinstall, which links the native binary and
+    # installs the macOS clipboard helper under the name the binary verifies.
     completed = subprocess.run(
-        [bun, "x", f"{PACKAGE}@{version}", *argv], shell=False, check=False
+        [bun, "x", "--trust", f"{PACKAGE}@{version}", *argv], shell=False, check=False
     )
     return completed.returncode
 
