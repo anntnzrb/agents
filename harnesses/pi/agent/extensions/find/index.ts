@@ -11,7 +11,8 @@
 import { mkdtemp, open, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { Type, type ClassifierApi, type ClassifierContext, type ClassifierModel, type Usage } from "@earendil-works/pi-ai";
+import type { ClassifierApi, ClassifierContext, ClassifierModel, Usage } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { eligible, fileScore, idf, keywords, windows } from "./search.ts";
 import { renderFindCall, renderFindResult } from "./render.ts";
