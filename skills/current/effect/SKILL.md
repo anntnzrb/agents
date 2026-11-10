@@ -36,13 +36,8 @@ For implementation, refactoring, or review, loading this file alone is incomplet
 
 Effect API questions MUST use authoritative documentation sources. Answer from the installed package and vendored source first. Use live documentation when they lack coverage, for packages not installed, or when no project exists yet.
 
-Context7 can return v3 content. Discard results that do not match the project's major version. Query it directly:
+Context7 can return v3 content. Discard results that do not match the project's major version. Load the context7 skill and follow its workflow to resolve Effect or its sub-packages and query the returned library ID, such as `/effect-ts/effect`.
 
-```bash
-bun x ctx7@latest docs /effect-ts/effect "<what to look up>"
-```
-
-- For library resolution or sub-packages, use `bun x ctx7@latest library "Effect" "<topic>"`.
 - For official v4 guides and API reference, consult <https://effect.website/docs/v4>. Append `.md` to guide URLs for Markdown.
 - For implementation patterns, inspect vendored `Effect-TS/effect` source or upstream repository (`LLMS.md`, `MIGRATION.md`, tests).
 - Missing or unclear coverage: fall back to matching vendored source, `gh`, or `firecrawl`.
