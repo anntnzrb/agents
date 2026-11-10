@@ -1,8 +1,8 @@
 {
   "repo": "supercorp-ai/supergateway",
-  "release": "v4.2.1",
-  "commit": "a78bd90804d3080e8268961949f22575b34826f0",
+  "release": "v4.2.2",
+  "commit": "8bf6a94cbfefb2c1736feca507bf898092232722",
   "trees": {
-    "src": "c3019f9a7178174575f9aab2f715920af7cf01e8"
+    "src": "3da51d4536663ae381cdb36a616a8a1a1cc7884f"
   }
 }

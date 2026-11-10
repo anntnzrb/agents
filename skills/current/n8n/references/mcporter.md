@@ -19,8 +19,8 @@ workflow/endpoint changes; MUST NOT preserve a catalog as timeless.
 
 ## Transport and Authentication Prerequisites
 
-The managed registry starts the pinned `supergateway` package with `bun x`, bridges
-stdio to `N8N_MCP_URL`, and sends `N8N_MCP_TOKEN` as a bearer token.
+The managed registry starts `supergateway@4.2.2` with `bun x`, bridges stdio
+to `N8N_MCP_URL`, and sends `N8N_MCP_TOKEN` as a bearer token.
 
 When updating the pin in `tools/mcporter/mcporter.jsonc`, review the upstream
 `src` drift tracked in `UPSTREAM.json`. Confirm that the npm package version
