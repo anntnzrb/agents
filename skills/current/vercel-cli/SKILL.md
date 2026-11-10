@@ -11,9 +11,11 @@ metadata:
 
 `vercel`/`vc`: deploy, manage, and develop Vercel projects from the command line. `vercel <command> -h`: full flags for any command.
 
-## Project linking
+## Public entrypoint
 
-Set `<VERCEL_CMD>` to installed `vercel` or ephemeral `bun x vercel`; examples use `vercel`.
+Use the installed `vercel` or `vc` command. Examples use `vercel`. If neither is installed, use `bun x vercel <args>` as an unpinned ephemeral fallback; it selects the current package version, which can change.
+
+## Project linking
 
 MUST run commands from the directory containing `.vercel/` or a descendant.
 
@@ -73,3 +75,7 @@ vercel --prod     # production deployment
 - After `vercel build`, `vercel deploy` ignores build output unless run with `--prebuilt`.
 - Tokens: use `VERCEL_TOKEN`, not `--token`.
 - Preview deploy access: use `vercel curl`, not deployment-protection disabling.
+
+## Maintenance
+
+The fallback is unpinned because the newest eligible npm CLI version has no matching upstream release tag, and the repository's latest release can belong to another package. The current CLI can change with the Vercel service. When revisiting this choice, compare the newest stable npm `vercel` package at least 14 days old with its upstream CLI release tag. Add a tracked pin only when the versions match and the upstream tracker can follow CLI releases without selecting unrelated packages.
