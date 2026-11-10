@@ -9,6 +9,7 @@ Choose a page by the task you need to complete. Sync application documentation l
 ## Operate
 
 - [Model gateway clients](cliproxyapi.md) describes the client endpoint, URL placeholders, and readiness gating.
+- [Maintain harness customizations](maintenance.md) checks harness hooks into upstream internals after a package update.
 
 ## Develop
 
