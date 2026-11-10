@@ -3,6 +3,7 @@
 # requires-python = ">=3.14"
 # dependencies = [
 #     "lxml>=5.0",
+#     "portalocker[win32]==4.4.1",
 # ]
 # ///
 """Public entrypoint and dispatcher for Odoo Ops."""

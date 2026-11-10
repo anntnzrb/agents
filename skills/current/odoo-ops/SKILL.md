@@ -160,3 +160,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 - Container logs: use `logs -c web|db|test`. Container names are `odoo-db` and `odoo-web`.
 - Use `127.0.0.1` rather than `localhost` to avoid IPv6 binding failures.
 - Do not run `git stash` while `dev` is running; filesystem changes trigger autoreload crashes.
+
+## Maintenance
+
+When updating Ruff, match the version pinned in `skill-creator/scripts/gates.py`. Update the Portalocker pin in both script metadata blocks together and check shared and exclusive locking on each supported platform.

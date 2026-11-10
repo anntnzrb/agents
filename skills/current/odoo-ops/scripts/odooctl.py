@@ -3,6 +3,7 @@
 # requires-python = ">=3.14"
 # dependencies = [
 #     "lxml>=5.0",
+#     "portalocker[win32]==4.4.1",
 # ]
 # ///
 """Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."""
@@ -34,11 +35,7 @@ from io import BufferedIOBase
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, Self, TypedDict, TypeIs, override
 
-if sys.platform != "win32":
-    import fcntl
-else:
-    fcntl = None
-
+import portalocker
 import xml_view_linter
 
 if TYPE_CHECKING:
@@ -89,6 +86,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 CONFIG_DIR = SCRIPT_DIR.parent / "config"
 RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
+RUFF = "ruff==0.16.10"
 
 # Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
@@ -1051,11 +1049,7 @@ def _lock_dir() -> Path:
 
 @contextlib.contextmanager
 def _file_lock(name: str, waiting: str, *, shared: bool = False) -> Generator[None]:
-    """Hold a reentrant flock on `<tmp>/<name>`, exclusive unless `shared`."""
-    if fcntl is None:
-        yield
-        return
-
+    """Hold a reentrant interprocess lock, exclusive unless `shared`."""
     held = _HELD_LOCKS.get(name)
     if held is not None:
         if held.shared and not shared:
@@ -1068,22 +1062,21 @@ def _file_lock(name: str, waiting: str, *, shared: bool = False) -> Generator[No
             held.depth -= 1
         return
 
-    mode = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+    mode = portalocker.LOCK_SH if shared else portalocker.LOCK_EX
     lock_file = _lock_dir() / name
     with lock_file.open("a+", encoding="utf-8") as f:
         try:
-            fcntl.flock(f.fileno(), mode | fcntl.LOCK_NB)
-        except BlockingIOError, OSError:
+            portalocker.lock(f, mode | portalocker.LOCK_NB)
+        except portalocker.exceptions.AlreadyLocked:
             print(f"waiting for odoo-ops lock ({waiting})...", file=sys.stderr)
-            fcntl.flock(f.fileno(), mode)
+            portalocker.lock(f, mode)
 
         _HELD_LOCKS[name] = _HeldLock(depth=1, shared=shared)
         try:
             yield
         finally:
             del _HELD_LOCKS[name]
-            with contextlib.suppress(OSError):
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            portalocker.unlock(f)
 
 
 def _db_lock_name(db_name: str) -> str:
@@ -2076,7 +2069,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     skip_views = _require_bool(args, "skip_views")
     target_paths = _resolve_target_paths(target, profile, for_lint=True)
 
-    cmd = ["uvx", "ruff", "check"]
+    cmd = ["uvx", RUFF, "check"]
     if RUFF_CONFIG_PATH.is_file():
         cmd.extend(["--config", str(RUFF_CONFIG_PATH)])
 
@@ -2150,7 +2143,7 @@ def cmd_fmt(args: argparse.Namespace) -> int:
     check_mode = _require_bool(args, "check")
     target_paths = _resolve_target_paths(target, profile, for_lint=True)
 
-    cmd = ["uvx", "ruff", "format"]
+    cmd = ["uvx", RUFF, "format"]
     if RUFF_CONFIG_PATH.is_file():
         cmd.extend(["--config", str(RUFF_CONFIG_PATH)])
 

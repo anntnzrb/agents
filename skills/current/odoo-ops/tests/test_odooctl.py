@@ -6,7 +6,6 @@ import configparser
 import contextlib
 import dataclasses
 import email.message
-import fcntl
 import gzip
 import hashlib
 import io
@@ -14,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import threading
 import urllib.error
@@ -36,6 +36,7 @@ class _FakeResponse:
 from unittest.mock import MagicMock, patch
 
 import odooctl
+import portalocker
 import pytest
 from _narrow import (
     is_obj_dict,
@@ -69,14 +70,14 @@ class _StopError(Exception):
     """Stops a command right after it takes its locks."""
 
 
-def _try_flock(path: Path, mode: int) -> bool:
-    """Return whether a separate open file description can take the flock."""
+def _try_flock(path: Path, mode: portalocker.LockFlags) -> bool:
+    """Return whether another file handle can take the lock."""
     with path.open("a+", encoding="utf-8") as f:
         try:
-            fcntl.flock(f.fileno(), mode | fcntl.LOCK_NB)
-        except BlockingIOError:
+            portalocker.lock(f, mode | portalocker.LOCK_NB)
+        except portalocker.exceptions.AlreadyLocked:
             return False
-        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        portalocker.unlock(f)
         return True
 
 
@@ -1460,12 +1461,56 @@ class TestOpLockReentrancy:
             assert _lock_depth(name) == 1
         assert _lock_depth(name) == 0
 
+    @pytest.mark.parametrize(
+        ("held_shared", "child_shared", "blocked"),
+        [
+            (True, True, False),
+            (True, False, True),
+            (False, True, True),
+            (False, False, True),
+        ],
+    )
+    def test_interprocess_contention(
+        self,
+        isolated_lock_dir: Path,
+        *,
+        held_shared: bool,
+        child_shared: bool,
+        blocked: bool,
+    ) -> None:
+        """Shared holders coexist; every exclusive holder waits for release."""
+        code = (
+            "import sys; from pathlib import Path; import odooctl; "
+            "odooctl._lock_dir = lambda: Path(sys.argv[1]); "
+            "lock = odooctl._file_lock('process.lock', 'test', shared=sys.argv[2] == 'shared'); "
+            "lock.__enter__(); lock.__exit__(None, None, None)"
+        )
+        cmd = [
+            sys.executable,
+            "-c",
+            code,
+            str(isolated_lock_dir),
+            "shared" if child_shared else "exclusive",
+        ]
+        env = os.environ | {"PYTHONPATH": str(Path(odooctl.__file__).parent)}
+        with odooctl._file_lock("process.lock", "test", shared=held_shared):
+            if blocked:
+                with pytest.raises(subprocess.TimeoutExpired):
+                    _ = subprocess.run(
+                        cmd, env=env, capture_output=True, timeout=2, check=True
+                    )
+            else:
+                _ = subprocess.run(
+                    cmd, env=env, capture_output=True, timeout=10, check=True
+                )
+        _ = subprocess.run(cmd, env=env, capture_output=True, timeout=10, check=True)
+
     def test_same_database_serializes(self, isolated_lock_dir: Path) -> None:
         """Verify a second run on the same database cannot take its lock."""
         db_lock = isolated_lock_dir / odooctl._db_lock_name("work_a")
         with odooctl._test_run_lock("work_a"):
-            assert not _try_flock(db_lock, fcntl.LOCK_EX)
-        assert _try_flock(db_lock, fcntl.LOCK_EX)
+            assert not _try_flock(db_lock, portalocker.LOCK_EX)
+        assert _try_flock(db_lock, portalocker.LOCK_EX)
 
     def test_different_databases_use_independent_locks(
         self, isolated_lock_dir: Path
@@ -1474,18 +1519,18 @@ class TestOpLockReentrancy:
         assert odooctl._db_lock_name("work_a") != odooctl._db_lock_name("work_b")
         with odooctl._test_run_lock("work_a"):
             other = isolated_lock_dir / odooctl._db_lock_name("work_b")
-            assert _try_flock(other, fcntl.LOCK_EX)
+            assert _try_flock(other, portalocker.LOCK_EX)
             runs = isolated_lock_dir / odooctl.RUNS_LOCK_NAME
-            assert _try_flock(runs, fcntl.LOCK_SH)
-            assert not _try_flock(runs, fcntl.LOCK_EX)
+            assert _try_flock(runs, portalocker.LOCK_SH)
+            assert not _try_flock(runs, portalocker.LOCK_EX)
 
     def test_test_run_does_not_hold_pod_lock(self, isolated_lock_dir: Path) -> None:
         """Verify a test run takes the pod lock only while creating the pod."""
         pod = isolated_lock_dir / odooctl.POD_LOCK_NAME
         with odooctl._test_run_lock("work_a"):
-            assert _try_flock(pod, fcntl.LOCK_EX)
+            assert _try_flock(pod, portalocker.LOCK_EX)
             with odooctl._op_lock():
-                assert not _try_flock(pod, fcntl.LOCK_EX)
+                assert not _try_flock(pod, portalocker.LOCK_EX)
 
     def test_pod_creation_stays_global(self, tmp_path: Path) -> None:
         """Verify pod creation holds the global pod lock whatever database is in use."""
@@ -1573,7 +1618,7 @@ class TestOpLockReentrancy:
                 entered.set()
 
         with db_lock.open("a+", encoding="utf-8") as holder:
-            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+            portalocker.lock(holder, portalocker.LOCK_EX)
             with contextlib.redirect_stderr(stderr):
                 worker = threading.Thread(target=run)
                 worker.start()
@@ -1582,7 +1627,7 @@ class TestOpLockReentrancy:
                         break
                     _ = threading.Event().wait(0.01)
                 assert not entered.is_set()
-                fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+                portalocker.unlock(holder)
                 worker.join(timeout=5)
         assert entered.is_set()
         assert "waiting for odoo-ops lock" in stderr.getvalue()
@@ -1693,11 +1738,11 @@ class TestCommandsWaitForTestRuns:
             contextlib.redirect_stdout(io.StringIO()),
             held_lock.open("a+", encoding="utf-8") as holder,
         ):
-            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+            portalocker.lock(holder, portalocker.LOCK_EX)
             worker = threading.Thread(target=run)
             worker.start()
             while_held = reached.wait(0.5)
-            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+            portalocker.unlock(holder)
             worker.join(timeout=5)
         return while_held, reached.is_set()
 
@@ -1770,7 +1815,7 @@ class TestCommandsWaitForTestRuns:
         runs = isolated_lock_dir / odooctl.RUNS_LOCK_NAME
 
         def record() -> str:
-            shared_blocked.append(not _try_flock(runs, fcntl.LOCK_SH))
+            shared_blocked.append(not _try_flock(runs, portalocker.LOCK_SH))
             depths.append(
                 (
                     _lock_depth(odooctl.RUNS_LOCK_NAME),
