@@ -8,7 +8,7 @@
       "files": [],
       "expectations": [
         "Resolves the official React library ID starting with a leading forward slash (e.g. /reactjs/react.dev or /facebook/react)",
-        "Queries documentation using `bun x ctx7@latest docs` with the resolved ID",
+        "Queries documentation through `mcporter call context7.get_library_docs` with the resolved ID",
         "Provides code examples demonstrating useId with aria-describedby or htmlFor attributes",
         "Cites the Context7 library ID used for documentation retrieval"
       ]
@@ -163,34 +163,32 @@
       "expected_output": "Inspects library versions from Context7 and queries documentation using the version-specific library ID.",
       "files": [],
       "expectations": [
-        "Identifies version-specific ID format (/vercel/next.js/<version>)",
-        "Uses `bun x ctx7@latest docs` with the versioned ID",
+        "Resolves Next.js and checks the returned candidates for a version-specific ID",
+        "Queries documentation through `mcporter call context7.get_library_docs` with the returned versioned ID if available",
         "Provides guidance relevant to Next.js 14 without introducing breaking Next.js 15 defaults",
-        "Explains how versioned IDs are discovered from `bun x ctx7@latest library`"
+        "States if the requested version cannot be found instead of inventing a versioned ID"
       ]
     },
     {
       "id": 15,
       "prompt": "Configure the Context7 MCP server for Claude Code so Claude can query Context7 tools natively in this environment.",
-      "expected_output": "Guides or executes `bun x ctx7@latest setup --mcp --claude` for automated agent configuration.",
+      "expected_output": "Checks the live Context7 MCP server capabilities and provides supported Claude Code configuration guidance, or states that the skill does not document server setup.",
       "files": [],
       "expectations": [
-        "Recommends or runs `bun x ctx7@latest setup --mcp --claude`",
-        "Explains that `--project` can be appended for workspace-scoped config",
-        "Mentions authentication options (--api-key or interactive OAuth device flow)",
-        "Does not invent manual JSON configuration when the CLI command handles it"
+        "Recognizes that the skill requires a Context7 MCP server via MCPorter but does not document Claude Code setup",
+        "Inspects live tools or authoritative configuration documentation before giving setup instructions",
+        "Does not invent setup commands, configuration flags, or authentication options"
       ]
     },
     {
       "id": 16,
       "prompt": "Search the Context7 skills registry for skills related to testing and show how to install a skill from GitHub.",
-      "expected_output": "Provides the exact `bun x ctx7@latest skills search` and `bun x ctx7@latest skills install` commands.",
+      "expected_output": "Checks whether the live Context7 server supports skill search and installation, and does not invent commands if those capabilities are unavailable.",
       "files": [],
       "expectations": [
-        "Uses `bun x ctx7@latest skills search 'testing'`",
-        "Shows skill installation syntax with repository format `/owner/repo` (e.g. `bun x ctx7@latest skills install /anthropics/skills`)",
-        "Explains how `ctx7 skills list` and `ctx7 skills suggest` operate",
-        "Avoids incorrect git clone instructions for Context7 skills registry"
+        "Inspects the live Context7 tool roster for skill registry capabilities",
+        "Searches for testing skills and explains installation only if supported by discovered tools or authoritative documentation",
+        "States any capability that cannot be verified instead of inventing commands"
       ]
     },
     {
@@ -213,7 +211,7 @@
       "expectations": [
         "Explicitly warns against including passwords, API keys, or private secrets in search queries",
         "Redacts sensitive values and reformulates query with abstract placeholders (e.g. '<db_password>')",
-        "Executes `bun x ctx7@latest docs` with sanitized query text",
+        "If querying documentation, uses `mcporter call context7.get_library_docs` with sanitized query text",
         "Protects user credentials from leaking over network search requests"
       ]
     },
@@ -236,7 +234,7 @@
       "files": [],
       "expectations": [
         "Identifies this as general computer science theory and data structures, not a library documentation lookup",
-        "Does not invoke `bun x ctx7@latest` for textbook algorithms",
+        "Does not invoke Context7 through MCPorter for textbook algorithms",
         "Provides clear explanation of Red-Black tree properties (node colors, root black, red node children black, black height balance)",
         "Adheres to skill negative trigger boundaries"
       ]
