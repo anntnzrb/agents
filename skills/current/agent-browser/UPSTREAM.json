@@ -1,10 +1,10 @@
 {
   "repo": "vercel-labs/agent-browser",
-  "release": "v0.39.4",
-  "commit": "04ba5264dade678062c3cdcce0f4f293e748249f",
+  "release": "v0.42.0",
+  "commit": "e7519957b9067c541825afa21a792fbe1f483047",
   "trees": {
-    "skills/agent-browser": "82def67855a0d2aad7794207951820fa5422fdb0",
-    "skill-data/core": "e07c2126a2fd59e6f5240ebceedbe0d2755a64f3",
+    "skills/agent-browser": "29ba9c12789b1c54ab76ad40e2472e646d141b85",
+    "skill-data/core": "410ff3e757f492080a3436d65b7632224f7d898d",
     "bin": "3fce72bbeee40e5a9ca19d081402224b352826c0",
     "scripts": "110b190768ab049ac95c479894c662dd19c78c30"
   },
