@@ -29,14 +29,14 @@
     "metacritic": {
       "description": "Metacritic films, shows, and games: Metascores, user scores, and reviews",
       "command": "bun",
-      "args": ["x", "mcp-metacritic@latest"],
+      "args": ["x", "mcp-metacritic@2.0.1"],
     },
     "n8n": {
       "description": "n8n MCP",
       "command": "bun",
       "args": [
         "x",
-        "supergateway",
+        "supergateway@4.2.1",
         "--streamableHttp",
         "${N8N_MCP_URL:-}",
         "--header",
