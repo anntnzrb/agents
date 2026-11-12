@@ -52,6 +52,8 @@ Delegates to:
   bun x --trust {PACKAGE}@<version> <agent-desktop-args>...
 
 <version> is the `release` in {PIN.name}, without its leading `v`.
+Inside WSL it runs Windows `bun.exe` instead, so agent-desktop drives the
+Windows desktop. Linux accessibility is not reachable there.
 Use `help` or `<command> --help` for agent-desktop's own help.
 
 Unattended policy:
@@ -207,9 +209,11 @@ def run(argv: Sequence[str]) -> int:
     if version is None:
         print(f"error: no string `release` in {PIN}", file=sys.stderr)
         return 2
-    bun = shutil.which("bun")
+    # WSL has no Linux accessibility bus, so drive the Windows desktop instead.
+    runner = "bun.exe" if os.environ.get("WSL_DISTRO_NAME") else "bun"
+    bun = shutil.which(runner)
     if bun is None:
-        print("error: required executable not found: bun", file=sys.stderr)
+        print(f"error: required executable not found: {runner}", file=sys.stderr)
         print("Install bun: https://bun.sh", file=sys.stderr)
         return 127
     # --trust runs the package postinstall, which links the native binary and

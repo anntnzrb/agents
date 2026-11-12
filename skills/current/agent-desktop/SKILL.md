@@ -24,6 +24,8 @@ Set `<skill-dir>` to this skill directory. The wrapper runs `bun x --trust agent
 
 The binary carries guides that match its version, so this skill carries no command reference.
 
+Inside WSL the wrapper runs Windows `bun.exe` and drives the Windows desktop, so `status` reports `windows` and apps carry Windows process names such as `chrome.exe`. Install bun on Windows if the wrapper reports `bun.exe` missing.
+
 ## First run in a session
 
 1. Run `agent-desktop status` to read the platform, permissions, and `supported_surfaces`. If it fails with `PLATFORM_NOT_SUPPORTED` or the host has no desktop session, stop and tell the user.

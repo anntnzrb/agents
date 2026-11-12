@@ -30,18 +30,18 @@ def make_skill(root: Path, pin: object) -> Path:
     return skill / "scripts" / "cli.py"
 
 
-def make_bun(directory: Path) -> None:
-    """Install a fake `bun` on `directory` that logs its arguments."""
+def make_bun(directory: Path, name: str = "bun") -> None:
+    """Install a fake `name` launcher on `directory` that logs its arguments."""
     directory.mkdir()
     script = directory / "fake_bun.py"
     _ = script.write_text(FAKE_BUN, encoding="utf-8")
     if sys.platform == "win32":
-        launcher = directory / "bun.cmd"
+        launcher = directory / f"{name.removesuffix('.exe')}.cmd"
         _ = launcher.write_text(
             f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8"
         )
     else:
-        launcher = directory / "bun"
+        launcher = directory / name
         _ = launcher.write_text(f"#!{sys.executable}\n{FAKE_BUN}", encoding="utf-8")
         launcher.chmod(0o755)
 
@@ -111,6 +111,35 @@ def test_missing_bun_is_127(tmp_path: Path) -> None:
     completed, log = run_cli(cli, tmp_path / "empty", "status")
     assert completed.returncode == MISSING_EXECUTABLE
     assert "bun" in completed.stderr
+    assert not log.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="WSL runs a Linux wrapper")
+def test_wsl_runs_windows_bun(tmp_path: Path) -> None:
+    """Inside WSL the wrapper drives the Windows desktop through bun.exe."""
+    cli = make_skill(tmp_path, {"release": "v1.0.0"})
+    make_bun(tmp_path / "bin", "bun.exe")
+    completed, log = run_cli(
+        cli, tmp_path / "bin", "status", extra_env={"WSL_DISTRO_NAME": "distro"}
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(log.read_text(encoding="utf-8")) == [
+        "x",
+        "--trust",
+        "agent-desktop@1.0.0",
+        "status",
+    ]
+
+
+def test_wsl_without_windows_bun_is_127(tmp_path: Path) -> None:
+    """Inside WSL a Linux bun cannot reach the desktop, so it is not a fallback."""
+    cli = make_skill(tmp_path, {"release": "v1.0.0"})
+    make_bun(tmp_path / "bin")
+    completed, log = run_cli(
+        cli, tmp_path / "bin", "status", extra_env={"WSL_DISTRO_NAME": "distro"}
+    )
+    assert completed.returncode == MISSING_EXECUTABLE
+    assert "bun.exe" in completed.stderr
     assert not log.exists()
 
 
