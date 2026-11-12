@@ -25,6 +25,8 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Set `<skill-dir>` to this skill directory. The wrapper uses bun to run the pinned npm release and preserves exit codes. Install bun from https://bun.sh. If Chrome is missing, run `uv run --script <skill-dir>/scripts/cli.py install` once. Use this install command instead of upstream's global npm installation advice; never install a global package for this skill.
 
+Inside WSL, a Linux browser cannot reach the user's Windows browser. To drive a browser already running on Windows, connect to its CDP endpoint: `agent-browser connect <cdp-url>`.
+
 Examples use `agent-browser ...` as shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`. Always use the canonical command. Examples omit `--session <name>` for brevity; add it to every browser command.
 
 <critical>
