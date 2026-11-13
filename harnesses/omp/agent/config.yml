@@ -18,7 +18,7 @@ modelRoles:
   judge: opencode-zen-jev/jev-1.13-free
 
   opus: cliproxy/claude-opus-5-5:medium
-  opus: cliproxy/claude-haiku-5-5:xhigh
+  haiku: cliproxy/claude-haiku-5-5:xhigh
   ds: cliproxy/opencode-go/deepseek-v4.1-flash:max
   gem: cliproxy/gemini-3.8-flash-high:medium
   muse: cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh
