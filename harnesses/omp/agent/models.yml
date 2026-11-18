@@ -11,18 +11,35 @@ providers:
       # the rest on openai-completions. It also reports context_length per model.
       type: proxy
     modelOverrides:
-      gemini-3.7-flash-high:
-        contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits; matches the google-antigravity profile
-      gemini-3.8-flash-high:
-        contextWindow: 500000 # 500K * 85% = 425K trigger; matches the google-antigravity profile
-        cost:
-          input: 0.75
-          output: 3.75
-          cacheRead: 0.075
-          cacheWrite: 0
-      gpt-6-astra:
-        contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone; matches the openai-codex profile
-        # Proxy discovery disables effort by default; these GPT routes accept reasoning_effort.
+      gpt-6.2-sol:
+        reasoning: true
+        contextWindow: 588236 # 85% trigger = 500K, same budget as the rest of the GPT-6 family
+        maxTokens: 128000
+        compat:
+          supportsReasoningEffort: true
+        thinking:
+          mode: effort
+          efforts:
+            - low
+            - medium
+        input:
+          - text
+          - image
+      gpt-6.1-terra:
+        reasoning: true
+        contextWindow: 588236 # 85% trigger = 500K, same budget as the rest of the GPT-6 family
+        maxTokens: 128000
+        compat:
+          supportsReasoningEffort: true
+        thinking:
+          mode: effort
+          efforts:
+            - high
+        input:
+          - text
+          - image
+      gpt-6-luna:
+        contextWindow: 588236 # 85% trigger = 500K, same budget as the rest of the GPT-6 family
         compat:
           supportsReasoningEffort: true
       gpt-6.1-sol:
@@ -106,12 +123,6 @@ providers:
           output: 0
           cacheRead: 0
           cacheWrite: 0
-  google-antigravity:
-    modelOverrides:
-      gemini-3.7-flash:
-        contextWindow: 500000 # 500K * 85% = 425K trigger, keeping Flash within high-precision reasoning limits
-      gemini-3.8-flash:
-        contextWindow: 500000 # 500K * 85% = 425K trigger
   opencode-go:
     modelOverrides:
       glm-5.3-flash:
@@ -235,18 +246,6 @@ providers:
           output: 0
           cacheRead: 0
           cacheWrite: 0
-  openai-codex:
-    baseUrl: https://chatgpt.com/backend-api/codex
-    api: openai-codex-responses
-    auth: oauth
-    models:
-      - id: gpt-6-astra
-        name: GPT-6 Astra
-        contextWindow: 600000 # 600K * 85% = 510K trigger, preserving Astra's 100% needle-and-aggregation zone
-        reasoning: true
-        input:
-          - text
-          - image
 
 # -----------------------------------------------------------------------------
 # References & Citations

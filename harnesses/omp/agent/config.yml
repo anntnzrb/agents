@@ -7,22 +7,21 @@
 
 modelRoles:
   default: "@opus"
-  slow: cliproxy/gpt-6.1-sol:xhigh
-  smol: "@gem"
-  vision: "@gem"
-  commit: "@gem"
+  slow: "@sol"
+  smol: "@haiku"
+  vision: "@haiku"
+  commit: "@haiku"
   task: "@terra"
-  advisor: "@gem"
-  tiny: local/lfm2.5-230m,@gem
+  advisor: "@haiku"
+  tiny: local/lfm2.5-230m,@haiku
   web: web/parallel
   judge: opencode-zen-jev/jev-1.13-free
 
   opus: cliproxy/claude-opus-5-5:medium
   haiku: cliproxy/claude-haiku-5-5:xhigh
   ds: cliproxy/opencode-go/deepseek-v4.1-flash:max
-  gem: cliproxy/gemini-3.8-flash-high:medium
   muse: cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh
-  sol: cliproxy/gpt-6.1-sol:medium
+  sol: cliproxy/gpt-6.2-sol:medium
   terra: cliproxy/gpt-6.1-terra:high
   luna: cliproxy/gpt-6-luna:xhigh
 
@@ -35,20 +34,13 @@ cycleOrder:
   - terra
   - luna
   - muse
-  - gem
 
 defaultThinkingLevel: auto
 hideThinkingBlock: true
 textVerbosity: low
 
-tier:
-  google: priority
-
 retry:
   maxRetries: 50
-  # fallbackChains:
-  #   default:
-  #     - cliproxy/gemini-3.8-flash-high:medium
   fallbackChains:
     web:
       - web/firecrawl
@@ -125,8 +117,6 @@ ttsr:
 edit:
   autoRepair:
     enabled: true
-  modelVariants:
-    gemini-3.8-flash: replace
 
 lsp:
   enabled: false
