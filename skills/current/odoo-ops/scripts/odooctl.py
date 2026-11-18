@@ -3641,7 +3641,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lint_js = subparsers.add_parser(
         "lint-js",
         parents=[parent_parser],
-        help="Lint Odoo JavaScript with the runtime ESLint config",
+        help="Lint Odoo JavaScript with strict rules and the runtime ESLint config",
     )
     _ = p_lint_js.add_argument(
         "target", nargs="?", default="crm", help="Module or workflow (default: crm)"
@@ -3652,6 +3652,9 @@ def _build_parser() -> argparse.ArgumentParser:
         const="HEAD",
         metavar="REF",
         help="Only changed and untracked files (default ref: HEAD)",
+    )
+    _ = p_lint_js.add_argument(
+        "--odoo-only", action="store_true", help="Use only Odoo's runtime rules"
     )
     _ = p_lint_js.add_argument(
         "--format", action="store_true", help="Enable Prettier formatting checks"

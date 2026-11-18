@@ -142,7 +142,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 
 ## Flags that trip agents
 
-- `lint-js`: checks module JavaScript with the installed Odoo runtime config. Use `--changed [<ref>]` for changed and untracked files; add `--format` to enable Prettier checks.
+- `lint-js`: checks module JavaScript with strict rules over the installed Odoo runtime config. Use `--changed [<ref>]` for changed and untracked files, `--odoo-only` for the runtime rules alone, and `--format` to enable Prettier checks. Warnings do not fail the command.
 - `dev [workflow]`: runs in the foreground until stopped. Every start runs Odoo with `-i` and `-u` for all modules of the profile workflow (`profiles/<profile>.json`, default workflow `crm`), so each start applies module updates like a deploy. There is no update-only command: use `dev` for upgrade rehearsals ([Database recipes](references/db-recipes.md#upgrade-rehearsal)). Refuses `_seed_` databases.
 - `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. A per-database lock serializes test runs on the same database, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Prints `RESULT tests= failed= errors=`. It runs `-u` with `--test-enable`, so it is not an upgrade rehearsal.
 - `test --baseline <ref>`: separates new failures from pre-existing ones by running the same tests on `<ref>` in a temporary git worktree. Use it instead of `git stash`. Exit 0 means no new failures.
