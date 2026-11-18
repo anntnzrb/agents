@@ -4,11 +4,11 @@ This Pi extension replaces active `edit` and `write` tools with `apply_patch` fo
 
 ## Model selection
 
-Codex enables the tool when `model_info.apply_patch_tool_type` is present. Its model lookup uses the longest matching catalog slug prefix, then retries after one simple provider namespace, such as `command-code/gpt-6.1-sol`. Matching is case-sensitive. Unknown models receive fallback metadata with no patch capability.
+Codex enables the tool when `model_info.apply_patch_tool_type` is present. Its model lookup uses the longest matching catalog slug prefix, then retries after one simple provider namespace, such as `command-code/gpt-6.2-sol`. Matching is case-sensitive. Unknown models receive fallback metadata with no patch capability.
 
-Pi does not expose that Codex metadata. The extension uses the GPT entries from Codex 0.159.2's shipped catalog, projected into [model-catalog.ts](model-catalog.ts). Internal non-GPT entries are excluded to keep this extension GPT-only. It uses the same lookup and capability condition; it does not read Codex's machine-local cache or assume that future GPT versions support patching.
+Pi does not expose that Codex metadata. The extension uses the GPT entries from Codex 0.170.0's shipped catalog, projected into [model-catalog.ts](model-catalog.ts). Internal non-GPT entries are excluded to keep this extension GPT-only. It uses the same lookup and capability condition; it does not read Codex's machine-local cache or assume that future GPT versions support patching.
 
-Sources: [tool selection](https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/core/src/tools/spec_plan.rs), [model lookup](https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/models-manager/src/manager.rs), [fallback metadata](https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/models-manager/src/model_info.rs), and [shipped catalog](https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/models-manager/models.json). When updating the snapshot, preserve each GPT entry's `slug` and `apply_patch_tool_type`, then run the model-selection tests.
+Sources: [tool selection](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/core/src/tools/spec_plan.rs), [model lookup](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/models-manager/src/manager.rs), [fallback metadata](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/models-manager/src/model_info.rs), and [shipped catalog](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/models-manager/models.json). When updating the snapshot, preserve each GPT entry's `slug` and `apply_patch_tool_type`, then run the model-selection tests.
 
 Switching to another model hides `apply_patch` from both model declarations and nested tool calls, then restores the tools the extension replaced. Unrelated active tools stay active. The executor also rejects calls from non-GPT models.
 
@@ -16,7 +16,7 @@ Read-only tool selections stay read-only. With `--tools`, include `apply_patch` 
 
 ## Patch execution
 
-The extension invokes the installed `codex` CLI on `PATH` with `--codex-run-as-apply-patch`. This runs Codex's native patch engine locally without authentication or a model request. The hidden CLI flag was verified with Codex 0.159.2; keep the native execution tests passing when updating Codex.
+The extension invokes the installed `codex` CLI on `PATH` with `--codex-run-as-apply-patch`. This runs Codex's native patch engine locally without authentication or a model request. The hidden CLI flag was verified with Codex 0.170.0; keep the native execution tests passing when updating Codex.
 
 The tool accepts an `input` string containing Codex's `*** Begin Patch` syntax. Add, update, delete, move, context anchors, and end-of-file matching use the native engine. Paths resolve from Pi's working directory. Source and destination paths share Pi's file mutation queues, including symlink aliases and new files under symlinked directories.
 
@@ -59,7 +59,7 @@ This invokes the native patch engine locally without authentication or inference
 
 ```sh
 pi --no-extensions -e /absolute/path/to/apply-patch/index.ts \
-	--provider openai --model gpt-6.1-sol --no-session --mode json -p \
+	--provider openai --model gpt-6.2-sol --no-session --mode json -p \
 	--tools read,bash,edit,write,apply_patch \
 	'Use apply_patch to create proof.txt containing hello, then change it to goodbye. Read it to verify the result.'
 ```

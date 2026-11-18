@@ -1,12 +1,24 @@
-// GPT metadata from OpenAI Codex rust-v0.159.2, Apache-2.0 (see LICENSE).
-// Source: https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/models-manager/models.json
+// GPT metadata from OpenAI Codex rust-v0.170.0, Apache-2.0 (see LICENSE).
+// Source: https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/models-manager/models.json
 export const CODEX_GPT_MODELS = [
+  {
+    "slug": "gpt-6.2-sol",
+    "apply_patch_tool_type": "freeform"
+  },
+  {
+    "slug": "gpt-6.2-astra",
+    "apply_patch_tool_type": "freeform"
+  },
   {
     "slug": "gpt-6-astra",
     "apply_patch_tool_type": "freeform"
   },
   {
     "slug": "gpt-6.1-sol",
+    "apply_patch_tool_type": "freeform"
+  },
+  {
+    "slug": "gpt-6.1-terra",
     "apply_patch_tool_type": "freeform"
   },
   {
