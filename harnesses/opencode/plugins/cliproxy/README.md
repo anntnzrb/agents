@@ -26,8 +26,8 @@ Discovery:
    provider editor before this transform runs and reloads providers when its snapshot refreshes.
    Deprecated and non-text catalog models are absent. Lookups try the exact id, the segment after the
    last `/`, then the same keys with a trailing thinking-level qualifier (`-minimal`, `-low`, `-medium`,
-   `-high`, `-xhigh`, `-max`, `-thinking`) removed, so `gemini-3.8-flash-high` resolves to the
-   catalog's `gemini-3.8-flash` row. When several rows share a key, the widest context window wins.
+   `-high`, `-xhigh`, `-max`, `-thinking`) removed, so `claude-haiku-5-5-high` resolves to the
+   catalog's `claude-haiku-5-5` row. When several rows share a key, the widest context window wins.
    Matched models copy name, family, release date, tool support, input modalities, limits, and tiered cost.
    The family lets OpenCode pick a small model for session titles (`gpt-luna`, then `gemini-flash-lite`,
    `gemini-flash`, `claude-haiku`) instead of the session's own model.
@@ -43,4 +43,4 @@ The gateway translates `reasoningEffort` to each upstream's native thinking cont
 
 Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
 use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
-field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
+field (e.g. `GPT-6.2 Sol (openai)`, `Claude Haiku 5.5 (anthropic)`).
