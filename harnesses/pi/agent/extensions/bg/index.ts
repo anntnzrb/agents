@@ -188,7 +188,8 @@ export default function bg(pi: ExtensionAPI) {
             child.once("close", (code, sig) => settle(code, sig));
           });
           try {
-            const finished = await race(job.done.then(() => true), params.background ? 0 : threshold, execution.signal);
+            // Explicit background never races: a fast command finishing first would take the foreground path and lose its report.
+            const finished = params.background ? false : await race(job.done.then(() => true), threshold, execution.signal);
             if (execution.signal?.aborted) throw new Error("aborted");
             if (finished) {
               job.consumed = true;
