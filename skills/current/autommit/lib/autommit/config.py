@@ -10,9 +10,9 @@ from typing import Final, TypeIs
 from autommit.errors import AutommitError
 
 # owner defaults; flags and environment variables override each one
-DEFAULT_MODEL: Final[str] = "gemini-3.8-flash-high"
+DEFAULT_MODEL: Final[str] = "claude-haiku-5-5"
 DEFAULT_API_KEY: Final[str] = "keyless"
-DEFAULT_REASONING_EFFORT: Final[str] = "medium"
+DEFAULT_REASONING_EFFORT: Final[str] = "high"
 DEFAULT_TIMEOUT: Final[float] = 300.0
 
 # Sync installs the shared agents settings here; its gateway is the default
