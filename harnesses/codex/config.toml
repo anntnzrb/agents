@@ -24,9 +24,9 @@ The primary agent owns integration: inspect actual changes and evidence, resolve
 # MODEL
 # -----------------------------------------------------------------------------
 
-model = "gpt-6.1-sol"
+model = "gpt-6.2-sol"
 model_provider = "cliproxy"
-review_model = "gpt-6.1-sol"
+review_model = "gpt-6.2-sol"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
 # Reasoning stays enabled; omit summaries that hide_agent_reasoning hides.
