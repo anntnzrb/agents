@@ -12,14 +12,14 @@ use_for = "Parallel logic slices with disjoint files, implementation or debuggin
 not_for = "Changes whose context the orchestrator already holds, full test suites, and CI gates"
 provider = "codex"
 model = "gpt-6.1-terra"
-options = { reasoningEffort = "medium" }
+options = { reasoningEffort = "high" }
 
 [reviewer]
 role = "review"
 use_for = "A code diff that changes behavior, before the orchestrator reports it done"
 not_for = "Prose-only, mechanical, or typo-sized diffs"
 provider = "codex"
-model = "gpt-6.1-sol"
+model = "gpt-6.2-sol"
 options = { reasoningEffort = "medium" }
 
 [scout]
@@ -27,5 +27,5 @@ role = "research"
 use_for = "Read-only work: recon, code search, summaries, web research, running the verification commands the orchestrator names, such as full test suites, builds, linters, CI gates, and CI waits, then reporting pass or fail with trimmed failure output, and review of prose-only or mechanical diffs when the user asks for one"
 not_for = "Edits of any kind, fixing failures, choosing which checks to run, debugging, logic changes, and one quick targeted check the orchestrator runs itself"
 provider = "opencode"
-model = "cliproxy/gemini-3.8-flash-high"
-options = { variant = "high" }
+model = "cliproxy/claude-haiku-5-5"
+options = { variant = "xhigh" }
