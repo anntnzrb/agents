@@ -2244,13 +2244,17 @@ def cmd_lint_js(args: argparse.Namespace) -> int:
                 violations.append(
                     {"path": data.get("filePath"), **_to_str_dict(message)}
                 )
+    errors = sum(violation.get("severity") == 2 for violation in violations)
+    warnings = sum(violation.get("severity") == 1 for violation in violations)
     if json_mode:
         print(
             json.dumps(
                 {
-                    "success": not violations,
+                    "success": errors == 0,
                     "files_checked": len(files),
                     "total_js_violations": len(violations),
+                    "total_js_errors": errors,
+                    "total_js_warnings": warnings,
                     "js_violations": violations,
                 },
                 indent=2,
@@ -2259,10 +2263,10 @@ def cmd_lint_js(args: argparse.Namespace) -> int:
     else:
         for violation in violations:
             print(
-                f"{violation['path']}:{violation.get('line', 0)}:{violation.get('column', 0)} {violation.get('ruleId') or 'parse-error'} {violation.get('message')}"
+                f"{violation['path']}:{violation.get('line', 0)}:{violation.get('column', 0)} {'error' if violation.get('severity') == 2 else 'warning'} {violation.get('ruleId') or 'parse-error'} {violation.get('message')}"
             )
-        print(f"RESULT files={len(files)} findings={len(violations)}")
-    return 1 if violations else 0
+        print(f"RESULT files={len(files)} errors={errors} warnings={warnings}")
+    return 1 if errors else 0
 
 
 def cmd_lint(args: argparse.Namespace) -> int:
