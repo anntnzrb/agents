@@ -2143,6 +2143,23 @@ def _js_toolchain() -> Path:
     return toolchain
 
 
+def _js_effective_config(config: Path, destination: Path) -> Path:
+    """Overlay the bundled strict rules without changing the runtime config."""
+    runtime = _to_str_dict(_json_loads(config.read_text(encoding="utf-8")))
+    strict = _to_str_dict(
+        _json_loads(
+            (SCRIPT_DIR.parent / "assets" / "eslint-strict.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    )
+    runtime["rules"] = _to_str_dict(runtime.get("rules")) | _to_str_dict(
+        strict.get("rules")
+    )
+    _ = destination.write_text(json.dumps(runtime), encoding="utf-8")
+    return destination
+
+
 def _js_lint_command(
     toolchain: Path, config: Path, files: Sequence[Path], *, format_check: bool
 ) -> list[str]:
@@ -2192,12 +2209,21 @@ def cmd_lint_js(args: argparse.Namespace) -> int:
     toolchain = _js_toolchain()
     violations: list[dict[str, object]] = []
     if files:
-        result = _run(
-            _js_lint_command(
-                toolchain, config, files, format_check=_require_bool(args, "format")
-            ),
-            check=False,
-        )
+        with tempfile.TemporaryDirectory(dir=toolchain) as temp_dir:
+            effective_config = (
+                config
+                if _require_bool(args, "odoo_only")
+                else _js_effective_config(config, Path(temp_dir) / "eslint.json")
+            )
+            result = _run(
+                _js_lint_command(
+                    toolchain,
+                    effective_config,
+                    files,
+                    format_check=_require_bool(args, "format"),
+                ),
+                check=False,
+            )
         if result.returncode not in (0, 1):
             raise CliError(
                 f"ESLint configuration or execution failed: {result.stderr.strip()}",
