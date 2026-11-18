@@ -22,6 +22,15 @@ Follow these situational reading rules before taking action:
 - Before writing Server Action templates for user UI execution, you MUST read [references/server-action-capabilities.md](references/server-action-capabilities.md), [references/server-action-playbook.md](references/server-action-playbook.md), [references/server-action-safe-eval.md](references/server-action-safe-eval.md), [references/server-action-sql-safety.md](references/server-action-sql-safety.md), and [references/server-action-templates.md](references/server-action-templates.md).
 - Before analyzing CLI JSON outputs in an OMP Eval kernel, you MUST read [references/omp-eval.md](references/omp-eval.md).
 
+## Module lint gates
+
+| Changed files | Gate |
+| --- | --- |
+| `static/src/**/*.js` | `odoo-ops lint-js <module> --changed` |
+| `.py`, `.xml` | `odoo-ops lint <module>` |
+
+After creating or editing module JavaScript under `static/src/`, you MUST run the JavaScript gate and reach exit 0 before declaring done or committing. Report warnings; do not silence them. NEVER add `eslint-disable` comments or edit configs to pass the gate.
+
 ## Safety boundary
 
 - The skill CLI is the single interface between user, model, and Odoo. Execute all commands via `uv run --script <skill-dir>/scripts/cli.py` in shell. Agents MUST NOT write custom HTTP, XML-RPC, or JSON-RPC scripts, import skill transports or Python modules into notebooks or eval kernels, or use `curl`/`requests`/`urllib`. Stop and report any missing CLI capability.
