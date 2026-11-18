@@ -95,7 +95,6 @@ odoo-ops env --json
 odoo-ops dev <workflow>
 odoo-ops health --wait 30
 odoo-ops test <module> --tags /<module>:Class.test_method
-odoo-ops test <module> --parallel -j 4
 odoo-ops test <module> --tags /<module>:Class.test_method --baseline <ref>
 odoo-ops auth-temp --db <prodDB>_work_<YYYYMMDD>
 odoo-ops auth-restore --db <prodDB>_work_<YYYYMMDD>

@@ -31,3 +31,4 @@ uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_work_<YYYYMMDD>_<slu
 - `logs -c test` follows the newest `odoo-test-*` container, which may belong to another run.
 - All Odoo containers mount the same `<runtime>/data/web` directory. Filestores are per database, but the directory is shared.
 - `stop` and `prune` act on the whole stack, not on one agent's runs.
+- `test --parallel` runs one container per module against a single database, and each container upgrades every workflow module (`-u`) before its tests. When two or more modules start together, the upgrades write the same rows and fail with `SerializationFailure: could not serialize access due to concurrent update`. Run the workflow suite sequentially (`test <workflow>`) on a shared database.
