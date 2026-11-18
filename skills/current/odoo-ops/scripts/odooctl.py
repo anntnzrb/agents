@@ -87,6 +87,12 @@ PROFILE_DIR = SCRIPT_DIR.parent / "profiles"
 CONFIG_DIR = SCRIPT_DIR.parent / "config"
 RUFF_CONFIG_PATH = CONFIG_DIR / "ruff.toml"
 RUFF = "ruff==0.16.10"
+JS_PACKAGES = (
+    "eslint@8.57.1",
+    "eslint-plugin-prettier@4.2.1",
+    "eslint-config-prettier@8.10.0",
+    "prettier@2.8.8",
+)
 
 # Network & Ports (Zero Magic Numbers)
 DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
@@ -2059,6 +2065,180 @@ def cmd_test(args: argparse.Namespace) -> int:
         return 0 if is_success else (exit_code if exit_code != 0 else 1)
 
 
+def _js_files(target_paths: Sequence[Path], changed: set[Path] | None) -> list[Path]:
+    """Select module source JavaScript, optionally intersecting a changed-file set."""
+    files = {
+        path.resolve()
+        for module in target_paths
+        for path in (module / "static" / "src").rglob("*.js")
+        if path.is_file()
+    }
+    return sorted(files if changed is None else files & changed)
+
+
+def _js_changed_files(target_paths: Sequence[Path], ref: str) -> set[Path]:
+    """Find tracked changes and untracked files in each target's Git repository."""
+    roots: set[Path] = set()
+    for target in target_paths:
+        result = _run(
+            ["git", "-C", str(target), "rev-parse", "--show-toplevel"], check=False
+        )
+        if result.returncode:
+            raise CliError(
+                f"Cannot find Git repository for {target}: {result.stderr.strip()}",
+                code=2,
+            )
+        roots.add(Path(result.stdout.strip()))
+    changed: set[Path] = set()
+    for root in roots:
+        for command in (
+            ["git", "diff", "--name-only", "--no-renames", "-z", ref, "--"],
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        ):
+            result = _run(command, cwd=root, check=False)
+            if result.returncode:
+                raise CliError(
+                    f"Git file selection failed: {result.stderr.strip()}", code=2
+                )
+            changed.update(
+                (root / name).resolve() for name in result.stdout.split("\0") if name
+            )
+    return changed
+
+
+def _js_toolchain() -> Path:
+    """Install the pinned ESLint toolchain in an isolated, reusable cache."""
+    for executable in ("node", "npm"):
+        if not shutil.which(executable):
+            raise CliError(f"Required executable not found: {executable}", code=127)
+    override = os.environ.get("ODOO_OPS_JS_TOOLCHAIN")
+    if override:
+        return Path(override).expanduser().resolve()
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
+    key = hashlib.sha256("\n".join(JS_PACKAGES).encode()).hexdigest()[:16]
+    toolchain = cache / "odoo-ops" / "js" / key
+    toolchain.mkdir(parents=True, exist_ok=True)
+    with portalocker.Lock(str(toolchain / "install.lock"), timeout=300):
+        marker = toolchain / "installed"
+        if not marker.is_file():
+            result = _run(
+                [
+                    "npm",
+                    "install",
+                    "--prefix",
+                    str(toolchain),
+                    "--no-save",
+                    "--no-package-lock",
+                    "--no-audit",
+                    "--no-fund",
+                    *JS_PACKAGES,
+                ],
+                check=False,
+            )
+            if result.returncode:
+                raise CliError(
+                    f"JavaScript toolchain installation failed: {result.stderr.strip()}"
+                )
+            _ = marker.write_text("\n".join(JS_PACKAGES), encoding="utf-8")
+    return toolchain
+
+
+def _js_lint_command(
+    toolchain: Path, config: Path, files: Sequence[Path], *, format_check: bool
+) -> list[str]:
+    """Build an ESLint invocation isolated from the target repository config."""
+    command = [
+        "node",
+        str(toolchain / "node_modules" / "eslint" / "bin" / "eslint.js"),
+        "--no-eslintrc",
+        "--no-ignore",
+        "--config",
+        str(config),
+        "--resolve-plugins-relative-to",
+        str(toolchain),
+        "--format",
+        "json",
+    ]
+    if not format_check:
+        command.extend(["--rule", "prettier/prettier: off"])
+    command.extend(str(path) for path in files)
+    return command
+
+
+def cmd_lint_js(args: argparse.Namespace) -> int:
+    """Lint Odoo module JavaScript using the installed runtime's ESLint config."""
+    target = _require_str(args, "target", "crm")
+    profile = _require_str(args, "profile", "etech")
+    json_mode = _require_bool(args, "json")
+    try:
+        targets = _resolve_target_paths(target, profile, for_lint=True)
+    except CliError as err:
+        raise CliError(str(err), code=2) from err
+    if any(not path.is_dir() for path in targets):
+        raise CliError("lint-js target must be a module or workflow", code=2)
+    ref = _optional_str(args, "changed")
+    files = _js_files(
+        targets, _js_changed_files(targets, ref) if ref is not None else None
+    )
+    configs = [
+        path / "web" / "tooling" / "_eslintrc.json"
+        for path in _resolve_source_addons(_resolve_runtime())
+    ]
+    config = next((path for path in configs if path.is_file()), None)
+    if config is None:
+        raise CliError(
+            "Odoo runtime ESLint config not found in addons/web/tooling", code=2
+        )
+    toolchain = _js_toolchain()
+    violations: list[dict[str, object]] = []
+    if files:
+        result = _run(
+            _js_lint_command(
+                toolchain, config, files, format_check=_require_bool(args, "format")
+            ),
+            check=False,
+        )
+        if result.returncode not in (0, 1):
+            raise CliError(
+                f"ESLint configuration or execution failed: {result.stderr.strip()}",
+                code=2,
+            )
+        try:
+            reports = _json_loads(result.stdout)
+        except json.JSONDecodeError as err:
+            raise CliError("ESLint returned invalid JSON", code=2) from err
+        if not _is_obj_list(reports):
+            raise CliError("ESLint returned invalid reports", code=2)
+        for report in reports:
+            data = _to_str_dict(report)
+            messages = data.get("messages")
+            if not _is_obj_list(messages):
+                raise CliError("ESLint returned invalid messages", code=2)
+            for message in messages:
+                violations.append(
+                    {"path": data.get("filePath"), **_to_str_dict(message)}
+                )
+    if json_mode:
+        print(
+            json.dumps(
+                {
+                    "success": not violations,
+                    "files_checked": len(files),
+                    "total_js_violations": len(violations),
+                    "js_violations": violations,
+                },
+                indent=2,
+            )
+        )
+    else:
+        for violation in violations:
+            print(
+                f"{violation['path']}:{violation.get('line', 0)}:{violation.get('column', 0)} {violation.get('ruleId') or 'parse-error'} {violation.get('message')}"
+            )
+        print(f"RESULT files={len(files)} findings={len(violations)}")
+    return 1 if violations else 0
+
+
 def cmd_lint(args: argparse.Namespace) -> int:
     """Run Ruff Python and XML view linters on profile lint_modules or target."""
     target = _require_str(args, "target", "crm")
@@ -3432,6 +3612,25 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip XML view linting and only run Ruff Python checks",
     )
+    p_lint_js = subparsers.add_parser(
+        "lint-js",
+        parents=[parent_parser],
+        help="Lint Odoo JavaScript with the runtime ESLint config",
+    )
+    _ = p_lint_js.add_argument(
+        "target", nargs="?", default="crm", help="Module or workflow (default: crm)"
+    )
+    _ = p_lint_js.add_argument(
+        "--changed",
+        nargs="?",
+        const="HEAD",
+        metavar="REF",
+        help="Only changed and untracked files (default ref: HEAD)",
+    )
+    _ = p_lint_js.add_argument(
+        "--format", action="store_true", help="Enable Prettier formatting checks"
+    )
+
     # Fmt Command
     p_fmt = subparsers.add_parser(
         "fmt",
@@ -3702,6 +3901,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "dev": cmd_dev,
     "test": cmd_test,
     "lint": cmd_lint,
+    "lint-js": cmd_lint_js,
     "fmt": cmd_fmt,
     "lint-views": cmd_lint_views,
     "stop": cmd_stop,

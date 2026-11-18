@@ -91,6 +91,7 @@ odoo-ops test <module> --tags /<module>:Class.test_method --baseline <ref>
 odoo-ops auth-temp --db <prodDB>_work_<YYYYMMDD>
 odoo-ops auth-restore --db <prodDB>_work_<YYYYMMDD>
 odoo-ops lint <module>
+odoo-ops lint-js <module> --changed
 odoo-ops fmt <module> --check
 odoo-ops lint-views <module>
 odoo-ops stop --web
