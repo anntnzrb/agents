@@ -16,7 +16,7 @@ Discovery order during a network-enabled refresh:
 2. `https://models.dev/api.json` supplies limits, pricing, modalities, and reasoning flags for ids it
    knows. Lookups try the exact id, the segment after the last `/`, then the same keys with a trailing
    thinking-level qualifier (`-minimal`, `-low`, `-medium`, `-high`, `-xhigh`, `-max`, `-thinking`) removed, so
-   `gemini-3.8-flash-high` resolves to the catalog's `gemini-3.8-flash` row. When several catalog rows
+   `claude-haiku-5-5-high` resolves to the catalog's `claude-haiku-5-5` row. When several catalog rows
    share a key, the row with the widest context window wins.
 3. Known gateway models absent from models.dev (such as `devin/swe-2`) resolve from static catalog
    overrides before falling back to metadata-free defaults.
@@ -26,7 +26,7 @@ Discovery order during a network-enabled refresh:
 
 Display names carry the upstream pool in parentheses: multi-segment ids (`<pool>/<vendor>/<model>`)
 use the id's pool segment, while single-segment OAuth-pool ids fall back to the gateway's `owned_by`
-field (e.g. `GPT-6 Astra (openai)`, `Gemini 3.8 Flash (antigravity)`).
+field (e.g. `GPT-6.2 Sol (openai)`, `Claude Haiku 5.5 (anthropic)`).
 
 ## Per-model request metadata
 

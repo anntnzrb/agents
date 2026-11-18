@@ -18,10 +18,10 @@
   "followUpMode": "all",
   "subagents": {
     "agentOverrides": {
-      "scout": { "model": "cliproxy/gemini-3.8-flash-high", "thinking": "medium" },
-      "worker": { "model": "cliproxy/gpt-6.1-sol", "thinking": "medium" },
-      "delegate": { "model": "cliproxy/gpt-6.1-sol", "thinking": "medium" },
-      "reviewer": { "model": "cliproxy/gpt-6.1-sol", "thinking": "xhigh" },
+      "scout": { "model": "cliproxy/claude-haiku-5-5", "thinking": "medium" },
+      "worker": { "model": "cliproxy/gpt-6.2-sol", "thinking": "medium" },
+      "delegate": { "model": "cliproxy/gpt-6.2-sol", "thinking": "medium" },
+      "reviewer": { "model": "cliproxy/gpt-6.2-sol", "thinking": "medium" },
       "researcher": { "disabled": true },
       "evidence-auditor": { "disabled": true },
       "oracle": { "disabled": true }
@@ -31,7 +31,7 @@
   "lastChangelogVersion": "1.0.0",
   "enabledModels": [
     "cliproxy/claude-opus-5-5:medium",
-    "cliproxy/gpt-6.1-sol:medium",
+    "cliproxy/gpt-6.2-sol:medium",
     "cliproxy/opencode-go/muse-spark-1.3-contributor:xhigh",
     "cliproxy/opencode-go/deepseek-v4.1-flash:max"
   ],
