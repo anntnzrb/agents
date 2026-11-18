@@ -1283,6 +1283,18 @@ def cmd_stop(args: argparse.Namespace) -> int:
     return 0
 
 
+def _uninstalled_modules(modules: Sequence[str], db: str) -> list[str]:
+    """Return the profile modules that are not installed in the database."""
+    names = ", ".join(_quote_literal(name) for name in modules)
+    rows = _exec_sql_json(
+        f"SELECT name FROM ir_module_module WHERE state = 'installed' AND name IN ({names})",  # noqa: S608 - names are quoted literals
+        db=db,
+        readonly=True,
+    )
+    installed = {str(row.get("name")) for row in rows}
+    return [name for name in modules if name not in installed]
+
+
 def cmd_dev(args: argparse.Namespace) -> int:
     """Start Odoo 17 dev server in foreground with hot reload enabled."""
     ctx = _resolve_workspace(args)
@@ -1360,7 +1372,13 @@ def cmd_dev(args: argparse.Namespace) -> int:
     ]
 
     if modules_str:
-        cmd.extend(["-i", modules_str, "-u", modules_str])
+        # `-i` reloads data files in install mode, ignoring noupdate and rerunning
+        # noupdate <function> tags, which a deploy (`-u`) skips. Pass it only for
+        # modules the database does not have installed yet.
+        missing = _uninstalled_modules(profile.modules, db_to_use)
+        if missing:
+            cmd.extend(["-i", ",".join(missing)])
+        cmd.extend(["-u", modules_str])
     try:
         banner = (
             f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} "

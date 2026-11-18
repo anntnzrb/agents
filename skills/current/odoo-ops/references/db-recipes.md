@@ -101,7 +101,7 @@ uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_seed_<YYYYMMDD> --fo
 
 Rehearse a module upgrade on a fresh working copy before it ships. Never touch the seed.
 
-There is no update-only command. `dev` is the upgrade path: every start runs Odoo with `-i` and `-u` for all modules of the profile workflow, as a deploy does. `test` also runs `-u`, but with `--test-enable`, so it is not a rehearsal. `dev` runs in the foreground until stopped; an unattended agent starts it as a background process. `dev` refuses `_seed_` databases; pass the working copy with `--db`, because without it `dev` uses the workflow database from the profile.
+There is no update-only command. `dev` is the upgrade path: every start runs Odoo with `-u` for all modules of the profile workflow, as a deploy does, plus `-i` only for workflow modules the database has not installed. `test` also runs `-u`, but with `--test-enable`, so it is not a rehearsal. `dev` runs in the foreground until stopped; an unattended agent starts it as a background process. `dev` refuses `_seed_` databases; pass the working copy with `--db`, because without it `dev` uses the workflow database from the profile.
 
 ```text
 # 1. Fresh working copy from the seed

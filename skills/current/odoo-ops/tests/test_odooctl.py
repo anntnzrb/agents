@@ -1163,16 +1163,22 @@ class TestCmdDevSeedGuard:
         run.assert_not_called()
         subprocess_run.assert_not_called()
 
-    def test_dev_starts_on_work_db(self, tmp_path: Path) -> None:
-        """Verify dev still starts Odoo with -i/-u on a '_work_' database."""
+    def _dev_cmd(
+        self, tmp_path: Path, installed: list[str], modules: list[str]
+    ) -> list[str]:
         ctx = make_workspace_context(tmp_path)
         profile = odooctl.WorkflowProfile(
-            database="erptech_work_20260908", modules=["m"]
+            database="erptech_work_20260908", modules=modules
         )
         with (
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
             patch.object(odooctl, "_load_workflow_profile", return_value=profile),
             patch.object(odooctl, "_ensure_runtime_pod") as ensure_pod,
+            patch.object(
+                odooctl,
+                "_exec_sql_json",
+                return_value=[{"name": name} for name in installed],
+            ),
             patch.object(odooctl, "_run"),
             patch.object(subprocess, "run") as subprocess_run,
             contextlib.redirect_stdout(io.StringIO()),
@@ -1180,8 +1186,23 @@ class TestCmdDevSeedGuard:
             _ = odooctl.cmd_dev(self._dev_args("erptech_work_20260908"))
         ensure_pod.assert_called_once_with(ctx, wait_for_db="erptech_work_20260908")
         cmd = to_str_list(mock_call_args(subprocess_run.call_args)[0])
+        # Only Odoo's own arguments: `podman run -i` also uses -i for stdin.
+        return cmd[cmd.index("odoo") + 1 :]
+
+    def test_dev_upgrades_installed_modules_without_reinstalling(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify dev upgrades installed modules like a deploy, without -i."""
+        cmd = self._dev_cmd(tmp_path, installed=["m", "n"], modules=["m", "n"])
         assert cmd[cmd.index("-d") + 1] == "erptech_work_20260908"
-        assert cmd[cmd.index("-u") + 1] == "m"
+        assert cmd[cmd.index("-u") + 1] == "m,n"
+        assert "-i" not in cmd
+
+    def test_dev_installs_only_missing_modules(self, tmp_path: Path) -> None:
+        """Verify dev passes -i only for profile modules not yet installed."""
+        cmd = self._dev_cmd(tmp_path, installed=["m"], modules=["m", "n"])
+        assert cmd[cmd.index("-i") + 1] == "n"
+        assert cmd[cmd.index("-u") + 1] == "m,n"
 
 
 class TestCmdShell:

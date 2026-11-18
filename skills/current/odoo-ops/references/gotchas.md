@@ -60,6 +60,7 @@ These look newer but exist in 17.0: `@api.private`, `fields.NO_ACCESS`, `_allow_
 ## Modules and Data Loading
 
 - A `<function>` tag inside `noupdate="1"` data runs only at install (`odoo/tools/convert.py`, `_tag_function` returns when `noupdate` and mode is not `init`). A module upgrade (`-u`) skips it. For upgrade-time data changes, see the one-time backfill in [Database recipes](db-recipes.md).
+- `-i` on an installed module loads it in install mode (`odoo/modules/graph.py`, `add_modules`; `loading.py`, `load_module_graph`): data files rewrite `noupdate` records and rerun `noupdate` `<function>` tags. A local run with `-i <module>` therefore hides upgrade-only failures and can trigger large stored recomputes that a deploy never runs. Upgrade installed modules with `-u` alone.
 - `pre_init_hook` and `post_init_hook` run only on a new install (`odoo/modules/loading.py`, `load_module_graph`, `new_install`), never on upgrade.
 
 ## Controllers
