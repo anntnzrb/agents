@@ -83,6 +83,8 @@ except Exception:
 ## Web Client
 
 - List and form views hide the Archive and Unarchive actions when the model's `active` field is `readonly` (`archiveEnabled` in `web/static/src/views/list/list_controller.js` and `web/static/src/views/form/form_controller.js`).
+- OWL template expressions resolve bare names on the component context. JavaScript globals such as `Boolean(value)` can fail as `ctx.Boolean is not a function`; use `!!value` instead.
+- `t-att-disabled="value"` renders `disabled="null"` when `value` is `null`, leaving the control disabled. Coerce the expression to a boolean, for example `t-att-disabled="!!value"`.
 
 ## Scheduled Actions and Server Actions
 
