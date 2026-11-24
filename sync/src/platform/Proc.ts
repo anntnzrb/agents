@@ -157,12 +157,7 @@ const releaseCaptured = (resource: Captured) =>
     if (!resource.finished) {
       killGroup(resource.child)
     }
-    yield* Effect.promise(() =>
-      resource.done.then(
-        () => undefined,
-        () => undefined,
-      ),
-    )
+    yield* Effect.promise(() => resource.done.then(() => undefined).catch(() => undefined))
   })
 
 const run = Effect.fn("Proc.run")(function* (command: readonly string[], options: RunProcessOptions = {}) {
