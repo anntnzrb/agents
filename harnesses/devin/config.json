@@ -13,7 +13,7 @@
     "claude": false
   },
   "agent": {
-    "model": "swe-2-max"
+    "model": "swe-2-1-max"
   },
   "permissions": {
     "allow": [
