@@ -27,6 +27,8 @@ Set `<skill-dir>` to this skill directory. The wrapper uses bun to run the pinne
 
 Inside WSL, a Linux browser cannot reach the user's Windows browser. To drive a browser already running on Windows, connect to its CDP endpoint: `agent-browser connect <cdp-url>`.
 
+On NixOS, downloaded Chrome may lack system libraries. Use Nix-packaged Chromium with `--executable-path <path-to-chromium>` or `AGENT_BROWSER_EXECUTABLE_PATH`; resolve it from the active Nix environment with `command -v chromium`. The browser must remain available to the session daemon. Check its version and update the Nix input when necessary.
+
 Examples use `agent-browser ...` as shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`. Always use the canonical command. Examples omit `--session <name>` for brevity; add it to every browser command.
 
 <critical>
