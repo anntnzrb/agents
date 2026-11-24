@@ -89,7 +89,11 @@ Provide this snippet for the user to paste into their browser developer console 
     if (window.indexedDB && indexedDB.databases) {
         const dbs = await indexedDB.databases();
         for (const db of dbs) {
-            if (db.name) indexedDB.deleteDatabase(db.name);
+            if (!db.name) continue;
+            await new Promise((resolve) => {
+                const req = indexedDB.deleteDatabase(db.name);
+                req.onsuccess = req.onerror = req.onblocked = resolve;
+            });
         }
     }
     if (window.caches) {
