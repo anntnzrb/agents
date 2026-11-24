@@ -95,7 +95,7 @@ def make_workspace_context(workspace_root: Path) -> odooctl.WorkspaceContext:
         config_path=runtime / "config" / "odoo.conf",
         config=config,
         addons_paths=[workspace_root],
-        effective_db_name="erptech_test",
+        effective_db_name="erptech_work_20260907",
         runtime=runtime,
     )
 
@@ -192,7 +192,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=False,
             )
 
@@ -245,7 +245,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=False,
             )
 
@@ -299,7 +299,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=True,
             )
 
@@ -355,7 +355,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -396,7 +396,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -422,7 +422,7 @@ class TestCmdLint:
             mod_dir.mkdir(parents=True)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -462,7 +462,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=True,
                 strict=False,
@@ -610,8 +610,8 @@ class TestDatabaseAndSafetyValidation:
     def test_cmd_db_clone_rejects_identical_source_and_target(self) -> None:
         """Verify cloning database to itself raises CliError before runtime execution."""
         args = argparse.Namespace(
-            source="erptech_test",
-            target="erptech_test",
+            source="erptech_work_20260907",
+            target="erptech_work_20260907",
             force=True,
             json=False,
         )
@@ -628,7 +628,7 @@ class TestDatabaseAndSafetyValidation:
         """Verify chained multi-statement queries are blocked when --unsafe is False."""
         args = argparse.Namespace(
             sql="SELECT 1; DELETE FROM res_partner;",
-            db="erptech_test",
+            db="erptech_work_20260907",
             unsafe=False,
             json=False,
         )
@@ -757,10 +757,15 @@ class TestDbReplicaMaintenance:
     ) -> None:
         """Verify db-clone carries the filestore and drops the copied uuid."""
         ctx = make_workspace_context(tmp_path)
-        seed_fs = odooctl._filestore_path(ctx, "seed")
+        seed_fs = odooctl._filestore_path(ctx, "erptech_seed_20260908")
         seed_fs.mkdir(parents=True)
         _ = (seed_fs / "attachment").write_text("payload", encoding="utf-8")
-        args = argparse.Namespace(source="seed", target="work", force=True, json=False)
+        args = argparse.Namespace(
+            source="erptech_seed_20260908",
+            target="erptech_work_20260908",
+            force=True,
+            json=False,
+        )
         with (
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
             patch.object(odooctl, "_ensure_runtime_pod"),
@@ -775,7 +780,7 @@ class TestDbReplicaMaintenance:
             statement.startswith("DELETE FROM ir_config_parameter")
             for statement in statements
         )
-        work_fs = odooctl._filestore_path(ctx, "work")
+        work_fs = odooctl._filestore_path(ctx, "erptech_work_20260908")
         assert (work_fs / "attachment").read_text(encoding="utf-8") == "payload"
 
     def test_cmd_db_restore_requires_force_when_target_exists(
@@ -786,12 +791,16 @@ class TestDbReplicaMaintenance:
         dump = tmp_path / "replica.sql.gz"
         _ = dump.write_bytes(b"")
         args = argparse.Namespace(
-            dump=str(dump), target="work", force=False, json=False
+            dump=str(dump), target="erptech_work_20260908", force=False, json=False
         )
         with (
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
             patch.object(odooctl, "_ensure_runtime_pod"),
-            patch.object(odooctl, "_exec_sql_json", return_value=[{"datname": "work"}]),
+            patch.object(
+                odooctl,
+                "_exec_sql_json",
+                return_value=[{"datname": "erptech_work_20260908"}],
+            ),
             pytest.raises(odooctl.CliError, match="already exists"),
         ):
             _ = odooctl.cmd_db_restore(args)
@@ -829,7 +838,7 @@ class TestDbReplicaMaintenance:
         )
         _ = dump.write_bytes(gzip.compress(sql) if compressed else sql)
         args = argparse.Namespace(
-            dump=str(dump), target="work", force=False, json=False
+            dump=str(dump), target="erptech_work_20260908", force=False, json=False
         )
         sent = bytearray()
         proc = MagicMock(
@@ -853,7 +862,7 @@ class TestDbReplicaMaintenance:
         assert mock_call_args(exec_sql.call_args)[0] == (
             "DELETE FROM ir_config_parameter WHERE key = 'database.uuid';"
         )
-        assert mock_call_kwargs(exec_sql.call_args)["db"] == "work"
+        assert mock_call_kwargs(exec_sql.call_args)["db"] == "erptech_work_20260908"
 
     def test_cmd_db_restore_keeps_psql_errors_fatal(self, tmp_path: Path) -> None:
         """A real restore error must fail before resetting the database UUID."""
@@ -862,7 +871,7 @@ class TestDbReplicaMaintenance:
         sql = b"CREATE TABLE broken;\n"
         _ = dump.write_bytes(gzip.compress(sql))
         args = argparse.Namespace(
-            dump=str(dump), target="work", force=False, json=False
+            dump=str(dump), target="erptech_work_20260908", force=False, json=False
         )
         sent = bytearray()
         proc = MagicMock(
@@ -884,7 +893,7 @@ class TestDbReplicaMaintenance:
             _ = odooctl.cmd_db_restore(args)
         assert bytes(sent) == sql
         assert mock_call_args(exec_sql.call_args)[0] == (
-            f'CREATE DATABASE "work" OWNER "{odooctl.DEFAULT_DB_USER}";'
+            f'CREATE DATABASE "erptech_work_20260908" OWNER "{odooctl.DEFAULT_DB_USER}";'
         )
 
     def test_cmd_db_restore_rejects_unknown_dump_format(self, tmp_path: Path) -> None:
@@ -892,7 +901,7 @@ class TestDbReplicaMaintenance:
         dump = tmp_path / "backup.zip"
         _ = dump.write_bytes(b"")
         args = argparse.Namespace(
-            dump=str(dump), target="work", force=False, json=False
+            dump=str(dump), target="erptech_work_20260908", force=False, json=False
         )
         with pytest.raises(odooctl.CliError, match="Unsupported dump format"):
             _ = odooctl.cmd_db_restore(args)
@@ -906,10 +915,10 @@ class TestDatabaseResolution:
         conf = configparser.ConfigParser()
         conf.add_section("options")
         conf.set("options", "db_name", "conf_db")
-        args = argparse.Namespace(db="flag_db", profile="etech")
+        args = argparse.Namespace(db="flag_db", profile="erptech17")
         with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
             db, source = odooctl._resolve_effective_database(
-                args, profile_name="etech", config=conf
+                args, profile_name="erptech17", config=conf
             )
         assert db == "flag_db"
         assert source == "flag"
@@ -919,10 +928,10 @@ class TestDatabaseResolution:
         conf = configparser.ConfigParser()
         conf.add_section("options")
         conf.set("options", "db_name", "conf_db")
-        args = argparse.Namespace(db=None, profile="etech")
+        args = argparse.Namespace(db=None, profile="erptech17")
         with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
             db, source = odooctl._resolve_effective_database(
-                args, profile_name="etech", config=conf
+                args, profile_name="erptech17", config=conf
             )
         assert db == "env_db"
         assert source == "env"
@@ -1174,6 +1183,7 @@ class TestCmdDevSeedGuard:
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
             patch.object(odooctl, "_load_workflow_profile", return_value=profile),
             patch.object(odooctl, "_ensure_runtime_pod") as ensure_pod,
+            patch.object(odooctl, "_exec_sql", return_value="1\n"),
             patch.object(
                 odooctl,
                 "_exec_sql_json",
@@ -1475,9 +1485,9 @@ class TestOpLockReentrancy:
 
     def test_test_run_lock_reentrancy_within_same_process(self) -> None:
         """Verify nested test-run locks on one database do not deadlock."""
-        name = odooctl._db_lock_name("work_a")
-        with odooctl._test_run_lock("work_a"):
-            with odooctl._test_run_lock("work_a"):
+        name = odooctl._db_lock_name("erptech_work_20260901")
+        with odooctl._test_run_lock("erptech_work_20260901"):
+            with odooctl._test_run_lock("erptech_work_20260901"):
                 assert _lock_depth(name) == 2
             assert _lock_depth(name) == 1
         assert _lock_depth(name) == 0
@@ -1528,8 +1538,8 @@ class TestOpLockReentrancy:
 
     def test_same_database_serializes(self, isolated_lock_dir: Path) -> None:
         """Verify a second run on the same database cannot take its lock."""
-        db_lock = isolated_lock_dir / odooctl._db_lock_name("work_a")
-        with odooctl._test_run_lock("work_a"):
+        db_lock = isolated_lock_dir / odooctl._db_lock_name("erptech_work_20260901")
+        with odooctl._test_run_lock("erptech_work_20260901"):
             assert not _try_flock(db_lock, portalocker.LOCK_EX)
         assert _try_flock(db_lock, portalocker.LOCK_EX)
 
@@ -1537,9 +1547,11 @@ class TestOpLockReentrancy:
         self, isolated_lock_dir: Path
     ) -> None:
         """Verify runs on different databases neither share a lock nor block each other."""
-        assert odooctl._db_lock_name("work_a") != odooctl._db_lock_name("work_b")
-        with odooctl._test_run_lock("work_a"):
-            other = isolated_lock_dir / odooctl._db_lock_name("work_b")
+        assert odooctl._db_lock_name("erptech_work_20260901") != odooctl._db_lock_name(
+            "erptech_work_20260902"
+        )
+        with odooctl._test_run_lock("erptech_work_20260901"):
+            other = isolated_lock_dir / odooctl._db_lock_name("erptech_work_20260902")
             assert _try_flock(other, portalocker.LOCK_EX)
             runs = isolated_lock_dir / odooctl.RUNS_LOCK_NAME
             assert _try_flock(runs, portalocker.LOCK_SH)
@@ -1548,7 +1560,7 @@ class TestOpLockReentrancy:
     def test_test_run_does_not_hold_pod_lock(self, isolated_lock_dir: Path) -> None:
         """Verify a test run takes the pod lock only while creating the pod."""
         pod = isolated_lock_dir / odooctl.POD_LOCK_NAME
-        with odooctl._test_run_lock("work_a"):
+        with odooctl._test_run_lock("erptech_work_20260901"):
             assert _try_flock(pod, portalocker.LOCK_EX)
             with odooctl._op_lock():
                 assert not _try_flock(pod, portalocker.LOCK_EX)
@@ -1590,7 +1602,7 @@ class TestOpLockReentrancy:
             patch("time.sleep"),
         ):
             odooctl._ensure_runtime_pod(ctx)
-        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.DEFAULT_POD_NAME])
+        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.RUNTIME.pod])
         pod_create = next(
             i for i, c in enumerate(commands) if c[:3] == ["podman", "pod", "create"]
         )
@@ -1612,6 +1624,7 @@ class TestOpLockReentrancy:
         with (
             patch.object(odooctl, "_ensure_podman"),
             patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_pod_ports_unreachable", return_value=False),
             patch.object(odooctl, "_run", side_effect=run),
         ):
             odooctl._ensure_runtime_pod(ctx)
@@ -1620,6 +1633,38 @@ class TestOpLockReentrancy:
             for c in commands
             if c[:3] in (["podman", "pod", "rm"], ["podman", "pod", "create"])
         ]
+
+    def test_pod_without_port_forwarder_is_recreated(self, tmp_path: Path) -> None:
+        """Verify a running pod whose published ports lost their forwarder is rebuilt.
+
+        A rootless infra container can outlive its pasta process (for example
+        after a Podman upgrade): the pod reports Running but nothing on the host
+        reaches it.
+        """
+        ctx = make_workspace_context(tmp_path)
+        commands: list[list[str]] = []
+
+        def run(cmd: list[str], **_k: object) -> MagicMock:
+            commands.append(cmd)
+            if cmd[:3] == ["podman", "pod", "inspect"]:
+                return MagicMock(stdout="infra123\n")
+            if cmd[:3] == ["podman", "container", "inspect"]:
+                return MagicMock(stdout="running\n")
+            return MagicMock(stdout="Up")
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_pod_ports_unreachable", return_value=True),
+            patch.object(odooctl, "_run", side_effect=run),
+            patch("time.sleep"),
+        ):
+            odooctl._ensure_runtime_pod(ctx)
+        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.RUNTIME.pod])
+        pod_create = next(
+            i for i, c in enumerate(commands) if c[:3] == ["podman", "pod", "create"]
+        )
+        assert pod_rm < pod_create
 
     def test_db_lock_name_sanitizes_database_name(self) -> None:
         """Verify lock file names cannot escape the lock directory."""
@@ -1630,12 +1675,12 @@ class TestOpLockReentrancy:
 
     def test_waiting_message_names_the_database(self, isolated_lock_dir: Path) -> None:
         """Verify a blocked run reports which database it waits for."""
-        db_lock = isolated_lock_dir / odooctl._db_lock_name("work_a")
+        db_lock = isolated_lock_dir / odooctl._db_lock_name("erptech_work_20260901")
         stderr = io.StringIO()
         entered = threading.Event()
 
         def run() -> None:
-            with odooctl._test_run_lock("work_a"):
+            with odooctl._test_run_lock("erptech_work_20260901"):
                 entered.set()
 
         with db_lock.open("a+", encoding="utf-8") as holder:
@@ -1652,12 +1697,12 @@ class TestOpLockReentrancy:
                 worker.join(timeout=5)
         assert entered.is_set()
         assert "waiting for odoo-ops lock" in stderr.getvalue()
-        assert "'work_a'" in stderr.getvalue()
+        assert "'erptech_work_20260901'" in stderr.getvalue()
 
     def test_stop_inside_test_run_fails_instead_of_deadlocking(self) -> None:
         """Verify upgrading the shared runs gate raises instead of blocking forever."""
         with (
-            odooctl._test_run_lock("work_a"),
+            odooctl._test_run_lock("erptech_work_20260901"),
             patch.object(odooctl, "_ensure_podman"),
             patch.object(odooctl, "_run"),
             pytest.raises(odooctl.CliError, match="upgrade shared lock"),
@@ -1672,7 +1717,7 @@ class TestOpLockReentrancy:
             profile="p",
             json=False,
             tags=None,
-            db="work_b",
+            db="erptech_work_20260902",
             parallel=False,
             jobs=None,
             baseline=None,
@@ -1682,7 +1727,7 @@ class TestOpLockReentrancy:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("work_a", ["/mod"], ["mod"]),
+                return_value=("erptech_work_20260901", ["/mod"], ["mod"]),
             ),
             patch.object(
                 odooctl, "_test_run_lock", side_effect=_StopError
@@ -1690,20 +1735,24 @@ class TestOpLockReentrancy:
             pytest.raises(_StopError),
         ):
             _ = odooctl.cmd_test(args)
-        test_run_lock.assert_called_once_with("work_b")
+        test_run_lock.assert_called_once_with("erptech_work_20260902")
 
     @pytest.mark.parametrize(
         ("command", "args", "expected"),
         [
             (
                 odooctl.cmd_db_clone,
-                {"source": "seed", "target": "work", "force": True},
-                ("seed", "work"),
+                {
+                    "source": "erptech_seed_20260908",
+                    "target": "erptech_work_20260908",
+                    "force": True,
+                },
+                ("erptech_seed_20260908", "erptech_work_20260908"),
             ),
             (
                 odooctl.cmd_db_drop,
-                {"name": "work", "force": True, "allow_seed": False},
-                ("work",),
+                {"name": "erptech_work_20260908", "force": True, "allow_seed": False},
+                ("erptech_work_20260908",),
             ),
         ],
     )
@@ -1862,7 +1911,7 @@ class TestCommandsWaitForTestRuns:
     ) -> None:
         """Verify waiting commands hold the database lock only while ensuring the pod."""
         ctx = make_workspace_context(tmp_path)
-        name = odooctl._db_lock_name("work_a")
+        name = odooctl._db_lock_name("erptech_work_20260901")
         inside: list[int] = []
 
         def record() -> str:
@@ -1874,7 +1923,7 @@ class TestCommandsWaitForTestRuns:
             patch.object(odooctl, "_get_pod_status", side_effect=record),
             patch.object(odooctl, "_run", return_value=MagicMock(stdout="Up")),
         ):
-            odooctl._ensure_runtime_pod(ctx, wait_for_db="work_a")
+            odooctl._ensure_runtime_pod(ctx, wait_for_db="erptech_work_20260901")
         assert inside == [1]
         assert _lock_depth(name) == 0
 
@@ -1973,8 +2022,8 @@ class TestAuthTempAndRestore:
     def test_auth_temp_backup_written_before_update(self, tmp_path: Path) -> None:
         """Verify auth-temp writes backup JSON before executing UPDATE."""
         ctx = make_workspace_context(tmp_path)
-        ctx.effective_db_name = "erptech_work"
-        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        ctx.effective_db_name = "erptech_work_20260908"
+        args = argparse.Namespace(db="erptech_work_20260908", login=None, json=False)
         call_order: list[str] = []
 
         def mock_write(_path: Path, _content: str) -> None:
@@ -2007,14 +2056,14 @@ class TestAuthTempAndRestore:
     def test_auth_temp_existing_backup_not_overwritten(self, tmp_path: Path) -> None:
         """Verify auth-temp reuses existing backup without overwriting it."""
         ctx = make_workspace_context(tmp_path)
-        ctx.effective_db_name = "erptech_work"
-        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        ctx.effective_db_name = "erptech_work_20260908"
+        args = argparse.Namespace(db="erptech_work_20260908", login=None, json=False)
         state_dir = tmp_path / "state"
         auth_dir = state_dir / "auth"
         auth_dir.mkdir(parents=True)
-        backup_file = auth_dir / "erptech_work__2.json"
+        backup_file = auth_dir / "erptech_work_20260908__2.json"
         original_backup = {
-            "db": "erptech_work",
+            "db": "erptech_work_20260908",
             "user_id": 2,
             "login": "admin",
             "password_hash": "pre_existing_hash",
@@ -2042,16 +2091,16 @@ class TestAuthTempAndRestore:
     def test_auth_restore_verifies_then_deletes_backup(self, tmp_path: Path) -> None:
         """Verify auth-restore restores password, verifies it, then removes backup."""
         ctx = make_workspace_context(tmp_path)
-        ctx.effective_db_name = "erptech_work"
-        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        ctx.effective_db_name = "erptech_work_20260908"
+        args = argparse.Namespace(db="erptech_work_20260908", login=None, json=False)
         state_dir = tmp_path / "state"
         auth_dir = state_dir / "auth"
         auth_dir.mkdir(parents=True)
-        backup_file = auth_dir / "erptech_work__2.json"
+        backup_file = auth_dir / "erptech_work_20260908__2.json"
         _ = backup_file.write_text(
             json.dumps(
                 {
-                    "db": "erptech_work",
+                    "db": "erptech_work_20260908",
                     "user_id": 2,
                     "login": "admin",
                     "password_hash": "original_secret_hash",
@@ -2092,8 +2141,8 @@ class TestAuthTempAndRestore:
     def test_auth_restore_without_backup_exits_1(self, tmp_path: Path) -> None:
         """Verify auth-restore exits 1 when no backup exists."""
         ctx = make_workspace_context(tmp_path)
-        ctx.effective_db_name = "erptech_work"
-        args = argparse.Namespace(db="erptech_work", login=None, json=False)
+        ctx.effective_db_name = "erptech_work_20260908"
+        args = argparse.Namespace(db="erptech_work_20260908", login=None, json=False)
         state_dir = tmp_path / "state"
         with (
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
@@ -2159,7 +2208,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2193,7 +2242,7 @@ class TestBaselineComparison:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("test_db", ["/crm"], ["crm"]),
+                return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
             ),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
@@ -2211,7 +2260,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2243,7 +2292,7 @@ class TestBaselineComparison:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("test_db", ["/crm"], ["crm"]),
+                return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
             ),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
@@ -2262,7 +2311,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2296,7 +2345,7 @@ class TestBaselineComparison:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("test_db", ["/crm"], ["crm"]),
+                return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
             ),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
@@ -2316,7 +2365,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2352,7 +2401,7 @@ class TestBaselineComparison:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("test_db", ["/crm"], ["crm"]),
+                return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
             ),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
@@ -2371,7 +2420,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2404,7 +2453,7 @@ class TestBaselineComparison:
             patch.object(
                 odooctl,
                 "_resolve_test_targets",
-                return_value=("test_db", ["/crm"], ["crm"]),
+                return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
             ),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
@@ -2437,7 +2486,7 @@ class TestBaselineComparison:
         ctx = dataclasses.replace(ctx, root=repo)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2468,7 +2517,7 @@ class TestBaselineComparison:
                 patch.object(
                     odooctl,
                     "_resolve_test_targets",
-                    return_value=("test_db", ["/crm"], ["crm"]),
+                    return_value=("erptech_work_20260906", ["/crm"], ["crm"]),
                 ),
                 patch.object(odooctl, "_run_test_process", side_effect=mock_run_test),
                 contextlib.redirect_stdout(io.StringIO()),
@@ -2485,7 +2534,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2517,7 +2566,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db="prod_seed_20260908",

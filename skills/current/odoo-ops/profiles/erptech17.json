@@ -1,11 +1,28 @@
 {
+  "odoo_version": 17,
+  "rules": "erptech.md",
+  "runtime": {
+    "path": "/opt/odoo17",
+    "image": "localhost/odoo17-local:17.0-e-20260527",
+    "pod": "odoo-pod",
+    "db_container": "odoo-db",
+    "web_container": "odoo-web",
+    "test_container_prefix": "odoo-test-",
+    "http_port": 8069,
+    "test_http_port": 8079,
+    "postgres_port": 5432
+  },
   "workflows": {
     "crm": {
       "database": "espoltecherp_work_20261028",
       "modules": [
+        "admin_units",
+        "contact_extension",
         "budget",
         "budget_hr",
         "crm_espol",
+        "custom_event_ticket",
+        "project_details",
         "whatsapp_utils",
         "whatsapp_bot",
         "web_espol",

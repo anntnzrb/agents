@@ -29,6 +29,7 @@ Local `ir.actions.server.state` supports:
 - `object_write`: Update Record
 - `webhook`: Send Webhook Notification
 - `multi`: Execute Existing Actions
+- `object_copy` (19 only): Duplicate Record
 
 Code action return channel: `action = {...}` only. `multi`: sequence order; last non-empty returned action is used.
 

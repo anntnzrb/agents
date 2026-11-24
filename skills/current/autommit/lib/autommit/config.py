@@ -10,7 +10,7 @@ from typing import Final, TypeIs
 from autommit.errors import AutommitError
 
 # owner defaults; flags and environment variables override each one
-DEFAULT_MODEL: Final[str] = "claude-haiku-5-5"
+DEFAULT_MODEL: Final[str] = "gpt-6.1-terra"
 DEFAULT_API_KEY: Final[str] = "keyless"
 DEFAULT_REASONING_EFFORT: Final[str] = "high"
 DEFAULT_TIMEOUT: Final[float] = 300.0

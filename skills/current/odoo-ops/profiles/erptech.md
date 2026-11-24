@@ -1,10 +1,19 @@
-# Perfil de proyecto: etech
+# Perfil de proyecto: erptech
 
-Reglas del proyecto Odoo `etech`. Prevalecen sobre las reglas generales de `odoo-ops`; el detalle general de Odoo y del CLI vive en `SKILL.md` y `references/`. Configuración del CLI para este perfil (base y módulos por workflow; workflow por defecto `crm`): `profiles/etech.json`.
+Reglas del proyecto Odoo `erptech`, comunes a todas sus versiones. Prevalecen sobre las reglas generales de `odoo-ops`; el detalle general de Odoo y del CLI vive en `SKILL.md` y `references/`.
+
+Perfiles del CLI (runtime, base y módulos por workflow; workflow por defecto `crm`):
+
+| Perfil | Uso |
+| --- | --- |
+| `erptech17` (por defecto) | Producción actual: ramas que salen a `main`/`dev`, hotfixes y lecturas de prod |
+| `erptech19` | Migración a Odoo 19: solo en la rama de migración que indique su `AGENTS.md` |
+
+Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en cada comando (`--profile`). Cada perfil tiene su propio pod, puertos y bases: nunca apliques código de una versión sobre el runtime de la otra.
 
 ## 0. Contexto en 30s
 
-- Repo Odoo 17 Enterprise+Community, addons propios: `crm_espol(crm)`, `b2b`, `whatsapp_utils`, `whatsapp_bot`, `budget`, `budget_hr`, ...
+- Repo Odoo Enterprise+Community (versión según el perfil), addons propios: `crm_espol(crm)`, `b2b`, `whatsapp_utils`, `whatsapp_bot`, `budget`, `budget_hr`, ...
 - Trabaja desde la raíz del repo. `main` = prod en vivo. `dev` = integración. Todo cambio nuevo va a `dev` vía PR, nunca commit directo a `dev` ni a `main`.
 - Prod: DB viva según archivo de credenciales local (endpoint+DB+usuario+token, fuera del repo, vía `--env-file`). No quemes dominio/usuario/DB en este archivo. Deploy semanal lo hace OTRO dev. Tus cambios locales van al próximo `-u`.
 - Dos fuentes de verdad: (1) código local en rama, (2) prod por JSON-RPC solo-lectura. Nombra siempre la base en cada verificación: `<work...>` local vs `<prodDB>` prod.
@@ -31,7 +40,8 @@ Reglas del proyecto Odoo `etech`. Prevalecen sobre las reglas generales de `odoo
 
 - Origen: dump `.sql.gz` del DBA, fuera del repo, ya neutralizada. Sin filestore: ver "Restore Seed Replica" en `references/db-recipes.md`. Filestore real: ruta vía `env`/config, no asumir.
 - `<prodDB>` = DB prod según credenciales. Nombres, restore y clone de `seed`/`work`: `references/db-recipes.md`. `seed` es VIRGEN INTOCABLE: no instalar, no `-u` (tampoco `dev` sobre ella), no escribir. Todo el trabajo en `work`.
-- Invariantes: `0 tests != éxito` (revisa `profiles/etech.json` + `.env`); `neutralize != anonimiza` (apaga mails/crons, PII sigue legible); no copiar filestores huérfanos.
+- Invariantes: `0 tests != éxito` (revisa `profiles/<perfil>.json` + `.env`); `neutralize != anonimiza` (apaga mails/crons, PII sigue legible); no copiar filestores huérfanos.
+- Cada runtime tiene solo su par `<prodDB>_seed_<fecha>` / `<prodDB>_work_<fecha>`, con los mismos nombres en 17 y 19 (el perfil elige el runtime). El CLI rechaza cualquier otro nombre; no crees bases de prueba: resetea `work` clonándola desde `seed`. Mientras no exista el dump migrado a 19, el `seed` de `erptech19` es una instalación limpia de Odoo 19 (receta en `references/db-recipes.md`).
 - Una réplica congela los datos a la fecha del dump: valida lógica, nunca compares sus cifras con prod. `seed` virgen = todas sus marcas (`ir_module_module.write_date`, `res_users_log`, `crm_lead.write_date`) ≤ fecha del dump y 0 módulos pendientes; `database.uuid` no sirve de señal.
 
 ## 4. Esquema: pre-prod vs post-prod

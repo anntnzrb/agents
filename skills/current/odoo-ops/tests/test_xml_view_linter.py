@@ -1,4 +1,4 @@
-"""Unit tests for Odoo 17 XML View Linter."""
+"""Unit tests for the Odoo XML View Linter."""
 
 import argparse
 import configparser
@@ -66,6 +66,19 @@ class TestXmlViewLinterRules:
         violations = linter.lint_file(xml_file)
         assert any(v["rule_id"] == "ODOO_XML_002" for v in violations)
         assert any("column_invisible" in v["fix_suggestion"] for v in violations)
+
+    def test_list_invisible_may_hide_an_individual_cell(
+        self, linter: OdooXmlViewLinter, tmp_path: Path
+    ) -> None:
+        """Per-record expressions are valid and must not become column modifiers."""
+        xml_file = tmp_path / "list.xml"
+        _ = xml_file.write_text(
+            """<list><field name="res_model" column_invisible="True"/>
+            <field name="contact_id" invisible="res_model == 'b2b.contact'"/>
+            </list>""",
+            encoding="utf-8",
+        )
+        assert all(v["rule_id"] != "ODOO_XML_002" for v in linter.lint_file(xml_file))
 
     def test_xpath_class_and_positional(
         self, linter: OdooXmlViewLinter, tmp_path: Path
@@ -279,7 +292,7 @@ class TestLintViewsCli:
 
         args = argparse.Namespace(
             target="mock_addon",
-            profile="etech",
+            profile="erptech17",
             strict=False,
             json=True,
             all=False,
@@ -291,3 +304,37 @@ class TestLintViewsCli:
         data = parse_json_dict(captured.out)
         assert data["success"] is True
         assert data["total_violations"] == 0
+
+
+class TestOdooVersionRules:
+    """Rules that depend on the Odoo version of the active profile."""
+
+    TREE_VIEW: str = """<odoo>
+    <record id="view_x_list" model="ir.ui.view">
+        <field name="arch" type="xml">
+            <tree><field name="name"/></tree>
+        </field>
+    </record>
+    <record id="view_y_inherit" model="ir.ui.view">
+        <field name="arch" type="xml">
+            <xpath expr="//tree/field[@name='name']" position="after"/>
+        </field>
+    </record>
+</odoo>
+"""
+
+    def test_odoo19_rejects_tree_tag_and_tree_locators(self, tmp_path: Path) -> None:
+        xml_file = tmp_path / "views.xml"
+        _ = xml_file.write_text(self.TREE_VIEW, encoding="utf-8")
+        violations = OdooXmlViewLinter(root_path=tmp_path, odoo_version=19).lint_file(
+            xml_file
+        )
+        hits = [v for v in violations if v["rule_id"] == "ODOO_XML_010"]
+        assert [v["line"] for v in hits] == [4, 9]
+        assert all(v["severity"] == "CRITICAL" for v in hits)
+
+    def test_odoo17_keeps_accepting_tree(self, tmp_path: Path) -> None:
+        xml_file = tmp_path / "views.xml"
+        _ = xml_file.write_text(self.TREE_VIEW, encoding="utf-8")
+        violations = OdooXmlViewLinter(root_path=tmp_path).lint_file(xml_file)
+        assert not [v for v in violations if v["rule_id"] == "ODOO_XML_010"]

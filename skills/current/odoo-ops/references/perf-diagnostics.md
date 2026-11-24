@@ -52,7 +52,7 @@ Compare round-trip times. A delta exceeding 0.5s for 80 records indicates an N+1
 
 ### Symptoms
 - Switching between standard forms or menus freezes the browser for several seconds, while backend database queries respond in under 300ms.
-- Odoo 17 OWL framework maintains an in-memory reactive proxy for each pinned or minimized chat channel. When a partner accumulates hundreds or thousands of pinned channels (common after automated notification or bot activity), client-side reactivity stalls the main JavaScript thread.
+- The OWL client keeps reactive state for each pinned (and, on 17, minimized) chat channel. When a partner accumulates hundreds or thousands of pinned channels (common after automated notification or bot activity), client-side reactivity stalls the main JavaScript thread.
 
 ### Read-Only Diagnostic Counts
 Query accumulated notifications and channel memberships:
@@ -64,16 +64,16 @@ uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc count mail.notificati
 # 2. Pinned Discuss channels
 uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc count discuss.channel.member '[["partner_id", "=", <partner_id>], ["is_pinned", "=", true]]'
 
-# 3. Minimized (floating) chat windows
+# 3. Odoo 17 only: minimized (floating) chat windows
 uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc count discuss.channel.member '[["partner_id", "=", <partner_id>], ["is_minimized", "=", true]]'
 ```
 
-Values above 500 pinned or minimized channels indicate frontend saturation.
+Values above 500 pinned or minimized channels indicate frontend saturation. On 19, `discuss.channel.member` has no `is_minimized` or `fold_state`, and `is_pinned` is computed from `unpin_dt`.
 
 ### Remediation
 Unpin inactive channels on the local replica or prepare a dry-run mutation plan for production:
-- Reset `is_pinned` to `False` and `is_minimized` to `False` on `discuss.channel.member`.
-- Set `fold_state` to `'closed'`.
+- Odoo 17: reset `is_pinned` and `is_minimized` to `False` and set `fold_state` to `'closed'` on `discuss.channel.member`.
+- Odoo 19: unpin through `discuss.channel.member` `unpin_dt` (the field `is_pinned` derives from); chat window state lives in the browser.
 - Production changes must follow the dry-run plan and user approval workflow.
 
 ## Browser Client Storage Purge
@@ -89,7 +89,11 @@ Provide this snippet for the user to paste into their browser developer console 
     if (window.indexedDB && indexedDB.databases) {
         const dbs = await indexedDB.databases();
         for (const db of dbs) {
-            if (db.name) indexedDB.deleteDatabase(db.name);
+            if (!db.name) continue;
+            await new Promise((resolve) => {
+                const req = indexedDB.deleteDatabase(db.name);
+                req.onsuccess = req.onerror = req.onblocked = resolve;
+            });
         }
     }
     if (window.caches) {

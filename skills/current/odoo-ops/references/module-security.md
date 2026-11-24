@@ -1,17 +1,17 @@
 # Module Security
 
-Access-control facts and review checks for custom Odoo 17 module code. Paths are relative to the provisioned Odoo source (`env --json`: `runtime_path`).
+Access-control facts and review checks for custom Odoo module code. Paths are relative to the provisioned Odoo source (`env --json`: `runtime_path`). Source paths below cite the Odoo 17 layout (`odoo/models.py`, `odoo/fields.py`, `odoo/api.py`); on 19 the ORM moved to `odoo/orm/`, see the path map in [odoo19.md](odoo19.md#source-path-map).
 
 ## RPC entry points
 
 - Every public model method is callable over RPC by any user who can reach the model. `odoo/service/model.py` (`get_public_method`) refuses only names starting with `_`, methods decorated with `@api.private`, and unsafe attributes.
-- Name helper methods with a leading `_`. Use `@api.private` (`odoo/api.py`) only for an existing public method that must stop being RPC-callable.
-- A public method that writes, calls `sudo()`, or returns data MUST check the caller first: `self.check_access_rights(op)` for model ACLs (`ir.model.access`), then `self.check_access_rule(op)` for record rules. Odoo 17 has no combined `check_access` model method; the CLI's `check_access` subcommand wraps `check_access_rights`.
+- Name helper methods with a leading `_`. Use `@api.private` only for an existing public method that must stop being RPC-callable.
+- A public method that writes, calls `sudo()`, or returns data MUST check the caller first, for model ACLs (`ir.model.access`) and record rules. Odoo 17: `self.check_access_rights(op)` then `self.check_access_rule(op)` (no combined method). Odoo 19: `self.check_access(op)`, or `has_access(op)` for a boolean; the 17 pair still works but is deprecated. The CLI's `check_access` subcommand wraps `check_access_rights`.
 - Button methods (`type="object"`) are public methods. Hiding a button in the view does not stop an RPC call.
 
 ## sudo() boundaries
 
-- `sudo()` skips model ACLs (`ir.model.access.check` returns early when `env.su`) and record rules (`check_access_rule`, `_filter_access_rules`).
+- `sudo()` skips model ACLs (`ir.model.access.check` returns early when `env.su`) and record rules (17: `check_access_rule`, `_filter_access_rules`; 19: `check_access`, `_filtered_access`).
 - `sudo()` does not skip `_check_company`: with `_check_company_auto = True`, `create` and `write` still reject cross-company links.
 - Elevate the narrowest recordset for the shortest span. Validate inputs and the caller's access before `sudo()`, never after.
 - Never pass caller-supplied domains, field names, or values into a sudo call without a whitelist.
@@ -29,7 +29,7 @@ Access-control facts and review checks for custom Odoo 17 module code. Paths are
 
 - Build raw SQL with `odoo.tools.SQL`: pass values as `%s` arguments and table or column names through `SQL.identifier(name)`. Never format request values into a query string.
 - Raw SQL skips ACLs, record rules, and the `active` filter. Prefer the ORM when the caller's access matters.
-- Render QWeb output with `t-out`, which escapes unless the value is `Markup`. `t-esc` and `t-raw` are deprecated in 17; `t-raw` does not escape and logs a deprecation warning (`odoo/addons/base/models/ir_qweb.py`).
+- Render QWeb output with `t-out`, which escapes unless the value is `Markup`. `t-esc` and `t-raw` are deprecated (17 and 19); `t-raw` does not escape and logs a deprecation warning (`odoo/addons/base/models/ir_qweb.py`).
 - Wrap a value in `markupsafe.Markup` only after you build or sanitize that HTML yourself.
 
 ## Record rules and multi-company
