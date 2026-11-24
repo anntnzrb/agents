@@ -192,7 +192,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=False,
             )
 
@@ -245,7 +245,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=False,
             )
 
@@ -299,7 +299,7 @@ class TestCmdTestLifecycle:
 
             args = argparse.Namespace(
                 target="my_module",
-                profile="etech",
+                profile="erptech17",
                 json=True,
             )
 
@@ -355,7 +355,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -396,7 +396,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -422,7 +422,7 @@ class TestCmdLint:
             mod_dir.mkdir(parents=True)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=False,
                 strict=False,
@@ -462,7 +462,7 @@ class TestCmdLint:
             ctx = make_workspace_context(tmp_path)
             args = argparse.Namespace(
                 target="mock_mod",
-                profile="etech",
+                profile="erptech17",
                 fix=False,
                 json=True,
                 strict=False,
@@ -906,10 +906,10 @@ class TestDatabaseResolution:
         conf = configparser.ConfigParser()
         conf.add_section("options")
         conf.set("options", "db_name", "conf_db")
-        args = argparse.Namespace(db="flag_db", profile="etech")
+        args = argparse.Namespace(db="flag_db", profile="erptech17")
         with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
             db, source = odooctl._resolve_effective_database(
-                args, profile_name="etech", config=conf
+                args, profile_name="erptech17", config=conf
             )
         assert db == "flag_db"
         assert source == "flag"
@@ -919,10 +919,10 @@ class TestDatabaseResolution:
         conf = configparser.ConfigParser()
         conf.add_section("options")
         conf.set("options", "db_name", "conf_db")
-        args = argparse.Namespace(db=None, profile="etech")
+        args = argparse.Namespace(db=None, profile="erptech17")
         with patch.dict(os.environ, {"POSTGRES_DB": "env_db"}):
             db, source = odooctl._resolve_effective_database(
-                args, profile_name="etech", config=conf
+                args, profile_name="erptech17", config=conf
             )
         assert db == "env_db"
         assert source == "env"
@@ -1174,6 +1174,7 @@ class TestCmdDevSeedGuard:
             patch.object(odooctl, "_resolve_workspace", return_value=ctx),
             patch.object(odooctl, "_load_workflow_profile", return_value=profile),
             patch.object(odooctl, "_ensure_runtime_pod") as ensure_pod,
+            patch.object(odooctl, "_exec_sql", return_value="1\n"),
             patch.object(
                 odooctl,
                 "_exec_sql_json",
@@ -1590,7 +1591,7 @@ class TestOpLockReentrancy:
             patch("time.sleep"),
         ):
             odooctl._ensure_runtime_pod(ctx)
-        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.DEFAULT_POD_NAME])
+        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.RUNTIME.pod])
         pod_create = next(
             i for i, c in enumerate(commands) if c[:3] == ["podman", "pod", "create"]
         )
@@ -2159,7 +2160,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2211,7 +2212,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2262,7 +2263,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2316,7 +2317,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2371,7 +2372,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2437,7 +2438,7 @@ class TestBaselineComparison:
         ctx = dataclasses.replace(ctx, root=repo)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2485,7 +2486,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db=None,
@@ -2517,7 +2518,7 @@ class TestBaselineComparison:
         ctx = make_workspace_context(tmp_path)
         args = argparse.Namespace(
             target="crm",
-            profile="etech",
+            profile="erptech17",
             json=False,
             tags=None,
             db="prod_seed_20260908",

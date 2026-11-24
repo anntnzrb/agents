@@ -4,7 +4,8 @@ Read before local development or database operations. Discovery identifies paths
 
 ## Local Paths
 
-- Runtime: existing `ODOO_RUNTIME_PATH`, then `/opt/odoo17`, then `~/.local/share/odoo17`. If none exists, the resolver returns `/opt/odoo17` as fallback path.
+- Profile: `--profile` selects `profiles/<profile>.json`, which declares `odoo_version` and a `runtime` object (path, image, pod, containers, ports, test container prefix). Each profile runs its own pod, so two Odoo versions can run side by side. `ODOO_HTTP_PORT`, `ODOO_TEST_HTTP_PORT`, and `POSTGRES_PORT` override the profile ports.
+- Runtime: existing `ODOO_RUNTIME_PATH`, then the profile `runtime.path`, then `/opt/odoo<version>`, then `~/.local/share/odoo<version>`.
 - Custom addons: existing `ODOO_ADDONS_PATH`, then `~/repos/etech/odoo/addons`, then `./addons`, then the current working directory. Run the CLI from the repository root.
 - Config: `<runtime>/config/odoo.conf`.
 - Source addons: matching directories under `<runtime>/source` (resolved via `addons_paths`).
@@ -19,7 +20,7 @@ uv run --script <skill-dir>/scripts/cli.py env --json
 
 `env --json` reports `runtime_path` (installed Odoo core source), `addons_paths` (all active addon directories), the custom addons directory, the config path, and the effective database with its source. [Output contracts](output-contracts.md#environment) defines every field and the database precedence.
 
-Always check `runtime_path` and `addons_paths` before designing new models or methods. Inspecting the installed source ensures your code builds upon native Odoo 17 conventions and primitives.
+Always check `runtime_path` and `addons_paths` before designing new models or methods. Inspecting the installed source ensures your code builds upon the native conventions and primitives of the installed Odoo version.
 
 ## Database Selection
 

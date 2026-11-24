@@ -1,6 +1,6 @@
 ---
 name: odoo-ops
-description: "Use when developing, testing, or operating Odoo 17 modules, replica DBs, XML views, Server Actions, or safe RPC."
+description: "Use when developing, testing, or operating Odoo 17 or 19 modules, replica DBs, XML views, Server Actions, or safe RPC."
 license: AGPL-3.0-or-later
 ---
 
@@ -9,10 +9,11 @@ license: AGPL-3.0-or-later
 ## Before you act
 
 Follow these situational reading rules before taking action:
-- If `profiles/<profile>.md` exists for the active CLI profile (`--profile`, default `etech`), you MUST read it completely before acting. Its project rules override this skill's general rules.
+- Use the CLI profile (`--profile`, default `erptech17`) that the repository's `AGENTS.md` names, and pass it on every command. `odoo-ops env --json` reports its `odoo_version` and `profile_rules`. If `profile_rules` is set, you MUST read that file completely before acting; its project rules override this skill's general rules.
+- Before writing, porting, or reviewing Odoo code, you MUST read `references/odoo<odoo_version>.md` for the active profile ([Odoo 17](references/odoo17.md), [Odoo 19](references/odoo19.md)). Never apply one version's APIs to the other.
 - Before any production RPC, you MUST read [references/safety-model.md](references/safety-model.md).
 - Before local DB or shell work, you MUST read [references/db-recipes.md](references/db-recipes.md).
-- Before SQL on Odoo tables, savepoints or commits, crons, tests, debugging, or using code or docs from Odoo 18 or later, you MUST read [references/gotchas.md](references/gotchas.md).
+- Before SQL on Odoo tables, savepoints or commits, crons, tests, or debugging, you MUST read [references/gotchas.md](references/gotchas.md).
 - Before auditing slow views, chat saturation, or pre-deploy field removals, you MUST read [references/perf-diagnostics.md](references/perf-diagnostics.md).
 - Before inspecting routes, you MUST read [references/route-safety.md](references/route-safety.md).
 - Before auditing or fixing XML views, you MUST read [references/xml-view-rules.md](references/xml-view-rules.md).
@@ -69,12 +70,13 @@ In examples below, `odoo-ops` represents this exact command.
 
 | Need | Read | When |
 | --- | --- | --- |
-| Project rules for the active profile | `profiles/<profile>.md` | Before acting, when it exists |
+| Project rules for the active profile | The `profile_rules` file from `env --json` | Before acting, when it is set |
+| APIs and runtime of the active Odoo version | [Odoo 17](references/odoo17.md), [Odoo 19](references/odoo19.md) | Writing, porting, or reviewing Odoo code |
 | Permission and production boundaries | [Safety model](references/safety-model.md) | Before RPC or production work |
 | Local paths and database identity | [Runtime discovery](references/runtime-discovery.md) | Before local runtime or database operations |
 | Local SQL, ORM shell, and cloning | [Database recipes](references/db-recipes.md) | Querying or rebuilding a replica |
 | One replica per agent, sizing, and current limits | [Parallel work](references/parallel-work.md) | Only when splitting work across agents with separate replicas |
-| Technical facts and environment quirks | [Gotchas](references/gotchas.md) | Writing SQL, ORM code, transactions, crons, tests, debugging, or porting examples from Odoo 18 or later |
+| Technical facts and environment quirks | [Gotchas](references/gotchas.md) | Writing SQL, ORM code, transactions, crons, tests, or debugging |
 | Performance and pre-deploy auditing | [Performance diagnostics](references/perf-diagnostics.md) | Auditing slow views, notifications, or field removals |
 | Static controller inspection | [Route safety](references/route-safety.md) | Listing or assessing routes |
 | XML view rules and AST linting | [XML view rules](references/xml-view-rules.md) | Auditing or fixing XML views and QWeb templates |
@@ -130,7 +132,7 @@ odoo-ops rpc --allow-rpc metadata crm.lead '[101]'
 odoo-ops rpc --allow-rpc external_id crm.lead '[101]'
 odoo-ops rpc --allow-rpc default_get crm.lead name user_id
 odoo-ops rpc --allow-rpc check_access crm.lead read
-odoo-ops rpc --allow-rpc user_has_groups base.group_user
+odoo-ops rpc --allow-rpc user_has_groups base.group_user   # Odoo 17 only
 odoo-ops rpc --allow-rpc call crm.lead <read_method> --ids '[101]' --args '[]' --kwargs '{}'
 ```
 
@@ -161,7 +163,7 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 - `check_access`: takes positional action `{read,write,create,unlink}`, not `--operation`.
 - `default_get`: takes space-separated positional field names, not a JSON array.
 - `read_group`: domain is positional before flags (`read_group <model> [domain] --groupby f [f ...]`). Flags like `--groupby` consume arguments that follow them.
-- `call`: takes positional `model` and `method` plus `--ids JSON`, `--args JSON`, `--kwargs JSON`. Only methods in `READONLY_ALLOWLIST` (`scripts/odoo_rpc.py`: `search`, `search_read`, `search_count`, `search_fetch`, `read`, `read_group`, `fields_get`, `get_view`, `get_views`, `name_search`, `name_get`, `get_metadata`, `get_external_id`, `default_get`, `check_access_rights`, `check_field_access_rights`, `user_has_groups`) run directly. Any other public method creates a dry-run mutation plan, even if it only reads. Methods starting with `_` are refused.
+- `call`: takes positional `model` and `method` plus `--ids JSON`, `--args JSON`, `--kwargs JSON`. Only methods in `READONLY_ALLOWLIST` (`scripts/odoo_rpc.py`: `search`, `search_read`, `search_count`, `search_fetch`, `read`, `read_group`, `fields_get`, `get_view`, `get_views`, `name_search`, `name_get`, `get_metadata`, `get_external_id`, `default_get`, `check_access_rights`, `check_field_access_rights`, `user_has_groups`) run directly. `name_get` and `user_has_groups` exist only on 17; `read_group` and `check_access_rights` are deprecated on 19. Any other public method creates a dry-run mutation plan, even if it only reads. Methods starting with `_` are refused.
 - `call` plans have no automatic revert: the plan's pre-image holds only `display_name` and `write_date`, and `revert` exits 1 for method calls. Before `apply`, save the previous values of every affected field to a file outside the repository.
 - `count`: a subcommand of `rpc` (`rpc --allow-rpc count <model> '<domain>'`). Without `rpc`, the CLI exits with `invalid choice`.
 - `write-batch`: takes positional `model` and `file` mapping record ID to values dict.

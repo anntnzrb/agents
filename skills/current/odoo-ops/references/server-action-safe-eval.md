@@ -10,7 +10,7 @@ Sources:
 
 ## Production profile
 
-Audited deployment: Odoo 17 + Python 3.10. Deployment fact, not universal Odoo 17 guarantee; re-audit after changing Odoo image or Python runtime.
+Audited deployment: Odoo 17 + Python 3.10. Deployment fact, not universal Odoo 17 guarantee; re-audit after changing Odoo image or Python runtime. Not audited on Odoo 19 (Python 3.12 image): run the gauntlet there before relying on these results.
 
 Production gauntlet: 43/43 checks, `write_executed: false`, model `crm.lead`. This confirmed execution, not merely opcode compatibility, of: function annotations; import-free decorator without closure; positional-only and keyword-only arguments; generator functions/expressions; list/dict/set comprehensions; `map`, `filter`, `reduce`; higher-order pipeline; literal `match`; simple walrus; dict merge; self-documenting f-strings; ordered set-backed deduplication; Odoo recordset operations; `search_count`; `read_group`.
 
@@ -66,7 +66,7 @@ Do not turn a two-branch boolean check into `match`; modern-looking ceremony is 
 
 `record`/`records` may be `None`/empty unless context has matching `active_model` and `active_id(s)`. Global audit snippets MUST use `env['model.name']` explicitly.
 
-Odoo captures result through `action`: local `_run_action_code_multi` calls `safe_eval(..., mode='exec', nocopy=True)` then `return eval_context.get('action')`. Server Action snippets assign `action = {...}`; they do not use `return`.
+Odoo captures result through `action`: `_run_action_code_multi` runs the code with `safe_eval(..., mode='exec')` (with `nocopy=True` on 17) then returns `eval_context.get('action')`. Server Action snippets assign `action = {...}`; they do not use `return`.
 
 `log()` inserts into `ir_logging`; strict read-only audits should avoid it and return JSON in `UserError` instead. `_logger.info()` writes server logs, not the main audit output.
 

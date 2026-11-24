@@ -97,12 +97,12 @@ RULES = {
     "ODOO_XML_001": RuleDefinition(
         "ODOO_XML_001",
         Severity.CRITICAL,
-        "Deprecated attrs='' or states='' attribute in Odoo 17 (use direct invisible/readonly/required expressions)",
+        "Deprecated attrs='' or states='' attribute (use direct invisible/readonly/required expressions)",
     ),
     "ODOO_XML_002": RuleDefinition(
         "ODOO_XML_002",
         Severity.CRITICAL,
-        "Deprecated invisible='' in <tree> column (use column_invisible='' for list columns in Odoo 17)",
+        "Deprecated invisible='' in <tree>/<list> column (use column_invisible='' for list columns)",
     ),
     "ODOO_XML_003": RuleDefinition(
         "ODOO_XML_003",
@@ -139,7 +139,16 @@ RULES = {
         Severity.INFO,
         "Dead commented-out XML UI code block",
     ),
+    "ODOO_XML_010": RuleDefinition(
+        "ODOO_XML_010",
+        Severity.CRITICAL,
+        "<tree> view tag or //tree locator on Odoo 18+ (the view type is <list>)",
+    ),
 }
+
+# First Odoo version whose view type is <list> instead of <tree>.
+LIST_VIEW_SINCE = 18
+TREE_LOCATOR_PATTERN = re.compile(r"(?:^|/)tree\b")
 
 POSITIONAL_XPATH_PATTERN = re.compile(r"//?(?:[a-zA-Z0-9_-]+)\[\s*\d+\s*\]")
 EXACT_CLASS_XPATH_PATTERN = re.compile(r"@class\s*=\s*['\"][^'\"]+['\"]")
@@ -149,13 +158,14 @@ DEAD_COMMENTED_TAG_PATTERN = re.compile(
 
 
 class OdooXmlViewLinter:
-    """Deterministic AST & Semantic Linter for Odoo 17 XML views."""
+    """Deterministic AST & Semantic Linter for Odoo XML views."""
 
-    def __init__(self, root_path: Path | None = None) -> None:
-        """Initialize linter with optional project root path for relative reporting."""
+    def __init__(self, root_path: Path | None = None, odoo_version: int = 17) -> None:
+        """Initialize linter for an Odoo version, with a root for relative reporting."""
         self.root_path: Path = (
             root_path.resolve() if root_path else Path.cwd().resolve()
         )
+        self.odoo_version: int = odoo_version
 
     def _relpath(self, path: Path) -> str:
         """Return clean relative path string."""
@@ -221,6 +231,8 @@ class OdooXmlViewLinter:
         self._check_unnamed_groups_and_pages(path, tree, violations)
         self._check_accessible_alerts(path, tree, violations)
         self._check_template_xpath_injections(path, tree, violations)
+        if self.odoo_version >= LIST_VIEW_SINCE:
+            self._check_tree_view_type(path, tree, violations)
 
         # Sort violations by line number
         violations.sort(key=lambda v: (v["line"], v["rule_id"]))
@@ -307,6 +319,30 @@ class OdooXmlViewLinter:
                             fix_suggestion=f'Change invisible="{inv_val}" to column_invisible="{inv_val}".',
                         )
                     )
+
+    def _check_tree_view_type(
+        self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
+    ) -> None:
+        """Rule ODOO_XML_010: Odoo 18+ has no <tree> view type; it is <list>."""
+        for node in tree.iter():
+            expr = node.attrib.get("expr", "") if node.tag == "xpath" else ""
+            if node.tag != "tree" and not TREE_LOCATOR_PATTERN.search(expr):
+                continue
+            found = "<tree>" if node.tag == "tree" else f"xpath '{expr}'"
+            violations.append(
+                ViewViolation(
+                    file=self._relpath(path),
+                    line=node.sourceline or 1,
+                    rule_id="ODOO_XML_010",
+                    severity=Severity.CRITICAL.value,
+                    message=(
+                        f"{found} targets the <tree> view type, which Odoo "
+                        f"{self.odoo_version} does not have."
+                    ),
+                    snippet=found,
+                    fix_suggestion="Rename <tree> to <list> and //tree to //list.",
+                )
+            )
 
     def _check_xpath_expressions(
         self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
