@@ -25,8 +25,6 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Set `<skill-dir>` to this skill directory. The wrapper uses bun to run the pinned npm release and preserves exit codes. Install bun from https://bun.sh. If Chrome is missing, run `uv run --script <skill-dir>/scripts/cli.py install` once. Use this install command instead of upstream's global npm installation advice; never install a global package for this skill.
 
-Inside WSL, a Linux browser cannot reach the user's Windows browser. To drive a browser already running on Windows, connect to its CDP endpoint: `agent-browser connect <cdp-url>`.
-
 Examples use `agent-browser ...` as shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`. Always use the canonical command. Examples omit `--session <name>` for brevity; add it to every browser command.
 
 <critical>
@@ -43,6 +41,18 @@ Examples use `agent-browser ...` as shorthand for `uv run --script <skill-dir>/s
 - After any state-changing action, you MUST use the cheapest authoritative result check: `agent-browser get url`, `agent-browser get text @ref`, `agent-browser wait --url <glob>`, `agent-browser wait --load <state>`, or `agent-browser snapshot -i`
 - If the tree may have changed, you MUST take a fresh `agent-browser snapshot -i` before using refs
 </critical>
+
+## Choose the browser
+
+- By default, use an isolated named session. It shares nothing with the user's own browser.
+- Use the user's logged-in state only when the user asks for it. Copy the state instead of driving their profile:
+  1. `agent-browser --auto-connect state save <temp-dir>/auth.json`, then `close` that session. Closing detaches; it does not quit the user's browser.
+  2. Open a new named session with `--state <temp-dir>/auth.json`.
+  3. Delete the file at task end. It holds live cookies.
+- `--auto-connect` needs Chrome started with `--remote-debugging-port`. Ask the user to start it that way. NEVER restart or kill their browser yourself.
+- To drive a browser on another machine or OS, including Windows from WSL, run `agent-browser connect <cdp-url>`. Add `--cdp <cdp-url> --cdp-headers '<json>'` when the endpoint needs auth. Connect only over a private network such as Tailscale, because the endpoint grants full browser control.
+- A browser you connected to is not yours. Use only tabs you opened.
+
 <workflow>
 Every browser automation MUST follow this loop:
 1. Navigate: `agent-browser open <url>`
