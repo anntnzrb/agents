@@ -3,8 +3,10 @@
 import argparse
 import configparser
 import dataclasses
+import socket
 from collections.abc import Iterator
 from pathlib import Path
+from typing import cast
 
 import odooctl
 import pytest
@@ -180,3 +182,17 @@ def test_odoo_inside_the_pod_uses_the_internal_postgres_port(tmp_path: Path) -> 
     cmd = odooctl._build_test_cmd(ctx, "c", "erptech19_base", "/web", "web")
     assert cmd[cmd.index("--db_port") + 1] == "5432"
     assert "PORT=5432" in cmd
+
+
+def test_pod_ports_unreachable_tracks_a_real_listener(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An open published port means a live forwarder; a closed one means none."""
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        address = cast("tuple[str, int]", server.getsockname())
+        port = address[1]
+        monkeypatch.setattr(odooctl.RUNTIME, "postgres_port", port)
+        assert not odooctl._pod_ports_unreachable()
+    assert odooctl._pod_ports_unreachable()
