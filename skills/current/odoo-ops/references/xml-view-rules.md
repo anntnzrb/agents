@@ -13,7 +13,7 @@ These rules run automatically when executing `odoo-ops lint <module>` and can be
 | Rule ID | Severity | Description | Remedy |
 | --- | --- | --- | --- |
 | `ODOO_XML_001` | CRITICAL | `attrs` or `states` attributes (rejected with a `ValidationError` since 17.0) | Replace with direct expressions: `invisible="..."`, `readonly="..."`, `required="..."`. |
-| `ODOO_XML_002` | CRITICAL | Deprecated `invisible` in `<tree>`/`<list>` column | Use `column_invisible="..."` for list view columns. |
+| `ODOO_XML_002` | CRITICAL | A list field is always invisible | Check whether to hide the whole column with `column_invisible`. Dynamic `invisible` expressions can hide individual cells. |
 | `ODOO_XML_003` | WARNING | Fragile XPath using exact `@class` match | Use Odoo XPath helper `hasclass('classname')`. |
 | `ODOO_XML_004` | WARNING | Fragile positional XPath indexing (`//group[1]`) | Target elements semantically using `@name` or unique structural anchors. |
 | `ODOO_XML_005` | CRITICAL | Duplicate field without mutually exclusive conditions | Ensure duplicate field occurrences define distinct mutually exclusive `invisible` rules. |

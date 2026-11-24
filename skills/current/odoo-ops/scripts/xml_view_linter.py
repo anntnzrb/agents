@@ -102,7 +102,7 @@ RULES = {
     "ODOO_XML_002": RuleDefinition(
         "ODOO_XML_002",
         Severity.CRITICAL,
-        "Deprecated invisible='' in <tree>/<list> column (use column_invisible='' for list columns)",
+        "A permanently invisible list field may need column_invisible instead",
     ),
     "ODOO_XML_003": RuleDefinition(
         "ODOO_XML_003",
@@ -302,8 +302,11 @@ class OdooXmlViewLinter:
             for field_node in tree_node.xpath(".//field"):
                 line = field_node.sourceline or 1
                 inv_val = field_node.attrib.get("invisible")
-                # If invisible is defined on a tree field, and column_invisible is not present
-                if inv_val is not None and "column_invisible" not in field_node.attrib:
+                # Dynamic invisible expressions may deliberately hide individual cells.
+                if (
+                    inv_val in {"1", "True"}
+                    and "column_invisible" not in field_node.attrib
+                ):
                     field_name = field_node.attrib.get("name", "unnamed")
                     violations.append(
                         ViewViolation(
@@ -312,11 +315,11 @@ class OdooXmlViewLinter:
                             rule_id="ODOO_XML_002",
                             severity=Severity.CRITICAL.value,
                             message=(
-                                f"Field '{field_name}' inside <tree>/<list> uses 'invisible' "
-                                "instead of 'column_invisible'."
+                                f"Field '{field_name}' is always invisible inside <tree>/<list>; "
+                                "check whether its column should be hidden."
                             ),
                             snippet=f'<field name="{field_name}" invisible="{inv_val}"/>',
-                            fix_suggestion=f'Change invisible="{inv_val}" to column_invisible="{inv_val}".',
+                            fix_suggestion="If the whole column should be hidden, use column_invisible; otherwise retain invisible.",
                         )
                     )
 
