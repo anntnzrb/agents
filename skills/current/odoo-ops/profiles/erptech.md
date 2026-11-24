@@ -41,6 +41,7 @@ Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en
 - Origen: dump `.sql.gz` del DBA, fuera del repo, ya neutralizada. Sin filestore: ver "Restore Seed Replica" en `references/db-recipes.md`. Filestore real: ruta vía `env`/config, no asumir.
 - `<prodDB>` = DB prod según credenciales. Nombres, restore y clone de `seed`/`work`: `references/db-recipes.md`. `seed` es VIRGEN INTOCABLE: no instalar, no `-u` (tampoco `dev` sobre ella), no escribir. Todo el trabajo en `work`.
 - Invariantes: `0 tests != éxito` (revisa `profiles/<perfil>.json` + `.env`); `neutralize != anonimiza` (apaga mails/crons, PII sigue legible); no copiar filestores huérfanos.
+- Cada runtime tiene solo su par `<prodDB>_seed_<fecha>` / `<prodDB>_work_<fecha>`, con los mismos nombres en 17 y 19 (el perfil elige el runtime). El CLI rechaza cualquier otro nombre; no crees bases de prueba: resetea `work` clonándola desde `seed`. Mientras no exista el dump migrado a 19, el `seed` de `erptech19` es una instalación limpia de Odoo 19 (receta en `references/db-recipes.md`).
 - Una réplica congela los datos a la fecha del dump: valida lógica, nunca compares sus cifras con prod. `seed` virgen = todas sus marcas (`ir_module_module.write_date`, `res_users_log`, `crm_lead.write_date`) ≤ fecha del dump y 0 módulos pendientes; `database.uuid` no sirve de señal.
 
 ## 4. Esquema: pre-prod vs post-prod

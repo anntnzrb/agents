@@ -10,7 +10,7 @@ from typing import cast
 
 import odooctl
 import pytest
-from _narrow import parse_json_dict
+from _narrow import is_obj_dict, parse_json_dict
 
 
 @pytest.fixture(autouse=True)
@@ -196,3 +196,53 @@ def test_pod_ports_unreachable_tracks_a_real_listener(
         monkeypatch.setattr(odooctl.RUNTIME, "postgres_port", port)
         assert not odooctl._pod_ports_unreachable()
     assert odooctl._pod_ports_unreachable()
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["erptech19_base", "erptech19_work", "espoltecherp_work_2026", "x_probe_20261124"],
+)
+def test_writing_commands_refuse_names_outside_the_convention(name: str) -> None:
+    with pytest.raises(odooctl.CliError, match="_work_<YYYYMMDD>") as excinfo:
+        _ = odooctl._require_work_db(name, "start dev")
+    assert excinfo.value.code == 2
+
+
+def test_writing_commands_still_call_a_seed_untouchable() -> None:
+    with pytest.raises(odooctl.CliError, match="untouchable seed database"):
+        _ = odooctl._require_work_db("espoltecherp_seed_20261124", "start dev")
+
+
+def test_work_replica_is_accepted() -> None:
+    assert (
+        odooctl._require_work_db("espoltecherp_work_20261124", "start dev")
+        == "espoltecherp_work_20261124"
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "ok"),
+    [
+        ("espoltecherp_seed_20261124", True),
+        ("espoltecherp_work_20261124", True),
+        ("erptech19_base", False),
+        ("scratch_probe_20261124", False),
+    ],
+)
+def test_replica_targets_follow_the_convention(name: str, *, ok: bool) -> None:
+    if ok:
+        assert odooctl._require_replica_name(name) == name
+    else:
+        with pytest.raises(odooctl.CliError, match="_seed_<YYYYMMDD>"):
+            _ = odooctl._require_replica_name(name)
+
+
+def test_every_profile_workflow_uses_a_work_replica() -> None:
+    for pfile in sorted(odooctl.PROFILE_DIR.glob("*.json")):
+        workflows = parse_json_dict(pfile.read_text(encoding="utf-8"))["workflows"]
+        assert is_obj_dict(workflows), pfile.name
+        for name in workflows:
+            profile = odooctl._load_workflow_profile(pfile.stem, name)
+            assert odooctl._require_work_db(profile.database, "check") == (
+                profile.database
+            ), (pfile.name, name)

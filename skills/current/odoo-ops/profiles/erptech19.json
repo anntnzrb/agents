@@ -14,7 +14,7 @@
   },
   "workflows": {
     "crm": {
-      "database": "erptech19_work",
+      "database": "espoltecherp_work_20261124",
       "modules": [
         "admin_units",
         "contact_extension",
@@ -50,7 +50,7 @@
       ]
     },
     "base": {
-      "database": "erptech19_base",
+      "database": "espoltecherp_work_20261124",
       "modules": [
         "web"
       ],

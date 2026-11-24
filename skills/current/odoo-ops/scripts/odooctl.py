@@ -664,6 +664,36 @@ def _discover_all_modules(addons_dir: Path) -> dict[str, dict[str, object]]:
 
 
 _SAFE_IDENTIFIER_RE = re.compile(r"\A[a-zA-Z0-9_-]+\Z")
+# Local replicas: the untouched baseline and the disposable copy agents write to.
+_SEED_DB_RE = re.compile(r"\A[a-z0-9_]+_seed_\d{8}\Z")
+_WORK_DB_RE = re.compile(r"\A[a-z0-9_]+_work_\d{8}\Z")
+
+
+def _require_work_db(db: str, action: str) -> str:
+    """Return ``db`` if it is a work replica; writing commands accept nothing else."""
+    if _WORK_DB_RE.fullmatch(db):
+        return db
+    kind = (
+        "untouchable seed database"
+        if "_seed_" in db
+        else "database outside the naming convention"
+    )
+    msg = (
+        f"Refusing to {action} on {kind} {db!r}. Use a work replica named "
+        "<prodDB>_work_<YYYYMMDD>, cloned from its seed with db-clone."
+    )
+    raise CliError(msg, code=2)
+
+
+def _require_replica_name(db: str) -> str:
+    """Return ``db`` if it names a seed or work replica (restore and clone targets)."""
+    if _SEED_DB_RE.fullmatch(db) or _WORK_DB_RE.fullmatch(db):
+        return db
+    msg = (
+        f"Refusing database name {db!r}: local replicas are named "
+        "<prodDB>_seed_<YYYYMMDD> or <prodDB>_work_<YYYYMMDD>."
+    )
+    raise CliError(msg, code=2)
 
 
 def _validate_db_name(name: str) -> str:
@@ -1405,12 +1435,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
     profile = _load_workflow_profile(profile_name, workflow)
     db_to_use = _optional_str(args, "db") or profile.database
 
-    if "_seed_" in db_to_use:
-        msg = (
-            f"Refusing to start dev on untouchable seed database {db_to_use!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db_to_use, "start dev")
 
     _ensure_runtime_pod(ctx, wait_for_db=db_to_use)
 
@@ -2122,12 +2147,7 @@ def cmd_test(args: argparse.Namespace) -> int:
     if explicit_db:
         db_to_use = explicit_db
 
-    if "_seed_" in db_to_use:
-        msg = (
-            f"Refusing to execute tests on untouchable seed database "
-            f"{db_to_use!r}. Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db_to_use, "execute tests")
 
     with _test_run_lock(db_to_use):
         baseline_ref = _optional_str(args, "baseline")
@@ -3140,7 +3160,7 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
     this runtime, and a SQL dump carries no filestore.
     """
     dump_path = Path(_require_str(args, "dump")).expanduser()
-    target = _validate_db_name(_require_str(args, "target"))
+    target = _require_replica_name(_validate_db_name(_require_str(args, "target")))
     force = _require_bool(args, "force")
     json_mode = _require_bool(args, "json")
 
@@ -3206,7 +3226,7 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
 def cmd_db_clone(args: argparse.Namespace) -> int:
     """Clone a PostgreSQL database template to a new target database."""
     source = _validate_db_name(_require_str(args, "source"))
-    target = _validate_db_name(_require_str(args, "target"))
+    target = _require_replica_name(_validate_db_name(_require_str(args, "target")))
     if source == target:
         msg = f"Source and target database names cannot be identical ({source!r})."
         raise CliError(msg)
@@ -3363,12 +3383,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute shell on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute shell")
 
     script_source = _optional_str(args, "file") or _optional_str(args, "script")
     if not script_source:
@@ -3436,12 +3451,7 @@ def cmd_auth_temp(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute auth-temp on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute auth-temp")
 
     _ensure_runtime_pod(ctx, wait_for_db=db)
 
@@ -3528,12 +3538,7 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute auth-restore on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute auth-restore")
 
     _ensure_runtime_pod(ctx, wait_for_db=db)
 
