@@ -1613,6 +1613,7 @@ class TestOpLockReentrancy:
         with (
             patch.object(odooctl, "_ensure_podman"),
             patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_pod_ports_unreachable", return_value=False),
             patch.object(odooctl, "_run", side_effect=run),
         ):
             odooctl._ensure_runtime_pod(ctx)
@@ -1621,6 +1622,38 @@ class TestOpLockReentrancy:
             for c in commands
             if c[:3] in (["podman", "pod", "rm"], ["podman", "pod", "create"])
         ]
+
+    def test_pod_without_port_forwarder_is_recreated(self, tmp_path: Path) -> None:
+        """Verify a running pod whose published ports lost their forwarder is rebuilt.
+
+        A rootless infra container can outlive its pasta process (for example
+        after a Podman upgrade): the pod reports Running but nothing on the host
+        reaches it.
+        """
+        ctx = make_workspace_context(tmp_path)
+        commands: list[list[str]] = []
+
+        def run(cmd: list[str], **_k: object) -> MagicMock:
+            commands.append(cmd)
+            if cmd[:3] == ["podman", "pod", "inspect"]:
+                return MagicMock(stdout="infra123\n")
+            if cmd[:3] == ["podman", "container", "inspect"]:
+                return MagicMock(stdout="running\n")
+            return MagicMock(stdout="Up")
+
+        with (
+            patch.object(odooctl, "_ensure_podman"),
+            patch.object(odooctl, "_get_pod_status", return_value="Running"),
+            patch.object(odooctl, "_pod_ports_unreachable", return_value=True),
+            patch.object(odooctl, "_run", side_effect=run),
+            patch("time.sleep"),
+        ):
+            odooctl._ensure_runtime_pod(ctx)
+        pod_rm = commands.index(["podman", "pod", "rm", "-f", odooctl.RUNTIME.pod])
+        pod_create = next(
+            i for i, c in enumerate(commands) if c[:3] == ["podman", "pod", "create"]
+        )
+        assert pod_rm < pod_create
 
     def test_db_lock_name_sanitizes_database_name(self) -> None:
         """Verify lock file names cannot escape the lock directory."""

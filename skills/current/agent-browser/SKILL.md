@@ -25,6 +25,8 @@ uv run --script <skill-dir>/scripts/cli.py ...
 
 Set `<skill-dir>` to this skill directory. The wrapper uses bun to run the pinned npm release and preserves exit codes. Install bun from https://bun.sh. If Chrome is missing, run `uv run --script <skill-dir>/scripts/cli.py install` once. Use this install command instead of upstream's global npm installation advice; never install a global package for this skill.
 
+On NixOS, downloaded Chrome may lack system libraries. Use Nix-packaged Chromium with `--executable-path <path-to-chromium>` or `AGENT_BROWSER_EXECUTABLE_PATH`; resolve it from the active Nix environment with `command -v chromium`. The browser must remain available to the session daemon. Check its version and update the Nix input when necessary.
+
 Examples use `agent-browser ...` as shorthand for `uv run --script <skill-dir>/scripts/cli.py ...`. Always use the canonical command. Examples omit `--session <name>` for brevity; add it to every browser command.
 
 <critical>

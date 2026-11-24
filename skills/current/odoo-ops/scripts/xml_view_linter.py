@@ -5,7 +5,7 @@
 #     "lxml>=5.0",
 # ]
 # ///
-"""AST and semantic linter for Odoo 17 XML views and QWeb templates."""
+"""AST and semantic linter for Odoo XML views and QWeb templates."""
 
 import importlib
 import json
@@ -102,7 +102,7 @@ RULES = {
     "ODOO_XML_002": RuleDefinition(
         "ODOO_XML_002",
         Severity.CRITICAL,
-        "Deprecated invisible='' in <tree>/<list> column (use column_invisible='' for list columns)",
+        "A permanently invisible list field may need column_invisible instead",
     ),
     "ODOO_XML_003": RuleDefinition(
         "ODOO_XML_003",
@@ -261,7 +261,7 @@ class OdooXmlViewLinter:
     def _check_deprecated_attrs_and_states(
         self, path: Path, tree: _XmlElement, violations: list[ViewViolation]
     ) -> None:
-        """Rule ODOO_XML_001: attrs='' and states='' are deprecated in Odoo 17."""
+        """Rule ODOO_XML_001: attrs='' and states='' are rejected since Odoo 17."""
         for elem in tree.iter():
             if not isinstance(elem.tag, str):
                 continue
@@ -274,7 +274,7 @@ class OdooXmlViewLinter:
                         line=line,
                         rule_id="ODOO_XML_001",
                         severity=Severity.CRITICAL.value,
-                        message=f"Deprecated 'attrs' attribute on <{elem.tag}> in Odoo 17.",
+                        message=f"Rejected 'attrs' attribute on <{elem.tag}> since Odoo 17.",
                         snippet=f'<{elem.tag} name="{elem.attrib.get("name", "")}" attrs="{val}">',
                         fix_suggestion="Replace attrs='{...}' with direct invisible='...', readonly='...', or required='...' attributes.",
                     )
@@ -287,7 +287,7 @@ class OdooXmlViewLinter:
                         line=line,
                         rule_id="ODOO_XML_001",
                         severity=Severity.CRITICAL.value,
-                        message=f"Deprecated 'states' attribute on <{elem.tag}> in Odoo 17.",
+                        message=f"Rejected 'states' attribute on <{elem.tag}> since Odoo 17.",
                         snippet=f'<{elem.tag} name="{elem.attrib.get("name", "")}" states="{val}">',
                         fix_suggestion=f"Replace states='{val}' with invisible=\"state not in {val.split(',')}\".",
                     )
@@ -302,8 +302,11 @@ class OdooXmlViewLinter:
             for field_node in tree_node.xpath(".//field"):
                 line = field_node.sourceline or 1
                 inv_val = field_node.attrib.get("invisible")
-                # If invisible is defined on a tree field, and column_invisible is not present
-                if inv_val is not None and "column_invisible" not in field_node.attrib:
+                # Dynamic invisible expressions may deliberately hide individual cells.
+                if (
+                    inv_val in {"1", "True"}
+                    and "column_invisible" not in field_node.attrib
+                ):
                     field_name = field_node.attrib.get("name", "unnamed")
                     violations.append(
                         ViewViolation(
@@ -312,11 +315,11 @@ class OdooXmlViewLinter:
                             rule_id="ODOO_XML_002",
                             severity=Severity.CRITICAL.value,
                             message=(
-                                f"Field '{field_name}' inside <tree>/<list> uses 'invisible' "
-                                "instead of 'column_invisible'."
+                                f"Field '{field_name}' is always invisible inside <tree>/<list>; "
+                                "check whether its column should be hidden."
                             ),
                             snippet=f'<field name="{field_name}" invisible="{inv_val}"/>',
-                            fix_suggestion=f'Change invisible="{inv_val}" to column_invisible="{inv_val}".',
+                            fix_suggestion="If the whole column should be hidden, use column_invisible; otherwise retain invisible.",
                         )
                     )
 
@@ -513,7 +516,7 @@ class OdooXmlViewLinter:
                         severity=Severity.WARNING.value,
                         message="Bootstrap alert container lacks accessible role attribute (role='status' or role='alert').",
                         snippet=f'<div class="{class_str}">',
-                        fix_suggestion='Add role="status" or role="alert" to comply with WAI-ARIA and Odoo 17 view validation.',
+                        fix_suggestion='Add role="status" or role="alert" to comply with WAI-ARIA and Odoo view validation.',
                     )
                 )
 
@@ -580,7 +583,7 @@ class OdooXmlViewLinter:
 def format_violations_human(violations: list[ViewViolation]) -> str:
     """Format violations list into a clean human-readable terminal output."""
     if not violations:
-        return "[OK] All XML views passed Odoo 17 validation with 0 violations.\n"
+        return "[OK] All XML views passed validation with 0 violations.\n"
 
     critical_count = sum(
         1 for v in violations if v["severity"] == Severity.CRITICAL.value
@@ -591,7 +594,7 @@ def format_violations_human(violations: list[ViewViolation]) -> str:
     info_count = sum(1 for v in violations if v["severity"] == Severity.INFO.value)
 
     lines: list[str] = [
-        f"=== Odoo 17 XML View Linter Report ({len(violations)} issues found) ===",
+        f"=== Odoo XML View Linter Report ({len(violations)} issues found) ===",
         f"Summary: {critical_count} Critical, {warning_count} Warnings, {info_count} Info\n",
     ]
 

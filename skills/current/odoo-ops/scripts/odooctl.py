@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -1112,6 +1113,21 @@ def _pod_infra_down(pod_name: str | None = None) -> bool:
     return state in {"exited", "stopped", "dead"}
 
 
+def _pod_ports_unreachable() -> bool:
+    """Return True if nothing on the host forwards the pod's published DB port.
+
+    A rootless infra container can outlive its port forwarder (pasta), for
+    example after a Podman upgrade: the pod reports Running, but the host
+    reaches nothing. The forwarder listens even while Postgres starts, so a
+    refused connection means it is gone.
+    """
+    try:
+        with socket.create_connection(("127.0.0.1", RUNTIME.postgres_port), timeout=1):
+            return False
+    except OSError:
+        return True
+
+
 @dataclass
 class _HeldLock:
     depth: int
@@ -1231,9 +1247,10 @@ def _ensure_runtime_pod(
     with _pod_section(wait_for_db=wait_for_db, wait_for_all_runs=wait_for_all_runs):
         _ensure_podman()
         status = _get_pod_status()
-        if status and _pod_infra_down():
-            # Its containers keep the dead network namespace, so the pod cannot be
-            # repaired in place. Database data is bind-mounted and survives.
+        if status and (_pod_infra_down() or _pod_ports_unreachable()):
+            # Its containers keep the dead network namespace or forwarder, so the
+            # pod cannot be repaired in place. Database data is bind-mounted and
+            # survives.
             _remove_stack()
             status = None
 
