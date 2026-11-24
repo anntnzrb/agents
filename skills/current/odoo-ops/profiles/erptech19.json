@@ -16,9 +16,13 @@
     "crm": {
       "database": "erptech19_work",
       "modules": [
+        "admin_units",
+        "contact_extension",
         "budget",
         "budget_hr",
         "crm_espol",
+        "custom_event_ticket",
+        "project_details",
         "whatsapp_utils",
         "whatsapp_bot",
         "web_espol",
