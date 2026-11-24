@@ -58,7 +58,7 @@ from the installed Codex binary.
 
 Sync does not supervise a Codex app-server daemon. A host that should accept desktop-app SSH connections runs `codex app-server daemon start` itself; Codex then owns the detached daemon, its process records, and its updater. Stop it with `codex app-server daemon stop`.
 
-The app and daemon use the default control socket under `~/.codex/app-server-control/`. The app's SSH startup may attempt another server; an existing server keeps ownership of that socket. `config.toml` enables the Code Mode host and leaves CLI-triggered daemon auto-start off.
+The app and daemon use the default control socket under `~/.codex/app-server-control/`. The app's SSH startup may attempt another server. An existing server keeps ownership of that socket.
 
 ## Updates
 

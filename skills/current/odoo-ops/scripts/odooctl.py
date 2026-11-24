@@ -6,7 +6,7 @@
 #     "portalocker[win32]==4.4.2",
 # ]
 # ///
-"""Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."""
+"""Autonomous Odoo stack controller, test runner, and PostgreSQL inspector."""
 
 import argparse
 import ast
@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -95,21 +96,17 @@ JS_PACKAGES = (
 )
 
 # Network & Ports (Zero Magic Numbers)
-DEFAULT_HTTP_PORT = int(os.environ.get("ODOO_HTTP_PORT", "8069"))
 DEFAULT_HTTP_BIND = os.environ.get("ODOO_HTTP_BIND", "0.0.0.0")  # noqa: S104 - user-configurable pod bind
-DEFAULT_TEST_HTTP_PORT = int(os.environ.get("ODOO_TEST_HTTP_PORT", "8079"))
-DEFAULT_POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
 DEFAULT_DB_HOST = "127.0.0.1"
 DEFAULT_DB_USER = "odoo"
 DEFAULT_DB_PASS = "odoo"  # noqa: S105 - default dev password for local container
 DEFAULT_ADMIN_DB = "postgres"
+# Postgres listens on this port inside the pod; RUNTIME.postgres_port is the host publish port.
+POD_POSTGRES_PORT = 5432
 
 # Container Topology (Local Podman Pod)
-DEFAULT_POD_NAME = "odoo-pod"
-DEFAULT_DB_CONTAINER = "odoo-db"
-DEFAULT_WEB_CONTAINER = "odoo-web"
+DEFAULT_PROFILE = "erptech17"
 DEFAULT_POSTGRES_IMAGE = "docker.io/library/postgres:15"
-DEFAULT_ODOO_IMAGE = "localhost/odoo17-local:17.0-e-20260527"
 # Seconds postgres gets to finish its shutdown checkpoint before SIGKILL.
 DB_STOP_TIMEOUT = 60
 
@@ -204,6 +201,30 @@ class WorkspaceContext:
     effective_db_name: str
     runtime: Path
     database_source: str = ""
+
+
+@dataclass(slots=True)
+class RuntimeConfig:
+    """Container runtime of the active profile; defaults describe the Odoo 17 stack.
+
+    A profile JSON sets ``odoo_version`` and a ``runtime`` object with the same keys.
+    The environment variables ``ODOO_HTTP_PORT``, ``ODOO_TEST_HTTP_PORT`` and
+    ``POSTGRES_PORT`` override the profile ports.
+    """
+
+    odoo_version: int = 17
+    path: Path | None = None
+    image: str = "localhost/odoo17-local:17.0-e-20260527"
+    pod: str = "odoo-pod"
+    db_container: str = "odoo-db"
+    web_container: str = "odoo-web"
+    test_container_prefix: str = "odoo-test-"
+    http_port: int = 8069
+    test_http_port: int = 8079
+    postgres_port: int = 5432
+
+
+RUNTIME = RuntimeConfig()
 
 
 class ActionInfo(TypedDict):
@@ -563,10 +584,16 @@ def _resolve_runtime() -> Path:
         p = Path(env_runtime).resolve()
         if p.is_dir():
             return p
-    for candidate in (Path("/opt/odoo17"), Path.home() / ".local/share/odoo17"):
+    if RUNTIME.path is not None:
+        return RUNTIME.path
+    default = Path(f"/opt/odoo{RUNTIME.odoo_version}")
+    for candidate in (
+        default,
+        Path.home() / f".local/share/odoo{RUNTIME.odoo_version}",
+    ):
         if candidate.is_dir():
             return candidate
-    return Path("/opt/odoo17")
+    return default
 
 
 def _resolve_addons() -> Path:
@@ -637,6 +664,36 @@ def _discover_all_modules(addons_dir: Path) -> dict[str, dict[str, object]]:
 
 
 _SAFE_IDENTIFIER_RE = re.compile(r"\A[a-zA-Z0-9_-]+\Z")
+# Local replicas: the untouched baseline and the disposable copy agents write to.
+_SEED_DB_RE = re.compile(r"\A[a-z0-9_]+_seed_\d{8}\Z")
+_WORK_DB_RE = re.compile(r"\A[a-z0-9_]+_work_\d{8}\Z")
+
+
+def _require_work_db(db: str, action: str) -> str:
+    """Return ``db`` if it is a work replica; writing commands accept nothing else."""
+    if _WORK_DB_RE.fullmatch(db):
+        return db
+    kind = (
+        "untouchable seed database"
+        if "_seed_" in db
+        else "database outside the naming convention"
+    )
+    msg = (
+        f"Refusing to {action} on {kind} {db!r}. Use a work replica named "
+        "<prodDB>_work_<YYYYMMDD>, cloned from its seed with db-clone."
+    )
+    raise CliError(msg, code=2)
+
+
+def _require_replica_name(db: str) -> str:
+    """Return ``db`` if it names a seed or work replica (restore and clone targets)."""
+    if _SEED_DB_RE.fullmatch(db) or _WORK_DB_RE.fullmatch(db):
+        return db
+    msg = (
+        f"Refusing database name {db!r}: local replicas are named "
+        "<prodDB>_seed_<YYYYMMDD> or <prodDB>_work_<YYYYMMDD>."
+    )
+    raise CliError(msg, code=2)
 
 
 def _validate_db_name(name: str) -> str:
@@ -676,7 +733,7 @@ def _resolve_effective_database(
         return _validate_db_name(env_db), "env"
 
     prof = _optional_str(args, "profile") if args is not None else None
-    prof_name = prof or profile_name or "etech"
+    prof_name = prof or profile_name or DEFAULT_PROFILE
     if prof_name and _SAFE_IDENTIFIER_RE.match(prof_name):
         pfile = PROFILE_DIR / f"{prof_name}.json"
         if pfile.is_file() and pfile.resolve().parent == PROFILE_DIR.resolve():
@@ -753,17 +810,67 @@ def _resolve_workspace(
     )
 
 
-def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
-    """Load and parse workflow profile from JSON configuration."""
+def _read_profile(profile: str) -> dict[str, object]:
+    """Read ``profiles/<profile>.json``; raise CliError when it is missing."""
     if not profile or not _SAFE_IDENTIFIER_RE.match(profile):
         msg = f"invalid profile name: {profile!r}"
         raise CliError(msg)
     pfile = PROFILE_DIR / f"{profile}.json"
     if not pfile.is_file() or pfile.resolve().parent != PROFILE_DIR.resolve():
-        msg = f"workflow profile not found: {pfile}"
+        available = sorted(f.stem for f in PROFILE_DIR.glob("*.json"))
+        msg = f"profile not found: {profile!r}. Available profiles: {available}"
         raise CliError(msg)
-    data_raw = _json_loads(pfile.read_text(encoding="utf-8"))
-    data = _to_str_dict(data_raw)
+    return _to_str_dict(_json_loads(pfile.read_text(encoding="utf-8")))
+
+
+def _profile_int(
+    env_key: str, values: dict[str, object], key: str, default: int
+) -> int:
+    """Return the env override, else the profile value, else the default."""
+    env_val = os.environ.get(env_key, "").strip()
+    if env_val:
+        return int(env_val)
+    val = values.get(key)
+    return val if isinstance(val, int) else default
+
+
+def _profile_str(values: dict[str, object], key: str, default: str) -> str:
+    """Return a non-empty profile string value, else the default."""
+    val = values.get(key)
+    return val if isinstance(val, str) and val else default
+
+
+def _apply_runtime_profile(profile: str) -> None:
+    """Load the runtime of ``profile`` into RUNTIME (image, pod, ports, path)."""
+    data = _read_profile(profile)
+    raw_runtime = data.get("runtime")
+    values = _to_str_dict(raw_runtime) if _is_obj_dict(raw_runtime) else {}
+    base = RuntimeConfig()
+    version = data.get("odoo_version")
+    RUNTIME.odoo_version = version if isinstance(version, int) else base.odoo_version
+    raw_path = values.get("path")
+    RUNTIME.path = Path(raw_path) if isinstance(raw_path, str) and raw_path else None
+    RUNTIME.image = _profile_str(values, "image", base.image)
+    RUNTIME.pod = _profile_str(values, "pod", base.pod)
+    RUNTIME.db_container = _profile_str(values, "db_container", base.db_container)
+    RUNTIME.web_container = _profile_str(values, "web_container", base.web_container)
+    RUNTIME.test_container_prefix = _profile_str(
+        values, "test_container_prefix", base.test_container_prefix
+    )
+    RUNTIME.http_port = _profile_int(
+        "ODOO_HTTP_PORT", values, "http_port", base.http_port
+    )
+    RUNTIME.test_http_port = _profile_int(
+        "ODOO_TEST_HTTP_PORT", values, "test_http_port", base.test_http_port
+    )
+    RUNTIME.postgres_port = _profile_int(
+        "POSTGRES_PORT", values, "postgres_port", base.postgres_port
+    )
+
+
+def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
+    """Load and parse workflow profile from JSON configuration."""
+    data = _read_profile(profile)
     workflows_obj = data.get("workflows")
     workflows = _to_str_dict(workflows_obj)
     wf_obj = workflows.get(workflow)
@@ -807,7 +914,7 @@ def _load_workflow_profile(profile: str, workflow: str) -> WorkflowProfile:
 
 
 def _resolve_target_paths(
-    target: str, profile_name: str = "etech", *, for_lint: bool = False
+    target: str, profile_name: str = DEFAULT_PROFILE, *, for_lint: bool = False
 ) -> list[Path]:
     """Resolve target module paths from single module name or profile workflow."""
     addons = _resolve_addons()
@@ -864,7 +971,7 @@ def _exec_sql(
         "podman",
         "exec",
         "-i",
-        DEFAULT_DB_CONTAINER,
+        RUNTIME.db_container,
         "psql",
         "-U",
         DEFAULT_DB_USER,
@@ -996,8 +1103,9 @@ def _optional_int(args: argparse.Namespace, key: str) -> int | None:
 # ==============================================================================
 
 
-def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
+def _get_pod_status(pod_name: str | None = None) -> str | None:
     """Check status of podman pod."""
+    pod_name = pod_name or RUNTIME.pod
     _ensure_podman()
     res = _run(
         [
@@ -1015,12 +1123,13 @@ def _get_pod_status(pod_name: str = DEFAULT_POD_NAME) -> str | None:
     return out or None
 
 
-def _pod_infra_down(pod_name: str = DEFAULT_POD_NAME) -> bool:
+def _pod_infra_down(pod_name: str | None = None) -> bool:
     """Return True if the pod exists but its infra container has stopped.
 
     The infra container owns the network namespace and the published ports, so
     a pod without it keeps running containers that nothing outside can reach.
     """
+    pod_name = pod_name or RUNTIME.pod
     infra_id = _run(
         ["podman", "pod", "inspect", pod_name, "--format", "{{.InfraContainerID}}"],
         check=False,
@@ -1032,6 +1141,21 @@ def _pod_infra_down(pod_name: str = DEFAULT_POD_NAME) -> bool:
         check=False,
     ).stdout.strip()
     return state in {"exited", "stopped", "dead"}
+
+
+def _pod_ports_unreachable() -> bool:
+    """Return True if nothing on the host forwards the pod's published DB port.
+
+    A rootless infra container can outlive its port forwarder (pasta), for
+    example after a Podman upgrade: the pod reports Running, but the host
+    reaches nothing. The forwarder listens even while Postgres starts, so a
+    refused connection means it is gone.
+    """
+    try:
+        with socket.create_connection(("127.0.0.1", RUNTIME.postgres_port), timeout=1):
+            return False
+    except OSError:
+        return True
 
 
 @dataclass
@@ -1153,9 +1277,10 @@ def _ensure_runtime_pod(
     with _pod_section(wait_for_db=wait_for_db, wait_for_all_runs=wait_for_all_runs):
         _ensure_podman()
         status = _get_pod_status()
-        if status and _pod_infra_down():
-            # Its containers keep the dead network namespace, so the pod cannot be
-            # repaired in place. Database data is bind-mounted and survives.
+        if status and (_pod_infra_down() or _pod_ports_unreachable()):
+            # Its containers keep the dead network namespace or forwarder, so the
+            # pod cannot be repaired in place. Database data is bind-mounted and
+            # survives.
             _remove_stack()
             status = None
 
@@ -1167,11 +1292,11 @@ def _ensure_runtime_pod(
                     "pod",
                     "create",
                     "--name",
-                    DEFAULT_POD_NAME,
+                    RUNTIME.pod,
                     "-p",
-                    f"{DEFAULT_HTTP_BIND}:{DEFAULT_HTTP_PORT}:8069",
+                    f"{DEFAULT_HTTP_BIND}:{RUNTIME.http_port}:8069",
                     "-p",
-                    f"127.0.0.1:{DEFAULT_POSTGRES_PORT}:5432",
+                    f"127.0.0.1:{RUNTIME.postgres_port}:{POD_POSTGRES_PORT}",
                 ]
             )
 
@@ -1182,7 +1307,7 @@ def _ensure_runtime_pod(
                 "ps",
                 "-a",
                 "--filter",
-                f"name={DEFAULT_DB_CONTAINER}",
+                f"name={RUNTIME.db_container}",
                 "--format",
                 "{{.Status}}",
             ],
@@ -1198,9 +1323,9 @@ def _ensure_runtime_pod(
                     "run",
                     "-d",
                     "--pod",
-                    DEFAULT_POD_NAME,
+                    RUNTIME.pod,
                     "--name",
-                    DEFAULT_DB_CONTAINER,
+                    RUNTIME.db_container,
                     "-e",
                     f"POSTGRES_USER={DEFAULT_DB_USER}",
                     "-e",
@@ -1216,7 +1341,7 @@ def _ensure_runtime_pod(
             )
             time.sleep(2)
         elif "Up" not in db_status:
-            _ = _run(["podman", "start", DEFAULT_DB_CONTAINER])
+            _ = _run(["podman", "start", RUNTIME.db_container])
             time.sleep(1)
 
 
@@ -1237,12 +1362,12 @@ def _stop_all() -> None:
 def _remove_stack() -> None:
     """Remove the web and database containers and the pod; the caller holds the pod lock."""
     _ensure_podman()
-    _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+    _ = _run(["podman", "rm", "-f", RUNTIME.web_container], check=False)
     _ = _run(
-        ["podman", "rm", "-f", "-t", str(DB_STOP_TIMEOUT), DEFAULT_DB_CONTAINER],
+        ["podman", "rm", "-f", "-t", str(DB_STOP_TIMEOUT), RUNTIME.db_container],
         check=False,
     )
-    _ = _run(["podman", "pod", "rm", "-f", DEFAULT_POD_NAME], check=False)
+    _ = _run(["podman", "pod", "rm", "-f", RUNTIME.pod], check=False)
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
@@ -1252,19 +1377,19 @@ def cmd_stop(args: argparse.Namespace) -> int:
     json_mode = _require_bool(args, "json")
 
     if only_web:
-        _ = _run(["podman", "stop", DEFAULT_WEB_CONTAINER], check=False)
-        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+        _ = _run(["podman", "stop", RUNTIME.web_container], check=False)
+        _ = _run(["podman", "rm", "-f", RUNTIME.web_container], check=False)
         if json_mode:
             print(
                 json.dumps(
                     {
                         "status": "stopped",
-                        "container": DEFAULT_WEB_CONTAINER,
+                        "container": RUNTIME.web_container,
                     }
                 )
             )
         else:
-            print(f"Container {DEFAULT_WEB_CONTAINER} stopped and removed.")
+            print(f"Container {RUNTIME.web_container} stopped and removed.")
         return 0
 
     _stop_all()
@@ -1273,18 +1398,25 @@ def cmd_stop(args: argparse.Namespace) -> int:
             json.dumps(
                 {
                     "status": "stopped",
-                    "pod": DEFAULT_POD_NAME,
-                    "containers": [DEFAULT_WEB_CONTAINER, DEFAULT_DB_CONTAINER],
+                    "pod": RUNTIME.pod,
+                    "containers": [RUNTIME.web_container, RUNTIME.db_container],
                 }
             )
         )
     else:
-        print(f"Odoo stack ({DEFAULT_POD_NAME}) stopped and cleaned up.")
+        print(f"Odoo stack ({RUNTIME.pod}) stopped and cleaned up.")
     return 0
 
 
 def _uninstalled_modules(modules: Sequence[str], db: str) -> list[str]:
-    """Return the profile modules that are not installed in the database."""
+    """Return the profile modules that are not installed in the database.
+
+    A database that does not exist yet has none installed; ``-i`` then creates it.
+    """
+    safe_db = _validate_db_name(db)
+    exists_sql = f"SELECT 1 FROM pg_database WHERE datname = '{safe_db}';"  # noqa: S608 - validated db name
+    if _exec_sql(exists_sql, db=DEFAULT_ADMIN_DB, tuples_only=True).strip() != "1":
+        return list(modules)
     names = ", ".join(_quote_literal(name) for name in modules)
     rows = _exec_sql_json(
         f"SELECT name FROM ir_module_module WHERE state = 'installed' AND name IN ({names})",  # noqa: S608 - names are quoted literals
@@ -1296,28 +1428,25 @@ def _uninstalled_modules(modules: Sequence[str], db: str) -> list[str]:
 
 
 def cmd_dev(args: argparse.Namespace) -> int:
-    """Start Odoo 17 dev server in foreground with hot reload enabled."""
+    """Start Odoo dev server in foreground with hot reload enabled."""
     ctx = _resolve_workspace(args)
-    profile_name = _require_str(args, "profile", "etech")
+    profile_name = _require_str(args, "profile", DEFAULT_PROFILE)
     workflow = _require_str(args, "workflow", "crm")
     profile = _load_workflow_profile(profile_name, workflow)
     db_to_use = _optional_str(args, "db") or profile.database
 
-    if "_seed_" in db_to_use:
-        msg = (
-            f"Refusing to start dev on untouchable seed database {db_to_use!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db_to_use, "start dev")
 
     _ensure_runtime_pod(ctx, wait_for_db=db_to_use)
 
     # Remove prior web container if hanging
-    _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+    _ = _run(["podman", "rm", "-f", RUNTIME.web_container], check=False)
 
     source_matches = list(ctx.runtime.glob("source/odoo-*"))
     source_dir = (
-        source_matches[0] if source_matches else ctx.runtime / "source/odoo-17.0"
+        source_matches[0]
+        if source_matches
+        else ctx.runtime / f"source/odoo-{RUNTIME.odoo_version}.0"
     )
     addons_mount = ctx.root
     config_mount = ctx.runtime / "config"
@@ -1331,15 +1460,15 @@ def cmd_dev(args: argparse.Namespace) -> int:
         "run",
         "-it" if sys.stdin.isatty() else "-i",
         "--pod",
-        DEFAULT_POD_NAME,
+        RUNTIME.pod,
         "--name",
-        DEFAULT_WEB_CONTAINER,
+        RUNTIME.web_container,
         "-e",
         "PYTHONPATH=/mnt/odoo-src",
         "-e",
         f"HOST={DEFAULT_DB_HOST}",
         "-e",
-        f"PORT={DEFAULT_POSTGRES_PORT}",
+        f"PORT={POD_POSTGRES_PORT}",
         "-e",
         f"USER={DEFAULT_DB_USER}",
         "-e",
@@ -1352,7 +1481,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         f"{config_mount}:/etc/odoo:ro,z",
         "-v",
         f"{data_web}:/var/lib/odoo:z",
-        DEFAULT_ODOO_IMAGE,
+        RUNTIME.image,
         "python3",
         "-m",
         "odoo",
@@ -1363,7 +1492,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         "--db_host",
         DEFAULT_DB_HOST,
         "--db_port",
-        str(DEFAULT_POSTGRES_PORT),
+        str(POD_POSTGRES_PORT),
         "--db_user",
         DEFAULT_DB_USER,
         "--db_password",
@@ -1381,7 +1510,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         cmd.extend(["-u", modules_str])
     try:
         banner = (
-            f"Starting Odoo 17 dev server on http://localhost:{DEFAULT_HTTP_PORT} "
+            f"Starting Odoo {RUNTIME.odoo_version} dev server on http://localhost:{RUNTIME.http_port} "
             f"(db: {db_to_use})"
         )
         print(banner)
@@ -1389,7 +1518,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         print("Press Ctrl+C to stop.\n")
         _ = subprocess.run(cmd, check=False)
     finally:
-        _ = _run(["podman", "rm", "-f", DEFAULT_WEB_CONTAINER], check=False)
+        _ = _run(["podman", "rm", "-f", RUNTIME.web_container], check=False)
     return 0
 
 
@@ -1459,12 +1588,20 @@ def _extract_test_counts(output: str) -> tuple[int, int, int] | None:
 def _cleanup_stale_test_containers() -> None:
     """Clean up any leftover test containers from previously interrupted runs."""
     stale_check = _run(
-        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={RUNTIME.test_container_prefix}",
+            "--format",
+            "{{.Names}}",
+        ],
         check=False,
     )
     for stale in stale_check.stdout.splitlines():
         stale_name = stale.strip()
-        if stale_name.startswith("odoo-test-"):
+        if stale_name.startswith(RUNTIME.test_container_prefix):
             _ = _run(["podman", "rm", "-f", stale_name], check=False)
 
 
@@ -1572,7 +1709,7 @@ def _run_baseline_test_comparison(
             raise CliError(msg, code=2)
 
         # Baseline suite runs FIRST so DB ends at current code schema
-        container_base_name = f"odoo-test-base-{int(time.time())}"
+        container_base_name = f"{RUNTIME.test_container_prefix}base-{int(time.time())}"
         cmd_base = _build_test_cmd(
             ctx,
             container_base_name,
@@ -1612,7 +1749,7 @@ def _run_baseline_test_comparison(
         _cleanup_stale_test_containers()
 
         # Current suite runs SECOND
-        container_curr_name = f"odoo-test-curr-{int(time.time())}"
+        container_curr_name = f"{RUNTIME.test_container_prefix}curr-{int(time.time())}"
         cmd_curr = _build_test_cmd(
             ctx,
             container_curr_name,
@@ -1768,7 +1905,9 @@ def _build_test_cmd(
     """Construct podman run command for unit test runner."""
     source_matches = list(ctx.runtime.glob("source/odoo-*"))
     source_dir = (
-        source_matches[0] if source_matches else ctx.runtime / "source/odoo-17.0"
+        source_matches[0]
+        if source_matches
+        else ctx.runtime / f"source/odoo-{RUNTIME.odoo_version}.0"
     )
     addons_mount = source_root if source_root is not None else ctx.root
     config_mount = ctx.runtime / "config"
@@ -1781,7 +1920,7 @@ def _build_test_cmd(
         "--rm",
         "-i",
         "--pod",
-        DEFAULT_POD_NAME,
+        RUNTIME.pod,
         "--name",
         container_name,
         "-e",
@@ -1789,7 +1928,7 @@ def _build_test_cmd(
         "-e",
         f"HOST={DEFAULT_DB_HOST}",
         "-e",
-        f"PORT={DEFAULT_POSTGRES_PORT}",
+        f"PORT={POD_POSTGRES_PORT}",
         "-e",
         f"USER={DEFAULT_DB_USER}",
         "-e",
@@ -1802,7 +1941,7 @@ def _build_test_cmd(
         f"{config_mount}:/etc/odoo:ro,z",
         "-v",
         f"{data_web}:/var/lib/odoo:z",
-        DEFAULT_ODOO_IMAGE,
+        RUNTIME.image,
         "python3",
         "-m",
         "odoo",
@@ -1813,7 +1952,7 @@ def _build_test_cmd(
         "--db_host",
         DEFAULT_DB_HOST,
         "--db_port",
-        str(DEFAULT_POSTGRES_PORT),
+        str(POD_POSTGRES_PORT),
         "--db_user",
         DEFAULT_DB_USER,
         "--db_password",
@@ -1821,7 +1960,7 @@ def _build_test_cmd(
         "--test-enable",
         f"--test-tags={tags_str}",
         "--stop-after-init",
-        f"--http-port={DEFAULT_TEST_HTTP_PORT}",
+        f"--http-port={RUNTIME.test_http_port}",
         "--log-level=test",
     ]
     if update_str:
@@ -1886,7 +2025,9 @@ def _run_single_module_test(
     """Execute test container process for a single module in isolation."""
     start_time = time.time()
     tags_str = explicit_tags or f"/{mod}"
-    container_test_name = f"odoo-test-{mod}-{int(time.time())}-{index}"
+    container_test_name = (
+        f"{RUNTIME.test_container_prefix}{mod}-{int(time.time())}-{index}"
+    )
     cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, mod)
     exit_code, output = _run_test_process(cmd, container_test_name, json_mode=True)
     is_success, summary_lines = _evaluate_odoo_test_result(exit_code, output)
@@ -1991,10 +2132,10 @@ def _run_parallel_tests(
 
 
 def cmd_test(args: argparse.Namespace) -> int:
-    """Run isolated Odoo 17 unit tests for a module or workflow."""
+    """Run isolated Odoo unit tests for a module or workflow."""
     ctx = _resolve_workspace(args)
     target = _require_str(args, "target", "crm")
-    profile_name = _require_str(args, "profile", "etech")
+    profile_name = _require_str(args, "profile", DEFAULT_PROFILE)
     json_mode = _require_bool(args, "json")
     explicit_tags = _optional_str(args, "tags")
     explicit_db = _optional_str(args, "db")
@@ -2006,12 +2147,7 @@ def cmd_test(args: argparse.Namespace) -> int:
     if explicit_db:
         db_to_use = explicit_db
 
-    if "_seed_" in db_to_use:
-        msg = (
-            f"Refusing to execute tests on untouchable seed database "
-            f"{db_to_use!r}. Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db_to_use, "execute tests")
 
     with _test_run_lock(db_to_use):
         baseline_ref = _optional_str(args, "baseline")
@@ -2035,7 +2171,7 @@ def cmd_test(args: argparse.Namespace) -> int:
         _cleanup_stale_test_containers()
 
         update_str = ",".join(update_mods)
-        container_test_name = f"odoo-test-{int(time.time())}"
+        container_test_name = f"{RUNTIME.test_container_prefix}{int(time.time())}"
 
         cmd = _build_test_cmd(ctx, container_test_name, db_to_use, tags_str, update_str)
         header_msg = (
@@ -2203,7 +2339,7 @@ def _js_lint_command(
 def cmd_lint_js(args: argparse.Namespace) -> int:
     """Lint Odoo module JavaScript using the installed runtime's ESLint config."""
     target = _require_str(args, "target", "crm")
-    profile = _require_str(args, "profile", "etech")
+    profile = _require_str(args, "profile", DEFAULT_PROFILE)
     json_mode = _require_bool(args, "json")
     try:
         targets = _resolve_target_paths(target, profile, for_lint=True)
@@ -2290,7 +2426,7 @@ def cmd_lint_js(args: argparse.Namespace) -> int:
 def cmd_lint(args: argparse.Namespace) -> int:
     """Run Ruff Python and XML view linters on profile lint_modules or target."""
     target = _require_str(args, "target", "crm")
-    profile = _require_str(args, "profile", "etech")
+    profile = _require_str(args, "profile", DEFAULT_PROFILE)
     fix = _require_bool(args, "fix")
     json_mode = _require_bool(args, "json")
     strict = _require_bool(args, "strict")
@@ -2314,7 +2450,9 @@ def cmd_lint(args: argparse.Namespace) -> int:
         return proc.returncode
 
     ctx = _resolve_workspace()
-    linter = xml_view_linter.OdooXmlViewLinter(root_path=ctx.root)
+    linter = xml_view_linter.OdooXmlViewLinter(
+        root_path=ctx.root, odoo_version=RUNTIME.odoo_version
+    )
     violations: list[xml_view_linter.ViewViolation] = []
     for p in target_paths:
         if p.is_file() and p.suffix.lower() == ".xml":
@@ -2354,7 +2492,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         )
 
     proc = subprocess.run(cmd, check=False)
-    print("\n--- Odoo 17 XML View Linter ---")
+    print(f"\n--- Odoo {RUNTIME.odoo_version} XML View Linter ---")
     print(xml_view_linter.format_violations_human(violations))
 
     if proc.returncode != 0:
@@ -2367,7 +2505,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
 def cmd_fmt(args: argparse.Namespace) -> int:
     """Run Ruff formatter on profile lint_modules or target."""
     target = _require_str(args, "target", "crm")
-    profile = _require_str(args, "profile", "etech")
+    profile = _require_str(args, "profile", DEFAULT_PROFILE)
     check_mode = _require_bool(args, "check")
     target_paths = _resolve_target_paths(target, profile, for_lint=True)
 
@@ -2385,15 +2523,17 @@ def cmd_fmt(args: argparse.Namespace) -> int:
 
 
 def cmd_lint_views(args: argparse.Namespace) -> int:
-    """Run AST and semantic linter on Odoo 17 XML views."""
+    """Run AST and semantic linter on Odoo XML views."""
     ctx = _resolve_workspace()
     target = _require_str(args, "target", "crm")
-    profile = _require_str(args, "profile", "etech")
+    profile = _require_str(args, "profile", DEFAULT_PROFILE)
     strict = _require_bool(args, "strict")
     json_mode = _require_bool(args, "json")
     all_mode = _require_bool(args, "all")
 
-    linter = xml_view_linter.OdooXmlViewLinter(root_path=ctx.root)
+    linter = xml_view_linter.OdooXmlViewLinter(
+        root_path=ctx.root, odoo_version=RUNTIME.odoo_version
+    )
     violations: list[xml_view_linter.ViewViolation] = []
 
     if all_mode:
@@ -2430,7 +2570,15 @@ def _get_latest_test_container() -> str | None:
     """Find the most recently created odoo-test-* container."""
     _ensure_podman()
     res = _run(
-        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "json"],
+        [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={RUNTIME.test_container_prefix}",
+            "--format",
+            "json",
+        ],
         check=False,
     )
     out = res.stdout.strip()
@@ -2453,21 +2601,31 @@ def _get_latest_test_container() -> str | None:
                     names = item.get("Names")
                     if _is_obj_list(names) and names:
                         name = str(names[0]).lstrip("/")
-                        if name.startswith("odoo-test-"):
+                        if name.startswith(RUNTIME.test_container_prefix):
                             return name
-                    elif isinstance(names, str) and names.startswith("odoo-test-"):
+                    elif isinstance(names, str) and names.startswith(
+                        RUNTIME.test_container_prefix
+                    ):
                         return names.lstrip("/")
         except json.JSONDecodeError:
             pass
 
     names_res = _run(
-        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={RUNTIME.test_container_prefix}",
+            "--format",
+            "{{.Names}}",
+        ],
         check=False,
     )
     names = [
         n.strip().lstrip("/")
         for n in names_res.stdout.splitlines()
-        if n.strip().lstrip("/").startswith("odoo-test-")
+        if n.strip().lstrip("/").startswith(RUNTIME.test_container_prefix)
     ]
     return names[0] if names else None
 
@@ -2480,9 +2638,9 @@ def cmd_logs(args: argparse.Namespace) -> int:
     target_type = _require_str(args, "container", "web")
 
     if target_type == "web":
-        target = DEFAULT_WEB_CONTAINER
+        target = RUNTIME.web_container
     elif target_type == "db":
-        target = DEFAULT_DB_CONTAINER
+        target = RUNTIME.db_container
     elif target_type == "test":
         latest = _get_latest_test_container()
         if not latest:
@@ -2490,7 +2648,7 @@ def cmd_logs(args: argparse.Namespace) -> int:
             raise CliError(msg)
         target = latest
     else:
-        target = DEFAULT_WEB_CONTAINER
+        target = RUNTIME.web_container
 
     cmd = ["podman", "logs", f"--tail={tail}"]
     if follow:
@@ -2513,7 +2671,7 @@ def _is_db_container_running() -> bool:
             "podman",
             "ps",
             "--filter",
-            f"name={DEFAULT_DB_CONTAINER}",
+            f"name={RUNTIME.db_container}",
             "--filter",
             "status=running",
             "--format",
@@ -2530,8 +2688,15 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
     local_mods = _discover_all_modules(ctx.root)
     json_mode = _require_bool(args, "json")
 
+    profile_name = _require_str(args, "profile", DEFAULT_PROFILE)
+    rules = _read_profile(profile_name).get("rules")
     data: dict[str, object] = {
         "status": "ready",
+        "profile": profile_name,
+        "profile_rules": str(PROFILE_DIR / rules) if isinstance(rules, str) else None,
+        "odoo_version": RUNTIME.odoo_version,
+        "odoo_image": RUNTIME.image,
+        "http_port": RUNTIME.http_port,
         "runtime_path": str(ctx.runtime),
         "custom_addons_path": str(ctx.root),
         "config_path": str(ctx.config_path),
@@ -2539,7 +2704,7 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
         "database_source": ctx.database_source,
         "addons_paths": [str(p) for p in ctx.addons_paths],
         "local_modules_count": len(local_mods),
-        "podman_pod": DEFAULT_POD_NAME,
+        "podman_pod": RUNTIME.pod,
         "pod_status": _get_pod_status() or "stopped",
     }
 
@@ -2565,6 +2730,7 @@ def cmd_env_inspect(args: argparse.Namespace) -> int:
     if json_mode:
         print(json.dumps(data, indent=2))
     else:
+        print(f"Profile:             {profile_name} (Odoo {RUNTIME.odoo_version})")
         print(f"Odoo Runtime:        {data['runtime_path']}")
         print(f"Custom Addons:       {data['custom_addons_path']}")
         print(
@@ -2920,7 +3086,12 @@ def _copy_filestore(ctx: WorkspaceContext, source: str, target: str) -> bool:
             + f"in {target!r}."
         )
         return False
-    _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
+    try:
+        _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
+    except OSError:
+        # Rootless Podman owns the filestore through a subordinate UID.
+        _ = _run(["podman", "unshare", "mkdir", "-p", str(to_fs)])
+        _ = _run(["podman", "unshare", "cp", "-a", f"{from_fs}/.", str(to_fs)])
     print(f"[OK] Filestore copied: {from_fs} -> {to_fs}")
     return True
 
@@ -2932,7 +3103,7 @@ def _pipe_stream_to_psql(stream: BufferedIOBase, db_name: str, dump_path: Path) 
         "podman",
         "exec",
         "-i",
-        DEFAULT_DB_CONTAINER,
+        RUNTIME.db_container,
         "psql",
         "-U",
         DEFAULT_DB_USER,
@@ -2994,7 +3165,7 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
     this runtime, and a SQL dump carries no filestore.
     """
     dump_path = Path(_require_str(args, "dump")).expanduser()
-    target = _validate_db_name(_require_str(args, "target"))
+    target = _require_replica_name(_validate_db_name(_require_str(args, "target")))
     force = _require_bool(args, "force")
     json_mode = _require_bool(args, "json")
 
@@ -3060,7 +3231,7 @@ def cmd_db_restore(args: argparse.Namespace) -> int:
 def cmd_db_clone(args: argparse.Namespace) -> int:
     """Clone a PostgreSQL database template to a new target database."""
     source = _validate_db_name(_require_str(args, "source"))
-    target = _validate_db_name(_require_str(args, "target"))
+    target = _require_replica_name(_validate_db_name(_require_str(args, "target")))
     if source == target:
         msg = f"Source and target database names cannot be identical ({source!r})."
         raise CliError(msg)
@@ -3217,12 +3388,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute shell on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute shell")
 
     script_source = _optional_str(args, "file") or _optional_str(args, "script")
     if not script_source:
@@ -3248,7 +3414,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
             "podman",
             "ps",
             "--filter",
-            f"name={DEFAULT_WEB_CONTAINER}",
+            f"name={RUNTIME.web_container}",
             "--filter",
             "status=running",
             "--format",
@@ -3258,7 +3424,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     ).stdout.strip()
     if not web_status:
         msg = (
-            f"Container {DEFAULT_WEB_CONTAINER!r} is not running. "
+            f"Container {RUNTIME.web_container!r} is not running. "
             "Please start the development server first using 'dev'."
         )
         raise CliError(msg, code=1)
@@ -3267,7 +3433,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         "podman",
         "exec",
         "-i",
-        DEFAULT_WEB_CONTAINER,
+        RUNTIME.web_container,
         "odoo",
         "shell",
         "-c",
@@ -3290,12 +3456,7 @@ def cmd_auth_temp(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute auth-temp on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute auth-temp")
 
     _ensure_runtime_pod(ctx, wait_for_db=db)
 
@@ -3347,7 +3508,7 @@ def cmd_auth_temp(args: argparse.Namespace) -> int:
     )
     _ = _exec_sql(update_sql, db=db, readonly=False)
 
-    url = f"http://127.0.0.1:{DEFAULT_HTTP_PORT}/web/login?db={db}"
+    url = f"http://127.0.0.1:{RUNTIME.http_port}/web/login?db={db}"
     restore_cmd = (
         f"cli.py auth-restore --db {db} --login {user_login}"
         if login_arg
@@ -3382,12 +3543,7 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
     ctx = _resolve_workspace(args)
     db = ctx.effective_db_name
 
-    if "_seed_" in db:
-        msg = (
-            f"Refusing to execute auth-restore on untouchable seed database {db!r}. "
-            "Clone to a work database first (e.g., db-clone)."
-        )
-        raise CliError(msg, code=2)
+    _ = _require_work_db(db, "execute auth-restore")
 
     _ensure_runtime_pod(ctx, wait_for_db=db)
 
@@ -3474,7 +3630,7 @@ def cmd_auth_restore(args: argparse.Namespace) -> int:
 
 def cmd_health(args: argparse.Namespace) -> int:
     """Probe health and readiness of the local Odoo web server."""
-    port = _require_int(args, "port", DEFAULT_HTTP_PORT)
+    port = _require_int(args, "port", RUNTIME.http_port)
     wait_sec = max(0, _require_int(args, "wait", 0))
     json_mode = _require_bool(args, "json")
 
@@ -3529,13 +3685,21 @@ def cmd_prune(args: argparse.Namespace) -> int:
     json_mode = _require_bool(args, "json")
 
     res = _run(
-        ["podman", "ps", "-a", "--filter", "name=odoo-test-", "--format", "{{.Names}}"],
+        [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={RUNTIME.test_container_prefix}",
+            "--format",
+            "{{.Names}}",
+        ],
         check=False,
     )
     containers = [
         line.strip().lstrip("/")
         for line in res.stdout.splitlines()
-        if line.strip().lstrip("/").startswith("odoo-test-")
+        if line.strip().lstrip("/").startswith(RUNTIME.test_container_prefix)
     ]
 
     if containers:
@@ -3557,23 +3721,35 @@ def cmd_prune(args: argparse.Namespace) -> int:
 # ==============================================================================
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    """Construct CLI argument parser and subcommands for odooctl."""
-    parent_parser = argparse.ArgumentParser(add_help=False)
-    _ = parent_parser.add_argument(
-        "--json", action="store_true", help="Emit raw JSON output for agent pipelines"
+def _add_global_flags(
+    target: argparse.ArgumentParser, *, json_default: object, profile_default: object
+) -> None:
+    """Add --json and --profile to a parser with the given defaults."""
+    _ = target.add_argument(
+        "--json",
+        action="store_true",
+        default=json_default,
+        help="Emit raw JSON output for agent pipelines",
     )
-    _ = parent_parser.add_argument(
-        "--profile", default="etech", help="Workflow profile name (default: etech)"
+    _ = target.add_argument(
+        "--profile",
+        default=profile_default,
+        help=f"Workflow profile name (default: {DEFAULT_PROFILE})",
     )
 
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Construct CLI argument parser and subcommands for odooctl."""
     app_desc = (
-        "Autonomous Odoo 17 stack controller, test runner, and PostgreSQL inspector."
+        "Autonomous Odoo stack controller, test runner, and PostgreSQL inspector."
     )
-    parser = argparse.ArgumentParser(
-        prog="odooctl",
-        description=app_desc,
-        parents=[parent_parser],
+    parser = argparse.ArgumentParser(prog="odooctl", description=app_desc)
+    _add_global_flags(parser, json_default=False, profile_default=DEFAULT_PROFILE)
+    # Subcommands repeat the global flags as separate actions with SUPPRESS
+    # defaults, so a flag given before the subcommand is not reset by them.
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    _add_global_flags(
+        parent_parser, json_default=argparse.SUPPRESS, profile_default=argparse.SUPPRESS
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -3582,7 +3758,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_dev = subparsers.add_parser(
         "dev",
         parents=[parent_parser],
-        help="Start Odoo 17 dev server with hot-reload in foreground",
+        help="Start Odoo dev server with hot-reload in foreground",
     )
     _ = p_dev.add_argument(
         "workflow", default="crm", nargs="?", help="Workflow profile key (default: crm)"
@@ -3591,7 +3767,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Test Command
     p_test = subparsers.add_parser(
-        "test", parents=[parent_parser], help="Run isolated Odoo 17 unit tests"
+        "test", parents=[parent_parser], help="Run isolated Odoo unit tests"
     )
     _ = p_test.add_argument(
         "target",
@@ -3702,7 +3878,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lint_views = subparsers.add_parser(
         "lint-views",
         parents=[parent_parser],
-        help="AST and semantic linter for Odoo 17 XML views",
+        help="AST and semantic linter for Odoo XML views",
     )
     _ = p_lint_views.add_argument(
         "target",
@@ -3895,8 +4071,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = p_health.add_argument(
         "--port",
         type=int,
-        default=DEFAULT_HTTP_PORT,
-        help=f"Port of the Odoo web server (default: {DEFAULT_HTTP_PORT})",
+        default=RUNTIME.http_port,
+        help=f"Port of the Odoo web server (default: {RUNTIME.http_port})",
     )
     _ = p_health.add_argument(
         "--wait",
@@ -3993,6 +4169,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     try:
+        _apply_runtime_profile(_require_str(args, "profile", DEFAULT_PROFILE))
         return handler(args)
     except CliError as err:
         json_mode = _require_bool(args, "json")

@@ -25,6 +25,8 @@ Use the closest executable regression check instead: a targeted script, manual r
 
 Prefer no new test over a bad test. A bad test is one that mostly tests mocks, fakes the system under test instead of its external edges, encodes current implementation details, depends on timing or unrelated global state, needs expensive infrastructure for a small fix, or would be deleted immediately after proving the fix.
 
+Before keeping a test, imagine every function under test returning nothing. If the test would still pass, it asserts nothing. Rewrite or delete it. To measure this across a suite, run mutation testing with the `code-metrics` skill.
+
 ## Guardrails
 
 - Do not change tests merely to match a wrong implementation.

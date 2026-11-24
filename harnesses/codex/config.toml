@@ -92,25 +92,16 @@ diffAdded = "#1eff5a"
 diffRemoved = "#fa423e"
 skill = "#1eff5a"
 
-[shell_environment_policy]
-# "all", "core", "none"
-inherit = "all"
-
 # -----------------------------------------------------------------------------
 # FEATURES
 # -----------------------------------------------------------------------------
 
 [features]
 chronicle = false
-code_mode_host = true
 daemon_auto_start = false
 default_mode_request_user_input = true
-hooks = true
 memories = false
-plugins = true
 prevent_idle_sleep = true
-recommended_plugins = true
-worktrees = true
 
 [memories]
 generate_memories = false
@@ -140,8 +131,7 @@ enabled = true
 # -----------------------------------------------------------------------------
 
 [tui]
-alternate_screen = "never"
-vim_mode_default = false
+collapse_turn_details = true
 status_line = ["model-with-reasoning", "current-dir", "git-branch", "run-state", "context-used", "codex-version", "task-progress"]
 status_line_use_colors = true
 
@@ -158,8 +148,6 @@ enabled-reasoning-efforts = ["low", "medium", "high", "xhigh", "max", "ultra"]
 # -----------------------------------------------------------------------------
 
 [agents]
-enabled = true
-interrupt_message = true
 max_concurrent_threads_per_session = 12
 default_subagent_model = "gpt-6-luna"
 default_subagent_reasoning_effort = "xhigh"

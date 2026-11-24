@@ -1,0 +1,61 @@
+{
+  "odoo_version": 19,
+  "rules": "erptech.md",
+  "runtime": {
+    "path": "/opt/odoo19",
+    "image": "localhost/odoo19-local:19.0-e-20261120",
+    "pod": "odoo19-pod",
+    "db_container": "odoo19-db",
+    "web_container": "odoo19-web",
+    "test_container_prefix": "odoo19-test-",
+    "http_port": 8169,
+    "test_http_port": 8179,
+    "postgres_port": 5433
+  },
+  "workflows": {
+    "crm": {
+      "database": "espoltecherp_work_20261124",
+      "modules": [
+        "admin_units",
+        "contact_extension",
+        "budget",
+        "budget_hr",
+        "crm_espol",
+        "custom_event_ticket",
+        "project_details",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener",
+        "template_editor",
+        "b2b"
+      ],
+      "test_modules": [
+        "crm_espol",
+        "b2b",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener",
+        "template_editor"
+      ],
+      "lint_modules": [
+        "crm_espol",
+        "b2b",
+        "whatsapp_utils",
+        "whatsapp_bot",
+        "web_espol",
+        "url_shortener",
+        "template_editor"
+      ]
+    },
+    "base": {
+      "database": "espoltecherp_work_20261124",
+      "modules": [
+        "web"
+      ],
+      "test_modules": [],
+      "lint_modules": []
+    }
+  }
+}

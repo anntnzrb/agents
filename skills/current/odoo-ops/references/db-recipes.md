@@ -2,7 +2,7 @@
 
 Use these commands exclusively for local replica databases. Read [Runtime discovery](runtime-discovery.md) and [Safety model](safety-model.md) first.
 
-Naming convention: `<prodDB>_seed_<YYYYMMDD>` for the untouched baseline (restored once from a DBA dump) and `<prodDB>_work_<YYYYMMDD>` for the disposable working replica. Use lowercase letters and underscores only; never use hyphens, which require identifier quoting in PostgreSQL.
+Naming convention: `<prodDB>_seed_<YYYYMMDD>` for the untouched baseline (restored once from a DBA dump) and `<prodDB>_work_<YYYYMMDD>` for the disposable working replica. Use lowercase letters and underscores only; never use hyphens, which require identifier quoting in PostgreSQL. Each runtime holds only these two databases; the profile selects the runtime, so both runtimes use the same names. The CLI enforces the convention: `dev`, `test`, `shell`, `auth-temp`, and `auth-restore` accept only a `_work_` replica, `db-restore` and `db-clone` create only `_seed_` or `_work_` targets, and every profile workflow points at a `_work_` replica. Never create scratch or probe databases; reset the work replica from its seed instead.
 
 The CLI resolves the default database from the active profile (`effective_database`). Pass `--db <database_name>` to target a specific replica.
 
@@ -86,6 +86,18 @@ uv run --script <skill-dir>/scripts/cli.py db-clone <prodDB>_seed_<YYYYMMDD> <pr
 ```
 
 Clones the database at the engine level using PostgreSQL `TEMPLATE` cloning, copies the local filestore directory if present, and clears the copied `database.uuid`. The operation terminates active sessions on source and target databases before cloning. If the working copy is broken by experiments or corrupted data, drop it and clone again from seed.
+
+## Seed Without a Production Dump
+
+A runtime whose version has no production dump yet (a new Odoo version before the migrated database exists) starts from a clean install instead. Create the work replica from an empty addons path, so no custom module installs, then freeze it as the seed:
+
+```text
+ODOO_ADDONS_PATH=<empty-dir> uv run --script <skill-dir>/scripts/cli.py --profile <profile> dev base --db <prodDB>_work_<YYYYMMDD>
+uv run --script <skill-dir>/scripts/cli.py --profile <profile> stop --web
+uv run --script <skill-dir>/scripts/cli.py --profile <profile> db-clone <prodDB>_work_<YYYYMMDD> <prodDB>_seed_<YYYYMMDD> --force
+```
+
+When the migrated dump arrives, restore it as the seed with the dump date, clone the work replica from it, update the profile `database`, and drop the clean-install pair.
 
 ## Drop Database
 

@@ -147,7 +147,7 @@ MUTATION_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
-# Hard deny-list for production (non-loopback) endpoints, citing Odoo 17 risks:
+# Hard deny-list for production (non-loopback) endpoints, citing Odoo risks:
 # - unlink: BaseModel.unlink permanently deletes rows and on ir.model.fields drops SQL columns.
 # - ^_: private/internal methods (_auto_init, _drop_column, etc.) bypass public ORM guards.
 # - button_immediate_*, button_(un)?install, button_upgrade, module_uninstall:
@@ -163,75 +163,75 @@ MUTATION_ALLOWLIST: frozenset[str] = frozenset(
 # - set_param: ir.config_parameter.set_param alters global system configuration/secrets.
 # - change_password, action_reset_password: res.users credential mutation and reset emails.
 PROD_DENIED_METHOD_PATTERNS: tuple[tuple[str, str], ...] = (
-    (r"^unlink$", "Odoo 17 BaseModel.unlink permanently deletes records"),
-    (r"^_", "Odoo 17 private/internal methods starting with '_' are forbidden"),
+    (r"^unlink$", "Odoo BaseModel.unlink permanently deletes records"),
+    (r"^_", "Odoo private/internal methods starting with '_' are forbidden"),
     (
         r"^button_immediate_",
-        "Odoo 17 ir.module.module immediate module state changes are forbidden",
+        "Odoo ir.module.module immediate module state changes are forbidden",
     ),
     (
         r"^button_(un)?install",
-        "Odoo 17 module install/uninstall actions are forbidden",
+        "Odoo module install/uninstall actions are forbidden",
     ),
-    (r"^button_upgrade", "Odoo 17 module upgrade actions are forbidden"),
+    (r"^button_upgrade", "Odoo module upgrade actions are forbidden"),
     (
         r"^module_uninstall$",
-        "Odoo 17 ir.module.module.module_uninstall drops tables and data",
+        "Odoo ir.module.module.module_uninstall drops tables and data",
     ),
     (
         r"^run$",
-        "Odoo 17 ir.actions.server.run executes arbitrary server action code",
+        "Odoo ir.actions.server.run executes arbitrary server action code",
     ),
     (
         r"^method_direct_trigger$",
-        "Odoo 17 ir.cron.method_direct_trigger triggers live cron execution",
+        "Odoo ir.cron.method_direct_trigger triggers live cron execution",
     ),
-    (r"^send$", "Odoo 17 live message/email dispatch via send is forbidden"),
-    (r"^send_", "Odoo 17 outbound send_* methods dispatch live messages"),
+    (r"^send$", "Odoo live message/email dispatch via send is forbidden"),
+    (r"^send_", "Odoo outbound send_* methods dispatch live messages"),
     (
         r"^action_.*send",
-        "Odoo 17 workflow send actions dispatch live external messages",
+        "Odoo workflow send actions dispatch live external messages",
     ),
     (
         r"^action_launch$",
-        "Odoo 17 campaign/mailing launch dispatches live external messages",
+        "Odoo campaign/mailing launch dispatches live external messages",
     ),
     (
         r"^message_post$",
-        "Odoo 17 mail.thread.message_post posts chatter messages and notifies followers",
+        "Odoo mail.thread.message_post posts chatter messages and notifies followers",
     ),
     (
         r"^message_notify$",
-        "Odoo 17 mail.thread.message_notify sends live partner notifications",
+        "Odoo mail.thread.message_notify sends live partner notifications",
     ),
     (
         r"merge",
-        "Odoo 17 merge operations destructively reassign references and unlink records",
+        "Odoo merge operations destructively reassign references and unlink records",
     ),
     (
         r"^action_post$",
-        "Odoo 17 account.move.action_post locks accounting entries and sequences",
+        "Odoo account.move.action_post locks accounting entries and sequences",
     ),
     (
         r"^reconcile",
-        "Odoo 17 account.move.line.reconcile mutates accounting reconciliation state",
+        "Odoo account.move.line.reconcile mutates accounting reconciliation state",
     ),
-    (r"^action_sign", "Odoo 17 electronic signing actions are forbidden"),
-    (r"^action_mass_sign", "Odoo 17 batch electronic signing actions are forbidden"),
-    (r"^action_liquidate", "Odoo 17 liquidation actions are forbidden"),
+    (r"^action_sign", "Odoo electronic signing actions are forbidden"),
+    (r"^action_mass_sign", "Odoo batch electronic signing actions are forbidden"),
+    (r"^action_liquidate", "Odoo liquidation actions are forbidden"),
     (
         r"^action_payslip_done$",
-        "Odoo 17 hr.payslip.action_payslip_done locks payslips and posts entries",
+        "Odoo hr.payslip.action_payslip_done locks payslips and posts entries",
     ),
-    (r"^action_paid$", "Odoo 17 payment state transitions are forbidden"),
+    (r"^action_paid$", "Odoo payment state transitions are forbidden"),
     (
         r"^set_param$",
-        "Odoo 17 ir.config_parameter.set_param mutates global system parameters",
+        "Odoo ir.config_parameter.set_param mutates global system parameters",
     ),
-    (r"change_password", "Odoo 17 user password changes are forbidden"),
+    (r"change_password", "Odoo user password changes are forbidden"),
     (
         r"^action_reset_password$",
-        "Odoo 17 res.users.action_reset_password sends reset emails and invalidates tokens",
+        "Odoo res.users.action_reset_password sends reset emails and invalidates tokens",
     ),
 )
 PROD_DENIED_METHODS: tuple[str, ...] = tuple(
@@ -242,7 +242,7 @@ _COMPILED_DENIED_METHODS: tuple[tuple[re.Pattern[str], str, str], ...] = tuple(
     for pattern, reason in PROD_DENIED_METHOD_PATTERNS
 )
 
-# Odoo 17 schema, module registry, system parameter, ACL, and merge wizard models where
+# Odoo schema, module registry, system parameter, ACL, and merge wizard models where
 # create/write/write-batch/copy/call are denied on production (archive/unarchive remain allowed).
 PROD_DENIED_MODELS: frozenset[str] = frozenset(
     {
@@ -261,7 +261,7 @@ PROD_DENIED_MODELS: frozenset[str] = frozenset(
     }
 )
 
-# Odoo 17 credential fields denied in create/write/write-batch on any model in production.
+# Odoo credential fields denied in create/write/write-batch on any model in production.
 PROD_DENIED_VALUE_KEYS: frozenset[str] = frozenset(
     {
         "password",

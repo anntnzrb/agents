@@ -1503,6 +1503,7 @@ class TestEndToEnd:
             "basicConstraints=CA:FALSE",
             "keyUsage=digitalSignature,keyEncipherment",
             "extendedKeyUsage=serverAuth",
+            "authorityKeyIdentifier=keyid",
             "",
         )
         _ = ext.write_text("\n".join(ext_lines), encoding="utf-8")
@@ -1526,6 +1527,9 @@ class TestEndToEnd:
                 "basicConstraints=critical,CA:TRUE",
                 "-addext",
                 "keyUsage=critical,keyCertSign,cRLSign",
+                # LibreSSL omits it; the server AKI needs it for strict verify.
+                "-addext",
+                "subjectKeyIdentifier=hash",
             ],
             [
                 "openssl",
