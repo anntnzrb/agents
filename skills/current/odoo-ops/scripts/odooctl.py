@@ -3086,7 +3086,12 @@ def _copy_filestore(ctx: WorkspaceContext, source: str, target: str) -> bool:
             + f"in {target!r}."
         )
         return False
-    _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
+    try:
+        _ = shutil.copytree(from_fs, to_fs, dirs_exist_ok=True)
+    except OSError:
+        # Rootless Podman owns the filestore through a subordinate UID.
+        _ = _run(["podman", "unshare", "mkdir", "-p", str(to_fs)])
+        _ = _run(["podman", "unshare", "cp", "-a", f"{from_fs}/.", str(to_fs)])
     print(f"[OK] Filestore copied: {from_fs} -> {to_fs}")
     return True
 

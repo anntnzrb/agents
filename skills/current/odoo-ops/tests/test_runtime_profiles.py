@@ -3,7 +3,9 @@
 import argparse
 import configparser
 import dataclasses
+import shutil
 import socket
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
@@ -246,3 +248,39 @@ def test_every_profile_workflow_uses_a_work_replica() -> None:
             assert odooctl._require_work_db(profile.database, "check") == (
                 profile.database
             ), (pfile.name, name)
+
+
+def test_copy_filestore_falls_back_to_podman_unshare(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rootless Podman owns the filestore through a subordinate UID; copy as it."""
+    ctx = odooctl.WorkspaceContext(
+        root=tmp_path,
+        config_path=tmp_path / "odoo.conf",
+        config=configparser.ConfigParser(),
+        addons_paths=[tmp_path],
+        effective_db_name="espoltecherp_work_20261124",
+        runtime=tmp_path,
+    )
+    source = odooctl._filestore_path(ctx, "espoltecherp_work_20261124")
+    source.mkdir(parents=True)
+    _ = (source / "attachment").write_text("x", encoding="utf-8")
+    target = odooctl._filestore_path(ctx, "espoltecherp_seed_20261124")
+    commands: list[list[str]] = []
+
+    def denied(*_a: object, **_k: object) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    def run(cmd: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
+        commands.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(shutil, "copytree", denied)
+    monkeypatch.setattr(odooctl, "_run", run)
+    assert odooctl._copy_filestore(
+        ctx, "espoltecherp_work_20261124", "espoltecherp_seed_20261124"
+    )
+    assert commands == [
+        ["podman", "unshare", "mkdir", "-p", str(target)],
+        ["podman", "unshare", "cp", "-a", f"{source}/.", str(target)],
+    ]
