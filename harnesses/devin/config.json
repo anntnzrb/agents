@@ -5,7 +5,7 @@
   "theme_auto_detect": "always",
   "typewriter": true,
   "process_model": "daemon",
-  "mouse_capture": true,
+  "mouse_capture": false,
   "pty_for_noninteractive_exec": true,
   "notify": "always",
   "show_hints": false,
