@@ -4,6 +4,7 @@
   "theme_mode": null,
   "theme_auto_detect": "always",
   "typewriter": false,
+  "process_model": "daemon",
   "notify": "always",
   "show_hints": true,
   "show_path": true,
