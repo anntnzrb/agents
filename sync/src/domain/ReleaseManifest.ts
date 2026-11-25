@@ -6,8 +6,10 @@ export const StaticReleaseAsset = Schema.Struct({
 })
 export type StaticReleaseAsset = typeof StaticReleaseAsset.Type
 
+export const STATIC_RELEASE_VERSION_PATTERN = /^[A-Za-z0-9._-]+$/u
+
 export const StaticReleaseManifest = Schema.Struct({
-  version: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u)),
+  version: Schema.String.check(Schema.isPattern(STATIC_RELEASE_VERSION_PATTERN)),
   platforms: Schema.Record(Schema.String, StaticReleaseAsset),
 })
 export type StaticReleaseManifest = typeof StaticReleaseManifest.Type

@@ -131,7 +131,7 @@ test("installs, rotates and reuses releases; failed refresh preserves current an
   expect(failureResult._tag).toBe("Failure")
 })
 
-test("current cache rejects links outside a direct numeric version", async () => {
+test("current cache rejects links outside a direct release version", async () => {
   const home = mkdtempSync(path.join(tmpdir(), "static-release-"))
   roots.push(home)
   const versions = path.join(home, "install/_versions")
@@ -144,6 +144,23 @@ test("current cache rejects links outside a direct numeric version", async () =>
     currentStaticRelease(spec, home).pipe(Effect.provide(BunServices.layer)),
   )
   expect(Option.isNone(value)).toBe(true)
+})
+
+test("current cache accepts prerelease versions allowed by release manifests", async () => {
+  const home = mkdtempSync(path.join(tmpdir(), "static-release-"))
+  roots.push(home)
+  const versions = path.join(home, "install/_versions")
+  const versionRoot = path.join(versions, "1.0.0-rc.1")
+  mkdirSync(path.join(versionRoot, "bin"), { recursive: true })
+  writeFileSync(path.join(versionRoot, "bin/tool"), "#!/bin/sh\n", { mode: 0o755 })
+  symlinkSync("1.0.0-rc.1", path.join(versions, "current"))
+  const value = await Effect.runPromise(
+    currentStaticRelease(spec, home).pipe(Effect.provide(BunServices.layer)),
+  )
+  expect(Option.isSome(value)).toBe(true)
+  if (Option.isSome(value)) {
+    expect(value.value).toBe(realpathSync(path.join(versionRoot, "bin/tool")))
+  }
 })
 
 test("rejects an archive containing an escaping symbolic link", async () => {

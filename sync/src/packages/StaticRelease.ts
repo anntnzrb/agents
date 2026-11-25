@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem, Option, Order, Path, Schema, String as Str } from "effect"
 
 import type { StaticRelease } from "#domain/HarnessAdapters"
-import { StaticReleaseManifest } from "#domain/ReleaseManifest"
+import { STATIC_RELEASE_VERSION_PATTERN, StaticReleaseManifest } from "#domain/ReleaseManifest"
 import { Host } from "#platform/Host"
 import { Links } from "#platform/Links"
 import { Lock } from "#platform/Lock"
@@ -17,7 +17,7 @@ export class StaticReleaseError extends Schema.TaggedError<
 const failure = (message: string, cause?: unknown) => StaticReleaseError.make({ message, cause })
 const versionsPath = (path: Path.Path, home: string, release: StaticRelease) =>
   path.join(home, ...release.installSegments, "_versions")
-const numericVersion = /^\d+(?:\.\d+)*$/u
+const isReleaseVersion = (value: string) => STATIC_RELEASE_VERSION_PATTERN.test(value)
 
 export const currentStaticRelease = Effect.fn("StaticRelease.current")(function* (
   release: StaticRelease,
@@ -33,7 +33,7 @@ export const currentStaticRelease = Effect.fn("StaticRelease.current")(function*
     }
     const root = yield* fs.realPath(versions)
     const version = yield* fs.realPath(link)
-    if (path.dirname(version) !== root || !numericVersion.test(path.basename(version))) {
+    if (path.dirname(version) !== root || !isReleaseVersion(path.basename(version))) {
       return Option.none<string>()
     }
     const executable = yield* fs.realPath(path.join(version, ...release.executableSegments))
@@ -288,7 +288,7 @@ const publish = Effect.fn("StaticRelease.publish")(function* (
     const previous = yield* links.readLinkTarget(path.join(versions, "previous"))
     const keep = new Set([version, ...(Option.isSome(previous) ? [path.basename(previous.value)] : [])])
     for (const entry of yield* fs.readDirectoryEntries(versions)) {
-      if (entry.type !== "Directory" || !numericVersion.test(entry.name) || keep.has(entry.name)) {
+      if (entry.type !== "Directory" || !isReleaseVersion(entry.name) || keep.has(entry.name)) {
         continue
       }
       const candidate = path.join(versions, entry.name)
