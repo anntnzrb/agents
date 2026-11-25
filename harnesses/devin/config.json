@@ -6,6 +6,7 @@
   "typewriter": true,
   "process_model": "daemon",
   "mouse_capture": true,
+  "pty_for_noninteractive_exec": true,
   "notify": "always",
   "show_hints": false,
   "show_path": true,
