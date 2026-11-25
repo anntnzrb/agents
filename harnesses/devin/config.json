@@ -8,9 +8,16 @@
   "attribution": false,
   "include_gitignored_files": false,
   "read_config_from": {
+    "agents_standard": true,
     "cursor": false,
     "windsurf": false,
-    "claude": false
+    "claude": false,
+    "copilot": false,
+    "codex": false,
+    "kiro": false,
+    "opencode": false,
+    "zed": false,
+    "cloud": false
   },
   "agent": {
     "model": "swe-2-1-xhigh"
