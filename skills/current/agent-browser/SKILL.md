@@ -129,6 +129,16 @@ agent-browser pdf output.pdf          # Save as PDF
 
 For more commands and flags, load the version-matched reference above. Prefer element or text waits to `networkidle`, which can time out on pages with persistent network activity.
 
+## Troubleshooting
+
+Symptom-first diagnostics; verify each cause before applying its fix.
+
+- **The CDP port answers briefly, then refuses connections (macOS):** Chromium
+  launched by binary path is re-executed through LaunchServices or an existing
+  instance, dropping `--remote-debugging-port` and friends. Check with repeated
+  `lsof -nP -iTCP:<port>` over ~10 seconds rather than once. Relaunch through
+  `open -na "<App Name>" --args --remote-debugging-port=<port>`, which preserves
+  arguments, and confirm the port still answers after 10 seconds.
 ## Maintenance
 
 The daily `upstream` workflow opens a drift issue after a 14-day cooldown. Review `git diff <pin> <target> -- <tracked dirs>` in an upstream clone. Port relevant safety rule changes into the critical block. Update the release, commit, tree hashes, and watch entries in `UPSTREAM.json` together. Run the skill gates and smoke-test `--version`, then open, snapshot, and close a named session.
