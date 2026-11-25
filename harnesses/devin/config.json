@@ -3,6 +3,7 @@
   "auto_update": false,
   "theme_mode": null,
   "theme_auto_detect": "always",
+  "typewriter": false,
   "notify": "always",
   "show_hints": true,
   "show_path": true,
