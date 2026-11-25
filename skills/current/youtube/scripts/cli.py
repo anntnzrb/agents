@@ -23,6 +23,7 @@ the API surface needed here is small and stable.
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -44,6 +45,8 @@ TOKEN_URL = os.environ.get("YT_TEST_TOKEN_URL", "https://oauth2.googleapis.com/t
 REDIRECT_URI = "http://localhost"
 API_BASE = os.environ.get("YT_TEST_API_BASE", "https://www.googleapis.com/youtube/v3")
 HTTP_TIMEOUT = 30
+VIDEO_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{11}")
+VIDEO_BATCH = 50
 
 
 class _Readable(Protocol):
@@ -70,6 +73,10 @@ def _opt_str(value: JsonValue) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _opt_int(value: JsonValue) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 class _Args(argparse.Namespace):
     """Parsed command-line arguments."""
 
@@ -80,6 +87,12 @@ class _Args(argparse.Namespace):
     file: str | None = None
     privacy: str = "private"
     redirect_url: str | None = None
+    query: str = ""
+    limit: int = 5
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.videos: list[str] = []
 
 
 def emit(payload: object) -> None:
@@ -300,7 +313,7 @@ def cmd_auth_bootstrap(args: _Args) -> None:
     )
 
 
-def cmd_auth_status() -> None:
+def cmd_auth_status(_args: _Args) -> None:
     """Verify credentials by fetching the owning channel."""
     cfg = load_config()
     token = access_token(cfg)
@@ -344,7 +357,83 @@ def playlist_summary(item: dict[str, JsonValue]) -> dict[str, JsonValue]:
     }
 
 
-def cmd_playlists_list() -> None:
+def playlist_items(token: str, pid: str) -> list[dict[str, JsonValue]]:
+    """Collect every item of a playlist."""
+    return paged(
+        token,
+        "playlistItems",
+        {"part": "snippet", "playlistId": pid, "maxResults": "50"},
+    )
+
+
+def item_video_id(item: dict[str, JsonValue]) -> str | None:
+    """Return the video id a playlist item points at, when present."""
+    snippet = _as_dict(item.get("snippet"))
+    return _opt_str(_as_dict(snippet.get("resourceId")).get("videoId"))
+
+
+def normalize_video_id(raw: str) -> str | None:
+    """Extract a bare 11-character video id from an id or a supported URL.
+
+    Accepted forms: bare id, youtube.com/watch?v=ID, youtu.be/ID, and
+    youtube.com/shorts/ID; extra query parameters are ignored.
+    """
+    text = raw.strip()
+    if VIDEO_ID_PATTERN.fullmatch(text):
+        return text
+    parsed = urllib.parse.urlparse(text)
+    host = parsed.netloc.lower()
+    candidate = ""
+    if host == "youtu.be":
+        candidate = parsed.path.strip("/").split("/")[0]
+    elif host == "youtube.com" or host.endswith(".youtube.com"):
+        if parsed.path == "/watch":
+            candidate = urllib.parse.parse_qs(parsed.query).get("v", [""])[0]
+        elif parsed.path.startswith("/shorts/"):
+            candidate = parsed.path.removeprefix("/shorts/").split("/")[0]
+    return candidate if VIDEO_ID_PATTERN.fullmatch(candidate) else None
+
+
+def parse_video_ids(raws: Sequence[str]) -> list[str]:
+    """Normalize every input to a bare video id or fail before any API call."""
+    ids: list[str] = []
+    for raw in raws:
+        vid = normalize_video_id(raw)
+        if vid is None:
+            raise fail(
+                "INVALID_VIDEO",
+                (
+                    f"cannot parse a video id from {raw!r}; accepted forms:"
+                    " bare id, youtube.com/watch?v=ID, youtu.be/ID,"
+                    " youtube.com/shorts/ID"
+                ),
+            )
+        ids.append(vid)
+    return ids
+
+
+def find_playlist(token: str, target: str) -> dict[str, JsonValue]:
+    """Resolve one of the user's playlists by exact id or title prefix."""
+    mine = paged(
+        token,
+        "playlists",
+        {"part": "snippet,status", "mine": "true", "maxResults": "50"},
+    )
+    for it in mine:
+        if _opt_str(it.get("id")) == target or item_title(it).startswith(target):
+            return it
+    raise fail("NOT_FOUND", f"no playlist matching {target!r}")
+
+
+def playlist_ref(playlist: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Project the resolved playlist into the id/title pair outputs carry."""
+    return {
+        "id": _opt_str(playlist.get("id")) or "",
+        "title": item_title(playlist),
+    }
+
+
+def cmd_playlists_list(_args: _Args) -> None:
     """List the authenticated user's playlists."""
     token = access_token(load_config())
     items = paged(
@@ -392,16 +481,9 @@ def ensure_playlist(
 
 def existing_video_ids(token: str, pid: str) -> set[str]:
     """Collect the video IDs already present in a playlist."""
-    existing = paged(
-        token,
-        "playlistItems",
-        {"part": "snippet", "playlistId": pid, "maxResults": "50"},
-    )
     have: set[str] = set()
-    for it in existing:
-        snippet = _as_dict(it.get("snippet"))
-        resource = _as_dict(snippet.get("resourceId"))
-        vid = _opt_str(resource.get("videoId"))
+    for it in playlist_items(token, pid):
+        vid = item_video_id(it)
         if vid is not None:
             have.add(vid)
     return have
@@ -475,18 +557,7 @@ def cmd_playlists_notes(args: _Args) -> None:
         )
     token = access_token(load_config())
     notes = Path(file).read_text(encoding="utf-8")
-    mine = paged(
-        token,
-        "playlists",
-        {"part": "snippet,status", "mine": "true", "maxResults": "50"},
-    )
-    match: dict[str, JsonValue] | None = None
-    for it in mine:
-        if _opt_str(it.get("id")) == target or item_title(it).startswith(target):
-            match = it
-            break
-    if match is None:
-        raise fail("NOT_FOUND", f"no playlist matching {target!r}")
+    match = find_playlist(token, target)
     snippet = _as_dict(match.get("snippet"))
     snippet["description"] = notes
     _ = api(
@@ -503,6 +574,163 @@ def cmd_playlists_notes(args: _Args) -> None:
             "id": _opt_str(match.get("id")) or "",
         }
     )
+
+
+def require_target(args: _Args) -> str:
+    """Return the playlist target argument or fail with a stable error."""
+    if not args.target:
+        raise fail("MISSING_ARGS", "need a playlist id or title prefix")
+    return args.target
+
+
+def cmd_playlists_items(args: _Args) -> None:
+    """List a playlist's contents: position, video id, title."""
+    target = require_target(args)
+    token = access_token(load_config())
+    playlist = find_playlist(token, target)
+    pid = _opt_str(playlist.get("id")) or ""
+    entries: list[dict[str, JsonValue]] = []
+    for it in playlist_items(token, pid):
+        snippet = _as_dict(it.get("snippet"))
+        entries.append(
+            {
+                "position": _opt_int(snippet.get("position")),
+                "id": item_video_id(it),
+                "title": _opt_str(snippet.get("title")),
+            }
+        )
+    emit({"ok": True, "playlist": playlist_ref(playlist), "items": entries})
+
+
+def cmd_playlists_add(args: _Args) -> None:
+    """Insert videos into a playlist, skipping ones already present."""
+    target = require_target(args)
+    ids = parse_video_ids(args.videos)
+    token = access_token(load_config())
+    playlist = find_playlist(token, target)
+    pid = _opt_str(playlist.get("id")) or ""
+    have = existing_video_ids(token, pid)
+    added: list[str] = []
+    skipped: list[str] = []
+    for vid in ids:
+        if vid in have:
+            skipped.append(vid)
+            continue
+        insert_video(token, pid, vid)
+        have.add(vid)
+        added.append(vid)
+    emit(
+        {
+            "ok": True,
+            "playlist": playlist_ref(playlist),
+            "added": added,
+            "skipped": skipped,
+        }
+    )
+
+
+def cmd_playlists_remove(args: _Args) -> None:
+    """Delete the playlist items pointing at each given video."""
+    target = require_target(args)
+    ids = parse_video_ids(args.videos)
+    token = access_token(load_config())
+    playlist = find_playlist(token, target)
+    pid = _opt_str(playlist.get("id")) or ""
+    by_video: dict[str, list[str]] = {}
+    for it in playlist_items(token, pid):
+        item_id = _opt_str(it.get("id"))
+        vid = item_video_id(it)
+        if item_id and vid:
+            by_video.setdefault(vid, []).append(item_id)
+    removed: list[str] = []
+    missing: list[str] = []
+    for vid in ids:
+        item_ids = by_video.get(vid)
+        if not item_ids:
+            missing.append(vid)
+            continue
+        for item_id in item_ids:
+            _ = api("playlistItems", "DELETE", token, params={"id": item_id})
+        removed.append(vid)
+    emit(
+        {
+            "ok": True,
+            "playlist": playlist_ref(playlist),
+            "removed": removed,
+            "not_found": missing,
+        }
+    )
+
+
+def video_summary(item: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Project one videos.list item into its stable summary fields."""
+    snippet = _as_dict(item.get("snippet"))
+    details = _as_dict(item.get("contentDetails"))
+    return {
+        "id": _opt_str(item.get("id")),
+        "title": _opt_str(snippet.get("title")),
+        "channel": _opt_str(snippet.get("channelTitle")),
+        "duration": _opt_str(details.get("duration")),
+        "publishedAt": _opt_str(snippet.get("publishedAt")),
+    }
+
+
+def cmd_videos_info(args: _Args) -> None:
+    """Fetch snippet and contentDetails for videos, 50 ids per API call."""
+    ids = parse_video_ids(args.videos)
+    token = access_token(load_config())
+    videos: list[dict[str, JsonValue]] = []
+    for start in range(0, len(ids), VIDEO_BATCH):
+        chunk = ids[start : start + VIDEO_BATCH]
+        data = api(
+            "videos",
+            "GET",
+            token,
+            params={
+                "part": "snippet,contentDetails",
+                "id": ",".join(chunk),
+                "maxResults": str(VIDEO_BATCH),
+            },
+        )
+        raw_items = data.get("items")
+        if isinstance(raw_items, list):
+            videos.extend(
+                video_summary(item) for item in raw_items if isinstance(item, dict)
+            )
+    emit({"ok": True, "videos": videos})
+
+
+def cmd_search(args: _Args) -> None:
+    """Search videos; each call costs 100 quota units."""
+    limit = max(1, min(args.limit, 25))
+    token = access_token(load_config())
+    data = api(
+        "search",
+        "GET",
+        token,
+        params={
+            "part": "snippet",
+            "type": "video",
+            "q": args.query,
+            "maxResults": str(limit),
+        },
+    )
+    results: list[dict[str, JsonValue]] = []
+    raw_items = data.get("items")
+    if isinstance(raw_items, list):
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            snippet = _as_dict(item.get("snippet"))
+            results.append(
+                {
+                    "id": _opt_str(_as_dict(item.get("id")).get("videoId")),
+                    "title": _opt_str(snippet.get("title")),
+                    "channel": _opt_str(snippet.get("channelTitle")),
+                    "publishedAt": _opt_str(snippet.get("publishedAt")),
+                }
+            )
+    emit({"ok": True, "results": results})
 
 
 def arguments() -> _Args:
@@ -529,22 +757,78 @@ def arguments() -> _Args:
     notes = psub.add_parser("notes", help="replace a playlist description")
     _ = notes.add_argument("target", help="playlist id or title prefix")
     _ = notes.add_argument("--file", required=True)
+    items = psub.add_parser(
+        "items", help="list a playlist's videos: position, video id, title"
+    )
+    _ = items.add_argument("target", help="playlist id or title prefix")
+    addp = psub.add_parser(
+        "add",
+        help="add videos to a playlist, skipping ones already present",
+        epilog=(
+            "videos accept bare ids, youtube.com/watch?v=ID, youtu.be/ID,"
+            " and youtube.com/shorts/ID forms; each insert costs 50 quota units"
+        ),
+    )
+    _ = addp.add_argument("target", help="playlist id or title prefix")
+    _ = addp.add_argument("videos", nargs="+", help="video ids or URLs")
+    rem = psub.add_parser(
+        "remove",
+        help="remove videos from a playlist",
+        epilog=(
+            "videos accept bare ids, youtube.com/watch?v=ID, youtu.be/ID,"
+            " and youtube.com/shorts/ID forms; each delete costs 50 quota units"
+        ),
+    )
+    _ = rem.add_argument("target", help="playlist id or title prefix")
+    _ = rem.add_argument("videos", nargs="+", help="video ids or URLs")
+    vid = sub.add_parser("videos")
+    vsub = vid.add_subparsers(dest="sub", required=True)
+    info = vsub.add_parser(
+        "info",
+        help="video metadata: title, channel, duration, publishedAt",
+        epilog="ids are batched 50 per API call; each call costs 1 quota unit",
+    )
+    _ = info.add_argument("videos", nargs="+", help="video ids or URLs")
+    search = sub.add_parser(
+        "search",
+        help="search videos by query text",
+        epilog=(
+            "quota warning: each search call costs 100 units of the daily"
+            " project quota (default 10000 units/day); prefer videos info"
+            " when ids are already known"
+        ),
+    )
+    _ = search.add_argument("query", help="search query text")
+    _ = search.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="max results, default 5; values above 25 are capped to 25",
+    )
     return parser.parse_args(namespace=_Args())
+
+
+COMMANDS: dict[tuple[str, str], Callable[[_Args], None]] = {
+    ("auth", "bootstrap"): cmd_auth_bootstrap,
+    ("auth", "status"): cmd_auth_status,
+    ("playlists", "list"): cmd_playlists_list,
+    ("playlists", "apply"): cmd_playlists_apply,
+    ("playlists", "notes"): cmd_playlists_notes,
+    ("playlists", "items"): cmd_playlists_items,
+    ("playlists", "add"): cmd_playlists_add,
+    ("playlists", "remove"): cmd_playlists_remove,
+    ("videos", "info"): cmd_videos_info,
+    ("search", ""): cmd_search,
+}
 
 
 def main() -> None:
     """Dispatch the parsed subcommand."""
     args = arguments()
-    if args.command == "auth" and args.sub == "bootstrap":
-        cmd_auth_bootstrap(args)
-    elif args.command == "auth" and args.sub == "status":
-        cmd_auth_status()
-    elif args.command == "playlists" and args.sub == "list":
-        cmd_playlists_list()
-    elif args.command == "playlists" and args.sub == "apply":
-        cmd_playlists_apply(args)
-    elif args.command == "playlists" and args.sub == "notes":
-        cmd_playlists_notes(args)
+    handler = COMMANDS.get((args.command, args.sub))
+    if handler is None:
+        raise fail("UNKNOWN_COMMAND", f"unhandled command {args.command!r}")
+    handler(args)
 
 
 if __name__ == "__main__":

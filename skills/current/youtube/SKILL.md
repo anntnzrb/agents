@@ -1,6 +1,6 @@
 ---
 name: youtube
-description: "Use when downloading YouTube or yt-dlp media, audio, or subtitles, or when managing YouTube playlists via the Data API."
+description: "Use when downloading YouTube media or subtitles via yt-dlp, or for YouTube Data API playlist, video, or search tasks."
 license: AGPL-3.0-or-later
 metadata:
   author: anntnzrb
@@ -9,8 +9,9 @@ metadata:
 # YouTube: yt-dlp for media, cli.py for the Data API
 
 Two tools, two jobs. yt-dlp downloads media and subtitles; it cannot write to a
-user account. `scripts/cli.py` owns YouTube Data API v3 write operations:
-playlist creation, idempotent playlist filling, and description updates.
+user account. `scripts/cli.py` owns YouTube Data API v3 account operations:
+playlist creation, filling, item add/remove, description updates, video
+metadata, and search.
 
 ## Media download (yt-dlp)
 
@@ -43,11 +44,22 @@ Commands:
   three environment variables. Run once ever, on any machine.
 - `auth status`: verify credentials; returns the owning channel title.
 - `playlists list`: own playlists as JSON.
+- `playlists items <id-or-title-prefix>`: playlist contents as JSON
+  (position, video id, title), fully paginated.
+- `playlists add <id-or-title-prefix> <video>...`: insert videos, skipping
+  ones already present; reports `added` vs `skipped`. Videos accept bare ids,
+  `youtube.com/watch?v=ID`, `youtu.be/ID`, and `youtube.com/shorts/ID` forms.
+- `playlists remove <id-or-title-prefix> <video>...`: delete the playlist
+  items for the given videos; reports `removed` vs `not_found`.
 - `playlists apply <manifest.tsv> [--privacy private|unlisted|public]`:
   create missing playlists and insert missing videos, idempotent. Manifest
   columns: `playlist_title<TAB>video_id[<TAB>note]`; `#` lines are comments.
 - `playlists notes <id-or-title-prefix> --file <path>`: replace a playlist
   description with file contents (5000 character API limit).
+- `videos info <video>...`: title, channel, ISO 8601 duration, publishedAt;
+  ids batch 50 per API call, same id/URL forms as `playlists add`.
+- `search <query> [--limit N]`: video search, default 5 results, cap 25.
+  Expensive: 100 quota units per call; prefer `videos info` for known ids.
 
 ## Credentials
 
