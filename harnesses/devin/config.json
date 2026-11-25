@@ -1,7 +1,8 @@
 {
   "version": 1,
   "auto_update": false,
-  "theme_mode": "dark",
+  "theme_mode": null,
+  "theme_auto_detect": "always",
   "notify": "always",
   "show_hints": true,
   "show_path": true,
