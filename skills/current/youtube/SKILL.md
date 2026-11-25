@@ -61,6 +61,12 @@ Commands:
 - `search <query> [--limit N]`: video search, default 5 results, cap 25.
   Expensive: 100 quota units per call; prefer `videos info` for known ids.
 
+## Follow-up reads
+
+| Need | Read | When |
+| --- | --- | --- |
+| Endpoint map, quota costs, platform gotchas, extension recipe | `references/youtube-data-api.md` | Extending the CLI or needing endpoint details |
+
 ## Credentials
 
 Refresh tokens are portable across machines: bootstrap once, copy the file or
