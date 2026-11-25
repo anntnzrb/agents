@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import re
+import ssl
 import sys
 import urllib.error
 import urllib.parse
@@ -93,6 +94,29 @@ class _Args(argparse.Namespace):
     def __init__(self) -> None:
         super().__init__()
         self.videos: list[str] = []
+
+
+def ensure_ca_bundle() -> None:
+    """Point urllib at a CA bundle when the platform default store is absent.
+
+    Foreign Python builds (uv standalone) on NixOS cannot find the system
+    certificates because OpenSSL's compiled-in default paths do not match the
+    distro layout. Honored only when SSL_CERT_FILE is unset; a no-op on macOS
+    and conventional Linux distributions.
+    """
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    paths = ssl.get_default_verify_paths()
+    if paths.cafile and Path(paths.cafile).exists():
+        return
+    for candidate in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ssl/certs/ca-bundle.crt",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+    ):
+        if Path(candidate).exists():
+            os.environ["SSL_CERT_FILE"] = candidate
+            return
 
 
 def emit(payload: object) -> None:
@@ -824,6 +848,7 @@ COMMANDS: dict[tuple[str, str], Callable[[_Args], None]] = {
 
 def main() -> None:
     """Dispatch the parsed subcommand."""
+    ensure_ca_bundle()
     args = arguments()
     handler = COMMANDS.get((args.command, args.sub))
     if handler is None:
