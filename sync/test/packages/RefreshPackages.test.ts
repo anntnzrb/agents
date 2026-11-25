@@ -117,11 +117,12 @@ test("continues after each failed package and fails only when the entire round f
   const f = fixture()
   expect(await f.run()).toBe(1)
   expect(Arr.sort(f.attempted, Order.String)).toEqual([
+    "@getpaseo/cli@latest",
     "@openai/codex@latest",
     "@steipete/summarize@latest",
     "mcporter@latest",
   ])
-  expect(f.warnings).toHaveLength(3)
+  expect(f.warnings).toHaveLength(4)
   expect(Arr.some<string>((warning) => Str.includes("refresh-packages: codex:")(warning))(f.warnings)).toBe(
     true,
   )
@@ -132,7 +133,7 @@ test("a busy package makes a partially failed round successful", async () => {
   f.busy.add("mcporter")
   expect(await f.run()).toBe(0)
   expect(f.attempted).not.toContain("mcporter@latest")
-  expect(f.attempted).toHaveLength(2)
+  expect(f.attempted).toHaveLength(3)
 })
 
 test("discovers managed wrappers without their source and ignores symlink wrappers", async () => {

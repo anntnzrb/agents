@@ -67,6 +67,7 @@ test("rendered scripts quote arguments and forward caller arguments", () => {
   const destinations = wrapperDestinations(fixture())
   expect(Arr.map((entry: { readonly path: string }) => path.basename(entry.path))(destinations)).toEqual([
     "mcporter",
+    "paseo",
     "summarize",
   ])
 })

@@ -19,6 +19,7 @@ export const TOOL_LAUNCHERS: readonly ToolLauncherSpec[] = [
     defaultArgs: [],
     configHomeSegments: [".mcporter", "mcporter.json"],
   },
+  { id: "paseo", package: "@getpaseo/cli", bin: "paseo", defaultArgs: [], configHomeSegments: [] },
   {
     id: "summarize",
     package: "@steipete/summarize",
