@@ -40,24 +40,29 @@ const checkoutIsClean = Effect.fn("Update.checkoutIsClean")(function* (home: str
   return true
 })
 
-// Fast-forwards to origin/main when HEAD is behind; warns on divergence.
+// Fast-forwards to origin/main when HEAD is behind; refuses checkouts with local commits.
 const advance = Effect.fn("Update.advance")(function* (home: string) {
   const output = yield* Output
+  const counts = yield* git(home, "rev-list", "--left-right", "--count", "HEAD...origin/main")
+  if (!counts.ok) {
+    yield* output.warn(`update: divergence check failed; keeping local checkout (${counts.text})`)
+    return false
+  }
+  const [local, remote] = Str.split(counts.text, /\s+/u)
+  if (local !== "0") {
+    yield* output.warn(
+      `update: local checkout has ${local} local, ${remote ?? "unknown"} upstream commits; leaving it unchanged`,
+    )
+    return false
+  }
   const ancestor = yield* git(home, "merge-base", "--is-ancestor", "HEAD", "origin/main")
   if (ancestor.ok) {
     const merged = yield* git(home, "merge", "--ff-only", "--quiet", "origin/main")
     if (!merged.ok) {
       yield* output.warn(`update: fast-forward failed; keeping local checkout (${merged.text})`)
     }
-    return
   }
-  const counts = yield* git(home, "rev-list", "--left-right", "--count", "HEAD...origin/main")
-  const [local, remote] = counts.ok ? Str.split(counts.text, /\s+/u) : []
-  if (remote !== undefined && remote !== "0") {
-    yield* output.warn(
-      `update: diverged from origin/main (${local} local, ${remote} upstream); push or rebase`,
-    )
-  }
+  return true
 })
 
 export const fastForwardSsot = Effect.fn("Update.fastForwardSsot")(function* (home: string) {
@@ -73,7 +78,9 @@ export const fastForwardSsot = Effect.fn("Update.fastForwardSsot")(function* (ho
   const revisions = yield* git(home, "rev-parse", "HEAD", "origin/main")
   const [head, upstream] = revisions.ok ? Str.split(revisions.text, /\s+/u) : []
   if (fetched.ok && head !== undefined && head !== upstream) {
-    yield* advance(home)
+    if (!(yield* advance(home))) {
+      return null
+    }
   } else if (head !== undefined) {
     return head
   }
