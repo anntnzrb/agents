@@ -3,7 +3,7 @@
   "auto_update": false,
   "theme_mode": null,
   "theme_auto_detect": "always",
-  "typewriter": false,
+  "typewriter": true,
   "process_model": "daemon",
   "notify": "always",
   "show_hints": false,
