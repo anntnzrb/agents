@@ -148,6 +148,11 @@ Symptom-first diagnostics; verify each cause before applying its fix.
   relaunch with the debug port, connect, and at task end quit and relaunch it
   without the port. A debug port on a real profile grants any local process
   full control of every session; never leave it running.
+- **An OAuth flow ends on a dead `localhost` redirect (`chrome-error` page):**
+  the error page hides the target URL and the address bar is unreachable from
+  the page context, but the navigation request is still logged. Capture the
+  loopback URL with its `code` from `network requests` instead of asking the
+  user to copy anything. Clear the log before the run to keep it noise-free.
 ## Maintenance
 
 The daily `upstream` workflow opens a drift issue after a 14-day cooldown. Review `git diff <pin> <target> -- <tracked dirs>` in an upstream clone. Port relevant safety rule changes into the critical block. Update the release, commit, tree hashes, and watch entries in `UPSTREAM.json` together. Run the skill gates and smoke-test `--version`, then open, snapshot, and close a named session.
