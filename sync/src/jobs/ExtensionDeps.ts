@@ -123,7 +123,7 @@ export const installInferredImportPackages = Effect.fn("ExtensionDeps.installInf
     const candidates = missingPackageRoots(contents, () => false)
     const installed = new Set<string>()
     for (const root of candidates) {
-      if (yield* fs.exists(path.join(source, "node_modules", root))) {
+      if (yield* fs.exists(path.join(target, "node_modules", root))) {
         installed.add(root)
       }
     }
