@@ -20,7 +20,7 @@
     "kiro": false,
     "opencode": false,
     "zed": false,
-    "cloud": false
+    "cloud": true
   },
   "agent": {
     "model": "swe-2-1-xhigh"
