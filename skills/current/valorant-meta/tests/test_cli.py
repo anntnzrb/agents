@@ -235,6 +235,96 @@ def test_corrupt_fixture_is_parse_error(fixture_dir: Path, tmp_path: Path) -> No
     assert _is_mapping(error)
     assert error["code"] == "PARSE_FAILED"
 
+
+def test_failure_increments_consecutive_failures(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    env = fixture_env(fixture_dir, tmp_path)
+    (fixture_dir / "agents.md").unlink()
+    for _ in range(2):
+        proc = run_cli("agents", env=env)
+        assert proc.returncode == 1
+    proc = run_cli("sources", env=env)
+    raw = emit_json(proc)
+    sources = raw["sources"]
+    assert _is_object_list(sources)
+    agents_entry = next(
+        entry for entry in sources if _is_mapping(entry) and entry["key"] == "agents"
+    )
+    assert _is_mapping(agents_entry)
+    health = agents_entry["health"]
+    assert _is_mapping(health)
+    assert health["consecutive_failures"] == 2
+
+
+def test_corrupt_state_is_fresh_start(fixture_dir: Path, tmp_path: Path) -> None:
+    state_dir = tmp_path / "state" / "valorant-meta"
+    state_dir.mkdir(parents=True)
+    _ = (state_dir / "state.json").write_text("not json at all", encoding="utf-8")
+    proc = run_cli("agents", env=fixture_env(fixture_dir, tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    raw = emit_json(proc)
+    assert raw["ok"] is True
+    rewritten = _json_loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    assert _is_mapping(rewritten)
+    sources = rewritten["sources"]
+    assert _is_mapping(sources)
+    agents_state = sources["agents"]
+    assert _is_mapping(agents_state)
+    assert agents_state["consecutive_failures"] == 0
+
+
+def test_doctor_with_fixtures(fixture_dir: Path, tmp_path: Path) -> None:
+    proc = run_cli("doctor", env=fixture_env(fixture_dir, tmp_path))
+    assert proc.returncode == 0, proc.stdout
+    raw = emit_json(proc)
+    assert raw["ok"] is True
+    assert raw["healthy"] is True
+    sources = raw["sources"]
+    assert _is_object_list(sources)
+    assert len(sources) == 3
+    keys = sorted(str(entry["key"]) for entry in sources if _is_mapping(entry))
+    assert keys == ["agents", "maps", "patches"]
+    for entry in sources:
+        assert _is_mapping(entry)
+        assert entry["ok"] is True
+        assert entry["fingerprint_status"] == "no-baseline"
+        assert entry["consecutive_failures"] == 0
+        assert isinstance(entry["latency_ms"], int)
+
+
+def test_doctor_fingerprint_match_on_second_run(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    env = fixture_env(fixture_dir, tmp_path)
+    first = run_cli("doctor", env=env)
+    assert first.returncode == 0
+    second = run_cli("doctor", env=env)
+    raw = emit_json(second)
+    sources = raw["sources"]
+    assert _is_object_list(sources)
+    for entry in sources:
+        assert _is_mapping(entry)
+        assert entry["fingerprint_status"] == "match"
+
+
+def test_doctor_reports_broken_source(fixture_dir: Path, tmp_path: Path) -> None:
+    (fixture_dir / "maps.md").unlink()
+    proc = run_cli("doctor", env=fixture_env(fixture_dir, tmp_path))
+    assert proc.returncode == 0
+    raw = emit_json(proc)
+    assert raw["healthy"] is False
+    sources = raw["sources"]
+    assert _is_object_list(sources)
+    maps_entry = next(
+        entry for entry in sources if _is_mapping(entry) and entry["key"] == "maps"
+    )
+    assert _is_mapping(maps_entry)
+    assert maps_entry["ok"] is False
+    assert isinstance(maps_entry["error"], str)
+
+
+
 @pytest.mark.parametrize(
     ("cell", "expected"),
     [
