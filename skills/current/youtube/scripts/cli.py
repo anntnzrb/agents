@@ -76,6 +76,8 @@ class _Args(argparse.Namespace):
     command: str = ""
     sub: str = ""
     manifest: str | None = None
+    target: str | None = None
+    file: str | None = None
     privacy: str = "private"
     redirect_url: str | None = None
 
@@ -462,6 +464,47 @@ def cmd_playlists_apply(args: _Args) -> None:
     emit({"ok": True, "results": results})
 
 
+def cmd_playlists_notes(args: _Args) -> None:
+    """Replace a playlist description with file contents."""
+    target = args.target
+    file = args.file
+    if not target or not file:
+        raise fail(
+            "MISSING_ARGS",
+            "need playlist id/title prefix and --file with the notes text",
+        )
+    token = access_token(load_config())
+    notes = Path(file).read_text(encoding="utf-8")
+    mine = paged(
+        token,
+        "playlists",
+        {"part": "snippet,status", "mine": "true", "maxResults": "50"},
+    )
+    match: dict[str, JsonValue] | None = None
+    for it in mine:
+        if _opt_str(it.get("id")) == target or item_title(it).startswith(target):
+            match = it
+            break
+    if match is None:
+        raise fail("NOT_FOUND", f"no playlist matching {target!r}")
+    snippet = _as_dict(match.get("snippet"))
+    snippet["description"] = notes
+    _ = api(
+        "playlists",
+        "PUT",
+        token,
+        params={"part": "snippet"},
+        body={"id": _opt_str(match.get("id")) or "", "snippet": snippet},
+    )
+    emit(
+        {
+            "ok": True,
+            "updated": _opt_str(snippet.get("title")) or "",
+            "id": _opt_str(match.get("id")) or "",
+        }
+    )
+
+
 def arguments() -> _Args:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -483,6 +526,9 @@ def arguments() -> _Args:
     _ = appl.add_argument(
         "--privacy", default="private", choices=["private", "unlisted", "public"]
     )
+    notes = psub.add_parser("notes", help="replace a playlist description")
+    _ = notes.add_argument("target", help="playlist id or title prefix")
+    _ = notes.add_argument("--file", required=True)
     return parser.parse_args(namespace=_Args())
 
 
@@ -497,6 +543,8 @@ def main() -> None:
         cmd_playlists_list()
     elif args.command == "playlists" and args.sub == "apply":
         cmd_playlists_apply(args)
+    elif args.command == "playlists" and args.sub == "notes":
+        cmd_playlists_notes(args)
 
 
 if __name__ == "__main__":

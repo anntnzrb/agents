@@ -46,6 +46,8 @@ Commands:
 - `playlists apply <manifest.tsv> [--privacy private|unlisted|public]`:
   create missing playlists and insert missing videos, idempotent. Manifest
   columns: `playlist_title<TAB>video_id[<TAB>note]`; `#` lines are comments.
+- `playlists notes <id-or-title-prefix> --file <path>`: replace a playlist
+  description with file contents (5000 character API limit).
 
 ## Credentials
 
