@@ -1,0 +1,22 @@
+{
+  "sources": {
+    "agents": {
+      "name": "valking.gg agent tier list",
+      "url": "https://valking.gg/en/agents",
+      "parser": "parse_agents_table",
+      "description": "Agent win rates, pick rates, KDA and tiers at Platinum+, all maps."
+    },
+    "patches": {
+      "name": "valking.gg patch highlights index",
+      "url": "https://valking.gg/en/patches",
+      "parser": "parse_patches",
+      "description": "Patch cards with tagged changes; the latest card carries the detail page URL."
+    },
+    "maps": {
+      "name": "valking.gg map win rates",
+      "url": "https://valking.gg/en/maps",
+      "parser": "parse_maps",
+      "description": "Per-map attack/defense round win percentages; the page renders one map at a time."
+    }
+  }
+}
