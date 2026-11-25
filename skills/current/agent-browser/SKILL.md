@@ -139,6 +139,15 @@ Symptom-first diagnostics; verify each cause before applying its fix.
   `lsof -nP -iTCP:<port>` over ~10 seconds rather than once. Relaunch through
   `open -na "<App Name>" --args --remote-debugging-port=<port>`, which preserves
   arguments, and confirm the port still answers after 10 seconds.
+- **Google sign-in refuses an automated browser ("browser may not be
+  secure"):** Google detects fresh automation-controlled profiles and blocks
+  credential entry. Do not burn time on fresh-profile logins or copied profile
+  directories; macOS cookies are keychain-bound and copies rarely decrypt. When
+  the user authorizes it, drive their real browser over CDP where the session
+  already exists: quit it gracefully (AppleScript `quit`, so tabs restore),
+  relaunch with the debug port, connect, and at task end quit and relaunch it
+  without the port. A debug port on a real profile grants any local process
+  full control of every session; never leave it running.
 ## Maintenance
 
 The daily `upstream` workflow opens a drift issue after a 14-day cooldown. Review `git diff <pin> <target> -- <tracked dirs>` in an upstream clone. Port relevant safety rule changes into the critical block. Update the release, commit, tree hashes, and watch entries in `UPSTREAM.json` together. Run the skill gates and smoke-test `--version`, then open, snapshot, and close a named session.
