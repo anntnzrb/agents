@@ -75,6 +75,8 @@ class _Args(argparse.Namespace):
 
     command: str = ""
     sub: str = ""
+    manifest: str | None = None
+    privacy: str = "private"
     redirect_url: str | None = None
 
 
@@ -351,6 +353,115 @@ def cmd_playlists_list() -> None:
     emit({"ok": True, "playlists": [playlist_summary(it) for it in items]})
 
 
+def read_manifest(path: str) -> dict[str, list[str]]:
+    """Group video IDs by playlist title; columns: title<TAB>video_id[<TAB>note]."""
+    groups: dict[str, list[str]] = {}
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        title, video_id, *_rest = line.split("\t")
+        groups.setdefault(title.strip(), []).append(video_id.strip())
+    return groups
+
+
+def ensure_playlist(
+    token: str, title: str, by_title: dict[str, str], privacy: str
+) -> str:
+    """Return the id of the named playlist, creating it when missing."""
+    pid = by_title.get(title)
+    if pid is not None:
+        return pid
+    created = api(
+        "playlists",
+        "POST",
+        token,
+        params={"part": "snippet,status"},
+        body={
+            "snippet": {"title": title, "description": ""},
+            "status": {"privacyStatus": privacy},
+        },
+    )
+    created_id = _opt_str(created.get("id"))
+    if created_id is None:
+        raise fail("API_ERROR", f"created playlist {title!r} has no id")
+    return created_id
+
+
+def existing_video_ids(token: str, pid: str) -> set[str]:
+    """Collect the video IDs already present in a playlist."""
+    existing = paged(
+        token,
+        "playlistItems",
+        {"part": "snippet", "playlistId": pid, "maxResults": "50"},
+    )
+    have: set[str] = set()
+    for it in existing:
+        snippet = _as_dict(it.get("snippet"))
+        resource = _as_dict(snippet.get("resourceId"))
+        vid = _opt_str(resource.get("videoId"))
+        if vid is not None:
+            have.add(vid)
+    return have
+
+
+def insert_video(token: str, pid: str, vid: str) -> None:
+    """Insert one video into a playlist."""
+    _ = api(
+        "playlistItems",
+        "POST",
+        token,
+        params={"part": "snippet"},
+        body={
+            "snippet": {
+                "playlistId": pid,
+                "resourceId": {"kind": "youtube#video", "videoId": vid},
+            }
+        },
+    )
+
+
+def cmd_playlists_apply(args: _Args) -> None:
+    """Create missing playlists and insert missing videos, idempotently."""
+    if not args.manifest:
+        raise fail(
+            "NO_MANIFEST",
+            "pass a manifest TSV: playlist_title<TAB>video_id[<TAB>note]",
+        )
+    token = access_token(load_config())
+    wanted = read_manifest(args.manifest)
+    mine = paged(
+        token,
+        "playlists",
+        {"part": "snippet,status", "mine": "true", "maxResults": "50"},
+    )
+    by_title: dict[str, str] = {}
+    for it in mine:
+        pid = _opt_str(it.get("id"))
+        title = item_title(it)
+        if pid is not None and title:
+            by_title[title] = pid
+    results: list[dict[str, JsonValue]] = []
+    for title, video_ids in sorted(wanted.items()):
+        pid = ensure_playlist(token, title, by_title, args.privacy)
+        have = existing_video_ids(token, pid)
+        added: list[str] = []
+        for vid in video_ids:
+            if vid in have:
+                continue
+            insert_video(token, pid, vid)
+            added.append(vid)
+        results.append(
+            {
+                "title": title,
+                "id": pid,
+                "added": added,
+                "skipped": len(video_ids) - len(added),
+            }
+        )
+    emit({"ok": True, "results": results})
+
+
 def arguments() -> _Args:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -365,6 +476,13 @@ def arguments() -> _Args:
     pl = sub.add_parser("playlists")
     psub = pl.add_subparsers(dest="sub", required=True)
     _ = psub.add_parser("list")
+    appl = psub.add_parser(
+        "apply", help="create/fill playlists from a manifest TSV (idempotent)"
+    )
+    _ = appl.add_argument("manifest")
+    _ = appl.add_argument(
+        "--privacy", default="private", choices=["private", "unlisted", "public"]
+    )
     return parser.parse_args(namespace=_Args())
 
 
@@ -377,6 +495,8 @@ def main() -> None:
         cmd_auth_status()
     elif args.command == "playlists" and args.sub == "list":
         cmd_playlists_list()
+    elif args.command == "playlists" and args.sub == "apply":
+        cmd_playlists_apply(args)
 
 
 if __name__ == "__main__":

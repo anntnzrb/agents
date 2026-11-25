@@ -43,6 +43,9 @@ Commands:
   three environment variables. Run once ever, on any machine.
 - `auth status`: verify credentials; returns the owning channel title.
 - `playlists list`: own playlists as JSON.
+- `playlists apply <manifest.tsv> [--privacy private|unlisted|public]`:
+  create missing playlists and insert missing videos, idempotent. Manifest
+  columns: `playlist_title<TAB>video_id[<TAB>note]`; `#` lines are comments.
 
 ## Credentials
 
