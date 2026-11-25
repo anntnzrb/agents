@@ -324,6 +324,49 @@ def test_doctor_reports_broken_source(fixture_dir: Path, tmp_path: Path) -> None
     assert isinstance(maps_entry["error"], str)
 
 
+def test_discover_filters_registry_domains(fixture_dir: Path, tmp_path: Path) -> None:
+    fake = tmp_path / "fake_parallel.py"
+    payload = {
+        "results": [
+            {"url": "https://valking.gg/en/agents", "title": "already registered"},
+            {"url": "https://op.gg/valorant/statistics", "title": "candidate"},
+            {"url": "https://www.vstats.xyz/agent-stats", "title": "candidate"},
+        ]
+    }
+    script = (
+        "import json, sys\n"
+        f"sys.stdout.write(json.dumps({json.dumps(payload)}) + '\\n')\n"
+    )
+    _ = fake.write_text(script, encoding="utf-8")
+    env = fixture_env(fixture_dir, tmp_path)
+    env["VALORANT_META_PARALLEL_CLI"] = str(fake)
+    proc = run_cli("discover", env=env)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    raw = emit_json(proc)
+    assert raw["ok"] is True
+    candidates = raw["candidates"]
+    assert _is_object_list(candidates)
+    assert "op.gg" in candidates
+    assert "www.vstats.xyz" in candidates
+    assert "valking.gg" not in candidates
+
+
+def test_discover_missing_parallel_is_clean_error(tmp_path: Path) -> None:
+    env = {
+        "VALORANT_META_PARALLEL_CLI": str(tmp_path / "does-not-exist.py"),
+        "XDG_STATE_HOME": str(tmp_path / "state"),
+    }
+    proc = run_cli("discover", env=env)
+    assert proc.returncode == 1
+    raw = emit_json(proc)
+    assert raw["ok"] is False
+    error = raw["error"]
+    assert _is_mapping(error)
+    assert error["code"] == "MISSING_DEPENDENCY"
+    message = error["message"]
+    assert isinstance(message, str)
+    assert "VALORANT_META_PARALLEL_CLI" in message
+
 
 @pytest.mark.parametrize(
     ("cell", "expected"),
