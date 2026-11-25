@@ -6,7 +6,11 @@ describe("CLI parsing", () => {
   test("selects sync and update", () => {
     expect(parseCli([])).toEqual({ _tag: "Sync" })
     expect(parseCli(["sync"])).toEqual({ _tag: "Sync" })
-    expect(parseCli(["update", "ignored"])).toEqual({ _tag: "Update" })
+    expect(parseCli(["update"])).toEqual({ _tag: "Update" })
+    expect(parseCli(["update", "ignored"])).toEqual({
+      _tag: "Usage",
+      text: "sync: usage: sync\nRun 'sync --help' for available commands.\n",
+    })
   })
 
   test("preserves launch arguments only after the separator", () => {

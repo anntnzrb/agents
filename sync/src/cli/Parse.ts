@@ -134,7 +134,7 @@ export const parseCli = (args: readonly string[]): CliCommand => {
       return parseSync(rest)
     }
     case "update": {
-      return { _tag: "Update" }
+      return rest.length === 0 ? { _tag: "Update" } : usage(SYNC_USAGE)
     }
     case "launch": {
       return parseLaunch(rest)
