@@ -79,6 +79,23 @@ test("fingerprints missing, stable, ignored and changed trees", async () => {
   expect(await run(fingerprintTree(root))).not.toBe(initial)
 })
 
+test("fingerprints unreadable files with a distinct content-independent encoding", async () => {
+  const root = fixture()
+  const left = path.join(root, "left")
+  const right = path.join(root, "right")
+  mkdirSync(left)
+  mkdirSync(right)
+  writeFileSync(path.join(left, "a"), "one")
+  writeFileSync(path.join(right, "a"), "two")
+  chmodSync(path.join(left, "a"), 0)
+  chmodSync(path.join(right, "a"), 0)
+  const unreadableLeft = await run(fingerprintTree(left))
+  const unreadableRight = await run(fingerprintTree(right))
+  expect(unreadableLeft).toBe(unreadableRight)
+  chmodSync(path.join(left, "a"), 0o600)
+  expect(await run(fingerprintTree(left))).not.toBe(unreadableLeft)
+})
+
 test("fingerprints file and broken symlinks but refuses directory symlinks", async () => {
   const root = fixture()
   const source = path.join(root, "source")

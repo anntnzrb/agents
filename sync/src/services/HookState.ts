@@ -25,7 +25,7 @@ const readFingerprintFile = Effect.fn("HookState.readFingerprintFile")(function*
   const fs = yield* FileSystem.FileSystem
   const content = yield* fs.readFile(absolute).pipe(
     Effect.map((value) => ({ kind: "file" as const, content: value })),
-    Effect.catchIf(isMissing, () => Effect.succeed({ kind: "unreadable-file" as const })),
+    Effect.orElseSucceed(() => ({ kind: "unreadable-file" as const })),
   )
   return { name, ...content }
 })
