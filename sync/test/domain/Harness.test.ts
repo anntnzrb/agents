@@ -139,4 +139,5 @@ test("tool launchers include config and exact defaults", () => {
     "detailed",
   ])
   expect(toolLauncher("missing")).toBeUndefined()
+  expect(toolLauncher("paseo")).toBeUndefined()
 })
