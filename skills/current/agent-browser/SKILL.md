@@ -153,6 +153,13 @@ Symptom-first diagnostics; verify each cause before applying its fix.
   the page context, but the navigation request is still logged. Capture the
   loopback URL with its `code` from `network requests` instead of asking the
   user to copy anything. Clear the log before the run to keep it noise-free.
+- **A console form keeps its Save/confirm action disabled:** in Angular
+  Material UIs the disabled state reflects validation, not missing dirtiness.
+  Chip inputs commit only on Enter or blur, a filled-but-uncommitted chip reads
+  as empty, and combo boxes may display uncommitted text. Hover or inspect the
+  disabled control itself: tooltips often name the exact missing requirement,
+  which beats guessing field by field.
+
 ## Maintenance
 
 The daily `upstream` workflow opens a drift issue after a 14-day cooldown. Review `git diff <pin> <target> -- <tracked dirs>` in an upstream clone. Port relevant safety rule changes into the critical block. Update the release, commit, tree hashes, and watch entries in `UPSTREAM.json` together. Run the skill gates and smoke-test `--version`, then open, snapshot, and close a named session.
