@@ -31,15 +31,22 @@ export const harnessPackageSpec = (
 
 const processEnv = (
   parent: Readonly<Record<string, string | undefined>>,
+  rootEnv: Readonly<Record<string, string>>,
   overlay?: Readonly<Record<string, string>>,
 ): Record<string, string> => {
   const result: Record<string, string> = {}
+  const defaults: Record<string, string> = {}
   for (const [key, value] of Rec.toEntries(parent)) {
     if (value !== undefined) {
       result[key] = value
     }
   }
-  return Object.assign(result, overlay)
+  for (const [key, value] of Rec.toEntries(rootEnv)) {
+    if (parent[key] === undefined) {
+      defaults[key] = value
+    }
+  }
+  return Object.assign(result, defaults, overlay)
 }
 
 export const launchNpmPackage = Effect.fn("Launch.launchNpmPackage")(function* (
@@ -54,7 +61,7 @@ export const launchNpmPackage = Effect.fn("Launch.launchNpmPackage")(function* (
   return {
     executable: prepared.currentBin,
     args: [...args],
-    env: processEnv(host.env, spec.env),
+    env: processEnv(host.env, syncEnv.rootEnv, spec.env),
   } satisfies ExecPlan
 })
 
@@ -69,7 +76,7 @@ export const launchStaticRelease = Effect.fn("Launch.launchStaticRelease")(funct
   const executable = Option.isSome(cached)
     ? cached.value
     : yield* prepareStaticRelease(launcher.release, syncEnv.home, syncEnv.installTimeoutMs)
-  return { executable, args: [...args], env: processEnv(host.env, env) } satisfies ExecPlan
+  return { executable, args: [...args], env: processEnv(host.env, syncEnv.rootEnv, env) } satisfies ExecPlan
 })
 
 export const launchHarness = Effect.fn("Launch.launchHarness")(function* (
@@ -77,18 +84,11 @@ export const launchHarness = Effect.fn("Launch.launchHarness")(function* (
   harness: Harness,
   args: readonly string[],
 ) {
-  const host = yield* Host
-  const env: Record<string, string> = {}
-  for (const [key, value] of Rec.toEntries(syncEnv.rootEnv)) {
-    if (host.env[key] === undefined) {
-      env[key] = value
-    }
-  }
-  Object.assign(env, harness.launcher.env ?? {})
+  const launcherEnv = harness.launcher.env ?? undefined
   if (harness.launcher._tag === "StaticRelease") {
-    return yield* launchStaticRelease(syncEnv, harness.launcher, args, env)
+    return yield* launchStaticRelease(syncEnv, harness.launcher, args, launcherEnv)
   }
-  return yield* launchNpmPackage(syncEnv, harnessPackageSpec(harness, env), args)
+  return yield* launchNpmPackage(syncEnv, harnessPackageSpec(harness, launcherEnv), args)
 })
 
 export const harnessHasCache = Effect.fn("Launch.harnessHasCache")(function* (

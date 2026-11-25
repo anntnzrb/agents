@@ -66,7 +66,7 @@ test("launch prepends tool and harness defaults before forwarded arguments", asy
     arch: "x64",
     pid: 1,
     uid: 1,
-    env: {},
+    env: { SHARED_ENV: "parent" },
     now: Effect.succeed(0),
     isPidAlive: () => Effect.succeed(false),
   })
@@ -75,7 +75,7 @@ test("launch prepends tool and harness defaults before forwarded arguments", asy
     paths: syncEnvPaths(home),
     harnesses: [harness],
     platform: "linux",
-    rootEnv: {},
+    rootEnv: { SHARED_ENV: "root", ROOT_ONLY_ENV: "root" },
     installTimeoutMs: 1000,
     harness: (id) => (id === harness.id ? harness : undefined),
   })
@@ -97,7 +97,13 @@ test("launch prepends tool and harness defaults before forwarded arguments", asy
   await Effect.runPromise(launch("codex", ["user"]).pipe(Effect.provide(layer)))
   await Effect.runPromise(launch("mcporter", ["user"]).pipe(Effect.provide(layer)))
   expect(plans).toMatchObject([
-    { args: ["--harness-default", "user"] },
-    { args: ["--config", path.join(home, ".mcporter", "mcporter.json"), "user"] },
+    {
+      args: ["--harness-default", "user"],
+      env: { ROOT_ONLY_ENV: "root", SHARED_ENV: "parent" },
+    },
+    {
+      args: ["--config", path.join(home, ".mcporter", "mcporter.json"), "user"],
+      env: { ROOT_ONLY_ENV: "root", SHARED_ENV: "parent" },
+    },
   ])
 })
