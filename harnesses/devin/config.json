@@ -6,7 +6,7 @@
   "typewriter": false,
   "process_model": "daemon",
   "notify": "always",
-  "show_hints": true,
+  "show_hints": false,
   "show_path": true,
   "attribution": false,
   "include_gitignored_files": false,
