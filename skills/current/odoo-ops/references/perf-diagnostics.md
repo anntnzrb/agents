@@ -1,23 +1,10 @@
 # Performance Diagnostics and Pre-Deploy Checks
 
-Procedures for diagnosing slow views, frontend memory saturation, notification accumulation, and pre-deploy view collisions.
 
-All inspections must use the standard CLI (`uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc`). Never construct custom HTTP or XML-RPC scripts. Rehearse remediations on the local replica before proposing any production mutation.
 
-## View Latency and N+1 Compute Audit
+## Section index
 
-### Symptoms
-- List or Kanban views take over 10 seconds to load (`web_search_read` in browser network inspector).
-- Hiding columns in the table header does not improve speed: Odoo 17 fetches every field declared across base and inherited view architectures regardless of client visibility.
 
-### Root Causes
-- Non-stored computed fields (`store=False`) executing individual queries or external calls per record.
-- Odoo Studio customizations injecting computed fields into default list views with `optional="show"`.
-
-### Benchmarking Suspect Fields
-Isolate slow fields by querying a fixed batch size (e.g. 80 records) through JSON-RPC:
-
-```text
 # Baseline query with identifier only
 uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc search_read crm.lead '[["user_id", "=", <user_id>]]' --fields id --limit 80
 

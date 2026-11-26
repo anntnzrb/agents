@@ -1,14 +1,10 @@
 # Database Recipes
 
-Use these commands exclusively for local replica databases. [Runtime discovery](runtime-discovery.md) explains paths and configuration; [Safety model](safety-model.md) owns permission boundaries.
 
-Use `<prodDB>_seed_<YYYYMMDD>` for a baseline and `<prodDB>_work_<YYYYMMDD>` for a working copy. For delegated work, add `_<slug>` to the work name, using lowercase letters and digits in the slug. PostgreSQL identifiers here allow lowercase letters, digits, and underscores. `dev`, `test`, `shell`, `auth-temp`, and `auth-restore` accept only work replicas. `db-restore` and `db-clone` accept seed or work targets. Reset a work replica from its seed for a clean run.
 
-Pass `--db <database_name>` to target a specific replica. See [database selection](runtime-discovery.md#database-selection) for command defaults.
+## Section index
 
-## Database Inventory and Inspection
 
-```text
 # List local PostgreSQL databases
 uv run --script <skill-dir>/scripts/cli.py db-list
 
