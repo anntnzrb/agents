@@ -1465,7 +1465,8 @@ function ThemeWrapper({ children }: { children: ReactNode }) {
           __html: `
             (function() {
               try {
-                var theme = localStorage.getItem('theme') || 'light';
+                var theme = localStorage.getItem('theme');
+                if (theme !== 'light' && theme !== 'dark') theme = 'light';
                 var el = document.getElementById('theme-wrapper');
                 if (el) el.className = theme;
               } catch (e) {}
@@ -1480,7 +1481,7 @@ function ThemeWrapper({ children }: { children: ReactNode }) {
 
 The inline script executes synchronously before showing the element, ensuring the DOM already has the correct value. No flickering, no hydration mismatch.
 
-This pattern is especially useful for theme toggles, user preferences, authentication states, and any client-only data that should render immediately without flashing default values.
+This pattern is especially useful for theme toggles and other validated, non-sensitive user preferences that should render immediately without flashing default values. Do not use client storage as an authentication-state source of truth.
 
 ### 6.6 Use Activity Component for Show/Hide
 
