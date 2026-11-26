@@ -105,7 +105,7 @@ def markdown_paths(root: Path) -> list[Path]:
             cwd=root,
             stderr=subprocess.DEVNULL,
         ).decode("utf-8")
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError, FileNotFoundError:
         return sorted(root.rglob("*.md"))
     return sorted(root / name for name in output.split("\0") if name)
 
