@@ -89,7 +89,7 @@ Patterns:
 
 ## Eval Workflow Summary
 
-After drafting, propose 2-3 realistic test prompts before running. Save prompts to `evals/evals.json`; read `references/schemas.md` for the full schema, including the later-added `assertions` field.
+After drafting, propose 2-3 realistic test prompts before running. Save prompts to `evals/evals.json`; read `references/schemas.md` for the full schema, including the `expectations` field and per-iteration `eval_metadata.json` assertions.
 
 Detailed workflow: `references/eval-workflow.md`.
 

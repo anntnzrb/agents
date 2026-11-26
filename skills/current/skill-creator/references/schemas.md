@@ -3,6 +3,7 @@
 ## Section index
 
 - [evals.json](#evalsjson)
+- [eval_metadata.json](#eval_metadatajson)
 - [history.json](#historyjson)
 - [grading.json](#gradingjson)
 - [metrics.json](#metricsjson)
@@ -41,7 +42,34 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 - `evals[].prompt`: The task to execute
 - `evals[].expected_output`: Human-readable description of success
 - `evals[].files`: Optional list of input file paths (relative to skill root)
-- `evals[].expectations`: List of verifiable statements
+- `evals[].expectations`: List of verifiable statements. The eval workflow calls one statement an assertion while drafting and grading it, but the `evals.json` field name is `expectations`.
+
+---
+
+## eval_metadata.json
+
+Per-test-case metadata for one iteration. Located at `<workspace>/iteration-<N>/eval-<name>/eval_metadata.json`.
+
+```json
+{
+  "eval_id": 0,
+  "eval_name": "descriptive-name-here",
+  "prompt": "The user's task prompt",
+  "assertions": [
+    "The output includes X",
+    "The skill used script Y"
+  ]
+}
+```
+
+**Fields:**
+
+- `eval_id`: Numeric identifier copied into benchmark rows
+- `eval_name`: Human-readable eval name; use the same descriptive name for the eval directory
+- `prompt`: Exact task prompt given to the executor
+- `assertions`: List of verifiable statements for the grader. Use an empty list until Step 2 drafts them, then update this file before grading. Copy the same statements into `evals/evals.json` under `expectations`.
+
+The viewer reads `prompt` and `eval_id` from this file. The aggregation script reads `eval_id`. The grader consumes `assertions` as its expectation list and writes graded results under `grading.json` with exactly `text`, `passed`, and `evidence` per expectation.
 
 ---
 
