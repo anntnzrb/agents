@@ -1,6 +1,8 @@
 # Effect application engineering
 
-Read this reference when creating or materially changing a user-owned Effect application. Also read `code-quality.md`, load the TypeScript skill, and read `references/bun-application.md` from that skill. The TypeScript reference owns Bun, TypeScript 7, ESM, Oxc, and `bun:test`; this reference owns Effect.
+Read this reference when creating or materially changing a user-owned Effect application. Also read `code-quality.md` and load the TypeScript skill.
+
+For a standalone Bun application, read `references/bun-application.md` from the TypeScript skill; that reference owns Bun, TypeScript 7, ESM, Oxc, and `bun:test`. For a hosted extension, plugin, or embedded tool handler, the host owns the process, package lifecycle, test runner, and execution boundary. Follow that host contract instead of applying standalone Bun application setup, adding `@effect/platform-bun`, or installing a main runtime. This reference owns Effect design in both cases.
 
 ## Version and source policy
 
@@ -8,11 +10,15 @@ Use stable Effect v4 for new applications. Inspect installed metadata or query r
 
 Use matching stable v4 releases even if the registry still exposes beta or RC dist-tags. Preserve a prerelease only when maintaining a project that explicitly pins it.
 
+For a standalone Bun application:
+
 ```text
 bun add effect@4 @effect/platform-bun@4
 bun add --dev @effect/tsgo
 bunx @effect/tsgo setup
 ```
+
+For hosted code, use the host's dependency workflow and add only the Effect packages the host boundary actually requires.
 
 Keep Effect runtime packages on the same version. Tooling such as `@effect/tsgo` uses its own version series.
 
@@ -132,7 +138,7 @@ Do not add cluster, workflow, persistence, reactivity, workers, sockets, event-l
 
 ## Testing
 
-Use Bun's built-in `bun:test`. Do not add Vitest, Jest, or `@effect/vitest` by default.
+Use Bun's built-in `bun:test` for a standalone Bun application. Do not add Vitest, Jest, or `@effect/vitest` by default. Hosted code uses the host project's configured test harness.
 
 Test:
 
@@ -181,13 +187,13 @@ While coding:
 6. Add no compatibility shim, fallback, abstraction, or package without a current caller or failure mode.
 7. Keep Effect sequencing, typed failures, concurrency, and resource ownership inside Effect; bridge foreign control flow once at the edge.
 
-After coding, perform the mandatory review pass in `code-quality.md`, then run the TypeScript skill's gates plus:
+After coding, perform the mandatory review pass in `code-quality.md`. For a standalone Bun application, run the TypeScript skill's gates plus:
 
 ```text
 bun run effect:diagnostics
 ```
 
-Run the application or relevant command with Bun when possible. Fix failures introduced by the change and rerun the failed gate.
+Hosted code runs the host project's type, lint, and test gates; add Effect diagnostics when the host toolchain supports them. Run the application, host extension harness, or relevant command when possible. Fix failures introduced by the change and rerun the failed gate.
 
 Report the implementation, changed files, dependencies, commands, diagnostics, tests, assumptions, and remaining risks or decisions.
 
