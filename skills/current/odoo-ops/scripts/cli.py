@@ -13,8 +13,6 @@ import sys
 import odoo_rpc
 import odooctl
 
-_ODOOCTL_COMMANDS: frozenset[str] = odooctl.command_names()
-
 _RPC_FLAGS: frozenset[str] = frozenset(
     {
         "--allow-rpc",
@@ -46,9 +44,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args[0] == "rpc":
         return odoo_rpc.main(args[1:])
-    if _starts_with_rpc_flag(args[0]) or (
-        args[0] not in _ODOOCTL_COMMANDS and "rpc" in args[1:]
+    if (args[0] == "--profile" and args[2:3] == ["rpc"]) or (
+        args[0].startswith("--profile=") and args[1:2] == ["rpc"]
     ):
+        _ = sys.stderr.write(
+            "Error: rpc takes no --profile. Profiles select the local runtime. "
+            + "RPC uses the configured URL, database, and credentials. "
+            + "Run 'cli.py rpc --allow-rpc <op> ...'\n"
+        )
+        return 2
+    if _starts_with_rpc_flag(args[0]) or args[:2] == ["--json", "rpc"]:
         _ = sys.stderr.write(
             "Hint: RPC flags go with the rpc command, e.g. 'cli.py rpc --allow-rpc <op> ...'\n"
         )

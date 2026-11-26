@@ -49,8 +49,21 @@ def test_cli_dispatches_every_odooctl_command() -> None:
         result = run_script("cli.py", name, "--help")
         assert result.returncode == 0, (name, result.stderr[-500:])
         assert f"odooctl {name}" in result.stdout, name
-    shell = run_script("cli.py", "shell", "--file", "rpc")
+    shell = run_script("cli.py", "--profile", "erptech17", "shell", "--file", "rpc")
     assert "RPC flags go with the rpc command" not in shell.stderr
+    assert "rpc takes no --profile" not in shell.stderr
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="entrypoints run through uv")
+@pytest.mark.parametrize(
+    "prefix", [("--profile", "erptech17"), ("--profile=erptech17",)]
+)
+def test_cli_explains_that_rpc_takes_no_profile(prefix: tuple[str, ...]) -> None:
+    """A profile before rpc is refused with the fix, not the generic flag hint."""
+    result = run_script("cli.py", *prefix, "rpc", "--allow-rpc", "count", "res.users")
+    assert result.returncode == 2, result.stderr[-500:]
+    assert "rpc takes no --profile" in result.stderr
+    assert "RPC flags go with the rpc command" not in result.stderr
 
 
 def test_every_parser_command_has_a_handler() -> None:

@@ -6,16 +6,16 @@ Perfiles del CLI (runtime, base y módulos por workflow; workflow por defecto `c
 
 | Perfil | Uso |
 | --- | --- |
-| `erptech17` (por defecto) | Producción actual: ramas que salen a `main`/`dev`, hotfixes y lecturas de prod |
+| `erptech17` (por defecto) | Runtime local de Odoo 17 para `main`, `dev` y hotfixes |
 | `erptech19` | Migración a Odoo 19: solo en la rama de migración que indique su `AGENTS.md` |
 
-Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en cada comando (`--profile`). Cada perfil tiene su propio pod, puertos y bases: nunca apliques código de una versión sobre el runtime de la otra.
+Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en cada comando local (`--profile`). `rpc` no lleva perfil: el destino y las credenciales se resuelven con la configuración de conexión, independientemente de la rama. Cada perfil tiene su propio pod, puertos y bases: nunca apliques código de una versión sobre el runtime de la otra.
 
 ## 0. Contexto en 30s
 
 - Repo Odoo Enterprise+Community (versión según el perfil), addons propios: `crm_espol(crm)`, `b2b`, `whatsapp_utils`, `whatsapp_bot`, `budget`, `budget_hr`, ...
 - Trabaja desde la raíz del repo. `main` = prod en vivo. `dev` = integración. Todo cambio nuevo va a `dev` vía PR, nunca commit directo a `dev` ni a `main`.
-- Prod: DB viva según archivo de credenciales local (endpoint+DB+usuario+token, fuera del repo, vía `--env-file`). No quemes dominio/usuario/DB en este archivo. Deploy semanal lo hace OTRO dev. Tus cambios locales van al próximo `-u`.
+- Prod: DB viva según archivo de credenciales local (endpoint+DB+usuario+token, fuera del repo. Consulta las opciones de conexión en `references/safety-model.md`). No quemes dominio/usuario/DB en este archivo. Deploy semanal lo hace OTRO dev. Tus cambios locales van al próximo `-u`.
 - Dos fuentes de verdad: (1) código local en rama, (2) prod por JSON-RPC solo-lectura. Nombra siempre la base en cada verificación: `<work...>` local vs `<prodDB>` prod.
 - Artefactos del repo (commits, docstrings, docs, PRs, issues) en español. El idioma del chat lo fija la config global del usuario.
 
@@ -40,8 +40,8 @@ Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en
 
 - Origen: dump `.sql.gz` del DBA, fuera del repo, ya neutralizada. Sin filestore: ver "Restore Seed Replica" en `references/db-recipes.md`. Filestore real: ruta vía `env`/config, no asumir.
 - `<prodDB>` = DB prod según credenciales. Nombres, restore y clone de `seed`/`work`: `references/db-recipes.md`. `seed` es VIRGEN INTOCABLE: no instalar, no `-u` (tampoco `dev` sobre ella), no escribir. Todo el trabajo en `work`.
-- Invariantes: `0 tests != éxito` (revisa `profiles/<perfil>.json` + `.env`); `neutralize != anonimiza` (apaga mails/crons, PII sigue legible); no copiar filestores huérfanos.
-- Cada runtime tiene solo su par `<prodDB>_seed_<fecha>` / `<prodDB>_work_<fecha>`, con los mismos nombres en 17 y 19 (el perfil elige el runtime). El CLI rechaza cualquier otro nombre; no crees bases de prueba: resetea `work` clonándola desde `seed`. Mientras no exista el dump migrado a 19, el `seed` de `erptech19` es una instalación limpia de Odoo 19 (receta en `references/db-recipes.md`).
+- Invariantes: `0 tests != éxito` (revisa `profiles/<perfil>.json` y el resultado del runner); `neutralize != anonimiza` (apaga mails/crons, PII sigue legible); no copiar filestores huérfanos.
+- Cada runtime usa el patrón `<prodDB>_seed_<YYYYMMDD>` y `<prodDB>_work_<YYYYMMDD>`. Para trabajo delegado, añade `_<slug>` a la copia `work`. Para restablecer `work`, clónala desde `seed`. Mientras no exista el dump migrado a 19, el `seed` de `erptech19` es una instalación limpia de Odoo 19 (receta en `references/db-recipes.md`).
 - Una réplica congela los datos a la fecha del dump: valida lógica, nunca compares sus cifras con prod. `seed` virgen = todas sus marcas (`ir_module_module.write_date`, `res_users_log`, `crm_lead.write_date`) ≤ fecha del dump y 0 módulos pendientes; `database.uuid` no sirve de señal.
 
 ## 4. Esquema: pre-prod vs post-prod
@@ -56,7 +56,7 @@ Usa el perfil que indique el `AGENTS.md` del repo en la rama actual y pásalo en
 1. Inspección addon + base instalada (ruta vía `$CLI env --json`).
 2. Test regresión en `<modulo>/tests/` que FALLE primero. `tests/__init__.py` debe importar el archivo; corre el CLI desde la raíz o el mount falla y da falso `0-tests OK`. Filtro con `--tags`: "Flags that trip agents" en `SKILL.md`.
 3. Corrección mínima.
-4. `$CLI fmt <modulo> --check && $CLI lint <modulo> && $CLI test <workflow>`: todo verde o tarea NO completa.
+4. `$CLI fmt <modulo> --check && $CLI lint <modulo> && $CLI test <workflow>`: todo verde o tarea NO completa. Si cambias JavaScript bajo `static/src/`, ejecuta también `$CLI lint-js <modulo> --changed`.
 5. Docstrings en español PEP 257. ORM: `search_fetch` completo (no N+1), `_read_group` con dot-notation, `create` con `@api.model_create_multi`.
 
 ## 5A. Verificación visual y entrega de cambios de interfaz

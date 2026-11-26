@@ -9,7 +9,8 @@ license: AGPL-3.0-or-later
 ## Before you act
 
 Follow these situational reading rules before taking action:
-- Use the CLI profile (`--profile`, default `erptech17`) that the repository's `AGENTS.md` names, and pass it on every command. `odoo-ops env --json` reports its `odoo_version` and `profile_rules`. If `profile_rules` is set, you MUST read that file completely before acting; its project rules override this skill's general rules.
+- **JSON-RPC:** Start with `odoo-ops rpc --allow-rpc <operation> ...`. Omit `--profile`. The RPC target comes from connection settings, independent of the checkout and local runtime.
+- **Local commands:** Pass the `--profile` named by the project's `AGENTS.md` (default `erptech17`). Run `env --json` with that profile to locate the runtime and its Odoo version. Read its `profile_rules` file completely when set. Those rules override this skill's general guidance.
 - Before writing, porting, or reviewing Odoo code, you MUST read `references/odoo<odoo_version>.md` for the active profile ([Odoo 17](references/odoo17.md), [Odoo 19](references/odoo19.md)). Never apply one version's APIs to the other.
 - Before any production RPC, you MUST read [references/safety-model.md](references/safety-model.md).
 - Before local DB or shell work, you MUST read [references/db-recipes.md](references/db-recipes.md).
