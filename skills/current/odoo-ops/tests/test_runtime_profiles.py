@@ -284,6 +284,20 @@ def test_copy_filestore_falls_back_to_podman_unshare(
         ["podman", "unshare", "mkdir", "-p", str(target)],
         ["podman", "unshare", "cp", "-a", f"{source}/.", str(target)],
     ]
+
+
+@pytest.mark.usefixtures("no_port_env")
+def test_health_uses_selected_profile_port(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def offline(_request: object, *, timeout: float) -> None:
+        raise OSError(f"offline (timeout {timeout})")
+
+    monkeypatch.setattr(odooctl, "_urlopen", offline)
+    assert odooctl.main(["--profile", "erptech19", "health", "--json"]) == 1
+    assert "127.0.0.1:8169" in capsys.readouterr().out
+
+
 def test_agent_replica_works_for_clone_and_shell() -> None:
     name = "example_work_20261124_crm1"
     assert odooctl._require_replica_name(name) == name

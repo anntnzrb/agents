@@ -4073,8 +4073,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = p_health.add_argument(
         "--port",
         type=int,
-        default=RUNTIME.http_port,
-        help=f"Port of the Odoo web server (default: {RUNTIME.http_port})",
+        help="Port of the Odoo web server (default: active profile's HTTP port)",
     )
     _ = p_health.add_argument(
         "--wait",
