@@ -322,7 +322,7 @@ def request_get(
             message=f"Reddit returned HTTP {exc.code}",
             body=_read_http_error(exc),
         )
-        return 22, b""
+        return 1, b""
     except urllib.error.URLError as exc:
         emit_error(
             status=None,

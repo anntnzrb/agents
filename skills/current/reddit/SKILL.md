@@ -35,7 +35,7 @@ uv run --script <skill-dir>/scripts/cli.py browse all hot limit=25 raw=1
 ## Output
 
 Default HTTP commands return compact agent-shaped JSON:
-- `browse` / `search` / `user-posts` / `user-comments`: `{"type": ..., "<subreddit|user|query>": ..., "sort": ..., "time": ..., "count": N, "results": [...]}`. Each result retains `id`, `title`, `subreddit`, `author`, `score`, `num_comments`, `url`, `permalink`, `created_utc`, `over_18`, and `is_self`; `flair` and `selftext_preview` appear when set, with the latter collapsed and capped.
+- `browse` / `search`: `{"type": ..., "<subreddit|query>": ..., "sort": ..., "time": ..., "count": N, "results": [...]}`; `user-posts` / `user-comments`: `{"type": ..., "user": ..., "count": N, "results": [...]}`. Each result retains `id`, `title`, `subreddit`, `author`, `score`, `num_comments`, `url`, `permalink`, `created_utc`, `over_18`, and `is_self`; `flair` and `selftext_preview` appear when set, with the latter collapsed and capped.
 - `post` / `post-url`: `{"type": "post", "post": {...compact listing fields...}, "comments": [{"id", "author", "score", "body", "created_utc", "permalink", "depth"}, ...]}`. Drop `more` placeholders; collapse comment bodies to single-spaced text.
 - `user`: `{"type": "user", "user": "...", "profile": {"name", "created_utc", "link_karma", "comment_karma", "total_karma", "verified", "is_gold", "is_mod"}}`
 - `user-analysis`: structured summary; see `reference.md`.
@@ -51,9 +51,9 @@ HTTP failures emit this one-line compact JSON to stderr:
 {"error":{"provider":"reddit","status":403,"message":"Reddit returned HTTP 403","body_bytes":1234,"body_preview":"...","body_truncated":true,"kind":"network_security_block"}}
 ```
 
-Fields: `error.provider` = `"reddit"`; `error.status` = Reddit HTTP status, or `null` for network errors; `error.message` = short human-readable cause; `error.body_bytes` = upstream size; `error.body_preview` = first 500 upstream chars, UTF-8 decoded; `error.body_truncated` = `true` when body exceeds preview cap. `error.kind`: `"network_security_block"` when body contains `blocked by network security`; `"network_error"` for `URLError`; `"invalid_json"` for unparseable responses; otherwise omitted.
+Fields: `error.provider` = `"reddit"`; `error.status` = Reddit HTTP status, or `null` for network errors; `error.message` = short human-readable cause; `error.body_bytes` = upstream size; `error.body_preview` = sanitized single-line excerpt derived from the upstream body (scripts/tags removed, entities unescaped, whitespace collapsed), capped at 500 chars after sanitization; `error.body_truncated` = `true` when body exceeds preview cap. `error.kind`: `"network_security_block"` when body contains `blocked by network security`; `"network_error"` for `URLError`; `"invalid_json"` for unparseable responses; otherwise omitted.
 
-Exit codes: HTTP `22`; network `1`; validation `2` with concise stderr and no traceback.
+Exit codes: HTTP `1`; network `1`; validation `2` with concise stderr and no traceback.
 
 ## Environment
 

@@ -9,10 +9,11 @@
 
 Keep `.env` beside this skill for persistent local defaults; the CLI loads it.
 
-Supported helper lookup order:
+Process environment variables win. When `REDDIT_USER_AGENT` is absent, helper lookup order is:
 
 - `REDDIT_ENV_FILE`
-- `$SKILLS_DIR/reddit/.env`
+- this skill's `.env`
+- `$SKILLS_DIR/reddit/.env` when `SKILLS_DIR` is set
 - nearest ancestor `skills/reddit/.env`
 
 Common vars:
@@ -149,11 +150,11 @@ HTTP and parse failures emit one-line compact JSON on stderr:
 - `provider` is always `"reddit"`
 - `status` is the HTTP status from Reddit, or `null` for transport-level errors
 - `body_bytes` is the upstream body size
-- `body_preview` is the first 500 chars of the body, decoded UTF-8
+- `body_preview` is a sanitized single-line excerpt derived from the body: scripts/tags removed, entities unescaped, whitespace collapsed, capped at 500 chars after sanitization
 - `body_truncated` is `true` when the body is longer than 500 chars
 - `kind` is `"network_security_block"` when the body text contains `blocked by network security` (case-insensitive), `"network_error"` for `URLError`, `"invalid_json"` for unparseable bodies, and is omitted otherwise
 
-HTTP errors exit with `22`. Network errors exit with `1`. Validation / usage errors exit with `2` and a concise stderr line (no traceback).
+HTTP errors exit with `1`. Network errors exit with `1`. Validation / usage errors exit with `2` and a concise stderr line (no traceback).
 
 ## Public JSON endpoints used by the skill
 
