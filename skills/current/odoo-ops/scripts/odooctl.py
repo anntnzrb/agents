@@ -2991,6 +2991,8 @@ def cmd_db_query(args: argparse.Namespace) -> int:
 
         ctx = _resolve_workspace(args)
         db = ctx.effective_db_name
+        if unsafe and "_seed_" in db:
+            _ = _require_work_db(db, "execute unsafe SQL")
         _ensure_runtime_pod(ctx, wait_for_db=db)
 
         clean_sql = _strip_sql_comments(raw_sql).rstrip(";").strip()
