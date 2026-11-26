@@ -4,17 +4,15 @@
 {{QUICK_REFERENCE}}
 # Prerequisites
 
-The bundled scripts require Python 3 (standard library only, no third-party packages, no network access). Check if it is available:
+The bundled scripts use Python 3 standard library only and need no network access. Invoke them through uv so interpreter resolution stays portable across Windows, macOS, and Linux. Check whether uv is available:
 
 ```bash
-python3 --version || python --version
+uv --version
 ```
 
-If Python is not installed, **do not install it yourself**. Stop and ask the user to install Python 3 using their preferred method (e.g. from [python.org](https://www.python.org/downloads/) or their OS package manager), then continue once it is available. Never run package-manager or system-modifying commands (`sudo`, `brew`, `apt`, `winget`, etc.) on the user's machine for this skill.
+If uv is not installed, **do not install it yourself**. Stop and ask the user to install uv using their preferred method, then continue once it is available. Never run package-manager or system-modifying commands (`sudo`, `brew`, `apt`, `winget`, etc.) on the user's machine for this skill.
 
-If the user prefers not to install Python, skip the CLI searches and rely on the Quick Reference sections above.
-
-> **Note:** On Windows, use `python` instead of `python3` to run scripts (e.g., `python scripts/search.py` instead of `python3 scripts/search.py`).
+If the user prefers not to install uv, skip the CLI searches and rely on the Quick Reference sections above.
 
 ---
 
@@ -73,7 +71,7 @@ Extract key information from user request:
 Use `--design-system` when the task needs a coherent product-wide visual direction:
 
 ```bash
-python3 {{SCRIPT_PATH}} "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
+uv run --script {{SCRIPT_PATH}} "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
 ```
 
 This command:
@@ -84,7 +82,7 @@ This command:
 
 **Example:**
 ```bash
-python3 {{SCRIPT_PATH}} "beauty spa wellness service" --design-system -p "Serenity Spa"
+uv run --script {{SCRIPT_PATH}} "beauty spa wellness service" --design-system -p "Serenity Spa"
 ```
 
 ### Step 2b: Persist Design System (Master + Overrides Pattern)
@@ -92,7 +90,7 @@ python3 {{SCRIPT_PATH}} "beauty spa wellness service" --design-system -p "Sereni
 After verifying the design system, save it for **hierarchical retrieval across sessions** with `--persist` and an explicit project root:
 
 ```bash
-python3 {{SCRIPT_PATH}} "<query>" --design-system --persist -p "Project Name" --output-dir "<project-root>"
+uv run --script {{SCRIPT_PATH}} "<query>" --design-system --persist -p "Project Name" --output-dir "<project-root>"
 ```
 
 This creates:
@@ -101,7 +99,7 @@ This creates:
 
 **With page-specific override:**
 ```bash
-python3 {{SCRIPT_PATH}} "<query>" --design-system --persist -p "Project Name" --page "dashboard" --output-dir "<project-root>"
+uv run --script {{SCRIPT_PATH}} "<query>" --design-system --persist -p "Project Name" --page "dashboard" --output-dir "<project-root>"
 ```
 
 This also creates:
@@ -128,7 +126,7 @@ Now, generate the code...
 Three optional 1-10 sliders that tune `--design-system` output without changing your query. Add any combination of them to the same command:
 
 ```bash
-python3 {{SCRIPT_PATH}} "<query>" --design-system --variance <1-10> --motion <1-10> --density <1-10>
+uv run --script {{SCRIPT_PATH}} "<query>" --design-system --variance <1-10> --motion <1-10> --density <1-10>
 ```
 
 | Dial | Low (1-3) | Mid (4-7) | High (8-10) |
@@ -143,7 +141,7 @@ python3 {{SCRIPT_PATH}} "<query>" --design-system --variance <1-10> --motion <1-
 
 **Example:**
 ```bash
-python3 {{SCRIPT_PATH}} "internal analytics dashboard" --design-system --variance 8 --motion 7 --density 8 -p "Ops Console"
+uv run --script {{SCRIPT_PATH}} "internal analytics dashboard" --design-system --variance 8 --motion 7 --density 8 -p "Ops Console"
 ```
 
 ### Step 3: Supplement with Detailed Searches (as needed)
@@ -151,7 +149,7 @@ python3 {{SCRIPT_PATH}} "internal analytics dashboard" --design-system --varianc
 After getting the design system, use domain searches to get additional details:
 
 ```bash
-python3 {{SCRIPT_PATH}} "<keyword>" --domain <domain> [-n <max_results>]
+uv run --script {{SCRIPT_PATH}} "<keyword>" --domain <domain> [-n <max_results>]
 ```
 
 **When to use detailed searches:**
@@ -176,13 +174,13 @@ python3 {{SCRIPT_PATH}} "<keyword>" --domain <domain> [-n <max_results>]
 Get implementation-specific best practices for the user's stack:
 
 ```bash
-python3 {{SCRIPT_PATH}} "<keyword>" --stack <stack>
+uv run --script {{SCRIPT_PATH}} "<keyword>" --stack <stack>
 ```
 
 Example for a known React Native implementation concern:
 
 ```bash
-python3 {{SCRIPT_PATH}} "virtualized list" --stack react-native
+uv run --script {{SCRIPT_PATH}} "virtualized list" --stack react-native
 ```
 
 ---
@@ -213,8 +211,8 @@ python3 {{SCRIPT_PATH}} "virtualized list" --stack react-native
 **JavaFX enterprise examples:**
 
 ```bash
-python3 {{SCRIPT_PATH}} "atlantafx primer enterprise theme" --stack javafx
-python3 {{SCRIPT_PATH}} "enterprise tableview density permission" --stack javafx
+uv run --script {{SCRIPT_PATH}} "atlantafx primer enterprise theme" --stack javafx
+uv run --script {{SCRIPT_PATH}} "enterprise tableview density permission" --stack javafx
 ```
 
 ---
@@ -232,7 +230,7 @@ python3 {{SCRIPT_PATH}} "enterprise tableview density permission" --stack javafx
 ### Step 2: Generate Design System
 
 ```bash
-python3 {{SCRIPT_PATH}} "AI search tool modern minimal" --design-system -p "AI Search"
+uv run --script {{SCRIPT_PATH}} "AI search tool modern minimal" --design-system -p "AI Search"
 ```
 
 **Output:** Complete design system with pattern, style, colors, typography, effects, and anti-patterns.
@@ -241,16 +239,16 @@ python3 {{SCRIPT_PATH}} "AI search tool modern minimal" --design-system -p "AI S
 
 ```bash
 # Get style options for a modern tool product
-python3 {{SCRIPT_PATH}} "minimalism dark mode" --domain style
+uv run --script {{SCRIPT_PATH}} "minimalism dark mode" --domain style
 
 # Get UX best practices for search interaction and loading
-python3 {{SCRIPT_PATH}} "search loading animation" --domain ux
+uv run --script {{SCRIPT_PATH}} "search loading animation" --domain ux
 ```
 
 ### Step 4: Stack Guidelines
 
 ```bash
-python3 {{SCRIPT_PATH}} "streaming suspense" --stack nextjs
+uv run --script {{SCRIPT_PATH}} "streaming suspense" --stack nextjs
 ```
 
 **Then:** Synthesize design system + detailed searches and implement the design.
@@ -263,10 +261,10 @@ The `--design-system` flag supports two output formats:
 
 ```bash
 # ASCII box (default) - best for terminal display
-python3 {{SCRIPT_PATH}} "fintech crypto" --design-system
+uv run --script {{SCRIPT_PATH}} "fintech crypto" --design-system
 
 # Markdown - best for documentation
-python3 {{SCRIPT_PATH}} "fintech crypto" --design-system -f markdown
+uv run --script {{SCRIPT_PATH}} "fintech crypto" --design-system -f markdown
 ```
 
 ---
