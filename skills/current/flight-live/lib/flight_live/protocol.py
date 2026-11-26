@@ -92,6 +92,10 @@ def search_flights(request: SearchRequest) -> SearchPayload:
         market=request.market,
         stay_min=request.stay_min,
         stay_max=request.stay_max,
+        adults=request.adults,
+        children=request.children,
+        infants=request.infants,
+        cabin=request.cabin,
     )
 
     filtered = _filter_planner_offers(planner_offers, request=request)

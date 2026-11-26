@@ -104,6 +104,10 @@ def fetch_kiwi_web_calendar(  # noqa: PLR0913 - public provider surface mirrors 
     market: str,
     stay_min: int | None,
     stay_max: int | None,
+    adults: int = 1,
+    children: int = 0,
+    infants: int = 0,
+    cabin: str = "economy",
 ) -> list[PlannerOffer]:
     """Fetch planner offers across the departure window via agent-browser scraping."""
     origin_place = _lookup_kiwi_place(origin, locale=locale)
@@ -122,6 +126,10 @@ def fetch_kiwi_web_calendar(  # noqa: PLR0913 - public provider surface mirrors 
             return_date=return_anchor,
             currency=currency,
             market=market,
+            adults=adults,
+            children=children,
+            infants=infants,
+            cabin=cabin,
         )
         try:
             snapshot = scrape_kiwi_snapshot_text(url)
@@ -166,15 +174,19 @@ def build_kiwi_results_url(  # noqa: PLR0913 - public provider surface mirrors t
     return_date: date,
     currency: str,
     market: str,
+    adults: int = 1,
+    children: int = 0,
+    infants: int = 0,
+    cabin: str = "economy",
 ) -> str:
     """Build a Kiwi search-results URL from slugs, dates, and market settings."""
     market_part = market.strip().lower()[:2] if market.strip() else "us"
     query = urlencode(
         {
-            "adults": 1,
-            "children": 0,
-            "infants": 0,
-            "cabinClass": "ECONOMY",
+            "adults": adults,
+            "children": children,
+            "infants": infants,
+            "cabinClass": cabin.upper(),
             "currency": currency.lower(),
         },
     )

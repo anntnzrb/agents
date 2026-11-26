@@ -19,7 +19,7 @@ No credentials. No API keys. No commercial APIs.
 ## Entry points
 
 - From skill root: `uv run --script <skill-dir>/scripts/cli.py ...`
-- From anywhere: `uv run --script "$SKILLS_DIR/flight-live/scripts/cli.py" ...`
+- From anywhere: `uv run --script <skill-dir>/scripts/cli.py ...`
 - If `SKILLS_DIR` is not set: `uv run --script <skill-dir>/scripts/cli.py ...`
 - For process integration: `uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
