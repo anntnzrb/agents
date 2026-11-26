@@ -38,7 +38,7 @@ Before editing, inspect the configuration that applies to the affected project:
 1. Run the repository gate for the change. If none exists, build the affected project.
 2. Fix the earliest diagnostic in compile order before chasing downstream inference errors.
 3. Run focused tests. Record executed test names or counts and the exit code. Exit zero with zero executed tests is not verification.
-4. Run the repository-pinned formatter, using `dotnet tool run fantomas` or `dotnet fantomas --check` as configured.
+4. Run the repository-pinned formatter check, using `dotnet tool run fantomas -- --check .` or `dotnet fantomas --check .` as configured.
 5. Run analyzers only when the repository configures them.
 6. Before handoff, run `git status --short`. Confirm every changed or untracked file is part of the requested change. Move or delete probes, scratch scripts, and test rigs you created unless the user asked to keep them.
 
