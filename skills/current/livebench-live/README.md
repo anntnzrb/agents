@@ -5,9 +5,9 @@
 ## Use
 
 ```text
-uv run --script skills/current/livebench-live/scripts/cli.py releases
-uv run --script skills/current/livebench-live/scripts/cli.py leaderboard --release latest
-uv run --script skills/current/livebench-live/scripts/cli.py compare --models model-a,model-b --release latest
+uv run --script <skill-dir>/scripts/cli.py releases
+uv run --script <skill-dir>/scripts/cli.py leaderboard --release latest
+uv run --script <skill-dir>/scripts/cli.py compare --models model-a,model-b --release latest
 ```
 
 Use `--snapshot <path>` for deterministic historical fixtures, `--cache-dir <path>` for immutable cache placement, and `--allow-stale` only when an outage-served cache is explicitly acceptable. `schema` is offline and describes the stable wire contract.

@@ -11,7 +11,7 @@ Use this skill when a request names LiveBench, a LiveBench release/category/subt
 ## Entrypoint
 
 ```text
-uv run --script skills/current/livebench-live/scripts/cli.py <command> [options]
+uv run --script <skill-dir>/scripts/cli.py <command> [options]
 ```
 
 Commands: `releases`, `catalog`, `leaderboard`, `model`, `compare`, `category`, `subtasks`, `catalog-diff`, `diagnose`, `schema`, plus practical `refresh` and `snapshot`.

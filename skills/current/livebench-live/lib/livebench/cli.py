@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, TextIO, override
+from typing import TYPE_CHECKING, NoReturn, TextIO, cast, override
 
 from .cache import CacheStore
 from .catalog_diff import diff_catalog, load_snapshot_catalog
@@ -127,7 +127,9 @@ def _add_release_command(
     _ = parser.add_argument("--categories-url", default=None, help=argparse.SUPPRESS)
     _ = parser.add_argument("--cost-url", default=None, help=argparse.SUPPRESS)
     if "model" in features:
-        _ = parser.add_argument("--model", required=True)
+        _ = parser.add_argument(
+            "--model", required=True, help="exact model or model-variant selector"
+        )
     if "models" in features:
         _ = parser.add_argument(
             "--models",
@@ -135,11 +137,26 @@ def _add_release_command(
             help="comma-separated exact model/model-variant selectors",
         )
     if "category" in features:
-        _ = parser.add_argument("--category", required=True)
+        _ = parser.add_argument(
+            "--category", required=True, help="exact category key or source label"
+        )
     if "output" in features:
         _ = parser.add_argument("--output", type=Path, default=None)
     if name == "diagnose":
         _ = parser.add_argument("--asset", default=None, help=argparse.SUPPRESS)
+
+
+def _subcommand_parser(
+    parser: argparse.ArgumentParser, command: str
+) -> argparse.ArgumentParser | None:
+    """Return the argparse subparser for command-specific help."""
+    for action in parser._actions:
+        choices: object = getattr(action, "choices", None)
+        if isinstance(choices, dict):
+            selected: object = cast("dict[object, object]", choices).get(command)
+            if isinstance(selected, argparse.ArgumentParser):
+                return selected
+    return None
 
 
 def _str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
@@ -195,18 +212,17 @@ def main(
     command = next((item for item in raw_argv if not item.startswith("-")), "unknown")
     parser = build_parser()
     if any(item in {"-h", "--help"} for item in raw_argv):
-        _ = out.write(
-            compact_json(
-                success(
-                    "help",
-                    {
-                        "usage": parser.format_usage().strip(),
-                        "commands": list(COMMANDS),
-                    },
-                )
-            )
-            + "\n"
-        )
+        help_data: dict[str, object] = {
+            "usage": parser.format_usage().strip(),
+            "commands": list(COMMANDS),
+        }
+        help_command = next((item for item in raw_argv if item in COMMANDS), None)
+        if help_command:
+            command_parser = _subcommand_parser(parser, help_command)
+            if command_parser is not None:
+                help_data["usage"] = command_parser.format_usage().strip()
+                help_data["help"] = command_parser.format_help()
+        _ = out.write(compact_json(success("help", help_data)) + "\n")
         return 0
     try:
         args = parser.parse_args(raw_argv)

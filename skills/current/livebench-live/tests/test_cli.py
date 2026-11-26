@@ -37,6 +37,17 @@ def test_catalog_success_has_required_data_fields() -> None:
     assert stderr == ""
 
 
+def test_subtasks_help_exposes_required_model_and_category() -> None:
+    status, payload, stderr = invoke("subtasks", "--help")
+    assert status == 0
+    data = as_dict(payload["data"])
+    help_text = str(data.get("help", "")) + str(data.get("usage", ""))
+    assert "--model" in help_text
+    assert "--category" in help_text
+    assert "subtasks" in str(data.get("usage", ""))
+    assert stderr == ""
+
+
 def test_schema_is_offline_and_fixed_interface_is_additive() -> None:
     status, payload, stderr = invoke("schema")
     assert status == 0
