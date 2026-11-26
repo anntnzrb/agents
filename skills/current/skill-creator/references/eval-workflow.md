@@ -100,14 +100,14 @@ After all runs finish:
 
 4. **Launch the viewer** with qualitative outputs and quantitative data:
 
-   ```bash
-   nohup uv run --script <skill-creator-path>/scripts/cli.py generate-review \
+   ```text
+   uv run --script <skill-creator-path>/scripts/cli.py generate-review \
      <workspace>/iteration-N \
      --skill-name "my-skill" \
-     --benchmark <workspace>/iteration-N/benchmark.json \
-     > /dev/null 2>&1 &
-   VIEWER_PID=$!
+     --benchmark <workspace>/iteration-N/benchmark.json
    ```
+
+   Launch that command through the harness's background-process mechanism and retain the harness task handle. Do not use POSIX-only `nohup`, shell job control, `/dev/null`, or a shell PID as the portable contract. If the harness cannot keep a background process, use `--static` instead.
 
    For iteration 2+, also pass `--previous-workspace <workspace>/iteration-<N-1>`.
 
@@ -157,11 +157,7 @@ When the user says they are done, read `feedback.json`:
 
 Empty feedback means the user thought it was fine. Focus improvements on test cases with specific complaints.
 
-Kill the viewer server when finished:
-
-```bash
-kill $VIEWER_PID 2>/dev/null
-```
+Stop the viewer server when finished through the same harness task handle that started it. Do not use `kill` as the portable lifecycle contract. If `--static` was used, there is no server to stop.
 
 ## Improving the Skill
 
