@@ -125,8 +125,8 @@ Complex-number alternative:
 
 ```python
 pos = col + row * 1j
-turn_right = pos * -1j
-turn_left = pos * 1j
+turn_right = pos * 1j
+turn_left = pos * -1j
 ```
 
 Complex numbers make rotation trivial.
