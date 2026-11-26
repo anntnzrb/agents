@@ -22,7 +22,7 @@ Use `--json` when a machine-readable SHA/count/delta summary is useful. Use `--s
 uv run --script skills/current/nix-clan-2605/scripts/cli.py update --to-branch 26.11 --apply
 ```
 
-Updater resolves exact branch SHA, shallow-clones and verifies that SHA, stages a complete sibling copy, validates transforms, and atomically renames staging to `nix-clan-2611`; refuses an existing target. Source `nix-clan-2605` remains intact.
+Updater resolves exact branch SHA, shallow-clones and verifies that SHA, stages a complete sibling copy, validates transforms, reserves `nix-clan-2611`, rechecks that the branch did not move, and publishes the staged tree there; it refuses an existing target. Source `nix-clan-2605` remains intact.
 
 4. Run repository normal skill gates after the user-approved change. Do NOT remove old skill automatically; removing `nix-clan-2605` requires separate explicit user approval.
 

@@ -513,7 +513,7 @@ Here's the entire clan.nix file:
       };
     };
 
-    # Docs: https://clan.lol/docs/26.05/latest/services/official/zerotier/
+    # Docs: https://clan.lol/docs/26.05/services/official/zerotier/
     # The lines below will define a zerotier network and add all machines as 'peer' to it.
     # !!! Manual steps required:
     #   - Define a controller machine for the zerotier network.
@@ -528,7 +528,7 @@ Here's the entire clan.nix file:
       roles.peer.tags = [ "all" ];
     };
 
-    # Docs: https://clan.lol/docs/26.05/latest/services/official/tor/
+    # Docs: https://clan.lol/docs/26.05/services/official/tor/
     # Tor network provides secure, anonymous connections to your machines
     # All machines will be accessible via Tor as a fallback connection method
     tor = {

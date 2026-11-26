@@ -1,8 +1,7 @@
 """Regression tests for the Clan documentation snapshot updater CLI."""
 
-import contextlib
-import io
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
+CLI = ROOT / "scripts" / "cli.py"
 SUCCESS_RETURN_CODE = 0
 UPDATER_ERROR_CODE = 2
 SHA_HEX_LENGTH = 40
@@ -25,7 +25,6 @@ LIB_DIR = ROOT / "lib"
 if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
-from nix_clan_updater.cli import main
 from nix_clan_updater.core import (
     UpdaterError,
     _pin_clan_urls,
@@ -216,30 +215,43 @@ github:clan/clan-core
         _ = _git(self.repo, "branch", "26.05")
 
     def _run(self, *extra: str, branch: str = "26.11") -> tuple[int, str, str]:
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            code = main(
-                [
-                    "update",
-                    "--to-branch",
-                    branch,
-                    "--repo",
-                    str(self.repo),
-                    "--source-dir",
-                    str(self.source),
-                    *extra,
-                ],
-                skill_root=ROOT,
-            )
-        return code, stdout.getvalue(), stderr.getvalue()
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--quiet",
+                "--script",
+                str(CLI),
+                "update",
+                "--to-branch",
+                branch,
+                "--repo",
+                str(self.repo),
+                "--source-dir",
+                str(self.source),
+                *extra,
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+            shell=False,
+        )
+        return result.returncode, result.stdout, result.stderr
 
     def test_help(self) -> None:
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout), pytest.raises(SystemExit) as exc_info:
-            _ = main(["--help"], skill_root=ROOT)
-        assert exc_info.value.code == SUCCESS_RETURN_CODE
-        assert "update" in stdout.getvalue()
+        result = subprocess.run(
+            ["uv", "run", "--quiet", "--script", str(CLI), "--help"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+            shell=False,
+        )
+        assert result.returncode == SUCCESS_RETURN_CODE
+        assert "update" in result.stdout
 
     def test_dry_run_is_immutable_and_json(self) -> None:
         before = _tree(self.source)
@@ -295,11 +307,21 @@ github:clan/clan-core
         skill = (self.target / "SKILL.md").read_text(encoding="utf-8")
         assert "name: nix-clan-2611" in skill
         assert "branch: 26.11" in skill
+        assert (
+            "description: Use when configuring Clan 26.11 inventory, services, "
+            + "vars, or deployments, not for generic Nix flakes or derivations."
+        ) in skill
+        skill_retrieved = re.search(
+            r"^  retrieved: (\d{4}-\d{2}-\d{2})$", skill, re.MULTILINE
+        )
+        assert skill_retrieved is not None
+        assert skill_retrieved.group(1) != "2026-08-10"
         index = (self.target / "references/INDEX.md").read_text(encoding="utf-8")
         assert "- Branch: `26.11`" in index
         commit = _git(self.repo, "rev-parse", "26.11")
         assert f"- Commit: `{commit}`" in index
-        assert "- Retrieved: `2026-08-10`" in index
+        assert f"- Retrieved: `{skill_retrieved.group(1)}`" in index
+        assert "- Retrieved: `2026-08-10`" not in index
         assert (
             "- Vendored: 6 Markdown files from upstream `docs/src`; " + "excludes"
             in index
@@ -460,23 +482,9 @@ github:clan/clan-core
         assert code == UPDATER_ERROR_CODE
         assert "already exists" in stderr
         self.target.rmdir()
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            code = main(
-                [
-                    "update",
-                    "--to-branch",
-                    "2611",
-                    "--repo",
-                    str(self.repo),
-                    "--source-dir",
-                    str(self.source),
-                ],
-                skill_root=ROOT,
-            )
+        code, _, stderr = self._run(branch="2611")
         assert code == UPDATER_ERROR_CODE
-        assert "YY.MM" in stderr.getvalue()
+        assert "YY.MM" in stderr
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ The **age** backend encrypts secrets with [age](https://github.com/FiloSottile/a
 
 ## Choose a Backend
 
-Use age for direct age encryption without sops, target-side decryption without the sops-nix Go binary, automatic machine-key management, or hardware-token identities (YubiKey, PicoHSM) through age plugins. Use the [SOPS backend](../sops/secrets) for an existing sops workflow or sops-nix systemd service integration.
+Use age for direct age encryption without sops, target-side decryption without the sops-nix Go binary, automatic machine-key management, or hardware-token identities (YubiKey, PicoHSM) through age plugins. Use the [SOPS backend](../sops/secrets.md) for an existing sops workflow or sops-nix systemd service integration.
 
 ## Key Model
 
@@ -206,5 +206,5 @@ Verify that the `AGE_KEYFILE` path exists and is readable.
 ## See Also
 
 - [Age encryption tool](https://github.com/FiloSottile/age)
-- [Introduction to Vars](../intro-to-vars)
-- [SOPS Backend](../sops/secrets)
+- [Introduction to Vars](../intro-to-vars.md)
+- [SOPS Backend](../sops/secrets.md)

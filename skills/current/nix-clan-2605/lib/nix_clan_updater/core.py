@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
@@ -530,8 +531,8 @@ def update_skill(
     parsed = _parse_frontmatter(text)
     skill_name = f"nix-clan-{release.replace('.', '')}"
     description = (
-        f"Use for Clan {release} inventory, services, vars, deployment, migrations, "
-        "and NixOS workflow documentation."
+        f"Use when configuring Clan {release} inventory, services, vars, "
+        "or deployments, not for generic Nix flakes or derivations."
     )
     if len(description) > MAX_DESCRIPTION_LENGTH:
         msg = "generated SKILL.md description exceeds 120 characters"
@@ -1403,7 +1404,7 @@ def build_candidate(
 
     skill_path = candidate / "SKILL.md"
     skill_text = _read_text(skill_path, "SKILL.md")
-    retrieved = _parse_frontmatter(skill_text).retrieved
+    retrieved = datetime.now(UTC).date().isoformat()
     updated_skill, _, _ = update_skill(
         skill_text, target.branch, target.commit, retrieved
     )
