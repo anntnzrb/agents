@@ -5,9 +5,9 @@
 ## Run
 
 ```text
-uv run --script skills/current/vals-live/scripts/cli.py schema
-uv run --script skills/current/vals-live/scripts/cli.py catalog
-uv run --script skills/current/vals-live/scripts/cli.py compare --models model-a,model-b --benchmarks benchmark-a
+uv run --script <skill-dir>/scripts/cli.py schema
+uv run --script <skill-dir>/scripts/cli.py catalog
+uv run --script <skill-dir>/scripts/cli.py compare --models model-a,model-b --benchmarks benchmark-a
 ```
 
 Offline replay uses an explicit `--snapshot <path>`. Use `--allow-stale` only when a refresh outage should deliberately serve a matching cache entry. `--cache-dir <path>` overrides the platform/XDG cache root. The raw body is retained by immutable manifest reference and is never emitted inline.

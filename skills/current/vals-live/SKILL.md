@@ -15,7 +15,7 @@ Use when request names Vals, `vals.ai`, Vals Index, Vals benchmarks, model compa
 ## Invocation
 
 ```text
-uv run --script skills/current/vals-live/scripts/cli.py <command> [options]
+uv run --script <skill-dir>/scripts/cli.py <command> [options]
 ```
 
 Canonical commands:
