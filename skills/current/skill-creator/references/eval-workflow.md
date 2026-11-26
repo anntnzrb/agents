@@ -47,7 +47,7 @@ Execute this task:
 **Baseline run** uses the same prompt and changes by context:
 
 - **Creating a new skill**: no skill. Use no skill path. Save to `without_skill/outputs/`
-- **Improving an existing skill**: old version. Before editing, snapshot it with `cp -r <skill-path> <workspace>/skill-snapshot/`, point the baseline subagent at the snapshot, and save to `old_skill/outputs/`
+- **Improving an existing skill**: old version. Before editing, snapshot it with `uv run --no-project python -c "import shutil, sys; shutil.copytree(sys.argv[1], sys.argv[2])" <skill-path> <workspace>/skill-snapshot/`, point the baseline subagent at the snapshot, and save to `old_skill/outputs/`
 
 Write an `eval_metadata.json` for each test case in each iteration. Assertions can be empty at first. Give each eval a descriptive name based on what it tests; use the same name for the directory. If prompts are new or modified, create fresh metadata files for the new eval directories. NEVER assume metadata carries over.
 
