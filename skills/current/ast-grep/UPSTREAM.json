@@ -1,8 +1,8 @@
 {
   "repo": "ast-grep/ast-grep",
-  "release": "0.51.1",
-  "commit": "5a204b1ef3facef94de125d990dddc7cf90011c0",
+  "release": "0.51.2",
+  "commit": "627f854bc649ddf3eacdaabb5e61c76317da6260",
   "trees": {
-    "npm": "f8cc028e803d50faf44b26f504b7d5e960707c93"
+    "npm": "dd58d588bee5aed3142d38a9ed88c6cdc898205a"
   }
 }
