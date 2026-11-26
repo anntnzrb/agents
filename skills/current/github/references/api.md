@@ -1,71 +1,10 @@
 # GitHub API through `gh api`
 
-**Covers:** REST endpoints, GraphQL, placeholders, typed/raw fields, input bodies,
-methods, pagination, slurp, previews, host selection, output filters, and errors.
 
-**Safe default:** use a read-only explicit endpoint, explicit host/repository, an
-explicit HTTP method, minimal fields, and `--jq`/`--template` at the boundary.
 
-**Write boundary:** `gh api` is an external mutation surface. Require explicit user
-authorization before any non-GET request or request whose parameters/body can change
-state. Existing scoped authorization satisfies this boundary; ask only for missing
-scope and re-read the affected resource afterward. Never put tokens or secrets in an
-endpoint, field, input file, example, transcript, or output.
+## Section index
 
-**Adjacent handoff:** use `core.md` for target/auth/output/exit behavior,
-`collaboration.md` or `automation.md` for a known object family, and
-`stack-commands.md` for stack REST/GraphQL boundaries.
 
-## Invocation and method safety
-
-```text
-gh api <endpoint> [flags]
-```
-
-- REST endpoints use paths such as `repos/{owner}/{repo}/releases` or
-  `repos/{owner}/{repo}/issues/{number}/comments`.
-- `{owner}`, `{repo}`, and `{branch}` placeholders resolve from the repository of
-  the current directory or the `GH_REPO` environment variable. `gh api` has no
-  `--repo` flag. Prefer literal owner/repo in the endpoint path over placeholders,
-  or set `GH_REPO` when the value is known and safe; use `--hostname <host>` for
-  the target host. If context is not verified, replace placeholders with an
-  explicit target rather than guessing.
-- The default request is GET **only when no parameters/body are supplied**
-  `--field`, `--raw-field`, and `--input` can switch the request to POST. Whenever
-  fields, input, or mutation intent is present, pass an explicit `--method GET` for a
-  read or the exact mutation method for a write.
-- `--field key=value` performs typed conversion for booleans, numbers, `null`,
-  placeholders, and `@file`; `--raw-field key=value` always sends a string. Choose
-  deliberately; neither is a harmless annotation.
-- `--input <file>` sends a request body. Inspect the file and exact endpoint/method;
-  stdin is `--input -` and must not carry secrets into logs.
-- `--header` changes request semantics and can expose sensitive material. Use only
-  for a documented header/preview and never for an auth token.
-
-## Read example
-
-List every release title without requesting a browser or printing the full objects:
-
-```text
-gh api --method GET --hostname github.com \
-  repos/OWNER/REPO/releases --paginate --slurp \
-  --jq '[.[].[] | .name]'
-```
-
-For a single page, omit `--paginate --slurp` and select `.[].name`. With pagination,
-`--paginate` follows API page links. `--slurp` wraps page results in an outer array;
-shape the filter for the endpoint's page type and verify it against a small read.
-
-Use `--jq` for selected values or `--template` for stable text. Keep response body
-parsing separate from stderr. `--include` adds status/headers; `--verbose` is a
-diagnostic that may expose request details and should not be used in normal output.
-
-## Deliberately gated mutation example
-
-This would comment on an issue and MUST NOT run without target verification and explicit
-authorization:
-
-```text
 # Plan only until OWNER/REPO, issue number, body, and authorization are confirmed.
 gh api --method POST --hostname github.com \
   repos/OWNER/REPO/issues/ISSUE_NUMBER/comments \

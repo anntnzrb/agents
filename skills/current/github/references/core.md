@@ -1,44 +1,10 @@
 # GitHub CLI core behavior
 
-**Covers:** invocation, target selection, hosts, authentication, environment, output,
-configuration, prompts, aliases, completion, help, and exit handling.
 
-**Safe default:** read-only, explicit target, noninteractive, structured output, and
-credentials supplied only by the user's already-configured auth environment.
 
-**Write boundary:** any remote mutation, account change, push, merge, extension
-install, or credential change needs user authorization covering that operation.
-Honor existing scoped authorization, including Ship's destination. Ask again only
-for scope expansion or required approvals; installation needs setup authorization.
-After an authorized write, re-read the affected resource.
+## Section index
 
-**Adjacent handoff:** route command-family details to the family references from
-`SKILL.md`; route custom HTTP work to `api.md`.
 
-## Invocation and target
-
-The general shape is:
-
-```text
-gh <command> [<subcommand> ...] [flags]
-```
-
-- Use an explicit `[HOST/]OWNER/REPO` with `--repo` whenever the command supports it
-- A verified local checkout may supply repository context, but confirm its remote and
-  host first; a directory name is not a repository identity.
-- Use `--hostname <host>` for commands that expose host selection. For `gh api`, the
-  endpoint's `{owner}` and `{repo}` placeholders resolve from the selected repository.
-- `GH_HOST` sets the default GitHub Enterprise host. `GH_REPO` supplies a default
-  repository in `HOST/OWNER/REPO` form. Set either only when the value is known and
-  safe for this operation; explicit flags are easier to audit.
-- For multiple remotes, inspect them and select the intended remote/host explicitly
-  Never infer the write target from whichever remote appears first.
-
-Read-only preflight for a live request:
-
-```text
-gh --version
-gh auth status
 # If a target is known:
 gh repo view [HOST/]OWNER/REPO --json nameWithOwner,url,defaultBranchRef
 ```
