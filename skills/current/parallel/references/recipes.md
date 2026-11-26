@@ -1,10 +1,48 @@
 # Parallel Workflow Recipes
 
 
-
 ## Section index
 
+- [Recipe 1: Fast web search and source extraction](#recipe-1-fast-web-search-and-source-extraction)
+  - [Objective](#objective)
+  - [Steps](#steps)
+  - [Illustrative commands](#illustrative-commands)
+- [Recipe 2: Deep research with cost awareness](#recipe-2-deep-research-with-cost-awareness)
+  - [Objective](#objective)
+  - [Steps](#steps)
+  - [Illustrative commands](#illustrative-commands)
+- [Recipe 3: Entity discovery and enrichment](#recipe-3-entity-discovery-and-enrichment)
+  - [Objective](#objective)
+  - [Steps](#steps)
+  - [Illustrative commands](#illustrative-commands)
+- [Recipe 4: Semantic topic monitoring](#recipe-4-semantic-topic-monitoring)
+  - [Objective](#objective)
+  - [Steps](#steps)
+  - [Illustrative commands](#illustrative-commands)
+- [Recipe 5: Recalling past research from memory](#recipe-5-recalling-past-research-from-memory)
+  - [Objective](#objective)
+  - [Steps](#steps)
+  - [Illustrative commands](#illustrative-commands)
 
+Note: Command and flag spellings in this document are illustrative and subject to CLI evolution. Always confirm exact options and syntax with `uv run --script <skill-dir>/scripts/cli.py <command> --help` before execution.
+
+## Recipe 1: Fast web search and source extraction
+
+### Objective
+Answer a specific technical or factual question by retrieving relevant web pages and extracting full source content only when excerpts are insufficient.
+
+### Steps
+1. Inspect search options:
+   Run `uv run --script <skill-dir>/scripts/cli.py search --help` to confirm available filters (such as mode, date cutoffs, domain inclusions, and output flags).
+2. Execute focused search:
+   Run short, specific queries covering distinct angles rather than one long, overloaded prompt. Request a small result count (for example 3 to 5 results). Save output to a file to keep context compact.
+3. Review matches:
+   Inspect titles, URLs, and excerpts in the saved output using jq or targeted reads.
+4. Extract complete content:
+   If an excerpt lacks necessary details (such as full code blocks or exact API signatures), extract full markdown only from the one or two most authoritative URLs. If the target page requires client-side JavaScript rendering and returns thin or empty markdown, use a rendering scraper.
+
+### Illustrative commands
+```bash
 # Verify search options
 uv run --script <skill-dir>/scripts/cli.py search --help
 
