@@ -8,7 +8,7 @@ Scope: exact command selection, invocation examples, RPC mode, reliability behav
 Fetch a live snapshot from the provider leaderboard RSC source and authenticated official model API.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
+uv run --script <skill-dir>/scripts/cli.py fetch
 ```
 
 Schema-v2 snapshot structure:
@@ -21,7 +21,7 @@ Schema-v2 snapshot structure:
 Compare canonical models across published releases and reasoning efforts without duplicating provider endpoints:
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" compare \
+uv run --script <skill-dir>/scripts/cli.py compare \
   --select "Muse Spark 1.3" --select "Astra:low,non-reasoning"
 ```
 
@@ -33,23 +33,23 @@ For dedicated benchmark comparisons, discover variants with `compare`, then read
 Filter and sort snapshot rows deterministically.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
+uv run --script <skill-dir>/scripts/cli.py query --model claude-opus-4-7 --sort-by speed --order desc --limit 5
 ```
 
 ### qa
 Translate a natural-language question into query arguments.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" qa "best provider for claude opus 4.7 by speed top 3"
+uv run --script <skill-dir>/scripts/cli.py qa "best provider for claude opus 4.7 by speed top 3"
 ```
 
 ### evaluation
 Extract model scores from a dedicated public benchmark page or replayed HTML/RSC file:
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation \
+uv run --script <skill-dir>/scripts/cli.py evaluation \
   https://artificialanalysis.ai/evaluations/<benchmark-slug> --sort-by score --order desc --limit 10
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" evaluation --input <temp-dir>/evaluation.html
+uv run --script <skill-dir>/scripts/cli.py evaluation --input <temp-dir>/evaluation.html
 ```
 
 Generic evaluation extraction depends on page schema structure. Dedicated page scores remain separate from official model snapshot metrics.
@@ -58,7 +58,7 @@ Generic evaluation extraction depends on page schema structure. Dedicated page s
 Estimate per-variant evaluation cost. Use the page metric and the total rollout count from the methodology; FrontierCode 2.0 has 132 tasks with three attempts each.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" eval-cost \
+uv run --script <skill-dir>/scripts/cli.py eval-cost \
   https://artificialanalysis.ai/evaluations/frontiercode-2-0 \
   --metric frontierCode20 --attempts 396 --snapshot <temp-dir>/full-data.json
 ```
@@ -69,15 +69,15 @@ The calculation assumes all cacheable input is cached and uses the manifest cach
 Display snapshot counts and top providers.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" stats
+uv run --script <skill-dir>/scripts/cli.py stats
 ```
 
 ### diff
 Compare snapshots while preserving legacy endpoint and provider keys:
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diff old.json new.json --schema-aware
+uv run --script <skill-dir>/scripts/cli.py diff old.json new.json
+uv run --script <skill-dir>/scripts/cli.py diff old.json new.json --schema-aware
 ```
 
 Pass `--schema-aware` to inspect model, field, metric, evidence/status, freshness/parser/schema, duplicate, or diagnostic changes. Matching uses stable IDs first. Treat possible renames as suggestions without merging records.
@@ -86,7 +86,7 @@ Pass `--schema-aware` to inspect model, field, metric, evidence/status, freshnes
 Inspect local health without fetching:
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" diagnose \
+uv run --script <skill-dir>/scripts/cli.py diagnose \
   --snapshot <temp-dir>/snapshot.json --cache-dir <temp-dir>/aa-cache
 ```
 
@@ -104,14 +104,14 @@ Reports redacted snapshot, cache, schema, parser, freshness, artifact, and diagn
 Output the machine-readable capability contract.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" schema
+uv run --script <skill-dir>/scripts/cli.py schema
 ```
 
 ## RPC mode
 Use RPC mode when another process consumes JSONL envelopes.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" --mode rpc
+uv run --script <skill-dir>/scripts/cli.py --mode rpc
 ```
 
 ## Reliability defaults

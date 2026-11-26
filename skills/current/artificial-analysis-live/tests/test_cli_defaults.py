@@ -212,6 +212,37 @@ class TestCliDefaultPaths(unittest.TestCase):
                 assert os.environ["ARTIFICIAL_ANALYSIS_API_KEY"] == "process-key"
                 assert os.environ["UNRELATED"] == "process-value"
 
+    def test_legacy_skill_and_cwd_dotenv_files_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            legacy_dir = root / "skills" / "artificial-analysis-live"
+            legacy_dir.mkdir(parents=True)
+            _ = (legacy_dir / ".env").write_text(
+                "ARTIFICIAL_ANALYSIS_API_KEY=legacy-key\n",
+                encoding="utf-8",
+            )
+            work = root / "work"
+            work.mkdir()
+            with (
+                patch.dict(os.environ, {}, clear=True),
+                patch.object(Path, "cwd", return_value=work),
+            ):
+                os.environ["SKILLS_DIR"] = str(root / "skills")
+                _load_dotenv()
+                assert "ARTIFICIAL_ANALYSIS_API_KEY" not in os.environ
+
+    def test_explicit_external_dotenv_file_is_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / "aa.env"
+            _ = env_file.write_text(
+                "ARTIFICIAL_ANALYSIS_API_KEY=file-key\n",
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {}, clear=True):
+                os.environ["ARTIFICIAL_ANALYSIS_ENV_FILE"] = str(env_file)
+                _load_dotenv()
+                assert os.environ["ARTIFICIAL_ANALYSIS_API_KEY"] == "file-key"
+
     def test_schema_v2_readers_join_slim_endpoints_to_canonical_models(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             snapshot_path = Path(temp_dir) / "snapshot.json"

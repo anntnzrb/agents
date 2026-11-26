@@ -15,7 +15,7 @@ Query fresh Artificial Analysis endpoint data before answering model or provider
 ## Public entrypoint
 
 With `SKILLS_DIR`:
-`uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" ...`
+`uv run --script <skill-dir>/scripts/cli.py ...`
 
 Direct:
 `uv run --script <skill-dir>/scripts/cli.py ...`
@@ -29,7 +29,7 @@ Set `ARTIFICIAL_ANALYSIS_API_KEY` in the process environment, or set `ARTIFICIAL
 NEVER copy `.env.example` into the skill directory or generated tool home. Keep `.env.example` as a tracked template. Store credentials in external environment variables or external dotenv files. NEVER pass API keys via CLI flags or RPC payloads. Legacy dotenv discovery from the skill root or parent directory is unsupported. This release does not support `AA_LEGACY_DOTENV`. The asset sync process MUST exclude local `.env` files and secret files from generated tool homes.
 
 ```bash
-uv run --script "$SKILLS_DIR/artificial-analysis-live/scripts/cli.py" fetch
+uv run --script <skill-dir>/scripts/cli.py fetch
 ```
 
 ## Model and effort comparisons

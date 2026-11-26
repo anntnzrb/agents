@@ -207,23 +207,10 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 
 def _dotenv_candidates() -> list[Path]:
-    candidates: list[Path] = []
+    """Return only the explicitly configured external dotenv file."""
     if configured_path := os.environ.get("ARTIFICIAL_ANALYSIS_ENV_FILE"):
-        candidates.append(Path(configured_path).expanduser())
-
-    skill_root = Path(__file__).resolve().parents[2]
-    candidates.append(skill_root / ".env")
-    if skills_dir := os.environ.get("SKILLS_DIR"):
-        candidates.append(
-            Path(skills_dir).expanduser() / "artificial-analysis-live" / ".env",
-        )
-
-    for ancestor in (Path.cwd(), *Path.cwd().parents):
-        candidate = ancestor / "skills" / "artificial-analysis-live" / ".env"
-        if candidate.exists():
-            candidates.append(candidate)
-            break
-    return candidates
+        return [Path(configured_path).expanduser()]
+    return []
 
 
 def _load_dotenv() -> None:
