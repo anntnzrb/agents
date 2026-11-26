@@ -1,10 +1,22 @@
 # Node Backends on Vercel
 
 
-
 ## Section index
 
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [Entrypoint Detection](#entrypoint-detection)
+- [Minimal Express App](#minimal-express-app)
+- [Minimal Hono App](#minimal-hono-app)
+- [Local Development](#local-development)
+- [Configuration](#configuration)
+- [Anti-Patterns](#anti-patterns)
 
+Vercel supports Node.js backend frameworks as first-class apps. Express and Hono are the most common, but Fastify, Elysia, NestJS, H3, and Koa are also supported. Your app is the entrypoint; not the `api/` folder. No rewrites, no build scripts. Just export your app and deploy.
+
+## Quick Start
+
+```bash
 # Express
 npm init -y && npm i express
 # Create server.ts that exports default app
