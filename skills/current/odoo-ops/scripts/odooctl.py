@@ -2965,7 +2965,7 @@ def cmd_db_query(args: argparse.Namespace) -> int:
             if file_arg == "-":
                 raw_sql = sys.stdin.read()
             else:
-                fpath = Path(file_arg)
+                fpath = Path(file_arg).expanduser()
                 if not fpath.is_file():
                     msg = f"SQL file not found: {fpath}"
                     raise CliError(msg)
@@ -3400,7 +3400,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     if script_source == "-":
         script_code = sys.stdin.read()
     else:
-        spath = Path(script_source)
+        spath = Path(script_source).expanduser()
         if not spath.is_file():
             msg = f"Script file not found: {spath}"
             raise CliError(msg)
