@@ -93,7 +93,7 @@ Don't mix modes: no reference tables inside a tutorial, no tutorial hand-holding
 - Delete AI vocabulary, filler, hedging, and formatting tells as you write. Clean as you draft; the cleanup-afterward pass has been measured to fail.
 - PR descriptions and commit messages are writing too. Every layer except Diátaxis applies to them. A PR body is a briefing that a reviewer can read in under a minute. Do not paste swarm logs, SHA lists, or metric tables. Link them.
 - Product UI strings are not documentation. Use your product's copy guidelines for those.
-- Indent code snippets with tabs. Write real paths. Make every count or tree claim true at the commit that lands it, and include the command that regenerates it.
+- Indent code snippets with tabs where the language allows. Formats that forbid tabs, such as YAML, keep spaces. Write real paths. Make every count or tree claim true at the commit that lands it, and include the command that regenerates it.
 
 ## Worked example
 
