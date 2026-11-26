@@ -27,7 +27,7 @@ Set `<skill-dir>` to this skill directory. The wrapper runs `uvx --from git+http
 
 ## Before a run
 
-- Run from the project root on a committed tree. `mutator` rewrites source files while it tests each mutant, then restores them. Check `git status` after the run.
+- Run from the project root on a committed tree. The pinned `mutator` tests mutants in symlink overlays under `target/mutation-workers` and leaves the project tree unchanged. It restores copies left by interrupted older runs before a non-scan run; check `git status` after the run.
 - The tools write `.metrics/` and, with coverage, `target/coverage/` and `.coverage` in the project root. Delete them at the end unless the project ignores them.
 - Start with one file or `--changed`. A first `mutator` run over a tree executes every covered mutant.
 
