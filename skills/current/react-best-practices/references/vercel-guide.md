@@ -789,10 +789,12 @@ export async function POST(request: Request) {
   // Log after response is sent
   after(async () => {
     const userAgent = (await headers()).get("user-agent") || "unknown";
-    const sessionCookie =
-      (await cookies()).get("session-id")?.value || "anonymous";
+    const sessionCookie = (await cookies()).get("session-id")?.value;
 
-    logUserAction({ sessionCookie, userAgent });
+    await logUserAction({
+      sessionState: sessionCookie ? "present" : "anonymous",
+      userAgent,
+    });
   });
 
   return new Response(JSON.stringify({ status: "success" }), {
@@ -821,6 +823,8 @@ The response is sent immediately while logging happens in the background.
 - `after()` runs even if the response fails or redirects
 
 - Works in Server Actions, Route Handlers, and Server Components
+
+- Never log raw session cookies or tokens; log a redacted presence/state value or an application-owned subject identifier instead
 
 Reference: [https://nextjs.org/docs/app/api-reference/functions/after](https://nextjs.org/docs/app/api-reference/functions/after)
 
