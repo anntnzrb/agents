@@ -16,7 +16,7 @@ Invoke this skill in natural language with a problem, issue, PR, or current chan
 
 Delivery routes through local integration and normal push where permitted, or through a pull request when required or requested.
 
-For ordinary pull request delivery outside T3-managed passive waits, run the merge command: `uv run --script <skill-dir>/scripts/cli.py <number>`. Omit the number for the current branch.
+For ordinary pull request delivery outside T3-managed passive waits, run the merge command: `uv run --script <skill-dir>/scripts/cli.py <number>`. Omit the number for the current branch. For an open PR, the PR branch must exist locally at the exact current PR head before the command runs; it refuses a missing or mismatched branch. A PR already merged remotely may be reconciled without that local branch.
 
 The merge command blocks until merge or stop, with a default timeout of 1800 seconds. Harnesses without durable wake must keep their own wait or completion-notification mechanism and resume when it exits. Do not hand back to the user while it runs. Never end with an empty promise to finish after CI. Stop only after confirmed merge and follow-ups, or a hard blocker.
 
