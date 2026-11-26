@@ -390,3 +390,45 @@ def test_long_reference_accepts_contents_heading(tmp_path: Path) -> None:
     skill = make_skill(tmp_path / "s", "# Fixture\n\n" + _READS_TABLE)
     _ = write(skill, "references/usage.md", body)
     assert lint_skill(skill) == []
+
+
+def test_unresolved_relative_markdown_link_is_reported(tmp_path: Path) -> None:
+    """Relative Markdown links resolve from the containing file."""
+    body = "# Fixture\n\nSee [missing](references/missing.md).\n"
+    skill = make_skill(tmp_path / "s", body)
+    assert messages(lint_skill(skill)) == [
+        "SKILL.md:8: unresolved relative Markdown link: references/missing.md"
+    ]
+
+
+def test_markdown_link_targets_external_anchor_and_code_are_ignored(
+    tmp_path: Path,
+) -> None:
+    """External URLs, anchors, and inline-code examples are not filesystem links."""
+    body = (
+        "# Fixture\n\n[site](https://example.com) [anchor](#local) "
+        "`[code](missing.md)`\n\n```text\n[fenced](missing.md)\n```\n"
+    )
+    assert lint_skill(make_skill(tmp_path / "s", body)) == []
+
+
+def test_checkout_relative_public_invocation_is_reported(tmp_path: Path) -> None:
+    """Operational prose cannot depend on the source checkout layout."""
+    body = "# Fixture\n\nRun `uv run --script skills/current/fixture/scripts/cli.py`.\n"
+    skill = make_skill(tmp_path / "s", body)
+    assert messages(lint_skill(skill)) == [
+        (
+            "SKILL.md:8: checkout-relative public invocation; "
+            "use <skill-dir>/scripts/cli.py"
+        )
+    ]
+
+
+def test_checkout_relative_validation_command_is_exempt(tmp_path: Path) -> None:
+    """Repository validation prose may intentionally name the source checkout."""
+    body = (
+        "# Fixture\n\n## Validate\n\n"
+        "uv run --script skills/current/skill-creator/scripts/cli.py "
+        "gates skills/current/fixture --tests\n"
+    )
+    assert lint_skill(make_skill(tmp_path / "s", body)) == []

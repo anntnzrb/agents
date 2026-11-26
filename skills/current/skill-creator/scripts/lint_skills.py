@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, TypeIs
@@ -55,6 +56,12 @@ _SKILL_DEPTH: Final[int] = 3
 _USAGE: Final[str] = "usage: cli.py lint [<skill-dir> ...]"
 _FENCE: Final[re.Pattern[str]] = re.compile(r"^\s*(`{3,}|~{3,})")
 _INLINE_CODE: Final[re.Pattern[str]] = re.compile(r"(`+)(?:.+?)(?<!`)\1(?!`)")
+_MARKDOWN_LINK: Final[re.Pattern[str]] = re.compile(
+    r"(?<!!)\[[^\]\n]+\]\((<[^>]+>|[^)\s]+)(?:\s+[\"'][^)]*)?\)"
+)
+_CHECKOUT_ENTRYPOINT: Final[re.Pattern[str]] = re.compile(
+    r"skills/current/[^/\s`]+/scripts/cli\.py"
+)
 _LICENSE_LINE: Final[re.Pattern[str]] = re.compile(
     rf"^license:\s*[\"']?{re.escape(LICENSE)}[\"']?\s*$"
 )
@@ -180,6 +187,76 @@ def _prose_lines(text: str) -> list[tuple[int, str]]:
         ):
             fence = None
     return prose
+
+
+def _markdown_links(path: Path, text: str) -> list[Finding]:
+    """Report relative Markdown links that do not resolve from their file."""
+    findings: list[Finding] = []
+    for number, line in _prose_lines(text):
+        for match in _MARKDOWN_LINK.finditer(line):
+            raw = match.group(1).strip()
+            target = raw[1:-1] if raw.startswith("<") and raw.endswith(">") else raw
+            target = target.split("#", 1)[0].split("?", 1)[0]
+            if (
+                not target
+                or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target)
+                or target.startswith("/")
+                or "<" in target
+                or ">" in target
+                or "{" in target
+            ):
+                continue
+            resolved = (path.parent / urllib.parse.unquote(target)).resolve()
+            if not resolved.exists():
+                findings.append(
+                    Finding(
+                        path, number, f"unresolved relative Markdown link: {target}"
+                    )
+                )
+    return findings
+
+
+def _checkout_entrypoint(path: Path, rel: Path, text: str) -> list[Finding]:
+    """Reject checkout-relative public invocation examples.
+
+    Maintenance and validation documentation may intentionally operate in the
+    source checkout. Treat an explicit file name or nearest heading as that
+    audience boundary; operational prose outside it must use `<skill-dir>`.
+    """
+    name = rel.name.lower()
+    maintenance_file = (
+        name == "maintenance.md"
+        or "maintenance" in name
+        or "update-workflow" in name
+        or "implementation" in name
+    )
+    findings: list[Finding] = []
+    heading = ""
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.startswith("#"):
+            heading = line.lower()
+        if not _CHECKOUT_ENTRYPOINT.search(line):
+            continue
+        lowered = line.lower()
+        if any(
+            boundary in lowered
+            for boundary in ("must not", "never", "do not", "not use")
+        ):
+            continue
+        maintenance_heading = any(
+            word in heading
+            for word in ("maintenance", "validate", "validation", "verification")
+        )
+        if maintenance_file or maintenance_heading:
+            continue
+        findings.append(
+            Finding(
+                path,
+                number,
+                "checkout-relative public invocation; use <skill-dir>/scripts/cli.py",
+            )
+        )
+    return findings
 
 
 def _section_index(
@@ -312,6 +389,8 @@ def lint_skill(skill_dir: Path) -> list[Finding]:
         findings.extend(_whitespace(path, text, rules))
         if path.suffix == ".md":
             findings.extend(_dashes(path, text))
+            findings.extend(_markdown_links(path, text))
+            findings.extend(_checkout_entrypoint(path, rel, text))
             findings.extend(_section_index(path, rel, text, rules))
     text = skill_md.read_text(encoding="utf-8")
     findings.extend(_skill_md(skill_md, text, bundled_docs=bundled_docs))
