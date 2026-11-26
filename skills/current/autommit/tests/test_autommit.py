@@ -242,6 +242,18 @@ class AutommitCliTests(unittest.TestCase):
         self.assertIn("--smoke", completed.stdout)
         self.assertIn("--no-verify", completed.stdout)
 
+    def test_mode_specific_flags_are_rejected_outside_their_mode(self) -> None:
+        for arguments, flag in (
+            (("--base", "HEAD", "--json"), "--base"),
+            (("rewrite", "--filter", "m", "--json"), "--filter"),
+            (("models", "--base", "HEAD", "--json"), "--base"),
+        ):
+            payload = self.cli(*arguments, expected_code=2)
+            error = _as_error(payload["error"])
+            self.assertEqual(error["code"], "usage_error")
+            self.assertIn(flag, error["message"])
+        self.assertFalse((self.repo / ".git" / "autommit").exists())
+
     def exact_slices(
         self,
         base: str,

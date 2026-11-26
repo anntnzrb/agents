@@ -354,6 +354,16 @@ def _dispatch(arguments: argparse.Namespace) -> object:
     raise AutommitError("usage_error", "Unknown command.")
 
 
+def _parse_mode_arguments(command: str, values: Sequence[str]) -> argparse.Namespace:
+    """Parse run-mode flags and reject flags owned by another mode."""
+    arguments = _run_parser().parse_args(values)
+    if command != "rewrite" and _arg_optional_str(arguments, "base") is not None:
+        raise AutommitError("usage_error", "--base is valid only in rewrite mode.")
+    if command != "models" and _arg_optional_str(arguments, "filter") is not None:
+        raise AutommitError("usage_error", "--filter is valid only in models mode.")
+    return arguments
+
+
 def _print_models(arguments: argparse.Namespace) -> int:
     """List the model ids the configured endpoint exposes.
 
@@ -404,11 +414,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         run_args = args_list[1:] if command == "run" else args_list
         if command == "models":
-            return _print_models(_run_parser().parse_args(args_list[1:]))
+            return _print_models(_parse_mode_arguments(command, args_list[1:]))
         if command == "rewrite":
             run_args = args_list[1:]
-            return run_rewrite(_run_options(_run_parser().parse_args(run_args)))
-        return run_orchestrated(_run_options(_run_parser().parse_args(run_args)))
+            arguments = _parse_mode_arguments(command, run_args)
+            return run_rewrite(_run_options(arguments))
+        arguments = _parse_mode_arguments("run", run_args)
+        return run_orchestrated(_run_options(arguments))
     except AutommitError as err:
         _emit(_failure(command or "run", err), error=True)
         return err.exit_code
