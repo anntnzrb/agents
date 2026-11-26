@@ -270,9 +270,10 @@ Before handoff after any skill change:
 1. Load `technical-writing`. Apply its plain-language, sentence, ambiguity, naming, and document-mode checks to changed model-facing prose.
 2. Load `pstack-principles`. Read every leaf principle that matches the change; applying a principle from the index alone is forbidden. Use the principles to minimize the diff, keep boundaries explicit, remove unnecessary structure, and choose direct verification. In the handoff, name each applied principle and the decision it changed.
 3. Load `unslop`. Apply prose mode to changed model-facing text. Apply code mode only when the requested work includes bounded, behavior-preserving cleanup; never use cleanup as permission to change feature behavior or widen scope.
-4. Fix every applicable finding.
-5. Rerun `quick-validate` and executable checks as required above.
-6. Run `uv run --script skills/current/skill-creator/scripts/cli.py lint` with no arguments. It must report no findings.
+4. For new skills and changes that affect what an agent does, run the [operational consistency review](../skills/current/skill-creator/references/authoring.md#review-operational-consistency). Check the instructions an agent receives at the decision point, including unchanged instructions that govern the same action.
+5. Fix every applicable finding. Resolve any unverified claim that affects permission, target, or side effects before publishing.
+6. Rerun `quick-validate` and executable checks as required above.
+7. Run `uv run --script skills/current/skill-creator/scripts/cli.py lint` with no arguments. It must report no findings.
 
 ## Stop rules
 

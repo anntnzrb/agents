@@ -1,6 +1,6 @@
 # Skill Authoring
 
-Read this reference when creating or materially refactoring a skill.
+Read this reference when creating a skill or changing instructions that affect what an agent does.
 
 ## Communicating With the User
 
@@ -61,3 +61,15 @@ Skills MUST match the user's stated intent. They NEVER contain malware, exploit 
 Use imperative instructions. Explain why instructions matter instead of leaning on rigid MUSTs. Use RFC keywords for technical and operational constraints, not taste. Give the model enough purpose and theory of mind to generalize beyond examples. Draft, reread cold, then improve.
 
 Define output formats with exact templates when structure matters. Use examples for transformations and style choices, but keep examples small and realistic.
+
+## Review operational consistency
+
+Review new skills and changes that affect what an agent does. This is an authoring check for people or agents. CI checks executable contracts and metadata with its deterministic gates.
+
+1. Start with the diff and one realistic request per affected workflow. For a new skill, cover each workflow. If a rule has a condition or exception, include the closest request on the other side of that boundary.
+2. Start at `SKILL.md` as a reader without the drafting conversation. Follow the prescribed reads and write down the exact next action and what evidence would establish success. Check that the reader gets the needed conditions and permissions before that action. For permission, target, or side-effect changes, prefer a fresh reviewer with the same starting context.
+3. Compare the resulting action with the sources for that decision. Include unchanged references, profiles, applicable project instructions, and worked examples. Check flags and defaults against the CLI parser or tool schema. Check result semantics against the implementation or a fixture. Use local help, mocks, or disposable inputs to verify behavior without acting on a live target.
+4. Report each defect with the concrete request, the action the text leads to, and the consequence. Cite the conflicting lines or the instruction and the executable contract. If the problem is a missing prerequisite, cite where the reader is sent and where the needed rule lives. Mark missing evidence as unverified.
+5. Fix the rule at the decision point and align affected examples. Repeat the request and its boundary case. For a concrete regression, keep a deterministic check when possible. If the action still depends on model interpretation, use a fresh [skill eval](eval-workflow.md) with a model that will use the skill.
+
+For example, a profile rule for local inventory can conflict with a remote query example that uses a separate connection. A reader who applies the local flag to the query gets a parser error. Confirm the grammar locally, scope the profile rule to local commands, and check both example invocations.

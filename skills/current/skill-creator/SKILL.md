@@ -111,7 +111,7 @@ Detailed workflow: `references/eval-workflow.md`.
 
 |Need|Read|When|
 |---|---|---|
-|Intent capture, research, authoring, and user communication|`references/authoring.md`|Creating or materially refactoring a skill|
+|Intent capture, authoring, and operational consistency review|`references/authoring.md`|Creating a skill or changing instructions that affect what an agent does|
 |Exact eval/benchmark JSON|`references/schemas.md`|Creating or validating artifacts|
 |Eval, timing, grading, viewer, iteration|`references/eval-workflow.md`|Running evaluations|
 |Trigger writing and eval sets|`references/description-optimization.md`|Optimizing metadata descriptions|
