@@ -60,7 +60,7 @@ def request_get(base_url: str, params: list[tuple[str, str]]) -> int:
     except urllib.error.HTTPError as exc:
         text = exc.read().decode("utf-8", errors="replace") or f"HTTP {exc.code}"
         print(text, file=sys.stderr)
-        return 22
+        return 1
     except urllib.error.URLError as exc:
         print(f"Grep.app network error: {exc.reason}", file=sys.stderr)
         return 1
