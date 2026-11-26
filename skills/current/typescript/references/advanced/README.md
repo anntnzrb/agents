@@ -18,13 +18,13 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Category | Use | Never |
 |---|---|---|
 | Runtime | Bun (native TS, single binary) | ts-node, tsx |
-| Package manager | `pnpm` | npm, yarn (unless workspace requires it) |
-| Linter + formatter | Biome | ESLint, Prettier |
+| Package manager | Bun for greenfield; otherwise the existing lockfile owner | creating a second lockfile |
+| Linter + formatter | Oxlint + Oxfmt for greenfield; otherwise existing tools | silently substituting ESLint, Prettier, or Biome |
 | Type checker | `tsc --noEmit` with strict config | skip type checking |
-| Web framework | Hono | Express |
-| Validation | Zod | joi, yup, class-validator |
-| Testing | `bun test` or vitest | jest |
-| ORM | Drizzle | TypeORM, Prisma (unless already in project) |
+| Web framework | no default; Hono is an opt-in recipe for concrete HTTP routing needs | framework-by-default |
+| Validation | local typed narrowing or Effect Schema for greenfield; Zod only when chosen/inherited | adding a validation library by default |
+| Testing | `bun test` for greenfield; otherwise existing runner | jest for a new project |
+| ORM | no default; Drizzle is an opt-in recipe | TypeORM, Prisma (unless already in project) |
 
 ### The iron list
 
@@ -36,7 +36,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 6. **No non-null assertion**: `x!` is banned. Use narrowing or optional chaining (`x?.y`)
 7. **No @ts-ignore / @ts-expect-error**: fix the type
 8. **No enum**: use `as const` objects + literal union types
-9. **Zod at boundaries**: external input (API, user, file) → Zod schema. Internal → plain types
+9. **Validate at boundaries**: external input (API, user, file) is decoded once with the project's chosen schema boundary or typed narrowing. Internal → plain types. Do not add Zod merely because input exists
 10. **Typed errors**: Error subclasses with typed fields. No `throw new Error("bare string")` for domain errors. Use Result for expected failures within 1-2 call levels; throw for propagation across many layers
 11. **as const for constants**: module-level constant objects and arrays use `as const`
 12. **import type**: type-only imports use `import type`. Enforced by `verbatimModuleSyntax`
@@ -47,7 +47,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 
 | Situation | Use |
 |---|---|
-| User input, API request/response | Zod schema + `z.infer` |
+| User input, API request/response | Project schema boundary + inferred/parsed type |
 | Internal value object | `type` with `readonly` properties |
 | Function with multiple outcomes | Discriminated union (`kind` field) |
 | Contract for implementations | `interface` |
@@ -55,7 +55,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Distinct primitive (UserId vs OrderId) | Branded type |
 | Key-value map | `Record<K, V>` or index signature |
 
-**The one rule**: data crosses trust boundary → Zod. Everything else → plain `type` with `readonly`.
+**The one rule**: data crosses a trust boundary → parse once with the project's chosen validation mechanism. Everything else → plain `type` with `readonly`.
 
 Load `data-modeling.md` for the full decision flowchart and comparison.
 
@@ -107,9 +107,9 @@ async function main(): Promise<void> {  // no-excuse-ok: catch
 
 | Domain | Library | Why |
 |---|---|---|
-| HTTP framework | Hono | Lightweight, multi-runtime, middleware, OpenAPI |
-| Validation | Zod | Runtime validation + type inference |
-| ORM | Drizzle | Type-safe SQL, no codegen |
+| HTTP framework | Hono (opt-in) | Lightweight, multi-runtime, middleware, OpenAPI recipe when a framework is needed |
+| Validation | Zod (opt-in) | Runtime validation + type inference when chosen or inherited |
+| ORM | Drizzle (opt-in) | Type-safe SQL, no codegen |
 | HTTP client | `ky` | Thin fetch wrapper (5KB); auto-throw on non-2xx, retry, timeout, hooks, prefixUrl. Browser + Node + Bun + Deno |
 | HTTP client (perf) | `undici` (direct API) | When a Node backend needs connection pooling, HTTP/2, or pipelining |
 
@@ -138,12 +138,12 @@ Load on demand; not all at once.
 
 | Need | Load |
 |---|---|
-| Strict tsconfig + Biome config | `tsconfig-strict.md` |
+| Strict tsconfig + optional Biome recipe | `tsconfig-strict.md` |
 | Type patterns (branded, as const, satisfies, narrowing, assertNever) | `type-patterns.md` |
 | Data modeling (type vs interface vs Zod, readonly, parse-don't-validate) | `data-modeling.md` |
 | Error handling (Result, typed errors, union vs throw) | `error-handling.md` |
-| Bootstrapping a new project (Bun, pnpm, Hono, Vite) | `bootstrap.md` |
-| Hono backend stack (hono-openapi, Scalar, Swagger) | `backend-hono.md` |
+| Bootstrapping a new project (Bun first, opt-in framework/tool recipes) | `bootstrap.md` |
+| Opt-in Hono + OpenAPI backend stack | `backend-hono.md` |
 
 ## No-excuse audit
 
@@ -164,11 +164,11 @@ Use the repository's configured formatter, linter, type checker, and test suite 
 | `empty-catch` | `catch { }` or `catch (e) { }` with empty body | `// no-excuse-ok: catch` |
 | `catch-without-narrowing` | `catch (e)` used without `instanceof` or re-throw | `// no-excuse-ok: catch` |
 
-Biome enforces additional rules (noExplicitAny, noNonNullAssertion, noDefaultExport, useImportType). The script catches what Biome cannot.
+In repositories that use it, Biome enforces additional rules (noExplicitAny, noNonNullAssertion, noDefaultExport, useImportType). The script catches what the configured linter cannot.
 
 ## In tests
 
-Tests are strict too, with these exceptions (configure in `biome.jsonc` overrides):
+Tests are strict too, with these exceptions (configure them in the repository's linter overrides):
 
 | In tests you may | Why |
 |---|---|

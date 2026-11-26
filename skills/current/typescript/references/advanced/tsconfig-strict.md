@@ -1,6 +1,6 @@
-# Strict tsconfig + Biome
+# Strict tsconfig + optional Biome recipe
 
-The canonical ultra-strict config. Copy-paste, then add your own paths.
+The strict compiler flags are broadly applicable. For a new user-owned Bun application, start from [`../bun-application.md`](../bun-application.md) and its Oxlint/Oxfmt policy. Use the Biome portion below only in a repository that already uses Biome or explicitly chooses it.
 
 ---
 
@@ -65,7 +65,7 @@ The canonical ultra-strict config. Copy-paste, then add your own paths.
 For Bun projects, add to `compilerOptions`:
 ```jsonc
 {
-  "types": ["bun-types"],
+  "types": ["bun"],
   "moduleDetection": "force"
 }
 ```
@@ -135,7 +135,7 @@ For Bun projects, add to `compilerOptions`:
 
 ---
 
-## CI gate
+## CI gate for a Biome repository
 
 ```bash
 bunx biome check .

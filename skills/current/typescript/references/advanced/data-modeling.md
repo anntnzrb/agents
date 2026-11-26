@@ -17,7 +17,7 @@ Is it an interface / contract?
   YES → interface (structural typing is the default in TS)
   NO ↓
 Does the data cross a trust boundary (user input, API, file)?
-  YES → Zod schema + z.infer<typeof schema>
+  YES → project schema boundary or typed narrowing; validate once
   NO ↓
 Is it a union of possible outcomes?
   YES → Discriminated union (kind/type field)
@@ -73,9 +73,9 @@ interface UserRepository extends Repository<User> {
 | `interface` | Contracts that will be `implements`ed or `extends`ed, declaration merging needed |
 | **Default** | **`type`: unless you have a specific reason for `interface`** |
 
-### Zod schema: trust boundary guardian
+### Zod schema: opt-in boundary validator
 
-Use when data enters your system. Validates at runtime, infers types at compile time.
+Use when the project already uses Zod or explicitly chooses it. It validates at runtime and infers types at compile time. For a greenfield Bun application, first follow [`../bun-application.md`](../bun-application.md): keep small validation local, and load the Effect skill when validation needs a schema framework.
 
 ```typescript
 import { z } from "zod"
@@ -95,8 +95,8 @@ const UserResponseSchema = z.object({
 type UserResponse = z.infer<typeof UserResponseSchema>
 ```
 
-**The one rule**: data crosses a trust boundary → Zod. Everything else → plain type/interface.
-Never use Zod for internal-only data. The runtime validation cost and Zod coupling are unnecessary.
+**The one rule**: data crosses a trust boundary → parse once with the project's chosen validation mechanism. Everything else → plain type/interface.
+Never use Zod for internal-only data or add it merely because input exists. Runtime validation cost and schema-library coupling are real.
 
 ### as const: fixed constants
 
@@ -131,7 +131,7 @@ Each variant has a `kind` discriminant. TypeScript narrows on `switch (result.ki
 
 | Situation | Use |
 |---|---|
-| User input, API request/response | Zod schema + `z.infer` |
+| User input, API request/response | Project schema boundary + parsed/inferred type |
 | Internal value object | `type` with `readonly` properties |
 | Function with multiple outcomes | Discriminated union |
 | Contract for implementations | `interface` |

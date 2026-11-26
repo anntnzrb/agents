@@ -4,9 +4,9 @@
 
 Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-> **Canonical stack**: `hono` + `hono-openapi` + `@scalar/hono-api-reference` + `@hono/swagger-ui`
+> **Scope**: opt-in recipe for a service that explicitly needs Hono plus OpenAPI documentation. It is not the greenfield Bun default; [`../bun-application.md`](../bun-application.md) controls runtime, compiler, lint, format, test, and dependency policy.
 > **Runtime**: Bun (TypeScript-first)
-> **Validator**: Zod v4 (Standard Schema compliant, zero extra deps for OpenAPI)
+> **Validator in this recipe**: Zod v4 (Standard Schema compliant); adopt it only when this OpenAPI validation stack is a concrete requirement or the project already uses Zod
 
 ---
 
