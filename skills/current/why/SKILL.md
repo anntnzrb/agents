@@ -33,6 +33,8 @@ If the target is vague, make your best guess from conversation context, state yo
 
 ## Step 2. Establish the code anchor
 
+Every `gh` invocation in this workflow, including investigator subagents, follows the `github` skill: load it before the first `gh` call and apply its preflight (installed version, explicit repository target, auth status) and output rules. Investigation is read-only: `list`, `view`, `search`, `diff`, and API GET reads; never write.
+
 Anchor the investigation in concrete code before spawning investigators:
 
 ```bash
