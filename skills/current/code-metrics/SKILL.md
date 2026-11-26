@@ -36,10 +36,10 @@ Set `<skill-dir>` to this skill directory. The wrapper runs `uvx --from git+http
 Without `--coverage-command` or `--no-coverage`, `crapper` and `mutator` run coverage with `.venv/bin/python` or `python3` and pip-install `coverage` and `pytest` into that interpreter when missing. NEVER let them install into a user or system interpreter. Pass a uv command that writes LCOV where the tools read it:
 
 ```text
-code-metrics crapper --coverage-command "uv run --no-project --with pytest,coverage -- sh -c 'coverage run --source=<src> -m pytest -q <tests> && coverage lcov -o target/coverage/python/lcov.info'" <src>
+code-metrics crapper --coverage-command "uv run --no-project --with pytest,coverage -- sh -c 'coverage run --source=<package-or-dir> -m pytest -q <tests> && coverage lcov -o target/coverage/python/lcov.info'" <src>
 ```
 
-Add the project's test dependencies to `--with`, or use `uv run` inside a uv project instead of `--no-project`. Coverage counts only code that runs in the test process. When tests drive the code as a subprocess, every function reads 0% or uncovered: use `crapper --no-coverage` for complexity and `mutator --no-coverage --test-command "<cmd>"` so every site runs.
+Add the project's test dependencies to `--with`, or use `uv run` inside a uv project instead of `--no-project`. Coverage counts only code that runs in the test process. When tests drive the code as a subprocess, every function reads 0% or uncovered: use `crapper --no-coverage` for complexity and `mutator --no-coverage --test-command "<cmd>"` so uncovered sites become eligible. Add `--mutate-all` only when intentionally rerunning sites already killed in unchanged functions.
 
 ## Common calls
 
