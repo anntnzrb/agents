@@ -374,8 +374,8 @@ uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -
 ```
 
 This creates:
-- `design-system/MASTER.md`: Global Source of Truth with all design rules
-- `design-system/pages/`: Folder for page-specific overrides
+- `design-system/<project-slug>/MASTER.md`: Global Source of Truth with all design rules
+- `design-system/<project-slug>/pages/`: Folder for page-specific overrides
 
 **With page-specific override:**
 ```bash
@@ -383,17 +383,17 @@ uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -
 ```
 
 This also creates:
-- `design-system/pages/dashboard.md`: Page-specific deviations from Master
+- `design-system/<project-slug>/pages/dashboard.md`: Page-specific deviations from Master
 
 **How hierarchical retrieval works:**
-1. When building a specific page (e.g., "Checkout"), first check `design-system/pages/checkout.md`
+1. When building a specific page (e.g., "Checkout"), first check `design-system/<project-slug>/pages/checkout.md`
 2. If the page file exists, its rules **override** the Master file
-3. If not, use `design-system/MASTER.md` exclusively
+3. If not, use `design-system/<project-slug>/MASTER.md` exclusively
 
 **Context-aware retrieval prompt:**
 ```
-I am building the [Page Name] page. Please read design-system/MASTER.md.
-Also check if design-system/pages/[page-name].md exists.
+I am building the [Page Name] page. Please read design-system/<project-slug>/MASTER.md.
+Also check if design-system/<project-slug>/pages/[page-name].md exists.
 If the page file exists, prioritize its rules.
 If not, use the Master rules exclusively.
 Now, generate the code...
@@ -444,7 +444,7 @@ uv run --script <skill-dir>/scripts/cli.py "<keyword>" --domain <domain> [-n <ma
 | Individual Google Fonts | `google-fonts` | `--domain google-fonts "sans serif popular variable"` |
 | Landing structure | `landing` | `--domain landing "hero social-proof"` |
 | App interface a11y | `web` | `--domain web "accessibilityLabel touch safe-areas"` |
-| AI prompt / CSS keywords | `prompt` | `--domain prompt "minimalism"` |
+| AI prompt / CSS keywords | `style` | `--domain style "minimalism"` |
 
 ### Step 4: Stack Guidelines (match your framework)
 
@@ -473,8 +473,9 @@ uv run --script <skill-dir>/scripts/cli.py "<keyword>" --stack <your-stack>
 | `ux` | Best practices, anti-patterns | animation, accessibility, z-index, loading |
 | `gsap` | GSAP animation skeletons by intensity tier | scroll reveal, stagger, magnetic cursor, page transition |
 | `google-fonts` | Individual Google Fonts lookup | sans serif, monospace, japanese, variable font, popular |
+| `react` | React render performance and component anti-patterns | rerender, memo, effect, server component |
 | `web` | App interface guidelines (iOS/Android/React Native) | accessibilityLabel, touch targets, safe areas, Dynamic Type |
-| `prompt` | AI prompts, CSS keywords | (style name) |
+| `icons` | Icon library and usage guidance | lucide, heroicons, icon library |
 
 ### Available Stacks
 
@@ -498,6 +499,12 @@ Run `ls <skill>/data/stacks/` to see the live set. Shipped stacks:
 | `jetpack-compose` | Composables, state, navigation (Android) |
 | `react-native` | Components, Navigation, Lists |
 | `threejs` | 3D scenes, materials, performance |
+| `javafx` | JavaFX application lifecycle, threading, and FXML |
+| `wpf` | WPF XAML, bindings, and dependency properties |
+| `winui` | WinUI XAML, compiled bindings, and Windows app patterns |
+| `avalonia` | Avalonia XAML, compiled bindings, and cross-platform desktop UI |
+| `uno` | Uno Platform WinUI API compatibility across platforms |
+| `uwp` | Legacy UWP XAML, compiled bindings, and lifecycle |
 
 ---
 

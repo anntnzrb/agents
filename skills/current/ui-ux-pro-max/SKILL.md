@@ -34,9 +34,7 @@ MUST use the bundled CLI; MUST NOT invoke internal Python files directly.
    ```
 
 3. Add `--domain <domain>` for targeted evidence or `--stack <stack>` for
-   implementation guidance. Use `--rtl [full|partial|caveats]` with the `style`
-   or `product` domain to filter for right-to-left compatibility. Use `--full`
-   to show untruncated search fields.
+   implementation guidance. Use `--full` to show untruncated search fields.
 4. Use `--variance`, `--motion`, and `--density` only with `--design-system`.
    To persist output, add `--persist --output-dir <project-root>`; add `--page`
    for an override and `--force` to overwrite an existing master.

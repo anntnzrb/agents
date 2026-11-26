@@ -10,7 +10,7 @@ from typing import TypeIs
 _json_loads: Callable[[str | bytes | bytearray], object] = json.loads
 
 SKILL: Path = Path(__file__).resolve().parents[1]
-SEARCH: Path = SKILL / "scripts" / "search.py"
+SEARCH: Path = SKILL / "scripts" / "cli.py"
 
 
 def run_search(*args: str) -> subprocess.CompletedProcess[str]:
