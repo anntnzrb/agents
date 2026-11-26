@@ -36,7 +36,7 @@ uv run --script <skill-dir>/scripts/cli.py validate <WORKFLOW.json>
 ```
 
 MCP-exposed workflows MUST also be active.
-REST requires `N8N_BASE_URL` and `N8N_API_KEY`.
+REST API commands require `N8N_BASE_URL` and `N8N_API_KEY`. `validate` is offline and does not require them.
 MUST read `reference.md` before REST work or credential troubleshooting.
 
 ## Optional MCPorter route
