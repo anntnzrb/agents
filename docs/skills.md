@@ -191,6 +191,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
   - Reference files over 100 lines MUST start with a table of contents or equivalent section index, so a partial read still shows the file's scope. Verbatim upstream bytes are exempt.
   - Do not place large always-loaded docs in skill-package `AGENTS.md`; use `references/` and route to them from `SKILL.md`.
 - In `SKILL.md`, define the exact runnable entrypoint under `## Public entrypoint`. Worked examples in `## Common calls` and CLI `--help` text SHOULD use clean shorthand (e.g. `<command> <args>`) to minimize noise.
+- Public invocation examples MUST NOT use checkout-relative paths such as `skills/current/<name>/scripts/cli.py`; use `<skill-dir>/scripts/cli.py` or an explicitly defined installed-path variable. Repository-checkout commands belong only in maintenance documentation that names that audience.
 
 ## Metadata budget
 
@@ -234,6 +235,10 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Input schemas do not imply output schemas. Only a published output schema is contractual; observed responses are samples.
 - Keep implementation internals, recovery machinery, caching, telemetry, and performance details out unless they change the agent's decision.
 - Worked examples MUST match the real call grammar. Anti-patterns MUST come from observed failures, not speculation.
+- Every documented flag, command, input, output key, exit mode, and side effect MUST trace end-to-end to executable behavior. An accepted input MUST reach an outbound request, a local predicate, an output field, or an explicit unsupported error; never drop it silently.
+- Scope prerequisites and contracts to the command or mode that owns them. Do not state a global credential, offline, JSON-output, freshness, read/write, or safety guarantee when only some commands satisfy it.
+- Credential and target resolution MUST have one exact precedence contract. Secret-bearing values MUST NOT be required in argv when instructions forbid exposure.
+- External-write target resolution MUST fail closed when an ID, exact title, prefix, or fuzzy selector is ambiguous.
 - Before deleting apparently redundant prompt text, inspect `git blame` and the relevant commit or issue. Failure-prevention scar tissue stays unless evidence supersedes it.
 - Schema inferability makes text a prune candidate, never an automatic deletion.
 - Automated overlap probes are OPTIONAL. They MUST use the actual wire schema and rendered prompt; provider-specific probes are not repository-wide requirements.
@@ -247,6 +252,7 @@ The next sync removes the managed copy from harness homes. Sync does not publish
 - Docs use `<temp-dir>` and code uses `tempfile` or platform temp directories; avoid POSIX-only paths like `/tmp`.
 - Skill scripts, default headers (e.g. `User-Agent`), and prompt templates MUST NOT contain personal usernames, machine hostnames, or private URLs.
 - Docs, examples, and code defaults MUST NOT hardcode values tied to one environment, deployment, or instance (names, paths, identifiers). Use clearly marked placeholders in examples and make runtime defaults overridable via configuration or environment variables. Exempt: files whose purpose is per-instance configuration, and fixtures that need concrete values by design.
+- Platform-specific operational steps MUST either provide portable variants or stop with an explicit unsupported-platform handoff. Do not present `pbcopy`, `pbpaste`, `nohup`, `/dev/null`, `$!`, or similar forms as universal workflow steps.
 
 ## Cross-platform code rules
 
@@ -270,7 +276,7 @@ Before handoff after any skill change:
 1. Load `technical-writing`. Apply its plain-language, sentence, ambiguity, naming, and document-mode checks to changed model-facing prose.
 2. Load `pstack-principles`. Read every leaf principle that matches the change; applying a principle from the index alone is forbidden. Use the principles to minimize the diff, keep boundaries explicit, remove unnecessary structure, and choose direct verification. In the handoff, name each applied principle and the decision it changed.
 3. Load `unslop`. Apply prose mode to changed model-facing text. Apply code mode only when the requested work includes bounded, behavior-preserving cleanup; never use cleanup as permission to change feature behavior or widen scope.
-4. For new skills and changes that affect what an agent does, run the [operational consistency review](../skills/current/skill-creator/references/authoring.md#review-operational-consistency). Check the instructions an agent receives at the decision point, including unchanged instructions that govern the same action.
+4. For new skills and changes that affect what an agent does, run the [operational consistency review](../skills/current/skill-creator/references/authoring.md#review-operational-consistency). Check the instructions an agent receives at the decision point, including unchanged instructions that govern the same action. Include executable grammar, hidden required inputs, mode-specific flags, cache/freshness boundaries, external-write targets, process/filesystem side effects, eval expectations, and neighboring-skill ownership.
 5. Fix every applicable finding. Resolve any unverified claim that affects permission, target, or side effects before publishing.
 6. Rerun `quick-validate` and executable checks as required above.
 7. Run `uv run --script skills/current/skill-creator/scripts/cli.py lint` with no arguments. It must report no findings.
