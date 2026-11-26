@@ -437,15 +437,37 @@ def parse_video_ids(raws: Sequence[str]) -> list[str]:
 
 
 def find_playlist(token: str, target: str) -> dict[str, JsonValue]:
-    """Resolve one of the user's playlists by exact id or title prefix."""
+    """Resolve one of the user's playlists by exact id, title, or unique prefix."""
     mine = paged(
         token,
         "playlists",
         {"part": "snippet,status", "mine": "true", "maxResults": "50"},
     )
-    for it in mine:
-        if _opt_str(it.get("id")) == target or item_title(it).startswith(target):
-            return it
+    for item in mine:
+        if _opt_str(item.get("id")) == target:
+            return item
+
+    exact_titles = [item for item in mine if item_title(item) == target]
+    if len(exact_titles) == 1:
+        return exact_titles[0]
+    if len(exact_titles) > 1:
+        raise fail(
+            "AMBIGUOUS_PLAYLIST",
+            f"playlist target {target!r} matches multiple playlists; use a playlist id",
+            target=target,
+            matches=[playlist_ref(item) for item in exact_titles],
+        )
+
+    prefix_matches = [item for item in mine if item_title(item).startswith(target)]
+    if len(prefix_matches) == 1:
+        return prefix_matches[0]
+    if len(prefix_matches) > 1:
+        raise fail(
+            "AMBIGUOUS_PLAYLIST",
+            f"playlist target {target!r} matches multiple playlists; use a playlist id",
+            target=target,
+            matches=[playlist_ref(item) for item in prefix_matches],
+        )
     raise fail("NOT_FOUND", f"no playlist matching {target!r}")
 
 
@@ -470,13 +492,34 @@ def cmd_playlists_list(_args: _Args) -> None:
 
 def read_manifest(path: str) -> dict[str, list[str]]:
     """Group video IDs by playlist title; columns: title<TAB>video_id[<TAB>note]."""
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise fail("BAD_MANIFEST", f"cannot read manifest {path!r}: {exc}") from exc
+
     groups: dict[str, list[str]] = {}
-    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+    for line_number, raw in enumerate(lines, start=1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        title, video_id, *_rest = line.split("\t")
-        groups.setdefault(title.strip(), []).append(video_id.strip())
+        parts = line.split("\t")
+        if len(parts) not in (2, 3):
+            raise fail(
+                "BAD_MANIFEST",
+                f"manifest line {line_number} must have 2 or 3 tab-separated columns",
+                line=line_number,
+                text=line,
+            )
+        title = parts[0].strip()
+        video_id = parts[1].strip()
+        if not title or not video_id:
+            raise fail(
+                "BAD_MANIFEST",
+                f"manifest line {line_number} has an empty title or video id",
+                line=line_number,
+                text=line,
+            )
+        groups.setdefault(title, []).append(video_id)
     return groups
 
 
@@ -536,8 +579,8 @@ def cmd_playlists_apply(args: _Args) -> None:
             "NO_MANIFEST",
             "pass a manifest TSV: playlist_title<TAB>video_id[<TAB>note]",
         )
-    token = access_token(load_config())
     wanted = read_manifest(args.manifest)
+    token = access_token(load_config())
     mine = paged(
         token,
         "playlists",
@@ -725,7 +768,7 @@ def cmd_videos_info(args: _Args) -> None:
 
 
 def cmd_search(args: _Args) -> None:
-    """Search videos; each call costs 100 quota units."""
+    """Search videos; historically 100 quota units, subject to current quota rules."""
     limit = max(1, min(args.limit, 25))
     token = access_token(load_config())
     data = api(

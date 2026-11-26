@@ -9,7 +9,14 @@ import threading
 from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypeIs, override, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Protocol,
+    TypeIs,
+    override,
+    runtime_checkable,
+)
 
 import pytest
 
@@ -84,6 +91,12 @@ _PLAYLIST: dict[str, object] = {
     "status": {"privacyStatus": "private"},
 }
 
+_SECOND_PLAYLIST: dict[str, object] = {
+    "id": "pl-2",
+    "snippet": {"title": "Testlist archive"},
+    "status": {"privacyStatus": "private"},
+}
+
 _PLAYLIST_ITEMS: list[dict[str, object]] = [
     {
         "id": "item-1",
@@ -117,6 +130,8 @@ _VIDEO: dict[str, object] = {
 class _Fixture(BaseHTTPRequestHandler):
     """Loopback stand-in for the token and API endpoints."""
 
+    playlists: ClassVar[list[dict[str, object]]] = [dict(_PLAYLIST)]
+
     @override
     def log_message(self, format: str, *args: object) -> None:
         del format, args
@@ -144,17 +159,35 @@ class _Fixture(BaseHTTPRequestHandler):
         elif "playlistItems" in self.path:
             self._json({"items": list(_PLAYLIST_ITEMS)})
         elif "playlists" in self.path:
-            self._json({"items": [dict(_PLAYLIST)]})
+            self._json({"items": [dict(item) for item in self.playlists]})
         elif "videos" in self.path:
             self._json({"items": [dict(_VIDEO)]})
         else:
             self._json({"items": []})
 
 
+class _AmbiguousFixture(_Fixture):
+    playlists: ClassVar[list[dict[str, object]]] = [
+        dict(_PLAYLIST),
+        dict(_SECOND_PLAYLIST),
+    ]
+
+
 @pytest.fixture
 def server() -> Iterator[str]:
     """Serve the fixture on a loopback port for one test."""
     httpd = HTTPServer(("127.0.0.1", 0), _Fixture)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{httpd.server_port}"
+    httpd.shutdown()
+    thread.join(timeout=5)
+
+
+@pytest.fixture
+def ambiguous_server() -> Iterator[str]:
+    """Serve two playlists sharing the same title prefix."""
+    httpd = HTTPServer(("127.0.0.1", 0), _AmbiguousFixture)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     yield f"http://127.0.0.1:{httpd.server_port}"
@@ -273,6 +306,64 @@ def test_playlists_items_resolves_title_prefix(server: str) -> None:
     raw = _json_loads(proc.stdout)
     assert _is_mapping(raw)
     assert raw["ok"] is True
+
+
+def test_playlists_exact_title_wins_over_longer_prefix_match(
+    ambiguous_server: str,
+) -> None:
+    proc = run_cli("playlists", "items", "Testlist", env=api_env(ambiguous_server))
+    raw = _json_loads(proc.stdout)
+    assert _is_mapping(raw)
+    assert raw["ok"] is True
+    playlist = raw["playlist"]
+    assert _is_mapping(playlist)
+    assert playlist["id"] == "pl-1"
+
+
+def test_playlists_add_ambiguous_title_prefix_fails_closed(
+    ambiguous_server: str,
+) -> None:
+    proc = run_cli(
+        "playlists",
+        "add",
+        "Test",
+        "vid00000009",
+        env=api_env(ambiguous_server),
+    )
+    assert proc.returncode == 1
+    assert not proc.stderr
+    raw = _json_loads(proc.stdout)
+    assert _is_mapping(raw)
+    assert raw["ok"] is False
+    error = raw["error"]
+    assert _is_mapping(error)
+    assert error["code"] == "AMBIGUOUS_PLAYLIST"
+    details = error["details"]
+    assert _is_mapping(details)
+    matches = details["matches"]
+    assert _is_object_list(matches)
+    assert len(matches) == 2
+
+
+def test_playlists_apply_malformed_manifest_is_structured_error(
+    tmp_path: Path, server: str
+) -> None:
+    manifest = tmp_path / "bad.tsv"
+    _ = manifest.write_text(
+        "Testlist\tvid00000001\nmissing-video-column\n", encoding="utf-8"
+    )
+    proc = run_cli("playlists", "apply", str(manifest), env=api_env(server))
+    assert proc.returncode == 1
+    assert "Traceback" not in proc.stderr
+    raw = _json_loads(proc.stdout)
+    assert _is_mapping(raw)
+    assert raw["ok"] is False
+    error = raw["error"]
+    assert _is_mapping(error)
+    assert error["code"] == "BAD_MANIFEST"
+    details = error["details"]
+    assert _is_mapping(details)
+    assert details["line"] == 2
 
 
 def test_playlists_add_skips_present_videos(server: str) -> None:

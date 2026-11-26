@@ -31,7 +31,7 @@ Simple requests run directly with known options; complex ones fetch docs first.
 ## Data API operations (scripts/cli.py)
 
 ```text
-uv run --script skills/current/youtube/scripts/cli.py <command> [options]
+uv run --script <skill-dir>/scripts/cli.py <command> [options]
 ```
 
 Commands:
