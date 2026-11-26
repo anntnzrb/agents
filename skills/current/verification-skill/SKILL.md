@@ -22,7 +22,7 @@ Read the mode file in full before acting. Applying a mode from this table alone 
 ## Where the generated skill lives
 
 - Write the skill to `<repo>/.agents/skills/verify-<app>/`. Codex, pi, and omp discover project skills there.
-- Claude Code discovers project skills in `.claude/skills/`. Link it instead of copying: `ln -s ../../.agents/skills/verify-<app> .claude/skills/verify-<app>`. One copy per harness drifts.
+- Claude Code discovers project skills in `.claude/skills/`. Create `.claude/skills/` when absent, then link it instead of copying: `ln -s ../../.agents/skills/verify-<app> .claude/skills/verify-<app>`. One copy per harness drifts.
 - The generated skill belongs to the app repository. Never put it in the shared skills SSOT.
 - Helper scripts use the app's own stack and toolchain. The shared-skill `scripts/cli.py` rule does not apply to them.
 
