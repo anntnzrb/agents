@@ -89,4 +89,4 @@ mcporter call linear.list_teams --output json
 - **Passing multiline content or files:** Use `--args '{"key": "value"}'` for JSON or `content=@file.md` for Markdown payloads.
 - **Authentication recovery:** If a 401/403 error occurs, execute `mcporter auth linear`.
 - **Avoid duplicate document headers:** Linear renders a document's `title` property as the page header. Do not repeat the title as a leading `# H1` in `content`.
-- **Meeting notes & transcripts:** When logging recurring meetings in a project, maintain a pinned index document that links each session's summary and transcript. Include a `## Key People` roster (names, roles, and ASR variants) in the index to ground speaker attribution.
+- **Meeting notes & transcripts:** When the user asks to maintain recurring meeting notes or transcripts in a project, maintain a pinned index document that links each session's summary and transcript. Include a `## Key People` roster (names, roles, and ASR variants) in the index to ground speaker attribution.
