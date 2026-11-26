@@ -144,16 +144,22 @@ return dp[final_state]
 ```text
 state = initial
 seen = {state: 0}
+history = [state]
 
 for step in range(1, max_steps + 1):
     state = transition(state)
     if state in seen:
         cycle_start = seen[state]
         cycle_len = step - cycle_start
-        remaining = (target - cycle_start) % cycle_len
-        # Look up from stored states
+        answer_index = (
+            target
+            if target < cycle_start
+            else cycle_start + (target - cycle_start) % cycle_len
+        )
+        answer = history[answer_index]
         break
     seen[state] = step
+    history.append(state)
 ```
 
 **Tip**: Store full state history to retrieve answer after finding cycle.
