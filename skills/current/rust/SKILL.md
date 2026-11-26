@@ -107,7 +107,7 @@ Gate order:
 2. `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
 3. `cargo nextest run --workspace --all-features --locked`
 4. `cargo test --doc --all-features --locked` for each package with a library target; the gate runs it through bundled `assets/governance-check.py --doctests`
-5. `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --locked`
+5. `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --all-features --locked`
 6. `cargo deny --locked check`
 7. `cargo machete`
 8. `uv run --script <trusted-base-checker> <base> --inventory`

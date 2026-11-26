@@ -51,7 +51,10 @@ COMMANDS = (
         "doctests",
         (sys.executable, str(SKILL / "assets/governance-check.py"), "--doctests"),
     ),
-    ("docs", ("cargo", "doc", "--no-deps", "--workspace", "--locked")),
+    (
+        "docs",
+        ("cargo", "doc", "--no-deps", "--workspace", "--all-features", "--locked"),
+    ),
     ("dependencies", ("cargo", "deny", "--locked", "check")),
     ("unused dependencies", ("cargo", "machete")),
 )
@@ -79,11 +82,8 @@ def run(
     if docs:
         env["RUSTDOCFLAGS"] = f"{env.get('RUSTDOCFLAGS', '')} -D warnings".strip()
     if miri:
-        _ = env.setdefault("PROPTEST_CASES", "16")
-        env["MIRIFLAGS"] = (
-            f"{env.get('MIRIFLAGS', '')} "
-            "-Zmiri-disable-isolation -Zmiri-strict-provenance"
-        ).strip()
+        env["PROPTEST_CASES"] = "16"
+        env["MIRIFLAGS"] = "-Zmiri-disable-isolation -Zmiri-strict-provenance"
     result = subprocess.run(
         command,
         cwd=path,

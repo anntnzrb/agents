@@ -193,6 +193,7 @@ def test_full_gate_order(workspace: Path) -> None:
         "run",
     ]
     assert "test --doc --all-features --locked --package fixture" in commands[3]
+    assert "doc --no-deps --workspace --all-features --locked" in commands[4]
     assert "[9/9] Miri: no changes" in result.stdout
 
 
@@ -383,11 +384,11 @@ def test_inventory_failure_removes_baseline_worktree(workspace: Path) -> None:
     assert worktrees.count("worktree ") == 1
 
 
-@pytest.mark.parametrize("existing_flags", ["", "-Zmiri-seed=42"])
+@pytest.mark.parametrize("existing_flags", ["", "-Zmiri-disable-stacked-borrows"])
 def test_miri_scopes_unsafe_package(
     workspace: Path, monkeypatch: pytest.MonkeyPatch, existing_flags: str
 ) -> None:
-    """All containing approved packages run, preserving caller Miri flags first."""
+    """All approved packages run with hermetic Miri flags, ignoring caller overrides."""
     monkeypatch.setenv("MIRIFLAGS", existing_flags)
     source = workspace / "crates/nested/src/lib.rs"
     source.parent.mkdir(parents=True, exist_ok=True)
@@ -400,7 +401,7 @@ def test_miri_scopes_unsafe_package(
         commands[-1] == "cargo +nightly miri test --all-features -p fixture -p nested"
     )
     assert (workspace / "miri-flags.txt").read_text(encoding="utf-8") == (
-        f"{existing_flags} -Zmiri-disable-isolation -Zmiri-strict-provenance".strip()
+        "-Zmiri-disable-isolation -Zmiri-strict-provenance"
     )
 
 
@@ -428,11 +429,11 @@ def test_miri_packages_sorted_and_unique(workspace: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("existing_cases", [None, "5", ""])
+@pytest.mark.parametrize("existing_cases", [None, "1", ""])
 def test_miri_body_only_edit_and_property_budget(
     workspace: Path, monkeypatch: pytest.MonkeyPatch, existing_cases: str | None
 ) -> None:
-    """An unchanged unsafe token cannot hide a body edit from Miri."""
+    """A body edit reaches Miri with the hermetic property budget."""
     if existing_cases is None:
         monkeypatch.delenv("PROPTEST_CASES", raising=False)
     else:
@@ -452,9 +453,7 @@ def test_miri_body_only_edit_and_property_budget(
     result = invoke(workspace)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "[9/9] Miri\n" in result.stdout
-    assert (workspace / "proptest-cases.txt").read_text(encoding="utf-8") == (
-        "16" if existing_cases is None else existing_cases
-    )
+    assert (workspace / "proptest-cases.txt").read_text(encoding="utf-8") == "16"
 
 
 def test_miri_empty_trusted_selection(workspace: Path) -> None:

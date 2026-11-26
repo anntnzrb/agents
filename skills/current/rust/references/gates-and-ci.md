@@ -30,7 +30,7 @@ The ordered gate is:
 | 2 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Clippy |
 | 3 | `cargo nextest run --workspace --all-features --locked` | Nextest |
 | 4 | Bundled `assets/governance-check.py --doctests`, using the CLI's interpreter | rustdoc tests |
-| 5 | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --locked` | rustdoc |
+| 5 | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --all-features --locked` | rustdoc |
 | 6 | `cargo deny --locked check` | cargo-deny |
 | 7 | `cargo machete` | cargo-machete |
 | 8 | `uv run --script <trusted-base-checker> <base-ref> --inventory` | governance-check |
@@ -43,7 +43,7 @@ The CLI defaults to `--base origin/main` and `--path` set to the current directo
 The standalone checker defaults its base to `origin/main`. Exit codes match SKILL.md. `--doctests` selects library packages through Cargo metadata and returns success without a doctest command for a binary-only workspace. The local gate uses the bundled helper for this step; CI runs `uv run --script .gate/governance-check.py --doctests`.
 
 - MUST run Miri on executable unsafe logic in an approved escape-hatch path. Step 9 selects packages by path, which is a trigger, not a soundness proof. [Miri; self-check]
-- MUST expect gate step 9 to run Miri, on any change, for every workspace package containing files in escape-hatch paths. The gate sets the Miri flags and proptest case count. [scripts/cli.py gate; Miri]
+- MUST expect gate step 9 to run Miri, on any change, for every workspace package containing files in escape-hatch paths. The gate sets the Miri flags and proptest case count hermetically; inherited environment values do not override them. [scripts/cli.py gate; Miri]
 - MUST pass the local gate before reporting done. When the repository has CI, obtain green CI too. Otherwise report CI as unrun. Report every blocked or unrun check explicitly. [CI; self-check]
 
 ## Install assets
