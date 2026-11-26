@@ -8,34 +8,34 @@ This reference documents how to interact with the local transcript knowledge bas
 Mneme provides a single polymorphic `search` entrypoint modeled after modern retrieval systems:
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search <query> [options]
+uv run --script <skill-dir>/scripts/cli.py search <query> [options]
 ```
 
 ### 1. Hybrid Search (Default)
 By default, `search` executes a hybrid search combining BM25 keyword matching, dense vector embeddings, and an LLM reranker (via `qmd query`). This is best for natural language questions, conceptual queries, and conversational context:
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "what was the agreed timeline for project kickoff"
+uv run --script <skill-dir>/scripts/cli.py search "what was the agreed timeline for project kickoff"
 ```
 
 Structured typed queries can also be passed directly to target lexical and vector components:
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search $'lex: "budget review" timeline\nvec: when will the next phase start'
+uv run --script <skill-dir>/scripts/cli.py search $'lex: "budget review" timeline\nvec: when will the next phase start'
 ```
 
 ### 2. Exact Keyword Search (`--exact`)
 Passing `--exact` switches from hybrid retrieval to pure BM25 lexical keyword matching (via `qmd search`). This is best for exact terms, names, dates, amounts, or project identifiers:
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "Project Delta" --exact
-uv run --script skills/current/mneme/scripts/cli.py search "Q3-Budget" --exact -c meetings
+uv run --script <skill-dir>/scripts/cli.py search "Project Delta" --exact
+uv run --script <skill-dir>/scripts/cli.py search "Q3-Budget" --exact -c meetings
 ```
 
 ### 3. Disabling Reranker (`--no-rerank`)
 For faster hybrid queries where LLM reranking latency is unnecessary:
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "quarterly budget timeline" --no-rerank
+uv run --script <skill-dir>/scripts/cli.py search "quarterly budget timeline" --no-rerank
 ```
 
 ### 4. Limiting and Scoping
@@ -43,7 +43,7 @@ uv run --script skills/current/mneme/scripts/cli.py search "quarterly budget tim
 - `-n, --limit <count>`: Number of results to return (default: 5).
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "battery life" -c meetings -n 10
+uv run --script <skill-dir>/scripts/cli.py search "battery life" -c meetings -n 10
 ```
 
 ---
@@ -53,7 +53,7 @@ uv run --script skills/current/mneme/scripts/cli.py search "battery life" -c mee
 Passing `--json` instructs the search command to return machine-readable structured JSON containing rich snippets, document IDs, line numbers, and relevance scores:
 
 ```bash
-uv run --script skills/current/mneme/scripts/cli.py search "battery issues" --json
+uv run --script <skill-dir>/scripts/cli.py search "battery issues" --json
 ```
 
 ### Response Schema
@@ -93,7 +93,7 @@ When deeper context surrounding a matched `#docid` is needed, use the `get` comm
 
 ```bash
 # Fetch 15 lines starting from line 40 of document #abc1234
-uv run --script skills/current/mneme/scripts/cli.py get "#abc1234:40:15"
+uv run --script <skill-dir>/scripts/cli.py get "#abc1234:40:15"
 ```
 
 ---
@@ -104,7 +104,7 @@ When new clean transcripts are saved to disk, update the index using `qmd` direc
 
 ```bash
 # Add folder to collection if not already added
-qmd collection add ~/vault/meetings --name meetings
+qmd collection add <meetings-dir> --name meetings
 
 # Attach semantic folder context
 qmd context add qmd://meetings "Transcripts and notes from team meetings and discussions"

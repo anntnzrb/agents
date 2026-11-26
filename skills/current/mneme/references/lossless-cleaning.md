@@ -9,15 +9,17 @@ The primary failure mode when cleaning transcripts is premature summarization or
 ### What MUST Be Cleaned / Denoised
 
 1. **Verbal Fillers and Tics**:
-   - Strip meaningless verbal fillers across languages, such as `"um"`, `"uh"`, `"you know"`, `"like"`, `"ah"`, `"er"`, `"o sea"`, `"tipo"`, and `"este..."`, when they carry no semantic weight.
+   - Strip meaningless verbal fillers across languages, such as `"um"`, `"uh"`, `"you know"`, `"like"`, `"er"`, `"o sea"`, `"tipo"`, and `"este..."`, when they carry no semantic weight.
+   - Do not strip standalone `"ah"` or `"eh"` mechanically: they can be acknowledgments or hesitations, both of which are conversational signal. Collapse exact stutter repetitions to one occurrence, but preserve that occurrence.
 2. **ASR Hallucinations and Stutter Loops**:
+   - Remove `{disfmarker}` and `{vocalsound}` annotation syntax. If a labeled turn contains only removable noise, keep its speaker header as an empty turn so chronology and turn count remain visible.
    - Remove acoustic loop repetitions (for example, `"we need to, to, to review"` -> `"we need to review"`).
    - Remove false starts that the speaker immediately corrects (for example, `"We should, I mean, if we check"` -> `"If we check"`).
 3. **Punctuation and Paragraph Structure**:
    - Break run-on blocks into readable, grammatically coherent paragraphs.
    - Fix missing question marks, colons, and quotation marks around direct speech.
 4. **Speaker Attribution and Turn Reconstruction**:
-   - Preserve every speaker turn in chronological order. NEVER merge alternating turns into a single speaker block.
+   - Preserve every labeled speaker turn in chronological order. NEVER merge alternating turns or consecutive same-speaker turns into a single speaker block.
    - Strip meeting-platform suffixes such as `(You)`, `(Host)`, or `(Guest)` while preserving full Unicode and accented names.
    - When ASR assigns all text to one speaker, uses generic labels (`Speaker 1`), or misspells names, use contextual clues (greetings, roles, self-references) and any available participant roster to assign turns accurately.
 

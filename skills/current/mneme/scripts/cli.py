@@ -35,13 +35,13 @@ class MnemeArgs(argparse.Namespace):
 _STUTTER_RE = re.compile(r"\b([^\W\d_]+)(?:[,\s]+\1\b)+", re.IGNORECASE)
 # Cut-off word fragment followed by the full word: "escri- escribir".
 _FALSE_START_RE = re.compile(r"\b([^\W\d_]{1,10})-\s*(?=\1)", re.IGNORECASE)
-# Hyphen guards keep acknowledgements such as "Mm-hmm" intact.
+# Hyphen guards keep acknowledgements such as "Mm-hmm" intact. Standalone
+# "ah" and "eh" stay: they can carry acknowledgement or hesitation, both of
+# which are conversational signal rather than deterministic filler.
 _FILLERS = (
     "um",
     "uh",
     "er",
-    "ah",
-    "eh",
     "hmm",
     r"like,\s*you know",
     "you know what i mean",
@@ -53,6 +53,7 @@ _FILLER_RE = re.compile(
     rf"(?<![\w-])(?:{'|'.join(_FILLERS)})(?:\.\.\.)?(?![\w-]),?\s*",
     re.IGNORECASE,
 )
+_ASR_ANNOTATION_RE = re.compile(r"\{(?:disfmarker|vocalsound)\}", re.IGNORECASE)
 _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,.;:?!])")
 _REPEATED_COMMA_RE = re.compile(r",(?:\s*,)+")
 _NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
@@ -118,30 +119,36 @@ def handle_get(args: MnemeArgs) -> int:
 
 
 def denoise_line_text(line: str) -> str:
-    """Remove repetitive stutter loops and verbal fillers from a line."""
-    denoised = line
+    """Remove ASR annotations, repetitive stutter loops, and verbal fillers."""
+    denoised = _ASR_ANNOTATION_RE.sub("", line)
     while (step := _FALSE_START_RE.sub("", denoised)) != denoised:
         denoised = step
     denoised = _STUTTER_RE.sub(r"\1", denoised)
     denoised = _FILLER_RE.sub("", denoised)
     denoised = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", denoised)
     denoised = _REPEATED_COMMA_RE.sub(",", denoised)
-    return re.sub(r"[ \t]+", " ", denoised).strip().lstrip(",;: ")
+    denoised = re.sub(r"[ \t]+", " ", denoised).strip().lstrip(",;: ")
+    if not re.search(r"\w", denoised):
+        return ""
+    return denoised
 
 
 def clean_text_lossless(raw_text: str) -> str:
-    """Perform lossless transcript denoising preserving facts and turn order."""
+    """Perform lossless transcript denoising preserving facts and every turn."""
     cleaned_blocks: list[str] = []
     current_speaker: str | None = None
     current_paragraphs: list[str] = []
 
     def flush() -> None:
-        nonlocal current_speaker, current_paragraphs
-        if current_paragraphs:
-            content = " ".join(current_paragraphs).strip()
+        nonlocal current_paragraphs
+        content = " ".join(current_paragraphs).strip()
+        if current_speaker is not None:
+            block = f"**{current_speaker}:**"
             if content:
-                prefix = f"**{current_speaker}:**\n" if current_speaker else ""
-                cleaned_blocks.append(f"{prefix}{content}")
+                block += f"\n{content}"
+            cleaned_blocks.append(block)
+        elif content:
+            cleaned_blocks.append(content)
         current_paragraphs = []
 
     for raw_line in raw_text.splitlines():
@@ -154,9 +161,8 @@ def clean_text_lossless(raw_text: str) -> str:
                 (match.group(1) or match.group(2) or "").strip()
             )
             rest = match.group(3).strip()
-            if speaker_name != current_speaker:
-                flush()
-                current_speaker = speaker_name
+            flush()
+            current_speaker = speaker_name
             line = rest
 
         if line and (denoised := denoise_line_text(line)):

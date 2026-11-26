@@ -209,11 +209,49 @@ def test_clean_text_lossless_false_starts_and_spanish_fillers() -> None:
     cleaned = clean_text_lossless(raw)
     assert "le voy a escribir" in cleaned
     assert "escri-" not in cleaned
-    assert "**Juan:**\nya." in cleaned
-    assert "lo tengo 100% claro, manual." in cleaned
-    assert "Eh" not in cleaned
+    assert "**Juan:**\nAh, ya. Eh, lo tengo 100% claro, manual." in cleaned
     assert "Mm-hmm." in cleaned
     assert "\n," not in cleaned
+
+
+def test_clean_text_lossless_removes_asr_annotation_markers() -> None:
+    raw = (
+        "Alicia: {vocalsound} We need the battery smaller by 2027 "
+        "{disfmarker}.\n"
+        "Beto: {disfmarker} Agreed.\n"
+    )
+    cleaned = clean_text_lossless(raw)
+    assert "{vocalsound}" not in cleaned
+    assert "{disfmarker}" not in cleaned
+    assert "We need the battery smaller by 2027." in cleaned
+    assert "**Beto:**\nAgreed." in cleaned
+
+
+def test_clean_text_lossless_preserves_consecutive_same_speaker_turns() -> None:
+    raw = "Alicia: First turn.\nAlicia: Second turn.\nBeto: Answer.\n"
+    cleaned = clean_text_lossless(raw)
+    assert cleaned == (
+        "**Alicia:**\nFirst turn.\n\n**Alicia:**\nSecond turn.\n\n**Beto:**\nAnswer.\n"
+    )
+
+
+def test_clean_text_lossless_keeps_annotation_only_turn_position() -> None:
+    raw = "Alicia: {vocalsound}\nBeto: Hello.\n"
+    cleaned = clean_text_lossless(raw)
+    assert cleaned == "**Alicia:**\n\n**Beto:**\nHello.\n"
+
+
+def test_clean_text_lossless_drops_orphaned_filler_punctuation() -> None:
+    raw = "Alicia: Hmm hmm hmm .\nBeto: Hello.\n"
+    cleaned = clean_text_lossless(raw)
+    assert cleaned == "**Alicia:**\n\n**Beto:**\nHello.\n"
+
+
+def test_clean_text_lossless_preserves_ah_eh_acknowledgment_and_hesitation() -> None:
+    raw = "Alicia: Ah, I see the tradeoff.\nBeto: Eh, maybe we wait.\n"
+    cleaned = clean_text_lossless(raw)
+    assert "Ah, I see the tradeoff." in cleaned
+    assert "Eh, maybe we wait." in cleaned
 
 
 def test_clean_text_lossless_keeps_repeated_numbers() -> None:
