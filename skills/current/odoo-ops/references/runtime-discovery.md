@@ -18,13 +18,13 @@ Use absolute environment paths when configuring overrides. The CLI does not prov
 uv run --script <skill-dir>/scripts/cli.py env --json
 ```
 
-`env --json` reports `runtime_path` (installed Odoo core source), `addons_paths` (all active addon directories), the custom addons directory, the config path, and the effective database with its source. [Output contracts](output-contracts.md#environment) defines every field and the database precedence.
+`env --json` reports `runtime_path` (local runtime directory containing the core source), `addons_paths` (all active addon directories), the custom addons directory, the config path, and the effective database with its source. [Output contracts](output-contracts.md#environment) lists the fields and database precedence.
 
 Always check `runtime_path` and `addons_paths` before designing new models or methods. Inspecting the installed source ensures your code builds upon the native conventions and primitives of the installed Odoo version.
 
 ## Database Selection
 
-Commands default to the database resolved by `env` (`effective_database`). You can override this default explicitly with `--db <database_name>`.
+Pass `--db <database_name>` to override the default. `dev` and `test` prefer the selected workflow's database when configured. Other workspace commands use the database resolved by `env` (`effective_database`).
 
 If the default database is missing, run `env --json` or `db-list` to locate available working replicas. Do not resort to raw psql or ad-hoc shell commands to guess database names.
 
@@ -34,13 +34,13 @@ Use the CLI subcommands to inspect and manage container state:
 
 - `health [--port PORT] [--wait SECONDS]`: probes HTTP endpoint on `127.0.0.1` (never use `localhost` due to IPv6 binding conflicts). Use this command instead of invoking `curl` directly.
 - `logs [-c web|db|test] [-f] [-n LINES]`: displays or tails logs from specific containers in the pod.
-- `shell [script|-] [--file PATH] [--db DB] [--rollback]`: runs Python ORM code against the local replica (refuses `_seed_` and production). Requires `dev` to be running. Commits on exit unless `--rollback` is passed.
-- `prune`: removes every test container (`odoo-test-*`), including running ones, not only those left behind by aborted runs.
+- `shell [script|-] [--file PATH] [--db DB] [--rollback]`: runs Python ORM code against the local replica (accepts only work replicas). Requires `dev` to be running. Commits on exit unless `--rollback` is passed.
+- `prune`: removes every test container for the active profile, including running ones.
 - `stop [--web]`: stops the pod or gracefully stops only the web container.
 
 ## Session Lifecycle
 
-`dev` removes `odoo-web` on exit, and `test` removes its `odoo-test-*` container. Both leave `odoo-db` and `odoo-pod` running so repeated tests and other agents reuse the warm database.
+`dev` removes the profile's web container on exit, and `test` removes its test container. Both leave the profile's DB container and pod running so repeated tests and other agents reuse the warm database.
 
 When a development session ends, run `stop` to release the database. It waits for every running test and for pod creation, so it never interrupts either; it does not detect a `dev` server or `shell` run by another agent, so check with them first. PostgreSQL receives a fast shutdown and writes a clean checkpoint before its container is removed. Container removal never deletes the bind-mounted data directory (`<runtime>/data/db`) or filestores; the next `dev` or `test` recreates the pod against the same data.
 
@@ -48,4 +48,4 @@ When a development session ends, run `stop` to release the database. It waits fo
 
 The CLI serializes pod creation with a global file lock (`odoo-ops.lock`) and test runs with a per-database lock (`odoo-ops-test-<db>.lock`). Test runs on the same database run one after another; `db-clone`, `db-drop`, and `db-restore` wait for runs on the databases they touch. `db-summary`, `db-tables`, `db-query`, `auth-temp`, `auth-restore`, and `dev` wait for a run on their database before they start; `db-list` waits for every run. External `flock` wrappers are unnecessary. Runs on different databases still share other resources; see [Parallel work](parallel-work.md).
 
-The test runner executes inside its own transient container (`odoo-test-*`) within the pod. It does not restart the pod or stop `odoo-web`. Its effect on a running `dev` server and the `git stash` restriction are under "Flags that trip agents" in `SKILL.md`.
+The test runner executes inside its own transient container within the profile's pod. It leaves the pod and web container running. Its effect on a running `dev` server and the `git stash` restriction are under "Flags that trip agents" in `SKILL.md`.

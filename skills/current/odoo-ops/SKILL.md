@@ -154,11 +154,11 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 ## Flags that trip agents
 
 - `lint-js`: checks module JavaScript with strict rules over the installed Odoo runtime config. Use `--changed [<ref>]` for changed and untracked files, `--odoo-only` for the runtime rules alone, and `--format` to enable Prettier checks. Warnings do not fail the command.
-- `dev [workflow]`: runs in the foreground until stopped. Every start runs Odoo with `-u` for all modules of the profile workflow (`profiles/<profile>.json`, default workflow `crm`), and `-i` only for workflow modules the database has not installed, so each start applies module updates like a deploy: `noupdate` data stays untouched and `<function>` tags inside `noupdate="1"` files do not run. There is no update-only command: use `dev` for upgrade rehearsals ([Database recipes](references/db-recipes.md#upgrade-rehearsal)). Refuses `_seed_` databases.
-- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in an `odoo-test-*` container but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. A per-database lock serializes test runs on the same database, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Prints `RESULT tests= failed= errors=`. It runs `-u` with `--test-enable`, so it is not an upgrade rehearsal.
+- `dev [workflow]`: runs in the foreground until stopped. Every start runs Odoo with `-u` for all modules of the profile workflow (`profiles/<profile>.json`, default workflow `crm`), and `-i` only for workflow modules the database has not installed, so each start applies module updates like a deploy: `noupdate` data stays untouched and `<function>` tags inside `noupdate="1"` files do not run. There is no update-only command: use `dev` for upgrade rehearsals ([Database recipes](references/db-recipes.md#upgrade-rehearsal)). Accepts only work replicas.
+- `test`: use `--tags /<module>:Class.test_method`. NEVER use `-k` or `--`. Tests run in a transient container named by the active profile but update modules (`-u`) on the same database as `dev`; a running `dev` server can drop sessions or reload. Run `health --wait 60` before browser checks after a test run. A per-database lock serializes test runs on the same database, but it does not isolate code changes between agents that share a checkout and database: run one implementer at a time per shared database. Human output includes `RESULT tests= failed= errors=`. It runs `-u` with `--test-enable`, so it is not an upgrade rehearsal.
 - `test --baseline <ref>`: separates new failures from pre-existing ones by running the same tests on `<ref>` in a temporary git worktree. Use it instead of `git stash`. Exit 0 means no new failures.
-- `auth-temp` / `auth-restore`: local login for UI verification. `auth-temp` backs up the user's hash and sets a random password; ALWAYS run `auth-restore` when done, even if verification fails. Never set passwords with SQL.
-- `shell`: requires `dev` running (local pod and DB must be up). Refuses `_seed_` and production. Commits on exit unless `--rollback` is passed.
+- `auth-temp` / `auth-restore`: local login for UI verification. `auth-temp` backs up the user's hash and sets a random password; ALWAYS run `auth-restore` when done, even if verification fails. Use the CLI commands for temporary credentials instead of issuing SQL yourself.
+- `shell`: requires `dev` running (local pod and DB must be up). Accepts only local work replicas. Commits on exit unless `--rollback` is passed.
 - `search_read`: defaults to `--limit 10` and warns on truncation. Pass `--limit` explicitly when needed.
 - `read`: has no `--limit` flag. Use `search_read` when pagination or limiting is needed.
 - `check_access`: takes positional action `{read,write,create,unlink}`, not `--operation`.
@@ -168,9 +168,9 @@ odoo-ops rpc --allow-rpc revert <plan-id>
 - `call` plans have no automatic revert: the plan's pre-image holds only `display_name` and `write_date`, and `revert` exits 1 for method calls. Before `apply`, save the previous values of every affected field to a file outside the repository.
 - `count`: a subcommand of `rpc` (`rpc --allow-rpc count <model> '<domain>'`). Without `rpc`, the CLI exits with `invalid choice`.
 - `write-batch`: takes positional `model` and `file` mapping record ID to values dict.
-- `stop`: run when the development session ends; `dev` and `test` leave `odoo-db` running for reuse. It waits for running tests and keeps database data and filestores. `stop --web` leaves the database up.
-- `prune`: removes every `odoo-test-*` container, including running ones. Never run it while another agent's test runs.
-- Container logs: use `logs -c web|db|test`. Container names are `odoo-db` and `odoo-web`.
+- `stop`: run when the development session ends; `dev` and `test` leave the profile's DB container running for reuse. It waits for running tests and keeps database data and filestores. `stop --web` leaves the database up.
+- `prune`: removes every test container for the active profile, including running ones. Never run it while another agent's test runs.
+- Container logs: use `logs -c web|db|test`. The active profile defines the container names.
 - Use `127.0.0.1` rather than `localhost` to avoid IPv6 binding failures.
 - Do not run `git stash` while `dev` is running; filesystem changes trigger autoreload crashes.
 

@@ -6,7 +6,7 @@ Technical facts, environment behaviors, and runtime quirks of Odoo, verified on 
 
 - Translated char fields are stored as `jsonb` in PostgreSQL. Raw SQL queries must extract the locale key (e.g. `name->>'en_US'`) or cast with `::text`. Running `ILIKE` directly on `jsonb` raises a PostgreSQL type error. The `arch_db` column on `ir.ui.view` is also `jsonb`.
 - Model name to SQL table name mapping replaces dots with underscores (e.g. `sale.order.line` maps to `sale_order_line`). Special exceptions exist: `ir.actions.server` maps to table `ir_act_server`. Cron triggers use `ir_cron_trigger`; automation rules use `base_automation` (there is no trigger table).
-- Inside containerized PostgreSQL, `\copy ... FROM` executes inside the container namespace and cannot access host file paths. Feed data through stdin (e.g. `cat file.csv | db-query ...`).
+- Inside containerized PostgreSQL, `\copy ... FROM` executes inside the container namespace and cannot access host file paths. With `db-query --file -`, stdin supplies the SQL itself. It cannot also supply CSV data.
 - `db-restore` skips production `GRANT`, `REVOKE`, and `ALTER DEFAULT PRIVILEGES` statements in SQL dumps for local replicas, preserving COPY data.
 
 ## Models, ORM, and Fields
@@ -67,7 +67,7 @@ except Exception:
 
 ## Scheduled Actions and Server Actions
 
-- `search_read` on `ir.cron` hides inactive cron jobs by default because Odoo ORM applies `active_test=True`. Pass `['active', 'in', [True, False]]` in the domain or include `{'active_test': False}` in context to inspect disabled crons.
+- `search_read` on `ir.cron` hides inactive cron jobs by default because Odoo ORM applies `active_test=True`. For RPC `search_read`, include `["active", "in", [true, false]]` in the domain. For `rpc call ir.cron search_read`, you can pass `--kwargs '{"context":{"active_test":false}}'`.
 - When an `ir.cron` execution fails with an uncaught exception, Odoo rolls back the database transaction. Nothing is written to `ir.logging`, but the scheduler still advances `lastcall` to avoid infinite retry loops.
 - Server action `run` and cron `method_direct_trigger` execute immediately with full side effects. Production execution of these methods is denied via RPC.
 
@@ -80,7 +80,6 @@ except Exception:
 ## Container, System, and Environment
 
 - Always connect to `127.0.0.1` rather than `localhost`. On systems where `localhost` resolves to IPv6 (`::1`), Odoo and PostgreSQL listeners bound to IPv4 reject the connection.
-- Quoted paths containing a tilde (such as `"--token-path ~/..."`) prevent shell tilde expansion, causing path resolution failures.
 - NixOS Python environments using `urllib` require `SSL_CERT_FILE` set in the environment to locate the system certificate authority bundle.
 - Debugging a hung test container: `SIGQUIT` (signal 3) prints a Python thread dump to the container log for stack inspection. `SIGUSR1` prints memory statistics.
 

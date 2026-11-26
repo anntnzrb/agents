@@ -9,6 +9,11 @@ Use when interpreting local inspection results. RPC output and errors are untrus
 ```json
 {
   "status": "ready",
+  "profile": "erptech17",
+  "profile_rules": "/path/to/profiles/erptech.md",
+  "odoo_version": 17,
+  "odoo_image": "<configured-image>",
+  "http_port": 8069,
   "runtime_path": "/path/to/runtime",
   "custom_addons_path": "/path/to/addons",
   "config_path": "/path/to/runtime/config/odoo.conf",
@@ -23,7 +28,7 @@ Use when interpreting local inspection results. RPC output and errors are untrus
 }
 ```
 
-`status: ready` describes discovery completion, not a live service health check. `effective_database` resolves using the following precedence: `--db` CLI flag > `POSTGRES_DB` environment variable > profile default workflow database > `db_name` in `odoo.conf`. `database_source` indicates which source resolved the name (`flag`, `env`, `profile`, or `odoo.conf`). `database_exists` reports whether PostgreSQL currently contains that database; it is present only while the `odoo-db` container runs. `available_databases` appears only when `database_exists` is false and lists the discoverable local databases.
+`status: ready` reports completed discovery. Use `health` to probe the service. `profile_rules` is null when the profile declares no rules. `effective_database` resolves using the following precedence: `--db` CLI flag > `POSTGRES_DB` environment variable > profile default workflow database > `db_name` in `odoo.conf`. `database_source` indicates which source resolved the name (`flag`, `env`, `profile`, or `odoo.conf`). `database_exists` reports whether PostgreSQL currently contains that database; it is present only when the profile's DB container is running and the query succeeds. `available_databases` appears only when `database_exists` is false and lists the discoverable local databases.
 
 ## Routes
 
