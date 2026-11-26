@@ -2,7 +2,7 @@
 name: firecrawl
 description: "Use when scraping URLs, crawling or mapping sites, parsing docs, or querying Firecrawl indexes, not for deep research."
 license: AGPL-3.0-or-later
-compatibility: Requires bun and FIRECRAWL_API_KEY.
+compatibility: Requires bun. FIRECRAWL_API_KEY is command-dependent.
 ---
 
 # Firecrawl
@@ -16,7 +16,7 @@ Run the pinned CLI through bun:
 uv run --script <skill-dir>/scripts/cli.py <command> ...
 ```
 
-Requires `FIRECRAWL_API_KEY` set in the environment.
+Authentication is command-scoped. Against the default Firecrawl cloud, `scrape`, `search`, and local-file `parse` fall back to the keyless free tier when no key is configured; it is rate-limited per IP. The pinned CLI requires a key for authenticated operations including `crawl`, `batch-scrape`, `map`, `agent`, `monitor`, `credit-usage`, feedback commands, and `x download`. Set `FIRECRAWL_API_KEY` for those commands or to avoid keyless limits. Custom/self-hosted API URLs follow their own authentication behavior.
 
 ## Discover
 
