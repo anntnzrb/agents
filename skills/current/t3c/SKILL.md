@@ -6,7 +6,7 @@ license: AGPL-3.0-or-later
 
 # T3c
 
-You are the orchestrator of a T3 Code thread. Keep design, decisions, briefs, and verification in this thread. Delegates are T3-owned subagents, called children below, and delegated threads. Split work by context, not by kind. Every handoff loses detail and adds a round trip. Do work whose context this thread already holds, including mechanical edits, prose edits, and small logic changes. Delegate a slice that needs little from this conversation and returns a compact result: parallel slices with disjoint files, implementation whose context this thread has not loaded, noisy gate runs, recon, and independent review. Delegate work that would hold this turn for more than a few minutes, because a long turn keeps the user waiting. Write briefs and notes outside the repository, for example under `/tmp`. The user keeps chatting with you while delegates run, so this thread MUST stay responsive.
+You are the orchestrator of a T3 Code thread. Keep design, decisions, briefs, and verification in this thread. Delegates are T3-owned subagents, called children below, and delegated threads. Split work by context, not by kind. Every handoff loses detail and adds a round trip. Do work whose context this thread already holds, including mechanical edits, prose edits, and small logic changes. Delegate a slice that needs little from this conversation and returns a compact result: parallel slices with disjoint files, implementation whose context this thread has not loaded, noisy gate runs, recon, and independent review. Delegate work that would hold this turn for more than a few minutes, because a long turn keeps the user waiting. Write briefs and notes outside the repository, for example under `<temp-dir>`. The user keeps chatting with you while delegates run, so this thread MUST stay responsive.
 
 ## Roles
 
@@ -55,9 +55,10 @@ When waiting on pull requests in T3:
 - Give each slice its owned files, a done predicate, one targeted check for the implementer, and the full gate commands for the scout.
 - Decide edge cases and behavior choices in the brief. Never hand them to a delegate as "choose and justify".
 - Group small dependent slices into one delegation while the resulting diff stays reviewable. Split smaller only when the risk justifies it.
-- Delegates run in this thread's worktree with no isolation. Run slices in parallel only when their file sets are disjoint and each delegate has its own stateful resources: its own worktree and its own copy of any shared database, service, or port it mutates or tests against. Otherwise run them one after another.
+- `delegate_task` defaults to `isolation: "shared"`: the child works in this thread's checkout and sees its uncommitted edits. Keep implementers and gate scouts shared when the scout must verify uncommitted work. Use `isolation: "worktree"` only when the child needs a separate checkout or PR from the parent commit; uncommitted edits stay out.
+- Run shared slices in parallel only when their file sets are disjoint and each delegate has its own stateful resources: its own copy of any shared database, service, or port it mutates or tests against. Otherwise run them one after another.
 - Assign a single integrator for a target branch and publication. Never let multiple delegates or threads contend to push or integrate into the same target ref.
-- With that isolation, review slice N while slice N+1 runs.
+- With disjoint shared slices or isolated checkouts, review slice N while slice N+1 runs.
 - Before dispatching implementers, call `t3_worktree_status` to confirm the branch and path they inherit.
 
 ## Write the brief
@@ -78,7 +79,7 @@ Context: <facts already established>
 Acceptance: <observable result>
 Check: <one targeted command, or "none, the scout runs the gates">
 Blockers: try other approaches first. Stop only on a blocker that the repository and your tools cannot resolve, and report what you tried.
-Report: start with a short summary: PASS, ISSUES, or BLOCKED; changed or examined files; check results; open questions. Then the full detail: line ranges, check output, findings. If the full report exceeds what fits comfortably in a tool result, write it complete to a file under /tmp and end with the summary and its path. Never truncate or drop detail.
+Report: start with a short summary: PASS, ISSUES, or BLOCKED; changed or examined files; check results; open questions. Then the full detail: line ranges, check output, findings. If the full report exceeds what fits comfortably in a tool result, write it complete to a file under <temp-dir> and end with the summary and its path. Never truncate or drop detail.
 ```
 
 Omit `Change` for read-only roles. Name exact paths: a delegate that searches for its own scope drifts from it.
@@ -103,6 +104,7 @@ Keep the first two lines in every brief. T3's orchestration instructions encoura
 ```
 
 - Always pass `options`. A cross-provider target does not inherit options and falls back to the model's default effort, which can be lower.
+- Omit `isolation` for the shared default. Pass `"isolation": "worktree"` only under the separated-checkout rule above.
 - Pass only the option IDs `roles.toml` lists. The `opencode` driver accepts `variant` and `agent`; `reasoningEffort` and any other ID fail with `invalid_request`. An `opencode` child runs OpenCode's `build` agent, or `plan` in plan mode, regardless of `agent`.
 - A child inherits this thread's runtime mode. Outside full access, an `opencode` child asks before shell and edit commands, and the request waits on the child thread for the user. When a child is stuck there, tell the user which `childThreadId` needs approval.
 - Use a distinct `clientRequestId` per slice and round. Reuse a `clientRequestId` only to retry the same call.
@@ -110,8 +112,8 @@ Keep the first two lines in every brief. T3's orchestration instructions encoura
 
 ## Delegated threads
 
-- Launch with `t3_thread_launch`: `title`, the brief in `message`, `modelSelection` set to `{"instanceId": <provider>, "model": <model>, "options": <options>}` from `roles.toml`, and a `workspaceStrategy`. An omitted `workspaceStrategy` selects the project root, not this worktree; to share this worktree, pass `existing_worktree` with the path and branch from `t3_worktree_status`.
-- `t3_thread_launch` has no idempotency key. After a failed or lost launch, check `t3_thread_list` before retrying.
+- Launch with `t3_thread_launch`: `title`, the brief in `message`, `modelSelection` set to `{"instanceId": <provider>, "model": <model>, "options": <options>}` from `roles.toml`, a distinct `clientRequestId`, and a `workspaceStrategy`. An omitted `workspaceStrategy` selects the project root, not this worktree; to share this worktree, pass `{"type": "existing_worktree", "worktreePath": "<path>"}` with the path from `t3_worktree_status`.
+- After a failed or lost launch, retry the same launch with the same `clientRequestId`. Use a new key only for a different launch.
 - Append this protocol to the brief, with this thread's `threadId` from `t3_thread_list`: `When you finish a round, write your result to <file>, then call t3_thread_send with threadId <orchestrator threadId>, mode "queue", and a one-line summary with the file path. Stop every process you started, then end your turn and stay idle until the next message.`
 - Continue the dialogue with `t3_thread_send` to the thread: `mode: "queue"` for the next round, `mode: "steer"` to correct a running turn.
 - Delegated threads appear in the user's top-level thread list. When the dialogue ends, confirm the thread is idle, then call `t3_thread_organize` with `action: "archive"`.
@@ -158,7 +160,7 @@ Infrastructure failures are not model failures and do not spend the retry in ste
 | Passive PR wait on app wake | `watch_pull_request` |
 | Return thread to user inbox after PR wait | `unwatch_pull_request` |
 
-- `orchestrator_capabilities` returns the full model catalog, often hundreds of thousands of characters. Call it only after one of those errors, filter it for the role's provider and model, and report a missing target to the user.
+- `orchestrator_capabilities` returns a short default catalog; its `search` input replaces that list with matching model IDs and labels. Call it only after one of those errors, search for the role's provider or model, and report a missing target to the user.
 - Use `create_threads` only when the user asks for separate threads that share this checkout.
 - `t3_thread_fork` and `t3_thread_merge_back` are not delegation. Merge-back is lossy, and neither returns a `taskId`.
 - If the T3 tools are missing from the tool list, make one direct call to `orchestrator_capabilities`. If that fails, tell the user delegation is unavailable instead of doing the work as if delegated.
