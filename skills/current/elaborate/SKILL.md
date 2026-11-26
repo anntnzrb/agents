@@ -44,7 +44,7 @@ Commands: `ingest`, `status`, `prompt`, `check`, `build`. Every command takes `-
 4. Apply every finding marked `matters` and every cosmetic finding with a clear fix, then run `check` again.
 5. After two fix rounds with open `matters` findings, stop that unit and list it for the user with the findings. Do not loop further.
 6. Run `check --work <dir> --all` for the book-level gates (unique asides, consistent glosses).
-7. Build: `build --work <dir> --out <book>.epub --epubcheck`. When `epubcheck` is missing (exit 127), build without the flag and tell the user validation did not run.
+7. Build: `build --work <dir> --out <book>.epub --epubcheck`. When `epubcheck` is missing, the EPUB is still written; the command then exits 127 because validation did not run. Report the EPUB as unvalidated rather than rebuilding unless a rebuild is otherwise needed.
 
 Units are independent: adapt them in parallel. Re-running any command is safe. `ingest` never touches `adapted/`, and `check` caches by content hash.
 
@@ -61,7 +61,7 @@ cli.py build --work <dir> --out <book>.epub --epubcheck
 
 ## Exit codes
 
-- `0`: success, or every checked unit passes.
+- `0`: success, including pending units with no failing gates.
 - `1`: a gate failed, the build refused, or epubcheck reported errors.
 - `2`: bad input or configuration: not an EPUB, DRM, unknown config key, missing adapted file for an audit brief.
 - `127`: `--epubcheck` was given and `epubcheck` is not on `PATH`.
