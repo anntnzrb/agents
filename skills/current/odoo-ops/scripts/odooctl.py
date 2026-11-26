@@ -1510,7 +1510,7 @@ def cmd_dev(args: argparse.Namespace) -> int:
         cmd.extend(["-u", modules_str])
     try:
         banner = (
-            f"Starting Odoo {RUNTIME.odoo_version} dev server on http://localhost:{RUNTIME.http_port} "
+            f"Starting Odoo {RUNTIME.odoo_version} dev server on http://127.0.0.1:{RUNTIME.http_port} "
             f"(db: {db_to_use})"
         )
         print(banner)
