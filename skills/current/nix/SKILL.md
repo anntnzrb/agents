@@ -9,7 +9,7 @@ metadata:
 
 # Nix Development
 
-Research-first Nix development using **parallel Context7 `docs` queries** for accurate, up-to-date information.
+Research-first Nix development using **parallel Context7 documentation queries through MCPorter** for accurate, up-to-date information.
 
 ## Workflow
 

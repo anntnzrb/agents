@@ -161,10 +161,12 @@ Read this reference before selecting Context7 repositories or query patterns.
 
 ## Parallel Context7 Queries
 
-Spawn read-only subagents in parallel when the harness supports them to query relevant library IDs simultaneously; otherwise do the passes sequentially yourself:
+Spawn read-only subagents in parallel when the harness supports them to query relevant library IDs simultaneously; otherwise do the passes sequentially yourself. Load the `context7` skill, inspect the live tool schema with `mcporter list context7 --brief` and `mcporter list context7.<tool> --schema`, then call the live documentation tool with the exact library ID and a focused query:
 
-- Query `NixOS/nixpkgs`: `context7 docs /NixOS/nixpkgs "<USER_QUESTION>"` and extract key findings.
-- Query `NixOS/nix.dev`: `context7 docs /NixOS/nix.dev "<USER_QUESTION>"` and extract key findings.
+- Query `/NixOS/nixpkgs` with `<USER_QUESTION>` and extract key findings.
+- Query `/NixOS/nix.dev` with `<USER_QUESTION>` and extract key findings.
+
+Do not use a memorized Context7 command or schema; the live MCPorter schema is authoritative.
 
 ### Example Query Patterns
 
