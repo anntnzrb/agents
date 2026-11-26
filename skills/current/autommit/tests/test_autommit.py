@@ -1191,6 +1191,19 @@ class AutommitUnitTests(unittest.TestCase):
         self.assertTrue(requires_atomicity_review(broad, diff))
         self.assertFalse(requires_atomicity_review(narrow, diff))
 
+        explicit_hunk = normalize_proposal(
+            {
+                "commits": [
+                    {
+                        "summary": "Narrow change",
+                        "details": [],
+                        "changes": [{"path": "a.txt", "hunks": [1]}],
+                    }
+                ]
+            }
+        )
+        self.assertFalse(requires_atomicity_review(explicit_hunk, diff))
+
         split = normalize_proposal(
             {
                 "commits": [

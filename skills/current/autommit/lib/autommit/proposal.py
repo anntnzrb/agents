@@ -719,9 +719,13 @@ def requires_atomicity_review(proposal: CommitProposal, staged_diff: str) -> boo
     if len(proposal.commits) > 1:
         return False
     single = commits[0]
+    selector = single.changes[0].hunks if len(single.changes) == 1 else None
+    selects_only_hunk = isinstance(selector, AllSelector) or (
+        isinstance(selector, IndicesSelector) and selector.indices == (1,)
+    )
     narrow = (
         len(single.changes) == 1
-        and isinstance(single.changes[0].hunks, AllSelector)
+        and selects_only_hunk
         and len(single.details) <= 1
         and changed_hunk_count(staged_diff) <= 1
     )
