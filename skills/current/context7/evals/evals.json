@@ -8,7 +8,7 @@
       "files": [],
       "expectations": [
         "Resolves the official React library ID starting with a leading forward slash (e.g. /reactjs/react.dev or /facebook/react)",
-        "Queries documentation through `mcporter call context7.get_library_docs` with the resolved ID",
+        "Queries documentation through `mcporter call context7.query-docs` with the resolved ID",
         "Provides code examples demonstrating useId with aria-describedby or htmlFor attributes",
         "Cites the Context7 library ID used for documentation retrieval"
       ]
@@ -164,7 +164,7 @@
       "files": [],
       "expectations": [
         "Resolves Next.js and checks the returned candidates for a version-specific ID",
-        "Queries documentation through `mcporter call context7.get_library_docs` with the returned versioned ID if available",
+        "Queries documentation through `mcporter call context7.query-docs` with the returned versioned ID if available",
         "Provides guidance relevant to Next.js 14 without introducing breaking Next.js 15 defaults",
         "States if the requested version cannot be found instead of inventing a versioned ID"
       ]
@@ -211,7 +211,7 @@
       "expectations": [
         "Explicitly warns against including passwords, API keys, or private secrets in search queries",
         "Redacts sensitive values and reformulates query with abstract placeholders (e.g. '<db_password>')",
-        "If querying documentation, uses `mcporter call context7.get_library_docs` with sanitized query text",
+        "If querying documentation, uses `mcporter call context7.query-docs` with sanitized query text",
         "Protects user credentials from leaking over network search requests"
       ]
     },

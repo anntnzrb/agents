@@ -29,17 +29,18 @@ Documentation retrieval is a two-step process:
 ### 1. Resolve Library to Context7 ID
 Search the index with the library name (e.g., `"Next.js"`, `"React"`, `"OpenAI"`, `"Effect"`, `"Pydantic"`):
 ```sh
-mcporter call context7.resolve_library_id query="Next.js" --output json
+mcporter call context7.resolve-library-id libraryName="Next.js" query="App Router Server Actions" --output json
 ```
 *(Returns candidate library IDs starting with `/`, such as `/vercel/next.js` or `/openai/openai-node`).*
 
 ### 2. Query Documentation Snippets
 Fetch targeted documentation using the resolved library ID:
 ```sh
-mcporter call context7.get_library_docs library_id="/vercel/next.js" query="App Router Server Actions" --output json
+mcporter call context7.query-docs libraryId="/vercel/next.js" query="App Router Server Actions" language="TypeScript" --output json
 ```
 
 ## Best Practices
 - **Single-topic queries:** Keep each query focused on a single topic (e.g. routing, caching, auth).
-- **Exact library ID:** Always pass the full library ID starting with `/` returned by step 1.
+- **Exact library ID:** Always pass the full library ID starting with `/` returned by step 1 as `libraryId`; pass the optional version as `version`, not as a suffix you construct yourself.
+- **Resolution inputs:** `resolve-library-id` requires both `libraryName` and a focused `query`. The query is sent to Context7, so never include credentials, personal data, or proprietary code.
 - **Do not guess:** If a library is not found, search with official punctuation.
