@@ -1,30 +1,10 @@
 # Code Smells: Full Reference
 
-## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-When any of these smells is detected, **stop and re-examine the design.** A code smell is not a syntax error; it signals that the structure deserves a second look. Fix it when the task and project contract support that change, or document a specific reason to carry it. Do not trigger an unrelated rewrite merely because a smell exists.
+## Section index
 
----
 
-## Smell 1: Oversized module
-
-### Why size matters
-
-Line count is a proxy. For agents, a large file costs:
-
-- Parallelism: a file is one edit boundary. Two agents cannot safely edit it at once, so one large file serializes work that separate modules would let run concurrently.
-- Context: an open question ("where does X happen?") reads more of a large mixed file than of a module named for its responsibility.
-- Stale reads: every edit changes the file's snapshot. A large shared file forces more re-reads and more edits against stale content.
-
-Over-splitting also costs: tracing one flow across many tiny files, wrappers, and re-exports takes more reads than one cohesive file. Size alone never justifies a split; mixed responsibilities do.
-
-### Measuring pure LOC
-
-Pure LOC counts non-blank, non-comment lines.
-
-```bash
 # Quick (line-comment + blank exclusion):
 awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
 

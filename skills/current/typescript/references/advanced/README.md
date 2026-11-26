@@ -1,5 +1,22 @@
-
 # TypeScript Programmer
+
+
+## Section index
+
+- [Philosophy](#philosophy)
+- [Hard rules](#hard-rules)
+  - [Tooling](#tooling)
+  - [The iron list](#the-iron-list)
+  - [Data modeling: which construct, when](#data-modeling-which-construct-when)
+  - [When readonly does not apply](#when-readonly-does-not-apply)
+  - [Why empty/unhandled catch is banned](#why-emptyunhandled-catch-is-banned)
+  - [Libraries](#libraries)
+- [tsconfig: the one true config](#tsconfig-the-one-true-config)
+- [Reference loading](#reference-loading)
+- [No-excuse audit](#no-excuse-audit)
+- [In tests](#in-tests)
+- [Existing codebases](#existing-codebases)
+- [Activation](#activation)
 
 > **Precedence:** Treat this directory as an opinionated recipe library, not universal policy. Repository instructions, declared runtimes, lockfiles, configured gates, existing dependencies, and nearby working code override its stack and style defaults.
 
