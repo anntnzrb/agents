@@ -4,7 +4,7 @@
 
 Server Actions created from the Odoo UI under Settings > Technical > Actions > Server Actions, using `state=code` ("Execute Python Code"). Treat production as the default environment and the default risk model.
 
-Read [Safety model](safety-model.md) first. Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI denies `run` on production. Render and audit snippets locally before handing them to the user for UI execution. Never substitute unapproved operations.
+Read [Safety model](safety-model.md) first. Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Render and audit snippets locally before handing them to the user for UI execution. Never substitute unapproved operations.
 
 ## Hard rules
 

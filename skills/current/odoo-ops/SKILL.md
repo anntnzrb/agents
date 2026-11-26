@@ -36,17 +36,17 @@ After creating or editing module JavaScript under `static/src/`, you MUST run th
 
 - The skill CLI is the single interface between user, model, and Odoo. Execute all commands via `uv run --script <skill-dir>/scripts/cli.py` in shell. Agents MUST NOT write custom HTTP, XML-RPC, or JSON-RPC scripts, import skill transports or Python modules into notebooks or eval kernels, or use `curl`/`requests`/`urllib`. Stop and report any missing CLI capability.
 - Explore first: inspect provisioned source (`env --json`: `runtime_path`, `addons_paths`) and extend native primitives before designing changes or interventions. Never invent modules or APIs.
-- Local replica (`<prodDB>_work_<YYYYMMDD>`): unrestricted reads and writes for fast iteration. Seed replica (`<prodDB>_seed_<YYYYMMDD>`) is an untouched baseline; never write to it. Rebuild broken replicas with `db-clone`.
-- Production reads: no per-read approval required. Credentials auto-load from `<skill-dir>/.env` (`--env-file` overrides). Pass `--allow-rpc` on every RPC invocation (before or after the subcommand). Placing RPC flags before `rpc` exits 2 with a hint.
-- Production writes: plan and apply workflow. Any mutation without `--write` creates a dry-run plan (on loopback too). On production, passing `--write` on direct mutations is blocked; `--write` is valid exclusively with `apply <plan-id>`.
+- Use work replicas for local reads and writes. `db-query` defaults to read-only SQL and requires `--unsafe` for writes. Keep seed replicas untouched between restores. Rebuild broken replicas with `db-clone`.
+- Production reads: no per-read approval required. Pass `--allow-rpc` on every invocation after `rpc`, before or after the operation. See the [RPC connection settings](references/safety-model.md#production-read-only-by-default).
+- Production writes: plan and apply workflow. An allowed mutation without `--write` creates a dry-run plan on production or loopback. On production, use `--write` with `apply` only. On loopback, `--write` also enables direct mutations.
   1. Rehearse logic on local replica (validate behavior, not IDs).
   2. Run mutation command without `--write` to generate a dry-run plan and plan ID.
   3. Present plan ID and diff to user and request approval.
   4. Only after explicit approval, run `rpc --allow-rpc --write apply <plan-id>`.
-  5. Postcheck with reads. Approval is consumed immediately; subsequent batches require a fresh plan and approval.
+  5. Postcheck with reads. Once `apply` passes preflight and claims the plan, a fresh plan and approval are required for another attempt, even after a failure.
   6. Revert: `rpc --allow-rpc revert <plan-id>` creates a restore plan from the backup.
   7. Plans and backups live in the state dir automatically (`ODOO_OPS_STATE_DIR` or XDG state `odoo-ops`).
-- Hard deny-list on production (CLI refuses; instruct user to use Odoo web UI): `unlink`/`delete`, module install/upgrade/uninstall, schema/field/ACL/rule changes, server action `run`, cron `method_direct_trigger`, sending email/WhatsApp/SMS, `message_post`, partner merge, accounting post/reconcile, budget sign/liquidate, payslip done, `set_param`, password changes. Server Action templates provide the user's manual UI path; keep `WRITE_APPROVED = False` by default.
+- Hard deny-list on production (CLI refuses; instruct user to use Odoo web UI): `unlink`/`delete`, module install/upgrade/uninstall, schema/field/ACL/rule changes, mutations on server actions, scheduled actions (except archiving a cron), and outbound messaging models, `message_post`, partner merge, accounting post/reconcile, budget sign/liquidate, payslip done, `set_param`, password changes. Server Action templates provide the user's manual UI path; keep `WRITE_APPROVED = False` by default.
 - Data discipline: preserve exact values in private operational inputs; minimize requested fields (`--fields`). Sanitize chat evidence and handoff fixtures. NEVER print tokens, expose secrets from `ir_config_parameter`, or upload production data to public hosts.
 - Long SQL or ORM scripts: write to `<temp-dir>` and pass `--file`.
 

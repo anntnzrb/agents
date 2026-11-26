@@ -1247,3 +1247,66 @@ class TestOdooRpcNewFeatures(unittest.TestCase):
 
 if __name__ == "__main__":
     _ = unittest.main()
+
+
+def test_denied_outbound_mutation_never_reaches_rpc(tmp_path: Path) -> None:
+    with (
+        patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(tmp_path)}),
+        patch("odoo_rpc.json_rpc") as rpc,
+    ):
+        assert main(_prod_args("create", "mail.mail", "{}")) == 2
+    rpc.assert_not_called()
+
+
+def _prod_args(*args: str) -> list[str]:
+    return [
+        "--allow-rpc",
+        "--url",
+        "https://odoo.example.com/jsonrpc",
+        "--db",
+        "prod",
+        "--user",
+        "test",
+        "--token",
+        "fixture-token",
+        *args,
+    ]
+
+
+def test_failed_mutation_consumes_plan_approval(tmp_path: Path) -> None:
+    with (
+        patch.dict(os.environ, {"ODOO_OPS_STATE_DIR": str(tmp_path)}),
+        patch.object(
+            OdooRpcClient, "create", side_effect=ConnectionError("timeout")
+        ) as create,
+    ):
+        assert main(_prod_args("create", "res.partner", '{"name":"Fixture"}')) == 0
+        plan = next((tmp_path / "plans").glob("*.json"))
+        apply = _prod_args("--write", "apply", plan.stem)
+        assert main(apply) == 1
+        assert main(apply) == 1
+        create.assert_called_once()
+
+
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        ("account.move", {"state": "posted"}),
+        ("hr.payslip", {"state": "done"}),
+        ("account.payment", {"state": "draft"}),
+        ("res.users", {"password": "test-fixture"}),
+    ],
+)
+def test_production_value_guard_blocks_restricted_fields(
+    model: str, payload: odoo_rpc.JsonObject
+) -> None:
+    config = OdooRpcConfig(
+        url="https://odoo.example.com/jsonrpc",
+        database="prod",
+        user="test",
+        token="fixture-token",  # noqa: S106 - synthetic fixture, no RPC connection
+    )
+    with pytest.raises(odoo_rpc.ProductionDeniedError):
+        odoo_rpc.check_production_denylist(config, "write", model, payloads=(payload,))

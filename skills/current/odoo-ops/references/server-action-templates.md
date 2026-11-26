@@ -2,7 +2,7 @@
 
 Templates are starting points: copy to `<temp-dir>/<task>.py`, edit there, then use the platform clipboard command.
 
-Read [Safety model](safety-model.md) before production use. Creating and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI denies `run` on production. Render every placeholder and review the full result locally. Templates provide the user's manual UI workflow; do not use them to bypass JSON-RPC rules.
+Read [Safety model](safety-model.md) before production use. Creating and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Render every placeholder and review the full result locally. Templates provide the user's manual UI workflow; do not use them to bypass JSON-RPC rules.
 
 Both write templates default to `WRITE_APPROVED = False`. Set it to `True` only after explicit approval of the rendered action, exact target IDs, values, and expected effects. Never substitute a matching count for target identity. Rehearse on the disposable replica with outbound integrations disabled.
 
@@ -14,14 +14,14 @@ The final audit's `expected_distribution_literal` uses `{field_name: {group_key:
 
 ## Templates
 
-Shared required placeholders; `model name`, `domain`, `expected counts`, `target ids`, `excluded ids`, `fields to update`, `final invariant checks`; apply to:
+Each Python template declares its own placeholders. Read the selected file for the exact names and required values.
 
 - `templates/server_action_audit_readonly.py.tmpl`: read-only audit; ends with `raise UserError(payload)`.
 - `templates/server_action_dry_run.py.tmpl`: no-write validation of target counts/distribution and JSON output before approval.
 - `templates/server_action_execute_orm_small.py.tmpl`: small ORM writes requiring Odoo business logic; success via `action = display_notification`.
 - `templates/server_action_execute_sql_set_based.py.tmpl`: simple massive column writes; temp candidates + SQL pre/postcheck.
 - `templates/server_action_final_audit.py.tmpl`: independent closeout audit; no writes; checks invariants and persistent leftovers.
-- `templates/server_action_clipboard_workflow.md.tmpl`: macOS workflow reminder for `<temp-dir>`, `pbcopy`, `pbpaste`, and JSON parsing.
+- `templates/server_action_clipboard_workflow.md.tmpl`: macOS workflow for `pbcopy`, `pbpaste`, and JSON parsing. Fill in `temp_dir` and `action_file`.
 
 `templates/server_action_contextual_selection_audit.py.tmpl`: read-only contextual action launched from the list/form Action menu; validates `active_model`, resolves only selected `active_ids`, rejects empty or oversized selection, and returns compact JSON. Required placeholders: `model name`, `purpose`, `maximum selection size`, `sample limit`, `sample fields`, `grouping fields`, optional narrowing domain.
 

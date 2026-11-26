@@ -242,8 +242,7 @@ _COMPILED_DENIED_METHODS: tuple[tuple[re.Pattern[str], str, str], ...] = tuple(
     for pattern, reason in PROD_DENIED_METHOD_PATTERNS
 )
 
-# Odoo schema, module registry, system parameter, ACL, and merge wizard models where
-# create/write/write-batch/copy/call are denied on production (archive/unarchive remain allowed).
+# Models whose mutations are restricted to the Odoo UI in production.
 PROD_DENIED_MODELS: frozenset[str] = frozenset(
     {
         "ir.model",
@@ -258,10 +257,18 @@ PROD_DENIED_MODELS: frozenset[str] = frozenset(
         "ir.model.access",
         "res.groups",
         "base.partner.merge.automatic.wizard",
+        "ir.actions.server",
+        "ir.cron",
+        "mail.mail",
+        "mail.message",
+        "mail.notification",
+        "mailing.mailing",
+        "sms.sms",
+        "whatsapp.message",
     }
 )
 
-# Odoo credential fields denied in create/write/write-batch on any model in production.
+# Odoo credential fields denied in production mutation payloads.
 PROD_DENIED_VALUE_KEYS: frozenset[str] = frozenset(
     {
         "password",
@@ -1686,14 +1693,32 @@ def _append_writes_log(entry: Mapping[str, object]) -> None:
         log_file.chmod(0o600)
 
 
+def _check_mutation_payload(model: str, payload: JsonValue) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key in PROD_DENIED_VALUE_KEYS:
+                message = f"modifying field '{key}' is forbidden"
+                raise ProductionDeniedError(message)
+            if key == "state" and (
+                (model == "account.move" and value == "posted")
+                or (model == "hr.payslip" and value == "done")
+                or model == "account.payment"
+            ):
+                message = f"this state change on model '{model}' is forbidden"
+                raise ProductionDeniedError(message)
+            _check_mutation_payload(model, value)
+    elif isinstance(payload, list):
+        for value in payload:
+            _check_mutation_payload(model, value)
+
+
 def check_production_denylist(
     config: OdooRpcConfig,
     command: str,
     model: str,
     *,
     method: str | None = None,
-    values: JsonObject | list[JsonRecord] | None = None,
-    values_by_id: dict[int, JsonObject] | None = None,
+    payloads: tuple[JsonValue, ...] = (),
 ) -> None:
     """Check production deny-list invariants for non-loopback endpoints."""
     if is_loopback(config):
@@ -1712,29 +1737,13 @@ def check_production_denylist(
                 message = f"{reason} (pattern '{pattern_str}')"
                 raise ProductionDeniedError(message)
 
-    # 2. Models (archive/unarchive remain allowed)
-    if (
-        command in ("create", "write", "update", "write-batch", "copy", "call")
-        and model in PROD_DENIED_MODELS
-    ):
+    # Archiving a cron disables it. Enabling or editing it remains UI-only.
+    if model in PROD_DENIED_MODELS and (model, command) != ("ir.cron", "archive"):
         message = f"mutations on model '{model}' are forbidden"
         raise ProductionDeniedError(message)
 
-    # 3. Value keys
-    if command in ("create", "write", "update", "write-batch"):
-        dicts_to_check: list[JsonObject] = []
-        if isinstance(values, dict):
-            dicts_to_check.append(values)
-        elif isinstance(values, list):
-            dicts_to_check.extend(values)
-        if values_by_id:
-            dicts_to_check.extend(values_by_id.values())
-
-        for d in dicts_to_check:
-            for k in d:
-                if k in PROD_DENIED_VALUE_KEYS:
-                    message = f"modifying field '{k}' is forbidden"
-                    raise ProductionDeniedError(message)
+    for payload in payloads:
+        _check_mutation_payload(model, payload)
 
 
 def _generate_plan_id(canonical_payload: JsonObject) -> str:
@@ -2108,8 +2117,13 @@ def _run_mutation_commands(
         command,
         model,
         method=method,
-        values=vals,
-        values_by_id=values_by_id,
+        payloads=(
+            _narrow_json_value(vals),
+            list((values_by_id or {}).values()),
+            default_vals,
+            call_args,
+            call_kwargs,
+        ),
     )
 
     is_target_loopback = is_loopback(client.config)
@@ -2265,6 +2279,11 @@ def _run_apply(
         )
         return 1
 
+    claim_path = plan_path.with_suffix(".started")
+    if claim_path.exists():
+        _ = sys.stderr.write(f"Error: Approval for plan {plan_id} has been used.\n")
+        return 1
+
     plan_url = plan.get("url")
     plan_db = plan.get("db")
     if plan_url != client.config.url or plan_db != client.config.database:
@@ -2278,11 +2297,6 @@ def _run_apply(
     model = str(plan.get("model", ""))
     raw_method = plan.get("method")
     method = str(raw_method) if isinstance(raw_method, str) else None
-    values_obj: JsonObject | list[JsonRecord] | None = None
-    if isinstance(raw_vals := plan.get("values"), dict):
-        values_obj = _narrow_object(raw_vals)
-    elif isinstance(raw_vals, list):
-        values_obj = _narrow_record_list(raw_vals)
     raw_v_by_id = plan.get("values_by_id")
     v_by_id: dict[int, JsonObject] | None = None
     if isinstance(raw_v_by_id, dict):
@@ -2298,8 +2312,13 @@ def _run_apply(
         command,
         model,
         method=method,
-        values=values_obj,
-        values_by_id=v_by_id,
+        payloads=(
+            plan.get("values"),
+            list((v_by_id or {}).values()),
+            plan.get("default"),
+            plan.get("args"),
+            plan.get("kwargs"),
+        ),
     )
 
     planned_ids_raw = plan.get("ids")
@@ -2338,6 +2357,14 @@ def _run_apply(
             drifted_sorted = sorted(set(drifted_ids))
             _ = sys.stderr.write(f"drift detected on {model} ids {drifted_sorted}\n")
             return 1
+
+    # Claim the approval once, even if concurrent apply attempts passed preflight.
+    try:
+        fd = os.open(claim_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        _ = sys.stderr.write(f"Error: Approval for plan {plan_id} has been used.\n")
+        return 1
+    os.close(fd)
 
     # Write backup BEFORE mutating
     backup_path = get_state_dir() / "backups" / f"{plan_id}.json"

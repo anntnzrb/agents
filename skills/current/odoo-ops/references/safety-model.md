@@ -6,18 +6,18 @@ Explore first: before designing code modifications, planning production interven
 
 ## Local Replica: Free Iteration
 
-The disposable local replica (`<prodDB>_work_YYYYMMDD`) is the default workspace. It provides unrestricted reads and writes for rapid development, testing, schema experimentation, and repair workflows:
+The disposable local replica (`<prodDB>_work_<YYYYMMDD>`) is the default workspace. Use it for development, testing, schema experiments, and repairs:
 
-- Work replicas allow arbitrary ORM operations, SQL queries, and module upgrades without prompt gates.
+- Work replicas allow ORM operations and module upgrades. SQL writes require `db-query --unsafe`.
 - If a work replica breaks or contains corrupt test data, drop it and recreate a clean copy from the seed using `db-clone`.
-- The seed database (`<prodDB>_seed_<YYYYMMDD>`) is an untouchable baseline restored directly from the DBA dump. Never install modules, run migrations, or execute writes against the seed.
+- The seed database (`<prodDB>_seed_<YYYYMMDD>`) is a baseline restored from the DBA dump or created by cloning a clean installation. Keep it untouched between planned replacements with `db-restore` or `db-clone`.
 - The `shell` command runs interactive or script-based ORM Python on the local replica. By default, changes commit upon clean exit; use `--rollback` to test scripts safely. The CLI refuses to run `shell` against seed databases or production endpoints.
 - When executing long SQL statements or complex Python scripts, write them to a temporary file (`<temp-dir>`) and invoke `db-query --file PATH` or `shell --file PATH`. You do not need to delete temporary files after execution.
 - The CLI serializes pod creation and test runs with internal locks; external `flock` wrappers are unnecessary. See [Runtime discovery](runtime-discovery.md#isolation-and-multi-agent-concurrency).
 
 ## Production: Read-Only by Default
 
-Production is read-only by default. Read operations do not require per-query user approval. Connection credentials load automatically from `<skill-dir>/.env` (maintained by configuration sync). The `--env-file` parameter is reserved for manual overrides.
+Production is read-only by default. Read operations do not require per-query user approval. Start with `rpc --allow-rpc <operation> ...` without `--profile`, even if the checkout is on a migration branch. RPC flags and exported `ODOO_RPC_*` values take precedence over file settings. The CLI reads `<skill-dir>/.env` if present. `--env-file` or `ODOO_ENV_FILE` selects another file.
 
 Every `rpc` invocation requires the mechanical `--allow-rpc` flag. The flag may be placed before or after the operation subcommand (e.g. `rpc --allow-rpc search_read ...` or `rpc search_read ... --allow-rpc`). Placing RPC flags before the `rpc` command itself produces a hint and exits 2. The flag acknowledges remote execution; it prevents unintended execution when commands are pasted into non-RPC contexts.
 
@@ -30,9 +30,9 @@ Every `rpc` invocation requires the mechanical `--allow-rpc` flag. The flag may 
 
 ## Production Writes: Plan and Apply Workflow
 
-Production write operations are strictly gated. Any mutation requires explicit user authorization for that specific batch. On production endpoints, passing `--write` on direct mutation commands is blocked; `--write` is valid exclusively with `apply <plan-id>`.
+Any production mutation requires explicit user approval for that batch. Pass `--write` with `apply <plan-id>`. Direct mutation commands reject `--write` on production and execute with it on loopback.
 
-Any mutation command executed without `--write` creates a dry-run plan (both on production and loopback). Every production mutation follows a mandatory lifecycle:
+Any allowed mutation command executed without `--write` creates a dry-run plan (both on production and loopback). Every production mutation follows a mandatory lifecycle:
 
 1. **Rehearsal (Recommended):** Rehearse the operation on the local working replica to validate business logic and constraint handling. Because local replica data differs from production, validate logic and behavior, not concrete record IDs.
 2. **Dry-Run Plan:** Execute the mutation command WITHOUT the `--write` flag. The CLI generates a dry-run plan containing a pre-image snapshot, an old-to-new field diff, affected record counts, and a unique plan ID:
@@ -44,9 +44,9 @@ Any mutation command executed without `--write` creates a dry-run plan (both on 
    ```text
    uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc --write apply <plan-id>
    ```
-   The `apply` command verifies record state against the plan pre-image. If any target record has changed since the plan was created, `apply` aborts immediately to prevent overwriting concurrent updates. Upon successful application, it automatically stores a rollback backup.
+   During preflight, `apply` checks that each target still exists and that its `write_date` matches the pre-image. A mismatch stops the apply. The CLI saves a backup before the first write.
 5. **Postcheck:** Verify the updated state immediately using read-only queries (`read` or `search_read`).
-6. **Authorization Consumed:** Applying the plan consumes the authorization. The environment returns to read-only status immediately. Any subsequent mutation batch requires a fresh dry-run plan and distinct approval.
+6. **Authorization Consumed:** After preflight, the CLI claims the plan once before it attempts a write. A failed or interrupted attempt still uses that approval. A new attempt requires a fresh dry-run plan and explicit approval.
 
 An application can commit some RPC groups before a later group fails. A transport timeout can leave the last call's outcome unknown. Do not retry the full plan blindly. Read all planned IDs, compare actual values with the intended changes, and prepare a fresh plan for the verified remainder. See [partial-apply recovery](import-and-audit-workflow.md#recover-a-partially-applied-batch).
 
@@ -72,10 +72,10 @@ The CLI strictly refuses the following operations on production endpoints. If as
 1. `unlink` / `delete`: record deletion is prohibited on production.
 2. Module operations: `install`, `upgrade`, or `uninstall` of Odoo modules.
 3. Schema and metadata: altering models, fields, access control lists (`ir.model.access`), record rules (`ir.rule`), security groups, or `ir.config_parameter`.
-4. Immediate background actions: invoking `run` on `ir.actions.server` or `method_direct_trigger` on `ir.cron`. Creating and executing Server Actions in production is done by the user in the Odoo web UI.
-5. Outbound communications: sending email, WhatsApp messages, SMS, creating messages (`message_post` / notifications), or launching mass mailings.
+4. Server actions and scheduled actions: mutations on `ir.actions.server` and `ir.cron`, including `run` and `method_direct_trigger`. The `archive` command may disable a cron through the plan workflow.
+5. Outbound communications: sending email, WhatsApp messages, or SMS, posting or notifying on threads, and mutating outbound message and mass mailing models.
 6. Partner reconciliation: `res.partner` automated or manual merging.
-7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, setting payslips to `done`, and payment state changes (`action_paid`).
+7. Accounting and payroll: posting journal entries, reconciling bank statements, signing or liquidating budgets, setting payslips to `done`, and changing payment state directly or with `action_paid`.
 8. System credentials: modifying `set_param` values, changing user passwords, or sending password resets (`action_reset_password`).
 
 Server Action templates remain valid as the user's manual UI path. Keep their `WRITE_APPROVED = False` safety by default, setting it to `True` only after explicit user review.
