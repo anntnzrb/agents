@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING
 
+from models import EngineError
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -49,11 +51,14 @@ def resolve_adapters(
             ) and not any(r.id == adapter.id for r in resolved):
                 resolved.append(adapter)
 
-    return (
-        resolved
-        if len(resolved) > 0
-        else [a for a in get_available_adapters() if a.is_enabled_by_default]
-    )
+    if len(resolved) == 0:
+        valid = sorted(adapter.id for adapter in get_available_adapters())
+        raise EngineError(
+            "unknown_market",
+            f"unknown marketplace: {', '.join(normalized)}",
+            {"markets": normalized, "valid_markets": valid},
+        )
+    return resolved
 
 
 def clear_registry() -> None:

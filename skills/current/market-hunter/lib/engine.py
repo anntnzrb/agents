@@ -241,6 +241,22 @@ def _resolve_warning(
     return f"{prefix} {markets} {fallback} {cta}"
 
 
+_TYPE_FILTER_FORMATS: dict[str, set[str]] = {
+    "account": {"dedicated_account"},
+    "invite": {"buyer_email_upgrade"},
+    "link": {"promo_link_or_code"},
+    "code": {"promo_link_or_code"},
+}
+
+
+def _deal_sort_key(deal: ScoredDeal) -> tuple[int, float, float, float]:
+    """Rank term-priced deals by monthly cost, then trust and headline price."""
+    price_per_month = deal.get("pricePerMonthUsd")
+    if price_per_month is not None:
+        return (0, price_per_month, -deal["trustScore"], deal["priceUsd"])
+    return (1, float("inf"), -deal["trustScore"], deal["priceUsd"])
+
+
 def _filter_deals(
     scored_deals: list[ScoredDeal], options: ScanOptions
 ) -> tuple[list[ScoredDeal], int]:
@@ -263,8 +279,8 @@ def _filter_deals(
         type_filter = options.get("typeFilter")
         if type_filter and type_filter != "all":
             tf = type_filter.lower()
-            df = deal["deliveryFormat"].lower()
-            if tf not in df:
+            accepted_formats = _TYPE_FILTER_FORMATS.get(tf, {tf})
+            if deal["deliveryFormat"].lower() not in accepted_formats:
                 continue
 
         valid_deals.append(deal)
@@ -336,7 +352,7 @@ def execute_scan(options: ScanOptions) -> ScanResultData:
 
     scored_deals = [score_listing(listing) for listing in raw_listings]
     valid_deals, filtered_scams_count = _filter_deals(scored_deals, options)
-    valid_deals.sort(key=lambda d: (-d["trustScore"], d["priceUsd"]))
+    valid_deals.sort(key=_deal_sort_key)
 
     result: ScanResultData = {
         "query": options["query"],

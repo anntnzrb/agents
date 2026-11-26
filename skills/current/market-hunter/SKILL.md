@@ -25,7 +25,7 @@ Apply these on every recommendation:
 ## Public entrypoint
 
 ```text
-uv run --script skills/current/market-hunter/scripts/cli.py "<query>" [options]
+uv run --script <skill-dir>/scripts/cli.py "<query>" [options]
 ```
 
 For scraped marketplaces, configure `FIRECRAWL_API_KEY` for reliable coverage. Without it, the scan prefers an installed `firecrawl` executable, which is unversioned, or uses the sibling firecrawl skill's pinned wrapper. The wrapper requires `uv` and Bun.

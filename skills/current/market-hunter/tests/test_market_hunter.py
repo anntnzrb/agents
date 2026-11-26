@@ -979,7 +979,7 @@ class TestEngineIntegration:
         assert market_result["markets_queried"] == ["plati"]
         assert market_result["degraded_markets"] == []
 
-    def test_execute_scan_sorted_by_trust_descending(
+    def test_execute_scan_type_invite_matches_buyer_email_upgrade(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._patch_fetchers(
@@ -988,14 +988,61 @@ class TestEngineIntegration:
                 [
                     {
                         "id": 1,
-                        "name_eng": "ChatGPT Plus Dedicated Account",
-                        "price_usd": 8.0,
-                        "rating": 60.0,
+                        "name_eng": "ChatGPT Plus 12 Months invite to your email",
+                        "price_usd": 60.0,
+                        "rating": 99.5,
+                        "sales_count": 50000,
+                    },
+                ]
+            ),
+        )
+        result = engine.execute_scan(
+            {
+                "query": "chatgpt",
+                "typeFilter": "invite",
+                "minScore": 50,
+                "jsonOnly": False,
+                "full": False,
+                "markets": ["plati"],
+            }
+        )
+        assert result["valid_deals_count"] == 1
+        assert result["top_deals"][0]["deliveryFormat"] == "BUYER_EMAIL_UPGRADE"
+
+    def test_execute_scan_unknown_market_is_usage_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_fetchers(monkeypatch, api_payload=self._plati_payload([]))
+        with pytest.raises(EngineError) as exc_info:
+            _ = engine.execute_scan(
+                {
+                    "query": "chatgpt",
+                    "typeFilter": "all",
+                    "minScore": 50,
+                    "jsonOnly": False,
+                    "full": False,
+                    "markets": ["kingin"],
+                }
+            )
+        assert exc_info.value.code == "unknown_market"
+
+    def test_execute_scan_sorted_by_price_per_month(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_fetchers(
+            monkeypatch,
+            api_payload=self._plati_payload(
+                [
+                    {
+                        "id": 1,
+                        "name_eng": "ChatGPT Plus 12 Months Dedicated Account",
+                        "price_usd": 60.0,
+                        "rating": 80.0,
                         "sales_count": 10,
                     },
                     {
                         "id": 2,
-                        "name_eng": "ChatGPT Plus Dedicated Personal Account",
+                        "name_eng": "ChatGPT Plus 1 Month Dedicated Personal Account",
                         "price_usd": 10.0,
                         "rating": 99.9,
                         "sales_count": 90000,
@@ -1012,8 +1059,14 @@ class TestEngineIntegration:
                 "full": False,
             }
         )
-        scores = [d["trustScore"] for d in result["top_deals"]]
-        assert scores == sorted(scores, reverse=True)
+        assert result["top_deals"][0].get("months") == 12
+        prices = [
+            price
+            for deal in result["top_deals"]
+            if (price := deal.get("pricePerMonthUsd")) is not None
+        ]
+        assert len(prices) == len(result["top_deals"])
+        assert prices == sorted(prices)
 
     def test_scrape_target_keyless_cli_and_sdk_paths(
         self, monkeypatch: pytest.MonkeyPatch
