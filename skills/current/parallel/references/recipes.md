@@ -92,10 +92,9 @@ uv run --script <skill-dir>/scripts/cli.py findall run \
 # Check status or poll run to completion
 uv run --script <skill-dir>/scripts/cli.py findall poll <run_id> -o <temp-dir>/entities.json
 
-# Enrich results with targeted attributes
-uv run --script <skill-dir>/scripts/cli.py enrich run \
-  --input <temp-dir>/entities.json \
-  -o <temp-dir>/enriched_entities.json
+# Enrich a completed FindAll run with targeted attributes
+uv run --script <skill-dir>/scripts/cli.py findall enrich <findall_id> \
+  '<output-schema-json>'
 ```
 
 ## Recipe 4: Semantic topic monitoring
@@ -118,7 +117,7 @@ uv run --script <skill-dir>/scripts/cli.py monitor create --help
 
 # Create topic monitor
 uv run --script <skill-dir>/scripts/cli.py monitor create \
-  --query "<topic to watch>"
+  "<topic to watch>"
 
 # List detected events
 uv run --script <skill-dir>/scripts/cli.py monitor events <monitor_id>
@@ -140,7 +139,7 @@ Check saved interactions, tasks, or monitor events before launching duplicate qu
 ### Illustrative commands
 ```bash
 # Search memory for earlier work
-uv run --script <skill-dir>/scripts/cli.py memory "<keywords>"
+uv run --script <skill-dir>/scripts/cli.py memory retrieve "<keywords>"
 
 # Continue research using context from earlier interaction
 uv run --script <skill-dir>/scripts/cli.py research run \

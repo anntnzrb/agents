@@ -2,7 +2,7 @@
 name: parallel
 description: "Use when using Parallel for search, deep research, enrichment, monitors, or URL extraction, not site crawling."
 license: AGPL-3.0-or-later
-compatibility: Requires uv and PARALLEL_API_KEY in the environment.
+compatibility: Requires uv and active Parallel credentials (PARALLEL_API_KEY or stored login).
 metadata:
   author: anntnzrb
 ---
@@ -17,7 +17,7 @@ Official Parallel CLI for web search, cited deep research, entity discovery, dat
 uv run --script <skill-dir>/scripts/cli.py <command> [options] [arguments]
 ```
 
-Requires `uv` and `PARALLEL_API_KEY` in the environment. Run the CLI auth command to verify active credentials. The wrapper reads the release from `UPSTREAM.json` and passes all arguments to that pinned package.
+Requires `uv` and active Parallel credentials: either `PARALLEL_API_KEY` or stored credentials from `parallel-cli login`. Run the CLI auth command to verify active credentials. The wrapper reads the release from `UPSTREAM.json` and passes all arguments to that pinned package.
 
 ## Discovery
 
