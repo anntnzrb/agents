@@ -34,8 +34,8 @@ Background workspaces remain durable but are hidden from default lists and the s
 ## Common calls
 
 ```bash
-paseo run -d --title "<title>" --provider <provider>/<model> [--thinking <id>] "<prompt>"
-paseo run -d --new-workspace worktree --worktree-mode branch-off --new-branch <branch> --base origin/main --provider <provider>/<model> "<prompt>"
+paseo run --no-wait --title "<title>" --provider <provider>/<model> [--thinking <id>] "<prompt>"
+paseo run --no-wait --new-workspace worktree --worktree-mode branch-off --new-branch <branch> --base origin/main --provider <provider>/<model> "<prompt>"
 paseo send <agent-id> "<follow-up>"
 paseo agent wait <agent-id> --timeout <seconds>
 paseo logs <agent-id>
