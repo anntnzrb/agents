@@ -24,7 +24,7 @@ Discover fields with `--json` without a field list when installed options drift.
 - `gh issue transfer` changes repository ownership; verify destination and permission before authorization. Failures MAY be partial; re-read both sides.
 
 ## Pull requests and reviews
-- Inspection reads: `gh pr list`, `view`, `diff`, `checks`, `status`, `review`. `diff` returns patch text; a browser URL is not the patch.
+- Inspection reads: `gh pr list`, `view`, `diff`, `checks`, `status`. `diff` returns patch text; a browser URL is not the patch.
 - Required-check machine route: `gh pr checks NUMBER --repo OWNER/REPO --json ... --jq ...`. Separate pending, failed, skipped, successful; NEVER claim CI green from a human summary.
 - `gh pr view --json reviews,reviewDecision,statusCheckRollup,latestReviews` (fields available in installed CLI) exposes review/check state. If thread-level anchors or unresolved conversations matter, use the GitHub API reference and preserve file/line identity.
 - `gh pr diff --patch` remains a read.
@@ -45,8 +45,8 @@ gh project list --owner OWNER --format json
 gh project view NUMBER --owner OWNER --format json
 ```
 
-- `gh project item-list`, `field-list`, and `link`/`copy` inspection helps identify stable IDs.
-- Writes: `gh project create`, `item-add`, `item-edit`, `item-delete`, `field-create`, `field-edit`, `field-delete`, `close`, `delete`; project delete and item delete are destructive. After each authorized change, re-read project/item state.
+- Inspect stable IDs with `gh project item-list` and `field-list`.
+- Writes: `gh project create`, `copy`, `edit`, `close`, `delete`, `mark-template`, `link`, `unlink`, `item-add`, `item-create`, `item-edit`, `item-delete`, `item-archive`, `field-create`, `field-delete`. `link`/`unlink`/`copy` mutate the project even though they create nothing visible; project delete and item delete are destructive. There is no `field-edit`; renaming or reconfiguring a field means the destructive delete-and-recreate path, so confirm that cost before authorization. After each authorized change, re-read project/item state.
 
 ## Labels
 - Read: `gh label list --repo OWNER/REPO --json name,description,color,isDefault`.

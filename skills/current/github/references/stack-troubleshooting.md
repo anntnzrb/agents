@@ -56,7 +56,7 @@ Remote operations are not uniformly atomic:
 - `submit` pushes, creates/updates PRs, then links the stack; failure may leave branches/PRs without complete stack association.
 - `push` may update earlier branches before a later force-with-lease failure.
 - `link` may push and create/retarget multiple PRs before later validation fails.
-- `merge --yes` is all-or-nothing for direct stack merging; merge queues land the selected stack asynchronously as one merge group.
+- `merge --yes` is all-or-nothing for direct stack merging; merge queues keep the stack together as a single unit but may defer it to a later merge group, so landing is asynchronous and not guaranteed with the current group.
 
 After any partial result, inventory every branch, PR, and stack object; resume only from explicit remaining state. NEVER rerun the whole operation blindly.
 

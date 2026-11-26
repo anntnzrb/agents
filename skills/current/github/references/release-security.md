@@ -7,10 +7,10 @@
 structured output; use installed help for preview or version-sensitive flags.
 
 **Write boundary:** release create/edit/delete/upload/delete-asset, attestation
-policy or verification changes, ruleset create/update/delete, SSH/GPG key add/delete,
-and any repository security setting are sensitive external or account writes. Require
-explicit authorization. Never display key material, private signatures, tokens, or
-secret file contents. Re-read public metadata after a write.
+policy or verification changes, ruleset creation/update/deletion, SSH/GPG key
+add/delete, and any repository security setting are sensitive external or account
+writes. Require explicit authorization. Never display key material, private
+signatures, tokens, or secret file contents. Re-read public metadata after a write.
 
 **Adjacent handoff:** use `core.md` for auth/output/exit controls, `api.md` for
 custom rules/security endpoints, `automation.md` for Actions runs/secrets, and
@@ -21,7 +21,7 @@ custom rules/security endpoints, `automation.md` for Actions runs/secrets, and
 Read before acting:
 
 ```text
-gh release list --repo OWNER/REPO --json tagName,name,isDraft,isPrerelease,publishedAt,url
+gh release list --repo OWNER/REPO --json tagName,name,isDraft,isPrerelease,publishedAt
 
 gh release view TAG --repo OWNER/REPO --json tagName,name,body,assets,isDraft,isPrerelease,url
 ```
@@ -57,7 +57,10 @@ writes. Confirm the exact command and authorization; do not invent a fallback AP
 branch/tag applicability. Use explicit owner/repository and include enforcement,
 target, conditions, bypass actors, and rules in JSON where supported.
 
-`gh ruleset create`, `edit`, and `delete` change enforcement. Before an authorized
+`gh ruleset` has no create/edit/delete subcommands; the CLI surface is read-only.
+Ruleset writes go through the REST endpoints under `api.md`, such as
+`POST/PUT/DELETE repos/{owner}/{repo}/rulesets[/ID]`, only with explicit method,
+target, and authorization. Before an authorized
 write, record the current ruleset ID and effective scope; after it, re-read the
 ruleset and run a read-only applicability check. A 403 can mean missing administration
 scope, not an invalid ruleset. Preview/API availability varies by host.
@@ -77,12 +80,14 @@ operations change account authentication/signing configuration:
 
 ## Licenses
 
-`gh repo license view OWNER/REPO` reads the detected license and source text/metadata.
+License detection is `gh repo view OWNER/REPO --json licenseInfo`. `gh repo license
+list` and `gh repo license view <license-key-or-spdx-id>` browse the texts of common
+licenses; they do not detect a repository's license and take no repository argument.
 Treat license text as repository content, not as permission to change the repository.
-If a license endpoint or subcommand is absent, use `api.md` only for the documented
-read endpoint and report detection uncertainty. Adding or replacing a repository
-license is a repository content/policy write; route the actual contribution through
-the repository's contribution process after authorization.
+If the detection field is empty or a subcommand is absent, use `api.md` only for the
+documented read endpoint and report detection uncertainty. Adding or replacing a
+repository license is a repository content/policy write; route the actual contribution
+through the repository's contribution process after authorization.
 
 ## Preview and permission caveats
 

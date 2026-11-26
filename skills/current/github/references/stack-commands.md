@@ -76,7 +76,7 @@ Navigation and explicit-target `checkout` accept `--print-path`. For a branch oc
 ```text
 # Push/create/update all PRs and remote stack without the editor
 GH_PROMPT_DISABLED=1 gh stack submit --auto --remote <remote>
-# Add new PRs as ready for review only when authorized
+# Mark new AND existing PRs as ready for review only when authorized for every layer
 GH_PROMPT_DISABLED=1 gh stack submit --auto --open --remote <remote>
 
 # Fetch, reconcile, cascade-rebase, push, and refresh remote stack state
@@ -96,7 +96,7 @@ GH_PROMPT_DISABLED=1 gh stack push --remote <remote>
 GH_PROMPT_DISABLED=1 gh stack link --remote <remote> <bottom> <middle> <top>
 ```
 
-- `submit` pushes branches, creates/updates PRs, and creates/updates the remote stack. With `--auto`, new PRs are drafts unless `--open` is authorized. It can partially land before a later failure; re-read each branch/PR/stack instead of retrying.
+- `submit` pushes branches, creates/updates PRs, and creates/updates the remote stack. With `--auto`, new PRs are drafts unless `--open` is authorized. `--open` also marks existing draft PRs in the stack as ready for review; authorization must cover every affected layer, not only new PRs. It can partially land before a later failure; re-read each branch/PR/stack instead of retrying.
 - `sync` fetches, reconciles, fast-forwards trunk when possible, cascades rebases, pushes, refreshes PR/stack state, and optionally prunes local merged branches. It does not open PRs. It can exit `0` after a failed push or an aborted divergence. Verify intended remote branch tips and PR heads, not the exit code or success message. Do not select a local/remote truth automatically.
 - `rebase` changes local commit ancestry and may require `git add` plus `--continue`; `--abort` restores the pre-rebase state when supported. A rebase can make pushes non-fast-forward; verify leases and branch ownership.
 - `push` fetches before building its leases and can overwrite remote-only commits that local branches never incorporated. Inspect remote tips and account for those commits before any rewrite; a refreshed lease is not that proof. Updates are not atomic, so report per-branch state after partial failures.
@@ -116,7 +116,7 @@ GH_PROMPT_DISABLED=1 gh stack merge --yes --squash <stack-number|pr-number>
 
 `unstack` may leave merged/merging/queued PRs stacked and can dissolve the remote stack only after its remaining PRs are removed. `--local` skips the remote operation. Do not confuse unstacking with deleting branches or PRs; inspect the exact boundary.
 
-`merge --yes` merges through the selected PR, including every unmerged PR below it. Verify that all selected layers are reviewed and authorized; naming one PR does not authorize extra lower layers. Direct merging is all-or-nothing. With a merge queue, the selected stack lands as one merge group and the queue determines the method. Confirm each PR reaches MERGED; a queued request is pending delivery. **Never use `gh pr merge` for a native stack merge.**
+`merge --yes` merges through the selected PR, including every unmerged PR below it. Verify that all selected layers are reviewed and authorized; naming one PR does not authorize extra lower layers. Direct merging is all-or-nothing. With a merge queue, the stack's PRs enter the queue in order and stay together as a single unit, but the queue decides which merge group they join: a group may exceed its configured maximum size by up to 50 percent to fit the stack, and a larger stack is deferred to the next merge group as a unit. Ejection of one PR removes every PR above it. Confirm each PR reaches MERGED; a queued request is pending delivery. **Never use `gh pr merge` for a native stack merge.**
 
 The extension does not expose `--match-head-commit`; do not claim that it preserves the `ship` merge command's reviewed-head condition. Ship's CLI handles ordinary PRs and refuses known native membership. Native automation must establish its head conditions and merge scope through the documented API before replacing that guarantee. After partial merges, refresh every remaining layer's base/head and checks before cleanup or further landing.
 

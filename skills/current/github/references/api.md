@@ -24,10 +24,12 @@ gh api <endpoint> [flags]
 
 - REST endpoints use paths such as `repos/{owner}/{repo}/releases` or
   `repos/{owner}/{repo}/issues/{number}/comments`.
-- `{owner}`, `{repo}`, and `{branch}` placeholders resolve from the selected local
-  repository context. Prefer an explicit `--repo OWNER/REPO` where supported, and
-  use `--hostname <host>` for the target host. If context is not verified, replace
-  placeholders with an explicit target rather than guessing.
+- `{owner}`, `{repo}`, and `{branch}` placeholders resolve from the repository of
+  the current directory or the `GH_REPO` environment variable. `gh api` has no
+  `--repo` flag. Prefer literal owner/repo in the endpoint path over placeholders,
+  or set `GH_REPO` when the value is known and safe; use `--hostname <host>` for
+  the target host. If context is not verified, replace placeholders with an
+  explicit target rather than guessing.
 - The default request is GET **only when no parameters/body are supplied**
   `--field`, `--raw-field`, and `--input` can switch the request to POST. Whenever
   fields, input, or mutation intent is present, pass an explicit `--method GET` for a
@@ -98,8 +100,12 @@ small, use cursor pagination, and filter returned `data`/errors explicitly:
 ```text
 gh api graphql --method POST \
   -f query='query($endCursor:String) { viewer { repositories(first:100, after:$endCursor) { nodes { nameWithOwner } pageInfo { hasNextPage endCursor } } } }' \
-  -f endCursor=null --paginate --slurp --jq '[.[].data.viewer.repositories.nodes[].nameWithOwner]'
+  --paginate --slurp --jq '[.[].data.viewer.repositories.nodes[].nameWithOwner]'
 ```
+
+Omit `endCursor` on the first request; `--paginate` supplies it for subsequent
+pages. Do not seed it with `-f endCursor=null`: `--raw-field` sends the literal
+string `null` as the cursor, and even a typed null is not the documented form.
 
 GraphQL uses POST for the query; it is still a read when the query has no mutation
 field. Do not call a GraphQL mutation without explicit authorization. Handle a 200

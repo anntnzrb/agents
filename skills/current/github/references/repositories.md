@@ -68,9 +68,11 @@ gh search prs <query> --repo OWNER/REPO --limit <n> --json number,title,state,ur
 - `gh org list` and `gh org view ORG` are reads. Organization creation, membership,
   team, repository, or settings operations are remote writes; inspect permissions
   and use the installed subcommand help before acting.
-- `gh gist list`, `gh gist view ID`, and `gh gist rename ID` read or change gists
-  `gh gist create` publishes local content; inspect the exact files and visibility.
-  `gh gist edit/delete` are writes, and delete is irreversible from this workflow.
+- `gh gist list` and `gh gist view ID` are reads. `gh gist create` publishes local
+  content; inspect the exact files and visibility. `gh gist edit`,
+  `gh gist rename ID OLD-FILENAME NEW-FILENAME` (renames one file inside the gist,
+  not the gist itself), and `gh gist delete` are writes; delete is irreversible
+  from this workflow.
 - `gh codespace list --repo OWNER/REPO` and `gh codespace view` inspect Codespaces
   `gh codespace create` provisions remote compute; `gh codespace ssh`, `code`, or
   `logs` may open an interactive client. `gh codespace stop`, `delete`, and `edit`
