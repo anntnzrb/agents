@@ -1,9 +1,66 @@
 # Use Odoo Ops with OMP Eval
 
 
-
 ## Section index
 
+- [Local Analysis Workspace](#local-analysis-workspace)
+- [Preserve Useful State](#preserve-useful-state)
+- [Select Libraries by Workload](#select-libraries-by-workload)
+- [Analyze a Saved Snapshot](#analyze-a-saved-snapshot)
+- [Orchestration for Independent Analysis](#orchestration-for-independent-analysis)
+- [Recovery](#recovery)
+
+Read only when using this skill through Oh My Pi (OMP). This companion does not change the skill's CLI, permissions, or behavior.
+
+## Local Analysis Workspace
+
+OMP Eval is a persistent Python workspace for local data analysis, joins, and aggregations. It is not an alternative transport to Odoo.
+
+Agents MUST NOT write custom HTTP, XML-RPC, or JSON-RPC clients, import the skill's Python modules or transports into notebook or eval kernels, or make network calls to Odoo from within Eval. All data acquisition and all mutations MUST go through the CLI via shell (`odoo-ops rpc ...`). If the CLI lacks a required operation, stop and report the capability gap.
+
+Production reads through the CLI need no per-read approval. Production writes strictly require the dry-run plan, user review, and `apply <plan-id>` workflow executed through the CLI.
+
+Follow this boundary:
+1. Acquire data using the CLI in shell, saving structured output to a file:
+   ```text
+   uv run --script <skill-dir>/scripts/cli.py rpc --allow-rpc search_read crm.lead '[["user_id", "=", 2]]' --fields 'name team_id expected_revenue' --limit 100 --json > <temp-dir>/leads.json
+   ```
+2. Load and analyze the saved JSON file inside Eval.
+3. If mutations are needed, generate a dry-run plan via the CLI, present the diff to the user, and run `apply <plan-id>` via the CLI upon approval.
+
+## Preserve Useful State
+
+Work incrementally: load the saved JSON file, normalize shapes, validate on a small sample, then process the full input. Keep normalized tables and pure helpers in memory across cells. Print totals, schemas, mismatches, and bounded summaries instead of raw dumps.
+
+Keep analysis deterministic. After an analysis error, rerun only the failed transformation cell. After a kernel restart, reload inputs from the saved file.
+
+## Select Libraries by Workload
+
+Process data locally with standard Python tools or installed data libraries:
+
+| Workload | Useful combination | Boundary |
+| --- | --- | --- |
+| Small audits | `json`, `collections.Counter`, sets, `decimal.Decimal` | No dependencies needed for counts, exact ID comparisons, or small joins. |
+| Tabular joins and distributions | Polars with explicit schemas | Normalize Odoo relation values before constructing a table. |
+| SQL over local snapshots | DuckDB over saved Parquet, CSV, or JSON | Filter early; bound displayed results. |
+| Reusing a columnar snapshot in SQL | Polars to Arrow to DuckDB | Reuse Arrow tables in memory without re-parsing files. |
+| Excel reconciliation | `fastexcel` with Polars | Preserve identifiers, blanks, and leading zeros. |
+| Duplicate-name candidates | `rapidfuzz` after exact blocking | Similarity proposes candidates; it never authorizes a merge or deletion. |
+| Dependency analysis | `networkx` over extracted edges | Detect cycles and ordering without guessing model constraints. |
+
+Normalize many-to-one fields: convert `False` to `None` and `[id, display_name]` to `id`. Keep Boolean fields Boolean. Use explicit timezones and decimal types for financial figures. Reject unexpected schemas instead of coercing them to empty values.
+
+## Analyze a Saved Snapshot
+
+The following cells load and analyze a local dataset in memory. They make zero network calls:
+
+First cell:
+
+```python
+import json
+from decimal import Decimal
+from pathlib import Path
+import polars as pl
 
 # Load data saved from CLI output
 raw_data = json.loads(Path("<temp-dir>/leads.json").read_text(encoding="utf-8"))
