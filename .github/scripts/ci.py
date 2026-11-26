@@ -97,11 +97,25 @@ def metadata(root: Path) -> None:
 DASHES = {"\N{EN DASH}": "U+2013 en dash", "\N{EM DASH}": "U+2014 em dash"}
 
 
+def markdown_paths(root: Path) -> list[Path]:
+    """Return tracked and untracked Markdown files, honoring Git ignore rules."""
+    try:
+        output = subprocess.check_output(
+            ["git", "ls-files", "-co", "--exclude-standard", "-z", "--", "*.md"],
+            cwd=root,
+            stderr=subprocess.DEVNULL,
+        ).decode("utf-8")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return sorted(root.rglob("*.md"))
+    return sorted((root / name for name in output.split("\0") if name))
+
+
 def prose(root: Path) -> None:
     """Reject en and em dashes in Markdown outside skills, which the skill lint owns."""
     skip = {".git", "node_modules", "legacy"}
     findings: list[str] = []
-    for path in sorted(root.rglob("*.md")):
+    paths = markdown_paths(root)
+    for path in paths:
         relative = path.relative_to(root)
         if skip & set(relative.parts) or relative.parts[:1] == ("skills",):
             continue

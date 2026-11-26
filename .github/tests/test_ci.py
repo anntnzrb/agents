@@ -455,6 +455,18 @@ def test_metadata_runs_the_skill_lint_over_every_current_skill(
     assert "skills/current/prose/SKILL.md:6: trailing whitespace" in result.stdout
 
 
+def test_metadata_honors_gitignore_for_repository_prose(tmp_path: Path) -> None:
+    metadata_checker(tmp_path)
+    git(tmp_path, "init", "-q")
+    write(tmp_path, ".gitignore", ".firecrawl/\n")
+    write(tmp_path, ".firecrawl/cache.md", "Ignored — cache.\n")
+    write(tmp_path, "docs/page.md", "Visible — prose.\n")
+    result = metadata(tmp_path)
+    assert result.returncode == 1
+    assert "docs/page.md:1: U+2014 em dash" in result.stdout
+    assert ".firecrawl/cache.md" not in result.stdout
+
+
 def test_metadata_rejects_dashes_in_repository_prose(tmp_path: Path) -> None:
     metadata_checker(tmp_path)
     write(tmp_path, "docs/page.md", "Ranges like 1\N{EN DASH}2 are prose.\n")
