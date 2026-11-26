@@ -6,7 +6,7 @@ Higher-signal queries; structural selectors, relationships, precise scope contro
 Match a call expression inside a larger pattern:
 
 ```bash
-uv run --script <skill-dir>/scripts/cli.py run -p 'if ($COND) { $BODY }' --selector call_expression -l ts src
+uv run --script <skill-dir>/scripts/cli.py run -p 'if ($COND) { $CALLEE($$$) }' --selector call_expression -l ts src
 ```
 
 `--debug-query=ast` shows node kinds.
