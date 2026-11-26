@@ -1,10 +1,55 @@
 # `gh stack` commands and lifecycle
 
 
-
 ## Section index
 
+- [Capability and target gate](#capability-and-target-gate)
+- [Local lifecycle](#local-lifecycle)
+- [Remote operations](#remote-operations)
+- [Unstack and merge](#unstack-and-merge)
+- [CI, review, and API boundaries](#ci-review-and-api-boundaries)
+- [Exit codes](#exit-codes)
+- [Official references](#official-references)
 
+Native stacks are generally available on github.com. Enterprise Server availability depends on its release. The extension remains version-sensitive; verify installed help, target, remotes, auth, worktree ownership, and stack state before use.
+
+Writes: `add` staging/commit, checkout/rebase/navigation, submit, sync, push, link, unstack, and merge change local or remote state. Honor existing authorization for the operation and every affected layer/worktree; ask only for missing scope. Afterward re-read local `view --json`, remote branch tips, PRs, and stack state.
+
+Handoff: complete `stack-design.md`; use `stack-troubleshooting.md` for failures. `git-worktrees` and `autommit` remain authorities for local lifecycle and staging/history.
+
+## Capability and target gate
+
+Before any stack command:
+
+```text
+gh --version
+gh extension list
+gh auth status
+git remote -v
+gh repo view [HOST/]OWNER/REPO --json nameWithOwner,defaultBranchRef,url
+```
+
+If absent and useful for the requested work, recommend official `github/gh-stack`. Review publisher, release, and current docs before authorized installation. Do not probe a missing command with `gh stack --help`, which may trigger installation:
+
+```text
+gh extension install github/gh-stack --pin TAG_OR_COMMIT
+```
+
+A missing command, 404, disabled feature, or stack exit `9` limits the requested stack operation, not ordinary PR work. Preserve known native membership instead of silently merging or unstacking it. With multiple remotes, set verified `GH_REPO=<host/owner/repo>` for the API target as well as `--remote` for pushes; `--remote` alone does not bind both targets.
+
+Use explicit arguments, `view --json`, `submit --auto`, `merge --yes`, and a non-TTY stdout. `GH_PROMPT_DISABLED=1` is not sufficient to suppress the extension's prompts under a PTY. Avoid interactive `modify`, `switch`, and picker forms in agent execution. Examples below also set the host CLI's prompt control; it does not authorize writes. Check installed `gh stack <command> --help` after discovery.
+
+Read native membership without the extension:
+
+```text
+gh api --method GET 'repos/OWNER/REPO/stacks?pull_request=PR_NUMBER'
+```
+
+An empty array means no native membership. Do not infer that result from an auth or network failure. `view --json` describes locally tracked layers but omits the remote stack number; resolve that number through the remote read.
+
+## Local lifecycle
+
+```text
 # Initialize/adopt a linear stack with explicit branches (local state)
 GH_PROMPT_DISABLED=1 gh stack init --base <trunk> <layer-1> <layer-2> <layer-3>
 
