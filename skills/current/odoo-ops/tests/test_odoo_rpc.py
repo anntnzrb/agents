@@ -1288,6 +1288,10 @@ def test_failed_mutation_consumes_plan_approval(tmp_path: Path) -> None:
         create.assert_called_once()
 
 
+def test_user_has_groups_reads_without_model_argument() -> None:
+    with patch.object(OdooRpcClient, "user_has_groups", return_value=True) as groups:
+        assert main(_prod_args("user_has_groups", "base.group_user")) == 0
+    groups.assert_called_once_with("base.group_user")
 
 
 @pytest.mark.parametrize(

@@ -2000,6 +2000,11 @@ def _run_inspection_commands(
     client: OdooRpcClient, args: argparse.Namespace, command: str
 ) -> None:
     """Run safe-introspection subcommands."""
+    if command == "user_has_groups":
+        _emit_compact(
+            {"has_group": client.user_has_groups(_required_str(args, "groups"))}
+        )
+        return
     model = _required_str(args, "model")
     if command == "fields_get":
         _emit(
@@ -2035,10 +2040,6 @@ def _run_inspection_commands(
                     model, operation=_required_str(args, "operation")
                 )
             }
-        )
-    elif command == "user_has_groups":
-        _emit_compact(
-            {"has_group": client.user_has_groups(_required_str(args, "groups"))}
         )
     else:
         message = f"Unknown inspection command: {command}."
