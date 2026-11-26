@@ -801,6 +801,26 @@ def test_strict_compare_blocks_schema_and_denominator_mismatch(
     assert blocked[0]["reason"] == "denominator_mismatch"
 
 
+def test_bare_diagnose_requires_snapshot_without_fetching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bare diagnose fails closed instead of fetching an artifact."""
+
+    def unexpected_fetch(*_args: object, **_kwargs: object) -> NoReturn:
+        msg = "bare diagnose must never fetch"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(cli, "fetch_artifacts", unexpected_fetch)
+    code, envelope, diagnostics = invoke(monkeypatch, ["diagnose"])
+    assert code == USAGE_EXIT_STATUS
+    assert envelope["ok"] is False
+    error = as_dict(envelope["error"])
+    assert error["code"] == "usage"
+    assert "--snapshot" in str(error["message"])
+    assert "never fetches" in str(error["message"])
+    assert diagnostics
+
+
 def test_diagnose_snapshot_is_offline_and_metrics_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

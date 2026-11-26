@@ -1425,6 +1425,9 @@ def _diagnose_duplicates(
 
 
 def _handle_diagnose(args: argparse.Namespace) -> dict[str, object]:
+    if _arg_obj(args, "snapshot", None) is None:
+        message = "diagnose requires --snapshot PATH; diagnose never fetches"
+        raise CliUsageError(message)
     is_trials = _arg_bool(args, "trials", default=False)
     artifact = "trials.json" if is_trials else "leaderboard-live.json"
     context = _context(args, artifact=artifact, include_trials=is_trials)
