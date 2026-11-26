@@ -144,10 +144,11 @@ Symptom-first diagnostics; verify each cause before applying its fix.
   credential entry. Do not burn time on fresh-profile logins or copied profile
   directories; macOS cookies are keychain-bound and copies rarely decrypt. When
   the user authorizes it, drive their real browser over CDP where the session
-  already exists: quit it gracefully (AppleScript `quit`, so tabs restore),
-  relaunch with the debug port, connect, and at task end quit and relaunch it
-  without the port. A debug port on a real profile grants any local process
-  full control of every session; never leave it running.
+  already exists. Ask the user to quit it gracefully so tabs restore, relaunch
+  it with the debug port, and at task end quit and relaunch it without the
+  port. NEVER restart or kill their browser yourself. A debug port on a real
+  profile grants any local process full control of every session; never leave
+  it running.
 - **An OAuth flow ends on a dead `localhost` redirect (`chrome-error` page):**
   the error page hides the target URL and the address bar is unreachable from
   the page context, but the navigation request is still logged. Capture the
