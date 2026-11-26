@@ -305,26 +305,31 @@ def handle_patch(args: CliArgs) -> int:
         nearest = find_nearest_changelog(".", repo_path)
         target_path = nearest or (repo_path / "CHANGELOG.md").resolve()
 
-    if args.dry_run:
-        original = (
-            target_path.read_text(encoding="utf-8") if target_path.is_file() else ""
-        )
-        patched, changed = patch_changelog_content(original, entries)
-        _ = sys.stdout.write(
-            json.dumps(
-                {
-                    "ok": True,
-                    "target": str(target_path),
-                    "changed": changed,
-                    "preview": patched,
-                },
-                indent=2,
+    try:
+        if args.dry_run:
+            original = (
+                target_path.read_text(encoding="utf-8") if target_path.is_file() else ""
             )
-            + "\n"
-        )
-        return 0
+            patched, changed = patch_changelog_content(original, entries)
+            _ = sys.stdout.write(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "target": str(target_path),
+                        "changed": changed,
+                        "preview": patched,
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
+            return 0
 
-    changed = patch_changelog_file(target_path, entries)
+        changed = patch_changelog_file(target_path, entries)
+    except RuntimeError as err:
+        _ = sys.stderr.write(f"Runtime error: {err}\n")
+        return 1
+
     _ = sys.stdout.write(
         json.dumps(
             {

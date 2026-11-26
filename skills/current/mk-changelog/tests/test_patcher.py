@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from patcher import (
     deduplicate_entries,
     patch_changelog_content,
@@ -84,3 +85,32 @@ def test_patch_changelog_file_roundtrip(tmp_path: Path):
     # Idempotent second patch with same entry
     changed2 = patch_changelog_file(cl_path, {"Added": ["brand new feature."]})
     assert changed2 is False
+
+
+def test_patch_changelog_refuses_unrecognized_unreleased_content():
+    original = """# Changelog
+
+## [Unreleased]
+
+### Added
+- Existing feature
+
+operator note that must survive
+
+## [1.0.0] - 2026-01-01
+"""
+    with pytest.raises(RuntimeError, match="unrecognized content"):
+        _ = patch_changelog_content(original, {"Added": ["New feature"]})
+
+
+def test_patch_changelog_refuses_nested_bullets():
+    original = """# Changelog
+
+## [Unreleased]
+
+### Added
+- Existing feature
+  - nested detail that must survive
+"""
+    with pytest.raises(RuntimeError, match="line 7"):
+        _ = patch_changelog_content(original, {"Added": ["New feature"]})

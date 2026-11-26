@@ -8,6 +8,7 @@ from parser import (
     VERSION_HEADER_PATTERN,
     format_entries_markdown,
     parse_unreleased_section,
+    unrecognized_unreleased_lines,
 )
 
 DEFAULT_CHANGELOG_HEADER: str = """# Changelog
@@ -89,6 +90,14 @@ def patch_changelog_content(
     formatted_unreleased = format_entries_markdown(merged_entries, include_header=True)
 
     if parsed.unreleased_found:
+        unknown = unrecognized_unreleased_lines(original_content)
+        if unknown:
+            locations = ", ".join(str(line) for line, _ in unknown[:5])
+            msg = (
+                "unrecognized content in ## [Unreleased] at line "
+                f"{locations}; patch is refusing to rewrite it losslessly"
+            )
+            raise RuntimeError(msg)
         # Replace the entire [Unreleased] block from start_line to end_line
         before = lines[: parsed.start_line]
         after = lines[parsed.end_line :]

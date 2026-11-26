@@ -72,4 +72,5 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
 - Start each entry with a past-tense verb (Added, Fixed, Changed, Updated) and omit trailing periods.
 - Preserve deterministic community attribution format: `([#123](url) by @user)`.
 - Never duplicate entries already present under `## [Unreleased]`.
+- `patch` refuses an `## [Unreleased]` section containing free text, nested bullets, or other content its parser cannot represent losslessly. Normalize that content deliberately or patch another target; never let the tool silently discard it.
 - In monorepos, update the nearest package-level `CHANGELOG.md` unless instructed to target the root changelog.

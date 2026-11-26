@@ -67,6 +67,50 @@ def parse_unreleased_section(content: str) -> ExistingEntries:
     )
 
 
+def unrecognized_unreleased_lines(content: str) -> list[tuple[int, str]]:
+    """Return unreleased lines that patching cannot represent losslessly.
+
+    Blank lines, category headings, and top-level bullets inside a category are
+    representable. Everything else, including nested bullets and free text, is
+    user content that must not be silently normalized away.
+    """
+    lines = content.splitlines()
+    start_index = next(
+        (
+            idx
+            for idx, line in enumerate(lines)
+            if UNRELEASED_PATTERN.match(line.strip())
+        ),
+        -1,
+    )
+    if start_index == -1:
+        return []
+
+    end_index = len(lines)
+    for idx in range(start_index + 1, len(lines)):
+        line = lines[idx]
+        if line.startswith("## ") and (
+            VERSION_HEADER_PATTERN.match(line) or UNRELEASED_PATTERN.match(line)
+        ):
+            end_index = idx
+            break
+
+    unknown: list[tuple[int, str]] = []
+    in_category = False
+    for idx in range(start_index + 1, end_index):
+        line = lines[idx]
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if SECTION_PATTERN.match(stripped):
+            in_category = True
+            continue
+        if in_category and (line.startswith(("- ", "* "))):
+            continue
+        unknown.append((idx + 1, line))
+    return unknown
+
+
 def parse_changelog_file(file_path: Path) -> ExistingEntries:
     """Read and parse existing changelog file if present."""
     if not file_path.is_file():
