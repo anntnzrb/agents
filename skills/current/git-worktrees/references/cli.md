@@ -58,7 +58,7 @@ inspect --repo PATH
 - durable controller-managed leases for the repository; and
 - findings
 
-A non-Git, bare, or otherwise unusable repository is a typed successful finding when identity can be determined; otherwise it is an error response. Inspect does not grant lifecycle authority over a discovered worktree.
+A non-Git, bare, or otherwise unusable repository is an error response, never a successful finding: a bare repository is a refusal (`repository_bare`, exit 3) and a non-Git or unreadable path is a Git error (exit 4). Inspect does not grant lifecycle authority over a discovered worktree.
 
 ### `acquire`
 
