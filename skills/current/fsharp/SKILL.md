@@ -29,7 +29,7 @@ Before editing, inspect the configuration that applies to the affected project:
 - Repository conventions and configured tools win over the defaults below.
 - Never upgrade the SDK, `LangVersion`, or `FSharp.Core` to make code compile or use a newer feature.
 - Add new source files to the `.fsproj` in dependency order, with each `.fsi` before its `.fs`.
-- When adding or upgrading packages, including CPM `PackageVersion` pins, resolve "latest stable" only through listing-aware sources: `dotnet package search <id> --exact-match`, `dotnet list package --outdated`, or the registration API's `listed` flag. See `references/ecosystem.md` for metadata lookup.
+- When adding or upgrading packages, including CPM `PackageVersion` pins, resolve "latest stable" only through listing-aware sources: `dotnet package search <id> --exact-match` where the selected SDK provides it, `dotnet list package --outdated`, or the registration API's `listed` flag. Command availability is SDK-dependent; use the registration API when a noun-first command is unavailable. See `references/ecosystem.md` for metadata lookup.
 - Never select versions from the NuGet flat-container index. Check each chosen version's dependency ranges for compatibility before building.
 - If a test runner, adapter, or build breaks after a change, fix the version or configuration root cause. Never replace or override SDK targets such as `VSTest`, remove the adapter, or hand-roll a runner to make `dotnet test` pass.
 

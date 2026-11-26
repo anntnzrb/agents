@@ -17,7 +17,7 @@ dotnet --info
 dotnet msbuild App.fsproj -getProperty:LangVersion -getProperty:Nullable -getProperty:TreatWarningsAsErrors -getProperty:TargetFramework -getProperty:ManagePackageVersionsCentrally
 dotnet msbuild App.fsproj -getItem:Compile
 dotnet restore App.fsproj
-dotnet package list --project App.fsproj --include-transitive
+dotnet list package --project App.fsproj --include-transitive
 dotnet tool list --local
 ```
 
@@ -25,7 +25,7 @@ dotnet tool list --local
 
 An empty `LangVersion` property means no evaluated override. Check the selected compiler's default rather than treating the empty value as a language version.
 
-The package list reports resolved `FSharp.Core`. For conditional dependencies or unexpected resolution, inspect the affected target in `obj/project.assets.json`. Do not infer the library version from the language version.
+The package list reports resolved `FSharp.Core`. Use the noun-first form `dotnet package list` only when the selected SDK is .NET 10 or newer; `dotnet list package` is the broadly compatible form. For conditional dependencies or unexpected resolution, inspect the affected target in `obj/project.assets.json`. Do not infer the library version from the language version.
 
 For CPM, versions normally belong in `Directory.Packages.props`, while projects contain versionless `PackageReference` items. With Paket, use the repository's Paket workflow. Do not introduce a second package manager.
 
