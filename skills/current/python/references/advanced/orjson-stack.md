@@ -344,15 +344,15 @@ Set `OPT_PASSTHROUGH_SUBCLASS` and handle the subclass in `default=`. The design
 
 ### `int` overflow
 
-orjson refuses to encode integers larger than 2⁵³ - 1 by default (the IEEE-754 double-precision safe-integer limit; what JavaScript can round-trip). For larger ints, opt in:
+orjson serializes signed 64-bit integers by default. `OPT_STRICT_INTEGER` rejects integers outside the IEEE-754 double-precision safe range (what JavaScript can round-trip):
 
 ```python
-orjson.dumps(huge_int, option=orjson.OPT_STRICT_INTEGER)  # error
+orjson.dumps(huge_int, option=orjson.OPT_STRICT_INTEGER)  # error past 2^53 - 1
 orjson.dumps(huge_int)  # default; int is encoded as JSON number
 # JavaScript clients lose precision past 2^53; consider sending as string
 ```
 
-This is more spec-strict than stdlib `json`, which silently emits ints of any size.
+This opt-in is more spec-strict than stdlib `json`, which silently emits ints of any size.
 
 ### Timezone-naive datetimes
 

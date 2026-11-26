@@ -1,8 +1,8 @@
 # One-liner Scripts (PEP 723 + uv)
 
-Self-contained Python scripts declare dependencies and run without environment setup. The script IS its environment spec.
+Self-contained Python scripts can declare dependencies and run without environment setup. The script or project owns its environment spec.
 
-**Rule: EVERY `.py` script: even throwaway: MUST use PEP 723 inline metadata plus the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
+**Rule: a standalone `.py` script that imports third-party dependencies or needs a Python version floor MUST use PEP 723 inline metadata. Dependency-free scripts MAY omit the metadata block. Shared scripts include the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
 
 ## Patterns
 
@@ -18,12 +18,11 @@ print(httpx2.get('https://api.github.com').json())
 
 Terminal one-shot; do not save. Repeat `--with PKG` as needed.
 
-### 2. PEP 723 script + shebang (canonical)
+### 2. PEP 723 script (canonical)
 
 `.py` file with a comment metadata block. uv reads it, materialises a disposable cached venv, and runs the script.
 
 ```python
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
@@ -35,10 +34,8 @@ Terminal one-shot; do not save. Repeat `--with PKG` as needed.
 # ─── How to run ───
 # 1. Install uv (if not installed):
 #      curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Run directly (no venv, no pip install needed):
-#      uv run my_script.py
-# 3. Or make executable and run:
-#      chmod +x my_script.py && ./my_script.py
+# 2. Run with uv (no venv, no pip install needed):
+#      uv run --script my_script.py
 # ──────────────────
 
 import httpx2
@@ -60,10 +57,11 @@ if __name__ == "__main__":
 
 Every PEP 723 script MUST contain:
 
-1. `#!/usr/bin/env -S uv run --script`
-2. `# /// script` … `# ///`, containing `requires-python = ">=3.14"` and `dependencies`
-3. The usage comment block: uv installation plus script execution; use the exact template below
-4. `if __name__ == "__main__": main()` entry-point guard
+1. `# /// script` … `# ///`, containing `requires-python = ">=3.14"` and `dependencies` when the script imports third-party packages
+2. The usage comment block: uv installation plus script execution; use the exact template below
+3. `if __name__ == "__main__": main()` entry-point guard
+
+Do not rely on a shebang, executable bit, or direct `./script.py` invocation. The portable run path is `uv run --script`.
 
 ### Required usage comment block
 
@@ -71,10 +69,8 @@ Every PEP 723 script MUST contain:
 # ─── How to run ───
 # 1. Install uv (if not installed):
 #      curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Run directly (no venv, no pip install needed):
-#      uv run <SCRIPT_NAME>.py [ARGS]
-# 3. Or make executable and run:
-#      chmod +x <SCRIPT_NAME>.py && ./<SCRIPT_NAME>.py
+# 2. Run with uv (no venv, no pip install needed):
+#      uv run --script <SCRIPT_NAME>.py [ARGS]
 # ──────────────────
 ```
 
@@ -101,7 +97,6 @@ Copy the metadata and usage-comment pattern; declare only dependencies the scrip
 ### Fetch + print JSON
 
 ```python
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
@@ -112,7 +107,7 @@ Copy the metadata and usage-comment pattern; declare only dependencies the scrip
 
 # ─── How to run ───
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Run: uv run fetch_json.py https://api.github.com/repos/pydantic/httpx2
+# 2. Run: uv run --script fetch_json.py https://api.github.com/repos/pydantic/httpx2
 # ──────────────────
 
 import sys
@@ -136,7 +131,6 @@ if __name__ == "__main__":
 ### CSV → Parquet
 
 ```python
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
@@ -148,7 +142,7 @@ if __name__ == "__main__":
 
 # ─── How to run ───
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Run: uv run csv2parquet.py input.csv output.parquet
+# 2. Run: uv run --script csv2parquet.py input.csv output.parquet
 # ──────────────────
 
 from pathlib import Path
@@ -173,7 +167,6 @@ if __name__ == "__main__":
 ### Quick benchmark
 
 ```python
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
@@ -185,7 +178,7 @@ if __name__ == "__main__":
 
 # ─── How to run ───
 # 1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Run: uv run bench.py https://api.example.com/health 50
+# 2. Run: uv run --script bench.py https://api.example.com/health 50
 # ──────────────────
 
 import socket
@@ -239,12 +232,13 @@ if __name__ == "__main__":
 
 | Don’t | Do |
 |---|---|
-| `pip install httpx2 && python script.py` | `uv run script.py` |
-| `requirements.txt` beside script | PEP 723 inline metadata |
+| `pip install httpx2 && python script.py` | `uv run --script script.py` |
+| `requirements.txt` beside script | PEP 723 inline metadata when dependencies exist |
+| `chmod +x script.py && ./script.py` | `uv run --script script.py` |
 | `python -m venv .venv && ...` | `uv run --script` handles the environment |
 | Script without usage comment | Always include the “How to run” block |
 | `import asyncio; asyncio.run(main())` | `import anyio; anyio.run(main)` |
-| Bare `httpx2.AsyncClient()` | Full production defaults (see `references/httpx2-optimization.md`) |
+| Bare `httpx2.AsyncClient()` | Full production defaults (see `httpx2-optimization.md`) |
 
 ## Sources
 

@@ -18,7 +18,7 @@ Is it an interface / contract ("this thing can do X")?
   └─ Shared method implementation needed → ABC
   NO ↓
 Does the data cross a trust boundary (user input, API, file, external DB)?
-  YES → pydantic.BaseModel (frozen=True); validates + serializes
+  YES → boundary schema/model (Pydantic or msgspec); validate once
   NO ↓
 Is it a dict shape needed for JSON compat / **kwargs typing?
   YES → TypedDict
@@ -61,9 +61,9 @@ class Point:
 
 Always `frozen=True, slots=True`. Mutable only when mutation is the documented purpose (such as an accumulator, builder, or state machine whose docstring explains why).
 
-### Pydantic BaseModel: trust boundary guardian
+### Pydantic BaseModel: boundary model with schema support
 
-Use when data enters or leaves your system. Validates at construction, serializes to JSON, generates OpenAPI schema.
+Use when data enters or leaves your system and the boundary benefits from Pydantic's validation ergonomics, JSON schema, OpenAPI, settings, or serialization integration.
 
 ```python
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -85,8 +85,24 @@ class UserResponse(BaseModel):
     email: str
 ```
 
-**The one rule**: data crosses a trust boundary → Pydantic. Everything else → dataclass.
-Never use Pydantic for internal-only data just because it's convenient. The validation cost is real.
+**The one rule**: data crosses a trust boundary → parse and validate once into a boundary type. Use `msgspec.Struct` for closed, high-throughput payloads; use Pydantic when its schema or validation integration is the reason for the model. Everything internal-only → dataclass.
+Never use a boundary validator for internal-only data just because it's convenient. The validation cost is real.
+
+### msgspec Struct: closed high-throughput payload
+
+Use for closed JSON or binary payloads when schema generation is unnecessary and decoding cost matters. Reject unknown fields when the payload is owned or contracted:
+
+```python
+import msgspec
+
+
+class CreateUser(msgspec.Struct, forbid_unknown_fields=True):
+    name: str
+    email: str
+
+
+payload = msgspec.json.decode(raw_bytes, type=CreateUser)
+```
 
 ### TypedDict: dict that knows its shape
 
@@ -184,7 +200,8 @@ x, y = Coordinate(1.0, 2.0)  # tuple unpacking
 
 | Situation | Use | Why |
 |---|---|---|
-| User input, API request/response | `Pydantic BaseModel` | Validation, JSON schema, serialization |
+| User input, API request/response needing schema integration | `Pydantic BaseModel` | Validation, JSON schema, serialization |
+| Closed high-throughput JSON/binary payload | `msgspec.Struct` | Fast decode, strict field closure |
 | DB row ↔ Python (ORM) | SQLAlchemy `Mapped[]` model | ORM integration, async session |
 | Internal value object | `@dataclass(frozen=True, slots=True)` | Zero overhead, no validation needed |
 | Multiple outcomes from function | Union of frozen dataclasses | Distinct types for `match` |

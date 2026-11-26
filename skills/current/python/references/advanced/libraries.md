@@ -53,7 +53,7 @@ install(show_locals=True)
 
 `httpx2`: Pydantic-stewarded, sync+async, HTTP/2-native, brotli+zstd decoding, typed; replaces `requests`, `aiohttp`, and original `httpx`.
 
-Install exactly `httpx2[http2,brotli,zstd]`; always include all three extras. Bare `httpx2.AsyncClient()` or `httpx2.Client()` is a bug. MUST use the factory pattern from `references/httpx2-optimization.md`, with all optimizations enabled by default. Load that reference whenever writing ANY network code; it also defines `create_client()` / `create_async_client()`, event hooks, and setting rationale.
+Install exactly `httpx2[http2,brotli,zstd]`; always include all three extras. Bare `httpx2.AsyncClient()` or `httpx2.Client()` is a bug. MUST use the factory pattern from `httpx2-optimization.md`, with all optimizations enabled by default. Load that reference whenever writing ANY network code; it also defines `create_client()` / `create_async_client()`, event hooks, and setting rationale.
 
 ```python
 import socket
@@ -91,7 +91,7 @@ with httpx2.Client(
 
 ## JSON: stdlib `json` (default) or `orjson` (hot paths)
 
-Use stdlib `json` for cold paths/configs; use `orjson` when JSON is hot: cache layers, queue payloads, streaming responses, structured logs, or FastAPI raw `dict`/`list` responses. `orjson.dumps` returns `bytes`. For Pydantic v2, use `model_dump_json()`; pydantic-core (Rust) beats the `orjson + default=` bridge for Pydantic-shaped responses. FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`; Pydantic-typed responses correctly bypass it, while raw `dict`/`list` responses use orjson. See `references/orjson-stack.md` for the decision tree, flags, FastAPI, Redis/queue/logging patterns, and benchmark.
+Use stdlib `json` for cold paths/configs; use `orjson` when JSON is hot: cache layers, queue payloads, streaming responses, structured logs, or FastAPI raw `dict`/`list` responses. `orjson.dumps` returns `bytes`. For Pydantic v2, use `model_dump_json()`; pydantic-core (Rust) beats the `orjson + default=` bridge for Pydantic-shaped responses. FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`; Pydantic-typed responses correctly bypass it, while raw `dict`/`list` responses use orjson. See `orjson-stack.md` for the decision tree, flags, FastAPI, Redis/queue/logging patterns, and benchmark.
 
 ```python
 import orjson
@@ -103,9 +103,9 @@ raw: bytes = orjson.dumps(
 )
 ```
 
-## Validation: pydantic v2
+## Validation: pydantic v2 and msgspec
 
-Use Pydantic v2 as the boundary validator for HTTP models, config (env vars via `pydantic-settings`), and anything entering from outside. Its Rust core is ~10x faster than v1. `@dataclass` is acceptable for internal records needing no validation; process-boundary data requires Pydantic.
+Use Pydantic v2 for boundary models that need its validation ergonomics, JSON schema, OpenAPI, serialization, or settings integration (env vars via `pydantic-settings`). Use `msgspec.Struct` for closed high-throughput payloads where schema generation is unnecessary. `@dataclass` is appropriate for internal records needing no validation; process-boundary data must be parsed and validated once with Pydantic, msgspec, or explicit typed narrowing.
 
 ```python
 from pydantic import BaseModel, Field, EmailStr, field_validator
@@ -158,9 +158,10 @@ Type-hint-driven HTTP framework; Pydantic models automatically become OpenAPI sc
 
 ```python
 from fastapi import FastAPI
+from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI(default_response_class=ORJSONResponse)
 
 
 class CreateUser(BaseModel):
@@ -225,11 +226,11 @@ uv run alembic init -t async migrations
 
 ## DataFrames: polars + numpy
 
-Polars: 10-50x faster than pandas, real type system, lazy evaluation. Numpy remains for arrays. See [data-processing.md](data-processing.md).
+Polars: typed DataFrames, lazy evaluation, and parallel execution. Numpy remains for arrays. See [data-processing.md](data-processing.md).
 
 ## OLAP / SQL: duckdb
 
-DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading into memory, joins/aggregations 3-4x faster than Polars, zero-copy Polars interchange via Arrow. See [data-processing.md](data-processing.md).
+DuckDB: analytical SQL engine; queries CSV/Parquet/JSON directly without loading everything into memory, plans multi-table joins and aggregations, and interchanges with Polars zero-copy through Arrow. See [data-processing.md](data-processing.md).
 
 ## Tests: pytest
 

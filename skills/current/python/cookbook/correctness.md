@@ -4,7 +4,7 @@ Use smallest tool making failures obvious: basedpyright first; runtime validatio
 
 ## basedpyright baseline
 
-New projects MUST start with basedpyright (`typeCheckingMode = "all"`). Legacy repos MAY retain mypy as a secondary check, never the primary gate.
+New projects MUST start with basedpyright (`typeCheckingMode = "all"`). Inherited repositories keep their configured checker as primary unless migration is in scope; basedpyright may be added only as an agreed secondary check or for new code.
 
 ### `pyproject.toml`
 

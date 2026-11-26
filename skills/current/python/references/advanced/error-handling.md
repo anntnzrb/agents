@@ -153,7 +153,7 @@ f.close()  # forgotten? leaked
 # GOOD
 from pathlib import Path
 
-data = Path("data.txt").read_text()
+data = Path("data.txt").read_text(encoding="utf-8")
 ```
 
 ### Async resources

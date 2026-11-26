@@ -10,16 +10,14 @@ NEVER pandas. Polars (with numpy) plus DuckDB. Pandas is 10-50x slower, has weak
 |---|---|---|
 |`.csv` / `.parquet` / `.json` direct query|DuckDB|Zero memory load, SQL ergonomics|
 |`.duckdb` file|DuckDB|Native format|
-|Filter (any size)|Polars|128x faster than DuckDB for filtering|
-|Sort|Polars|12x faster|
-|Multi-table join|DuckDB|3x faster, more join types|
-|Heavy GROUP BY aggregation|DuckDB|4x faster on large datasets|
-|Window function|Polars|3-5x faster|
-|Pivot / melt / string ops|Polars|2x faster|
+|Filter (any size)|Polars|Lazy predicate pushdown and fast expression evaluation|
+|Sort|Polars|Parallel DataFrame operations|
+|Multi-table join|DuckDB|SQL join planner and more join types|
+|Heavy GROUP BY aggregation|DuckDB|Vectorized out-of-core aggregation|
+|Window function|Polars|Native expression support|
+|Pivot / melt / string ops|Polars|DataFrame ergonomics|
 |Larger than RAM|Polars streaming or DuckDB out-of-core|Both handle OOM|
 |Mixed pipeline|Hybrid (zero-copy via Arrow)|Use each tool's strengths|
-
-For the deep version (per-operation benchmarks, OOM strategies, full execution templates), load the **`data-scientist`** skill - it lives in this same skill set and is the source of truth for performance numbers.
 
 ## Standard imports
 
@@ -78,7 +76,7 @@ result = (
 ## Hybrid pipeline (most realistic shape)
 
 ```python
-# Phase 1: DuckDB for the join (3x faster)
+# Phase 1: DuckDB for the join
 joined = duckdb.sql("""
     SELECT o.*, c.region, p.category
     FROM 'orders.parquet' o
@@ -86,14 +84,14 @@ joined = duckdb.sql("""
     JOIN 'products.parquet'  p ON o.product_id  = p.id
 """).pl()
 
-# Phase 2: Polars for filtering and transformation (128x + 2x faster)
+# Phase 2: Polars for filtering and transformation
 processed = joined.filter(pl.col("amount") > 100).with_columns(
     [
         (pl.col("amount") * 1.1).alias("amount_with_tax"),
     ]
 )
 
-# Phase 3: DuckDB for final aggregation (4x faster) - register Polars frame by name
+# Phase 3: DuckDB for final aggregation - register Polars frame by name
 duckdb.register("processed", processed)
 final = duckdb.sql("""
     SELECT region, category, SUM(amount_with_tax) AS revenue
@@ -130,4 +128,3 @@ basedpyright understands `polars-stubs`, which ship with polars itself. No extra
 
 - Polars docs: <https://docs.pola.rs>
 - DuckDB Python API: <https://duckdb.org/docs/api/python/overview>
-- Cross-reference - this skill set's `data-scientist` skill (load it for the deep version)

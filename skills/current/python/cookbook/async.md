@@ -253,7 +253,7 @@ class ManagedPool:
     def __init__(self) -> None:
         self.active = False
 
-    async def __aenter__(self) -> ManagedPool:
+    async def __aenter__(self) -> "ManagedPool":
         await anyio.sleep(0.01)
         self.active = True
         return self

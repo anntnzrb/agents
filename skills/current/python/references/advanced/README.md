@@ -194,7 +194,8 @@ Use `polars` + `duckdb` for data. pandas is never the right answer in this stack
 
 | Situation | Use |
 |---|---|
-| User input, API request/response | `Pydantic BaseModel (frozen=True)` |
+| User input, API request/response needing schema integration | `Pydantic BaseModel (frozen=True)` |
+| Closed high-throughput JSON/binary payload | `msgspec.Struct` |
 | Internal value object (no I/O) | `@dataclass(frozen=True, slots=True)` |
 | Function with multiple outcomes | Union of frozen dataclasses + `match` |
 | Dict shape for JSON compat / `**kwargs` | `TypedDict` |
@@ -205,7 +206,7 @@ Use `polars` + `duckdb` for data. pandas is never the right answer in this stack
 | ORM model (SQLAlchemy) | `Mapped[]`: inherently mutable |
 | Config from env vars | `pydantic-settings BaseSettings` |
 
-**The one rule**: data crosses trust boundary → Pydantic. Everything else → dataclass.
+**The one rule**: data crosses a trust boundary → parse and validate once with Pydantic, msgspec, or typed narrowing. Everything internal-only → dataclass.
 
 Load `data-modeling.md` for the full decision flowchart and comparison matrix.
 
@@ -224,7 +225,7 @@ Canonical defaults (override only if `pyproject.toml` explicitly picks something
 | CLI | `typer` | Type-annotated CLI from function sigs |
 | Pretty output | `rich` | Tables, progress, tracebacks, markdown |
 | HTTP client | [`httpx2`](https://github.com/pydantic/httpx2) | Next-gen HTTP client (Pydantic stewardship), HTTP/2, brotli+zstd. Always `httpx2[http2,brotli,zstd]`. See `httpx2-optimization.md` |
-| Validation | `pydantic` v2 | Fast native validator, JSON Schema |
+| Validation | `pydantic` v2 or `msgspec` | Pydantic for schema/validation integration; msgspec for closed high-throughput payloads |
 | Web API | `fastapi` | Async, Pydantic-native, OpenAPI |
 | ORM | `sqlalchemy` 2.x async | `Mapped[]` types, async sessions |
 | DB driver (Postgres) | `asyncpg` (via SQLAlchemy) | Fastest PG driver |
@@ -236,11 +237,11 @@ Canonical defaults (override only if `pyproject.toml` explicitly picks something
 
 For a new project, start with `uv init --app myproject`, then load `pyproject-strict.md` and adapt its strict defaults to the project rather than using a bundled scaffold.
 
-## PEP 723: inline script metadata (mandatory for ALL scripts)
+## PEP 723: inline script metadata
 
-Every `.py` script; even throwaway; MUST use PEP 723 inline metadata with the `# ─── How to run ───` comment block. No venv, no `requirements.txt`. The script IS the environment spec. A script without the usage comment block is incomplete.
+A standalone script that imports third-party dependencies or needs a Python version floor MUST use PEP 723 inline metadata. Dependency-free scripts MAY omit the metadata block. Shared scripts include the `# ─── How to run ───` comment block. No venv, no `requirements.txt`; the script or project owns the environment spec.
 
-For a new script, write the PEP 723 metadata directly and use `uv run --script <script.py>`.
+For a new script, write the PEP 723 metadata directly when needed and use `uv run --script <script.py>`.
 
 Load `one-liners.md` for full patterns, examples, and anti-patterns.
 

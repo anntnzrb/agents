@@ -212,6 +212,7 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.responses import ORJSONResponse
 
 from myapi.config import get_settings
 from myapi.routers import users
@@ -233,6 +234,7 @@ def create_app() -> FastAPI:
         title="My API",
         debug=settings.debug,
         lifespan=lifespan,
+        default_response_class=ORJSONResponse,
     )
     app.include_router(users.router)
     return app
