@@ -15,7 +15,7 @@ Read-only Amazon catalog search through the bundled skill-local CLI. Use it for 
 ## Entry points
 
 - From the skill root: `uv run --script <skill-dir>/scripts/cli.py ...`
-- If `SKILLS_DIR` is set: `uv run --script "$SKILLS_DIR/amz-live/scripts/cli.py" ...`
+- If `SKILLS_DIR` is set: `uv run --script <skill-dir>/scripts/cli.py ...`
 - Otherwise resolve the skill directory, then run `uv run --script <skill-dir>/scripts/cli.py ...`
 - For process integration: `uv run --script <skill-dir>/scripts/cli.py --mode rpc`
 
