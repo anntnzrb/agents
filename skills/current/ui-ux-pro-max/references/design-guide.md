@@ -370,7 +370,7 @@ uv run --script <skill-dir>/scripts/cli.py "beauty spa wellness service" --desig
 To save the design system for **hierarchical retrieval across sessions**, add `--persist`:
 
 ```bash
-uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -p "Project Name"
+uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -p "Project Name" --output-dir "<project-root>"
 ```
 
 This creates:
@@ -379,7 +379,7 @@ This creates:
 
 **With page-specific override:**
 ```bash
-uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -p "Project Name" --page "dashboard"
+uv run --script <skill-dir>/scripts/cli.py "<query>" --design-system --persist -p "Project Name" --page "dashboard" --output-dir "<project-root>"
 ```
 
 This also creates:
