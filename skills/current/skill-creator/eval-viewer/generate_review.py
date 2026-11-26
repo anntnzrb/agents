@@ -24,12 +24,8 @@ import base64
 import contextlib
 import json
 import mimetypes
-import os
 import re
-import signal
-import subprocess
 import sys
-import time
 import webbrowser
 from dataclasses import dataclass
 from functools import partial
@@ -392,32 +388,6 @@ def generate_html(
 # ---------------------------------------------------------------------------
 
 
-def _kill_port(port: int) -> None:
-    """Kill any process listening on the given port."""
-    try:
-        # Fixed argv, no shell: checking local port usage via system lsof.
-        result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-        for pid_str in result.stdout.strip().split("\n"):
-            if pid_str.strip():
-                with contextlib.suppress(ProcessLookupError, ValueError):
-                    os.kill(int(pid_str.strip()), signal.SIGTERM)
-        if result.stdout.strip():
-            time.sleep(0.5)
-    except subprocess.TimeoutExpired:
-        pass
-    except FileNotFoundError:
-        print(
-            "Note: lsof not found, cannot check if port is in use",
-            file=sys.stderr,
-        )
-
-
 @dataclass(frozen=True, slots=True)
 class ServerConfig:
     """Configuration for running the review HTTP server."""
@@ -531,12 +501,11 @@ def _print_server_banner(url: str, config: ServerConfig) -> None:
 
 def _serve(config: ServerConfig) -> None:
     """Start the review HTTP server and open the browser."""
-    _kill_port(config.port)
     handler = partial(ReviewHandler, config)
     try:
         server = HTTPServer(("127.0.0.1", config.port), handler)
     except OSError:
-        # Port still in use after kill attempt - find a free one
+        # Another process owns the requested port; never kill it. Use a free one.
         server = HTTPServer(("127.0.0.1", 0), handler)
         config = ServerConfig(
             workspace=config.workspace,
