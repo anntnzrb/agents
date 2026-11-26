@@ -32,6 +32,8 @@ BASE_REF: Final[str] = "origin/main"
 CURRENT_SKILLS: Final[str] = "skills/current"
 LICENSE: Final[str] = "AGPL-3.0-or-later"
 SKILL_MD_HARD_CAP: Final[int] = 250
+REFERENCE_INDEX_LINE_CAP: Final[int] = 100
+REFERENCE_INDEX_SCAN_LINES: Final[int] = 50
 READS_COLUMNS: Final[frozenset[str]] = frozenset({"Need", "Read", "When"})
 READS_TABLE_MISSING: Final[str] = (
     "bundled docs exist but no follow-up reads table with Need, Read, When columns"
@@ -180,6 +182,39 @@ def _prose_lines(text: str) -> list[tuple[int, str]]:
     return prose
 
 
+def _section_index(
+    path: Path, rel: Path, text: str, rules: frozenset[str]
+) -> list[Finding]:
+    """Require long owned references to expose their shape near the top.
+
+    Files whose whitespace attribute is disabled are verbatim fixtures, data,
+    code, or upstream bytes under this repository's attribute convention. They
+    are not edited for navigability and are exempt.
+    """
+    if (
+        not rules
+        or rel.parts[:1] != ("references",)
+        or len(text.splitlines()) <= REFERENCE_INDEX_LINE_CAP
+    ):
+        return []
+    for number, line in _prose_lines(text):
+        if number > REFERENCE_INDEX_SCAN_LINES:
+            break
+        if re.match(
+            r"^##\s+(section index|contents|table of contents)(\s|$)",
+            line,
+            flags=re.IGNORECASE,
+        ):
+            return []
+    return [
+        Finding(
+            path,
+            1,
+            "reference over 100 lines lacks a top section index",
+        )
+    ]
+
+
 def _dashes(path: Path, text: str) -> list[Finding]:
     return [
         Finding(path, number, f"{name} in Markdown prose")
@@ -277,6 +312,7 @@ def lint_skill(skill_dir: Path) -> list[Finding]:
         findings.extend(_whitespace(path, text, rules))
         if path.suffix == ".md":
             findings.extend(_dashes(path, text))
+            findings.extend(_section_index(path, rel, text, rules))
     text = skill_md.read_text(encoding="utf-8")
     findings.extend(_skill_md(skill_md, text, bundled_docs=bundled_docs))
     upstream = skill_dir / "UPSTREAM.json"

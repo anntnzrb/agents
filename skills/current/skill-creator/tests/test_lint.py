@@ -368,3 +368,25 @@ def test_no_arguments_lints_skills_changed_against_origin_main(
     assert "skills/current/fresh/SKILL.md:6: U+2014 em dash" in out
     assert "untouched" not in out
     assert "legacy" not in out
+
+
+def test_long_reference_needs_section_index(tmp_path: Path) -> None:
+    """Long owned references expose their scope before deep content."""
+    body = "# Ref\n\n" + "\n".join(f"line {n}" for n in range(101)) + "\n"
+    skill = make_skill(tmp_path / "s", "# Fixture\n\n" + _READS_TABLE)
+    _ = write(skill, "references/usage.md", body)
+    assert messages(lint_skill(skill)) == [
+        "usage.md:1: reference over 100 lines lacks a top section index"
+    ]
+
+
+def test_long_reference_accepts_contents_heading(tmp_path: Path) -> None:
+    """A contents heading near the top satisfies the navigability rule."""
+    body = (
+        "# Ref\n\n## Contents\n\n- [Later](#later)\n\n"
+        + "\n".join(f"line {n}" for n in range(101))
+        + "\n"
+    )
+    skill = make_skill(tmp_path / "s", "# Fixture\n\n" + _READS_TABLE)
+    _ = write(skill, "references/usage.md", body)
+    assert lint_skill(skill) == []
