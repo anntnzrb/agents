@@ -27,7 +27,7 @@ source key:
 ```
 
 The key does double duty: it names the registry entry and, under fixture
-injection (`VALORANT_META_FIXTURE_DIR`), it names the fixture file
+injection (`VALO_FIXTURE_DIR`), it names the fixture file
 `<fixture_dir>/<key>.md`. The patch detail page is deliberately not a
 registry entry: its URL is dynamic, extracted from the latest patch card by
 the patches parser, so it is a second fetch step inside the `patch` command.

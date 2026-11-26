@@ -79,7 +79,7 @@ def run_cli(
 def fixture_env(fixture_dir: Path, tmp_path: Path) -> dict[str, str]:
     """Environment overlay activating fixture injection and a scratch state."""
     return {
-        "VALORANT_META_FIXTURE_DIR": str(fixture_dir),
+        "VALO_FIXTURE_DIR": str(fixture_dir),
         "XDG_STATE_HOME": str(tmp_path / "state"),
     }
 
@@ -258,7 +258,7 @@ def test_failure_increments_consecutive_failures(
 
 
 def test_corrupt_state_is_fresh_start(fixture_dir: Path, tmp_path: Path) -> None:
-    state_dir = tmp_path / "state" / "valorant-meta"
+    state_dir = tmp_path / "state" / "valo"
     state_dir.mkdir(parents=True)
     _ = (state_dir / "state.json").write_text("not json at all", encoding="utf-8")
     proc = run_cli("agents", env=fixture_env(fixture_dir, tmp_path))
@@ -365,7 +365,7 @@ def test_discover_missing_parallel_is_clean_error(tmp_path: Path) -> None:
     assert error["code"] == "MISSING_DEPENDENCY"
     message = error["message"]
     assert isinstance(message, str)
-    assert "VALORANT_META_PARALLEL_CLI" in message
+    assert "VALO_PARALLEL_CLI" in message
 
 
 @pytest.mark.parametrize(

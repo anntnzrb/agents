@@ -14,7 +14,7 @@ fingerprinted, and a state file tracks per-source health. When a source breaks
 or drifts, commands fail with explicit JSON errors or warnings instead of
 emitting garbage.
 
-Test injection: when VALORANT_META_FIXTURE_DIR is set, the fetch layer reads
+Test injection: when VALO_FIXTURE_DIR is set, the fetch layer reads
 <fixture_dir>/<source_key>.md instead of subprocessing firecrawl.
 """
 
@@ -256,7 +256,7 @@ def shape_fingerprint(keys: Iterable[str], count: int) -> str:
 def state_path() -> Path:
     """Return the XDG state file path for the maintenance tracker."""
     base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
-    return base / "valorant-meta" / "state.json"
+    return base / "valo" / "state.json"
 
 
 def load_state() -> dict[str, JsonValue]:
@@ -330,7 +330,7 @@ def baseline_fingerprints(state: dict[str, JsonValue]) -> dict[str, str]:
 
 def resolve_sibling(tool: str) -> Path:
     """Resolve a sibling skill CLI path or fail naming the env override."""
-    env_name = f"VALORANT_META_{tool.upper()}_CLI"
+    env_name = f"VALO_{tool.upper()}_CLI"
     override = os.environ.get(env_name)
     if override:
         candidate = Path(override)
@@ -377,7 +377,7 @@ def run_sibling(cli: Path, argv: list[str], timeout: int) -> str:
 
 def fetch_markdown(key: str, url: str) -> str:
     """Fetch one source as markdown, or read its fixture in test injection."""
-    fixture_dir = os.environ.get("VALORANT_META_FIXTURE_DIR")
+    fixture_dir = os.environ.get("VALO_FIXTURE_DIR")
     if fixture_dir:
         path = Path(fixture_dir) / f"{key}.md"
         if not path.is_file():

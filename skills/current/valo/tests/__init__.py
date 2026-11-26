@@ -1,1 +1,1 @@
-"""Tests for the valorant-meta skill."""
+"""Tests for the valo skill."""

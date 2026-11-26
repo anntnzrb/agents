@@ -1,5 +1,5 @@
 ---
-name: valorant-meta
+name: valo
 description: "Use when checking Valorant meta: tier list, win or pick rates, patch notes, map balance, or agents to abuse or avoid."
 license: AGPL-3.0-or-later
 metadata:
@@ -60,8 +60,8 @@ in `references/sources.md`.
 Fetching subprocesses the sibling skill CLIs; this skill never reimplements
 their APIs. Resolution order per tool (`firecrawl`, `parallel`):
 
-1. Environment override `VALORANT_META_FIRECRAWL_CLI` or
-   `VALORANT_META_PARALLEL_CLI`, a full path to the sibling `cli.py`.
+1. Environment override `VALO_FIRECRAWL_CLI` or
+   `VALO_PARALLEL_CLI`, a full path to the sibling `cli.py`.
 2. The sibling of this skill's own install: `<skills-dir>/<tool>/scripts/cli.py`.
 
 A missing sibling produces a `MISSING_DEPENDENCY` error naming the dependency
@@ -71,7 +71,7 @@ set for live fetching, as those skills document.
 ## Source health tracking
 
 Every fetch and parse is recorded in
-`${XDG_STATE_HOME:-~/.local/state}/valorant-meta/state.json` per source key:
+`${XDG_STATE_HOME:-~/.local/state}/valo/state.json` per source key:
 last fetch, last success, shape fingerprint, consecutive failures. The
 fingerprint is a hash of structural keys plus a row-count bucket; a mismatch
 against a fresh parse means the source shape drifted.
