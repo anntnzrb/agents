@@ -37,8 +37,11 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
    # 2. From a GitHub Pull Request URL or number
    uv run --script <skill-dir>/scripts/cli.py prepare --pr https://github.com/owner/repo/pull/123
 
-   # 3. From local staged or working tree changes
+   # 3. From local staged changes (the index only; unstaged working tree edits are excluded)
    uv run --script <skill-dir>/scripts/cli.py prepare --staged [--repo PATH]
+   ```
+
+   `--range`, `--pr`, and `--staged` are mutually exclusive; passing more than one is a usage error. Choose the single source that matches the task. `--pr` requires the GitHub CLI on PATH with valid auth. Prefer the full PR URL form; a bare number resolves against the `--repo` checkout's remotes through `gh`, so it is ambiguous outside a verified checkout. Follow the `github` skill's preflight when target or auth is uncertain.
 
 3. The command outputs a single structured JSON payload containing:
    - `commits`: normalized commit records (hash, subject, category, author, PR reference, revert status).
@@ -49,7 +52,9 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
 
 4. Distill and synthesize user-facing entries using the prompt guidance in `references/prompts.md`. Focus strictly on user-observable behavior; omit internal refactoring, tests, and CI churn.
 
-5. Output the result depending on your goal:
+5. Fan out in monorepos: when `boundaries` reports several package changelogs, synthesize entries per boundary covering only that boundary's files, and patch each boundary's changelog in a separate `patch` invocation. Never copy the full entry set into every package changelog. When the user instructs the root changelog only, patch the root alone.
+
+6. Output the result depending on your goal:
 
    - **For PR Body / Release Notes (no file writes):**
      ```text
@@ -60,6 +65,7 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
      ```text
      uv run --script <skill-dir>/scripts/cli.py patch --target CHANGELOG.md --entries-file <temp-dir>/entries.json
      ```
+
 ## Invariants
 
 - Group entries under a leading `Breaking Changes` section (a local extension), then the Keep a Changelog categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.

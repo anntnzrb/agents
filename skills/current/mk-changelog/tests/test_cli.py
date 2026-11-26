@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TypeIs
 
+import pytest
+
 from scripts.cli import main
 
 
@@ -149,3 +151,17 @@ def test_cli_status(capsys: CaptureFixture):
     tools = data.get("tools")
     assert _is_dict(tools)
     assert tools["git"] is True
+
+
+def test_cli_prepare_rejects_combined_sources(tmp_path: Path, capsys: CaptureFixture):
+    combinations = [
+        ["prepare", "--range", "HEAD~1..HEAD", "--staged", "--repo", str(tmp_path)],
+        ["prepare", "--pr", "123", "--staged", "--repo", str(tmp_path)],
+        ["prepare", "--pr", "123", "--range", "HEAD~1..HEAD", "--repo", str(tmp_path)],
+    ]
+    for argv in combinations:
+        with pytest.raises(SystemExit) as excinfo:
+            _ = main(argv)
+        assert excinfo.value.code == 2
+    captured = capsys.readouterr()
+    assert "not allowed with" in captured.err

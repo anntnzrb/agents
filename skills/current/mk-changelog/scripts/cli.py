@@ -74,17 +74,18 @@ def build_parser() -> argparse.ArgumentParser:
         "prepare",
         help="Extract git commits, boundaries, diffstats, and unreleased entries.",
     )
-    _ = prep_parser.add_argument(
+    source_group = prep_parser.add_mutually_exclusive_group()
+    _ = source_group.add_argument(
         "--range",
         dest="commit_range",
         help="Git commit range, e.g. v1.0.0..HEAD or HEAD~5..HEAD",
     )
-    _ = prep_parser.add_argument(
+    _ = source_group.add_argument(
         "--pr",
         dest="pr_identifier",
         help="GitHub Pull Request number or URL",
     )
-    _ = prep_parser.add_argument(
+    _ = source_group.add_argument(
         "--staged",
         action="store_true",
         help="Inspect staged changes in the current working tree",
