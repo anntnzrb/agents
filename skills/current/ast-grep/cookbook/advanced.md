@@ -42,7 +42,10 @@ Later globs override earlier ones.
 Restrict search to known files; cheap prefilter cuts parse cost:
 
 ```bash
-rg -l "console\\.log" src | xargs uv run --script <skill-dir>/scripts/cli.py run -p 'console.log($$$)' -l ts
+# Bash or zsh: NUL delimiters handle spaces, and an empty match set runs nothing.
+rg -l -0 "console\\.log" src | while IFS= read -r -d '' file; do
+  uv run --script <skill-dir>/scripts/cli.py run -p 'console.log($$$)' -l ts "$file"
+done
 ```
 
 ## Compact JSON
