@@ -1,81 +1,10 @@
 # Data Processing: Polars + DuckDB
 
-## The rule
 
-NEVER pandas. Polars (with numpy) plus DuckDB. Pandas is 10-50x slower, has weaker types, and the modern Python data ecosystem has moved on.
 
-## Quick decision tree
+## Section index
 
-|Operation|Use|Why|
-|---|---|---|
-|`.csv` / `.parquet` / `.json` direct query|DuckDB|Zero memory load, SQL ergonomics|
-|`.duckdb` file|DuckDB|Native format|
-|Filter (any size)|Polars|Lazy predicate pushdown and fast expression evaluation|
-|Sort|Polars|Parallel DataFrame operations|
-|Multi-table join|DuckDB|SQL join planner and more join types|
-|Heavy GROUP BY aggregation|DuckDB|Vectorized out-of-core aggregation|
-|Window function|Polars|Native expression support|
-|Pivot / melt / string ops|Polars|DataFrame ergonomics|
-|Larger than RAM|Polars streaming or DuckDB out-of-core|Both handle OOM|
-|Mixed pipeline|Hybrid (zero-copy via Arrow)|Use each tool's strengths|
 
-## Standard imports
-
-```python
-import numpy as np
-import polars as pl
-import duckdb
-```
-
-## DuckDB direct file query (zero memory load)
-
-```python
-result = duckdb.sql("""
-    SELECT category, SUM(amount) AS total
-    FROM 'data.csv'
-    WHERE date >= '2026-01-01'
-    GROUP BY category
-    ORDER BY total DESC
-""").pl()  # zero-copy → Polars DataFrame
-```
-
-`.pl()` returns Polars; `.df()` would return pandas - never use `.df()`.
-
-## Polars lazy pipeline
-
-```python
-result = (
-    pl.scan_csv("data.csv")  # lazy, no read yet
-    .filter(pl.col("amount") > 1000)
-    .filter(pl.col("status") == "active")
-    .sort("amount", descending=True)
-    .head(100)
-    .collect()  # execute optimised plan
-)
-```
-
-`scan_*` over `read_*` for files; `lazy()` then `collect()` for in-memory frames. Polars optimises the entire plan before execution (predicate pushdown, projection pushdown, common subexpression elimination).
-
-## Streaming for OOM data
-
-```python
-result = (
-    pl.scan_csv("huge.csv")
-    .filter(pl.col("active"))
-    .group_by("category")
-    .agg(
-        [
-            pl.len().alias("count"),
-            pl.sum("amount").alias("total"),
-        ]
-    )
-    .collect(streaming=True)
-)
-```
-
-## Hybrid pipeline (most realistic shape)
-
-```python
 # Phase 1: DuckDB for the join
 joined = duckdb.sql("""
     SELECT o.*, c.region, p.category

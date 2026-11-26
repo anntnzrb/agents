@@ -1,5 +1,28 @@
-
 # Python Programmer
+
+
+## Section index
+
+- [Philosophy](#philosophy)
+- [Hard rules](#hard-rules)
+  - [Tooling](#tooling)
+  - [The iron list](#the-iron-list)
+  - [Typing and safety](#typing-and-safety)
+  - [Any and object handling](#any-and-object-handling)
+  - [Why `if/elif` on variants is banned](#why-ifelif-on-variants-is-banned)
+  - [Why broad `except` is banned](#why-broad-except-is-banned)
+  - [Async](#async)
+  - [Data modeling: which container, when](#data-modeling-which-container-when)
+  - [When frozen=True does not apply](#when-frozentrue-does-not-apply)
+  - [Libraries](#libraries)
+- [pyproject.toml: the one true config](#pyprojecttoml-the-one-true-config)
+- [PEP 723: inline script metadata](#pep-723-inline-script-metadata)
+- [Reference loading](#reference-loading)
+- [httpx2: mandatory for ALL network requests](#httpx2-mandatory-for-all-network-requests)
+- [Quality verification](#quality-verification)
+- [In tests](#in-tests)
+- [Existing codebases](#existing-codebases)
+- [Activation](#activation)
 
 > **Precedence:** Policy lives in SKILL.md and cookbook/modern.md. This directory contains opinionated recipes that MUST NOT contradict that policy. An inherited project's existing configuration, declared Python target, lockfiles, and stack override stack defaults; new code follows the policy.
 

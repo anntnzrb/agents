@@ -1,10 +1,10 @@
 # Strict pyproject.toml (basedpyright + ruff + uv)
 
-The canonical "super strict but sane" config for modern Python projects. Copy-paste, then add your own dependencies.
 
-## Bootstrap
 
-```bash
+## Section index
+
+
 # Application
 uv init --app myproject --python 3.14
 cd myproject

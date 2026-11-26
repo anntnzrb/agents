@@ -1,52 +1,10 @@
 # orjson: When to Use, How to Integrate
 
-## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-`orjson` is the fastest JSON library on PyPI; written in Rust, 6-11× faster than stdlib `json` on serialization, 1.5-4× faster on deserialization. It also supports types the stdlib refuses to serialize: `datetime`, `date`, `UUID`, `numpy` arrays, `dataclass`, Pydantic models (via a small bridge).
+## Section index
 
-This document covers the production patterns. **Not every project needs orjson.** The decision tree is in §1.
 
----
-
-## 1. Decision tree; should you adopt orjson?
-
-```
-Are you serializing/deserializing JSON in a hot path?
-  ├─ NO  → stdlib `json` is fine. Stop here.
-  └─ YES ↓
-
-Is the project FastAPI?
-  ├─ YES ↓
-  │
-  │   Is your response body fully described by a Pydantic v2 model?
-  │     ├─ YES → Use FastAPI's default JSON response (uses Pydantic's
-  │     │       Rust-backed serializer; orjson saves nothing in this path).
-  │     │       Adopt orjson only for *non-Pydantic* responses below.
-  │     └─ NO  → Use `ORJSONResponse` for endpoints that return dicts,
-  │             lists, or arbitrary structures.
-  │
-  └─ NOT FastAPI ↓
-
-Are you serializing Pydantic v2 models repeatedly?
-  ├─ YES → Use `model.model_dump_json()` directly; backed by pydantic-core
-  │        (Rust), within ~10% of orjson on the same payload, and respects
-  │        every Pydantic feature (computed fields, aliases, validators).
-  └─ NO  ↓
-
-Are you serializing dicts / lists / dataclasses / datetime / UUID?
-  ├─ YES → orjson is the right answer.
-  └─ NO  → stdlib `json`.
-```
-
-**The crucial 2026 fact**: with Pydantic v2's `model_dump_json()`, **Pydantic-shaped responses no longer need orjson**. Adopt orjson where you are still going through `dict` / `list` / `dataclass`.
-
----
-
-## 2. Install
-
-```toml
 # pyproject.toml
 dependencies = [
     "orjson>=3.10",

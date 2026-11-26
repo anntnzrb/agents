@@ -1,16 +1,10 @@
 # httpx2: Production Defaults
 
-## Index
 
-Read the section whose heading matches the task; use heading search before loading unrelated detail.
 
-Source: [pydantic/httpx2](https://github.com/pydantic/httpx2), next-generation HTTP client for Python 3 and continuation of HTTPX under Pydantic stewardship.
+## Section index
 
-Every network request **MUST** use `httpx2`. **ALL optimizations below are ON by default**: HTTP/2, brotli+zstd, tuned connection pool, fine-grained timeouts, transport retries, and TCP_NODELAY. This is the baseline; a bare `httpx2.AsyncClient()` is a bug.
 
-## 1. Installation; all extras, always
-
-```toml
 # pyproject.toml
 dependencies = [
     "httpx2[http2,brotli,zstd]",

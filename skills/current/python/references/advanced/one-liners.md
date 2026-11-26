@@ -1,28 +1,10 @@
 # One-liner Scripts (PEP 723 + uv)
 
-Self-contained Python scripts can declare dependencies and run without environment setup. The script or project owns its environment spec.
 
-**Rule: a standalone `.py` script that imports third-party dependencies or needs a Python version floor MUST use PEP 723 inline metadata. Dependency-free scripts MAY omit the metadata block. Shared scripts include the usage comment block.** No venv, `requirements.txt`, or `setup.py`.
 
-## Patterns
+## Section index
 
-### 1. Inline `uv run`
 
-```bash
-uv run --with httpx2 --with rich python -c "
-import httpx2
-from rich import print
-print(httpx2.get('https://api.github.com').json())
-"
-```
-
-Terminal one-shot; do not save. Repeat `--with PKG` as needed.
-
-### 2. PEP 723 script (canonical)
-
-`.py` file with a comment metadata block. uv reads it, materialises a disposable cached venv, and runs the script.
-
-```python
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [

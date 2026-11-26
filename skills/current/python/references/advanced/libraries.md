@@ -1,47 +1,9 @@
 # Library Defaults: Decision Tree
 
-## Index
-
-Use heading search; load only the task-matching section. Each domain lists the canonical 2026 choice, rationale, and usage. The skill MUST enforce these defaults unless the project's `pyproject.toml` explicitly says otherwise.
-
-## CLI: typer
-
-Use `typer` + `rich` for multi-command applications. Use stdlib `argparse` for zero-dependency single-file scripts, including skill `scripts/cli.py` entrypoints. Never `click` or `fire`. Single-function script: `typer.run(main)`. Subcommands: `@app.command()`.
-
-```python
-import typer
-from rich import print as rprint
-
-app = typer.Typer()
 
 
-@app.command()
-def greet(name: str, count: int = 1, shout: bool = False) -> None:
-    """Print a greeting `count` times."""
-    message = f"Hello, {name}!" if not shout else f"HELLO, {name.upper()}!"
-    for _ in range(count):
-        rprint(message)
+## Section index
 
-
-if __name__ == "__main__":
-    app()
-```
-
-## Terminal output: rich
-
-Use `rich` for structured output: tables, progress bars, syntax highlighting, tracebacks. Plain `print` MAY serve non-interactive log lines; prefer `rich.console.Console(stderr=True).log(...)` even there. Install rich tracebacks once at process start.
-
-```python
-from rich.console import Console
-from rich.table import Table
-
-console = Console()
-
-table = Table(title="Users")
-table.add_column("ID", style="cyan")
-table.add_column("Name", style="magenta")
-table.add_row("1", "Alice")
-console.print(table)
 
 # Rich tracebacks (call once at process start)
 from rich.traceback import install

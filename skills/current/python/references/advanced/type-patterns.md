@@ -1,55 +1,10 @@
 # Type Patterns
 
-Catch bugs at check time, not runtime.
-
-## NewType: distinct primitives
-Same runtime type, distinct meaning; the type checker prevents mixing.
-
-```python
-from typing import NewType
-
-UserId = NewType("UserId", int)
-MovieId = NewType("MovieId", int)
-Email = NewType("Email", str)
-Seconds = NewType("Seconds", float)
-Milliseconds = NewType("Milliseconds", float)
 
 
-def get_user(user_id: UserId) -> User: ...
-def get_movie(movie_id: MovieId) -> Movie: ...
-def sleep(duration: Seconds) -> None: ...
+## Section index
 
 
-uid = UserId(42)
-mid = MovieId(42)
-
-get_user(uid)  # OK
-get_user(mid)  # type error: MovieId is not UserId
-get_user(42)  # type error: int is not UserId
-sleep(Milliseconds(100.0))  # type error
-```
-
-Use for IDs, indices, keys, units, or any swappable pair where mixing is a bug. Skip ephemeral local math where branding adds noise without safety.
-
-## Final: constants
-Module-level constants declare intent; reassignment is a type error.
-
-```python
-from typing import Final
-
-MAX_RETRIES: Final = 3
-API_BASE_URL: Final = "https://api.example.com"
-DEFAULT_TIMEOUT: Final = 30.0
-
-MAX_RETRIES = 5  # type error: cannot assign to Final
-```
-
-Runtime-changing values are not constants; use a function parameter or config field.
-
-## PEP 695 type aliases: name complex types
-Name unions or generics appearing more than once.
-
-```python
 # PEP 695 (Python 3.12+)
 type JsonValue = (
     str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]

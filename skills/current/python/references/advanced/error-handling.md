@@ -1,40 +1,10 @@
 # Error Handling
 
-Typed errors, exhaustive matching, union returns, and resource safety.
-
----
-
-## Typed errors: no bare strings
-
-Error types carry structured data. Pattern matching works. Callers know exactly what can go wrong.
-
-```python
-from dataclasses import dataclass
-from typing import NewType
-
-UserId = NewType("UserId", int)
 
 
-@dataclass(frozen=True, slots=True)
-class UserNotFoundError(Exception):
-    user_id: UserId
-
-    def __str__(self) -> str:  # REQUIRED; see note below
-        return f"user {self.user_id} not found"
+## Section index
 
 
-@dataclass(frozen=True, slots=True)
-class PermissionDeniedError(Exception):
-    user_id: UserId
-    required_role: str
-
-    def __str__(self) -> str:
-        return f"user {self.user_id} needs role {self.required_role}"
-```
-
-**`__str__` is mandatory** on dataclass exceptions. `@dataclass` replaces `Exception.__init__`, so `self.args` is always `()`. Without `__str__`, `str(e)` returns an empty string and logging/monitoring breaks.
-
-```python
 # BAD
 raise ValueError("user not found")
 raise ValueError("permission denied")
