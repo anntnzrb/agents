@@ -240,8 +240,7 @@ def test_native_failure_without_terminal_is_an_error(
 
     monkeypatch.setattr(subprocess, "run", failed)
     monkeypatch.setattr(cli, "get_output_channel", unavailable)
-    expected_exit = 7
-    assert cli.main() == expected_exit
+    assert cli.main() == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "copy failed" in captured.err

@@ -167,12 +167,10 @@ def main() -> int:
     if not data:
         return 0
 
-    native_error = 1
     if command := native_command():
         try:
             _ = subprocess.run(command, input=data, check=True, timeout=10)
         except subprocess.CalledProcessError as exc:
-            native_error = exc.returncode
             _ = sys.stderr.write(
                 f"clip: {command[0]} failed ({exc.returncode}); trying OSC 52\n"
             )
@@ -198,7 +196,7 @@ def main() -> int:
             target.flush()
     except OSError as exc:
         _ = sys.stderr.write(f"clip: copy failed: {exc}\n")
-        return native_error
+        return 1
 
     _ = sys.stderr.write(
         "clip: OSC 52 sent; terminal clipboard acceptance is unverified\n"

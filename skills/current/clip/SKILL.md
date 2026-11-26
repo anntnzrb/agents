@@ -54,9 +54,8 @@ uv run --script <skill-dir>/scripts/cli.py
 ## Exit codes
 
 - `0`: native tool succeeded, OSC 52 was sent, or empty input was skipped
-- `1`: no usable transport, write error, or runtime error
+- `1`: no usable transport, native clipboard failure, write error, or runtime error
 - `2`: usage or file error
-- Native tool exit codes are preserved if OSC 52 also fails.
 
 ## Empty input
 
