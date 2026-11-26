@@ -1,10 +1,54 @@
 # Code Smells: Full Reference
 
 
-
 ## Section index
 
+- [Smell 1: Oversized module](#smell-1-oversized-module)
+  - [Why size matters](#why-size-matters)
+  - [Measuring pure LOC](#measuring-pure-loc)
+  - [Thresholds](#thresholds)
+  - [Required behavior](#required-behavior)
+  - [Exempt](#exempt)
+  - [Concrete split examples](#concrete-split-examples)
+- [Smell 2: Function with more than 3 parameters](#smell-2-function-with-more-than-3-parameters)
+  - [Why 3](#why-3)
+  - [Workaround detection: THESE COUNT AS THE SAME SMELL](#workaround-detection-these-count-as-the-same-smell)
+  - [The fix](#the-fix)
+- [Smell 3: Redundant verification after a destructive action](#smell-3-redundant-verification-after-a-destructive-action)
+  - [Why this is slop](#why-this-is-slop)
+  - [Examples](#examples)
+  - [Broader pattern: same smell, different disguise](#broader-pattern-same-smell-different-disguise)
+- [Smell 4: Negative-form names and conditions](#smell-4-negative-form-names-and-conditions)
+  - [Why positive form wins](#why-positive-form-wins)
+  - [Naming](#naming)
+  - [Conditions](#conditions)
+  - [When negation IS appropriate](#when-negation-is-appropriate)
 
+## Index
+
+Read the section whose heading matches the task; use heading search before loading unrelated detail.
+
+When any of these smells is detected, **stop and re-examine the design.** A code smell is not a syntax error; it signals that the structure deserves a second look. Fix it when the task and project contract support that change, or document a specific reason to carry it. Do not trigger an unrelated rewrite merely because a smell exists.
+
+---
+
+## Smell 1: Oversized module
+
+### Why size matters
+
+Line count is a proxy. For agents, a large file costs:
+
+- Parallelism: a file is one edit boundary. Two agents cannot safely edit it at once, so one large file serializes work that separate modules would let run concurrently.
+- Context: an open question ("where does X happen?") reads more of a large mixed file than of a module named for its responsibility.
+- Stale reads: every edit changes the file's snapshot. A large shared file forces more re-reads and more edits against stale content.
+
+Over-splitting also costs: tracing one flow across many tiny files, wrappers, and re-exports takes more reads than one cohesive file. Size alone never justifies a split; mixed responsibilities do.
+
+### Measuring pure LOC
+
+Pure LOC counts non-blank, non-comment lines.
+
+```bash
 # Quick (line-comment + blank exclusion):
 awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
 
