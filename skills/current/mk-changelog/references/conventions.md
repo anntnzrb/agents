@@ -22,7 +22,7 @@ Group all changes strictly within these categories in descending order:
 - Focus: Describe the observable impact on the end user, consumer, or integrator rather than internal implementation mechanics.
 - Brevity: Keep entries concise (1 to 2 lines).
 - Punctuation: Do not include trailing periods at the end of single-line bullets.
-- Attribution: For external PRs and contributors, append `([#PR](https://github.com/owner/repo/pull/PR) by [@author](https://github.com/author))` at the end of the entry.
+- Attribution: when deterministic PR metadata supplies both the PR URL and author login, append `([#PR](https://github.com/owner/repo/pull/PR) by @author)` at the end of the entry. Do not invent a login from a commit display name or email.
 
 ### Good vs Bad Examples
 

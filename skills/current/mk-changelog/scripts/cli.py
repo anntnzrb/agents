@@ -227,8 +227,6 @@ def handle_prepare(args: CliArgs) -> int:
             commits = list(parsed_commits)
             for c in parsed_commits:
                 affected_files.extend(c.affected_files)
-                if not c.is_bot:
-                    contributors[c.author_name] = c.author_email
             diff_stat = get_diff_stat(repo_path, range_spec=args.commit_range)
             diff_snippet = get_diff_snippet(repo_path, range_spec=args.commit_range)
         elif args.staged:

@@ -17,7 +17,7 @@ You are an expert changelog generator. Your goal is to convert raw Git commits, 
 6. Skip items that are already documented in the provided existing entries.
 7. Begin each entry with a past-tense verb (`Added`, `Fixed`, `Changed`, etc.).
 8. Do not include trailing periods.
-9. Retain external contributor attribution suffixes when present in the input.
+9. Retain external contributor attribution suffixes when present in the input. When deterministic PR metadata supplies both `pr_url` and the author login, append `([#PR](pr_url) by @login)`; never invent a login from a commit display name or email.
 
 ### Output JSON Schema
 
@@ -51,6 +51,10 @@ Repository: {{ repo_name }}
 <commits>
 {{ prepared_commits_json }}
 </commits>
+
+<contributors>
+{{ contributors_json }}
+</contributors>
 
 <diff_stat>
 {{ diff_stat }}

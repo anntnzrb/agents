@@ -47,7 +47,7 @@ uv run --script <skill-dir>/scripts/cli.py <command> [options]
    - `commits`: normalized commit records (hash, subject, category, author, PR reference, revert status).
    - `boundaries`: mapped `CHANGELOG.md` paths with their respective modified files.
    - `existing_entries`: already documented items under `## [Unreleased]` to prevent duplicates.
-   - `contributors`: external contributors attribution mapping.
+   - `contributors`: deterministic external attribution input. For `--pr`, it maps the PR author login to the PR URL; commit ranges do not invent GitHub usernames from display names or emails.
    - `diff_stat`: file-level change statistics.
 
 4. Distill and synthesize user-facing entries using the prompt guidance in `references/prompts.md`. Focus strictly on user-observable behavior; omit internal refactoring, tests, and CI churn.
