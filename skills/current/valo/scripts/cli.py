@@ -3,11 +3,16 @@
 # requires-python = ">=3.14"
 # dependencies = []
 # ///
-"""Valorant meta CLI: live agent, patch, and map stats parsed from valking.gg.
+"""valo CLI: live Valorant meta stats plus a curated noiseless library.
 
-Nothing is embedded in this skill; every answer is fetched fresh at runtime.
-Sources are JS-rendered Next.js pages, so fetching goes through the sibling
-firecrawl skill CLI (scrape -> markdown) and parsing works on the markdown.
+Live agent, patch, and map stats are parsed from valking.gg. Nothing is
+embedded in this skill; every answer is fetched fresh at runtime. Sources are
+JS-rendered Next.js pages, so fetching goes through the sibling firecrawl
+skill CLI (scrape -> markdown) and parsing works on the markdown.
+
+The curated library (library.json) registers vetted high-signal resources as
+adopted and documented noise as avoid; discovery cross-checks candidates
+against it so vetted entities never resurface.
 
 Breakage detection is the point: parsers are strict, every parse is shape
 fingerprinted, and a state file tracks per-source health. When a source breaks
@@ -54,6 +59,32 @@ AVOID_COUNT = 3
 MOVERS_COUNT = 3
 TAGS = ("NEUTRAL", "REWORK", "BUFF", "NERF", "NEW")
 DISCOVER_QUERY = "valorant agent win rates pick rates stats site"
+LIBRARY_CATEGORIES = (
+    "stats-site",
+    "creator",
+    "aim-tool",
+    "vod-tool",
+    "pro-meta",
+    "community",
+)
+LIBRARY_STATUSES = ("adopted", "avoid", "unclear")
+LIBRARY_MACHINE_READABLE = (
+    "firecrawl-ok",
+    "server-rendered",
+    "api",
+    "no",
+    "unknown",
+    "n/a",
+)
+LIBRARY_REQUIRED_KEYS = (
+    "name",
+    "url",
+    "category",
+    "status",
+    "machine_readable",
+    "reason",
+    "vetted_at",
+)
 
 MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
 PATCH_VERSION_RE = re.compile(r"Patch (\d+\.\d+[a-z]?)")
@@ -201,12 +232,27 @@ class Probe:
     error_message: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class LibraryEntry:
+    """One vetted entity of the curated library."""
+
+    name: str
+    url: str
+    category: str
+    status: str
+    machine_readable: str
+    reason: str
+    vetted_at: str
+
+
 class _Args(argparse.Namespace):
     """Parsed command-line arguments."""
 
     command: str = ""
     query: str = DISCOVER_QUERY
     max_results: int = 10
+    category: str | None = None
+    status: str | None = None
 
 
 def emit(payload: object) -> None:
@@ -768,6 +814,115 @@ def probe_or_fail(
     return probe, warning
 
 
+# ------------------------------------------------------------- curated library
+
+
+def validate_library_entry(path: Path, index: int, raw: object) -> LibraryEntry:
+    """Validate one library entry strictly, or fail with LIBRARY_ERROR."""
+    if not _is_dict(raw):
+        raise fail("LIBRARY_ERROR", f"{path} entry {index} is not a JSON object")
+    fields: dict[str, str] = {}
+    for key in LIBRARY_REQUIRED_KEYS:
+        value = raw.get(key)
+        if not isinstance(value, str) or not value:
+            raise fail(
+                "LIBRARY_ERROR",
+                f"{path} entry {index} lacks a non-empty {key!r} string",
+            )
+        fields[key] = value
+    if fields["category"] not in LIBRARY_CATEGORIES:
+        raise fail(
+            "LIBRARY_ERROR",
+            f"{path} entry {index} carries unknown category {fields['category']!r}",
+        )
+    if fields["status"] not in LIBRARY_STATUSES:
+        raise fail(
+            "LIBRARY_ERROR",
+            f"{path} entry {index} carries unknown status {fields['status']!r}",
+        )
+    if fields["machine_readable"] not in LIBRARY_MACHINE_READABLE:
+        raise fail(
+            "LIBRARY_ERROR",
+            (
+                f"{path} entry {index} carries unknown machine_readable"
+                f" {fields['machine_readable']!r}"
+            ),
+        )
+    return LibraryEntry(
+        name=fields["name"],
+        url=fields["url"],
+        category=fields["category"],
+        status=fields["status"],
+        machine_readable=fields["machine_readable"],
+        reason=fields["reason"],
+        vetted_at=fields["vetted_at"],
+    )
+
+
+def load_library() -> list[LibraryEntry]:
+    """Load and validate the curated library beside the skill, strictly."""
+    override = os.environ.get("VALO_LIBRARY_FILE")
+    path = (
+        Path(override)
+        if override
+        else Path(__file__).resolve().parents[1] / "library.json"
+    )
+    try:
+        value = _json_loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise fail("LIBRARY_ERROR", f"cannot read {path}: {exc}") from exc
+    if not _is_dict(value):
+        raise fail("LIBRARY_ERROR", f"{path} is not a JSON object")
+    if value.get("version") != 1:
+        raise fail("LIBRARY_ERROR", f"{path} does not declare version 1")
+    raw_entries = value.get("entries")
+    if not isinstance(raw_entries, list):
+        raise fail("LIBRARY_ERROR", f"{path} lacks an entries list")
+    return [
+        validate_library_entry(path, index, raw)
+        for index, raw in enumerate(raw_entries)
+    ]
+
+
+def registrable_domain(url: str) -> str:
+    """Reduce a URL or host to its registrable domain: the last two labels.
+
+    Simple by design: no public-suffix list, so a `co.uk` style entity would
+    collapse wrongly; vetted entities live on plain two-label domains.
+    Subdomains never matter: `www.valking.gg`, `api.valking.gg`, and
+    `valking.gg` are the same entity.
+    """
+    text = url.strip()
+    if "://" not in text:
+        text = f"https://{text}"
+    host = urllib.parse.urlparse(text).hostname or ""
+    labels = [label for label in host.split(".") if label]
+    # a slice past the start yields the whole list, so short hosts pass through
+    return ".".join(labels[-2:])
+
+
+def known_domains(
+    registry: dict[str, dict[str, str]], library: list[LibraryEntry]
+) -> set[str]:
+    """Registrable domains of every vetted entity: registry plus library."""
+    known = {registrable_domain(entry["url"]) for entry in registry.values()}
+    known.update(registrable_domain(entry.url) for entry in library)
+    return known
+
+
+def library_entry_json(entry: LibraryEntry) -> dict[str, JsonValue]:
+    """Project one library entry into its stable output fields."""
+    return {
+        "name": entry.name,
+        "url": entry.url,
+        "category": entry.category,
+        "status": entry.status,
+        "machine_readable": entry.machine_readable,
+        "reason": entry.reason,
+        "vetted_at": entry.vetted_at,
+    }
+
+
 # ---------------------------------------------------------- json projections
 
 
@@ -1131,8 +1286,39 @@ def parse_search_domains(stdout: str) -> list[str]:
     return domains
 
 
+def cmd_library(args: _Args) -> None:
+    """Dump the curated library, optionally filtered by category or status.
+
+    Pure local data: no network, no state file writes.
+    """
+    entries = load_library()
+    if args.category is not None:
+        entries = [entry for entry in entries if entry.category == args.category]
+    if args.status is not None:
+        entries = [entry for entry in entries if entry.status == args.status]
+    counts = {
+        status: sum(1 for entry in entries if entry.status == status)
+        for status in LIBRARY_STATUSES
+    }
+    emit(
+        {
+            "ok": True,
+            "version": 1,
+            "filters": {"category": args.category, "status": args.status},
+            "total": len(entries),
+            "counts": counts,
+            "entries": [library_entry_json(entry) for entry in entries],
+        }
+    )
+
+
 def cmd_discover(args: _Args) -> None:
-    """Search for candidate valorant stats sources not yet in the registry."""
+    """Search for candidate valorant resources not yet vetted.
+
+    Every candidate domain is cross-checked against the source registry and
+    the curated library by registrable domain; already-vetted entities are
+    filtered out entirely and counted under filtered_known.
+    """
     try:
         cli = resolve_sibling("parallel")
     except _FetchError as exc:
@@ -1146,23 +1332,24 @@ def cmd_discover(args: _Args) -> None:
     except _FetchError as exc:
         raise fail(exc.code, exc.message, dependency="parallel") from exc
     registry = load_registry()
-    known = {
-        urllib.parse.urlparse(entry["url"]).netloc.lower()
-        for entry in registry.values()
-    }
-    candidates = [
-        domain for domain in parse_search_domains(stdout) if domain not in known
-    ]
+    library = load_library()
+    known = known_domains(registry, library)
+    seen: list[str] = []
+    for host in parse_search_domains(stdout):
+        domain = registrable_domain(host)
+        if domain not in seen:
+            seen.append(domain)
+    candidates = [domain for domain in seen if domain not in known]
     emit(
         {
             "ok": True,
             "fetched_at": utc_now(),
             "query": args.query,
-            "registry_domains": sorted(known),
-            "candidates": candidates,
+            "filtered_known": len(seen) - len(candidates),
+            "new_candidates": candidates,
             "vetting": (
-                "vet candidates with the procedure in references/sources.md"
-                " before adding them to the registry"
+                "vet candidates with the procedure in references/library.md"
+                " before adding them to the library"
             ),
         }
     )
@@ -1185,9 +1372,15 @@ def arguments() -> _Args:
         "doctor", help="probe every source live; report health and drift"
     )
     _ = sub.add_parser("sources", help="dump the source registry plus tracker health")
+    library = sub.add_parser(
+        "library",
+        help="dump the curated library, filtered by category or status",
+    )
+    _ = library.add_argument("--category", choices=LIBRARY_CATEGORIES, default=None)
+    _ = library.add_argument("--status", choices=LIBRARY_STATUSES, default=None)
     discover = sub.add_parser(
         "discover",
-        help="search for new valorant stats sources via the parallel skill",
+        help="search for valorant resources not yet vetted, via the parallel skill",
     )
     _ = discover.add_argument("--query", default=DISCOVER_QUERY)
     _ = discover.add_argument("--max-results", type=int, default=10)
@@ -1201,6 +1394,7 @@ COMMANDS: dict[str, Callable[[_Args], None]] = {
     "snapshot": cmd_snapshot,
     "doctor": cmd_doctor,
     "sources": cmd_sources,
+    "library": cmd_library,
     "discover": cmd_discover,
 }
 

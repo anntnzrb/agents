@@ -32,6 +32,12 @@ injection (`VALO_FIXTURE_DIR`), it names the fixture file
 registry entry: its URL is dynamic, extracted from the latest patch card by
 the patches parser, so it is a second fetch step inside the `patch` command.
 
+Do not confuse `sources.json` with `library.json`: sources.json is the
+machine-parseable fetch pipeline (what this skill fetches), library.json is
+the curated knowledge registry (which resources a human should trust or
+avoid, machine-readable or not). This file covers only the pipeline;
+curation lives in `references/library.md`.
+
 ## Add a source
 
 1. Capture a real fixture: scrape the URL through the sibling firecrawl CLI
@@ -51,7 +57,10 @@ the patches parser, so it is a second fetch step inside the `patch` command.
 
 ## Vet a discovered source
 
-`discover` lists candidate domains. Before adding one to the registry:
+`discover` lists unvetted candidate domains under `new_candidates`. Vet the
+entity first under the criteria in `references/library.md`; only an adopted,
+machine-readable stats site is a registry candidate. Before adding one to
+the registry:
 
 1. Determine rendering: fetch the page with plain curl. If the data table is
    in the HTML, the source is server-rendered and cheap to scrape. If the

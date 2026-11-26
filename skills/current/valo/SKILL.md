@@ -6,13 +6,17 @@ metadata:
   author: anntnzrb
 ---
 
-# Valorant meta: live stats, never embedded
+# valo: live Valorant stats plus a curated noiseless library
 
-Live Valorant meta data from valking.gg. Nothing is embedded in this skill:
-every answer is fetched fresh at runtime, so the data can never go stale by
-construction. Sources are JS-rendered Next.js pages; plain curl gets empty
-shells, so fetching goes through the sibling firecrawl skill (scrape to
-markdown) and parsing works on the markdown.
+Two halves. Live meta data from valking.gg: nothing is embedded, every answer
+is fetched fresh at runtime, so the data can never go stale by construction.
+And a curated library (`library.json`) of vetted Valorant resources: high-
+signal entries marked adopted, documented noise marked avoid, so research
+never re-litigates a source already judged.
+
+Live sources are JS-rendered Next.js pages; plain curl gets empty shells, so
+fetching goes through the sibling firecrawl skill (scrape to markdown) and
+parsing works on the markdown.
 
 ## Public entrypoint
 
@@ -41,8 +45,32 @@ or `ok:false` with a stable uppercase error code under `error.code`.
   ok/broken, latency, shape fingerprint status against the state file, and
   consecutive failures. Run this first when output looks wrong.
 - `sources`: dump the source registry plus per-source tracker health.
-- `discover`: search for new Valorant stats sources through the sibling
-  parallel skill and list candidate domains not yet in the registry.
+- `library`: dump the curated library as pure local data, no network.
+  Filter with `--category stats-site|creator|aim-tool|vod-tool|pro-meta|community`
+  or `--status adopted|avoid`. Consult it before recommending any Valorant
+  resource: adopted entries are vetted signal, avoid entries are documented
+  noise with the reason attached.
+- `discover`: search for new Valorant resources through the sibling parallel
+  skill. Candidate domains are cross-checked against the library and the
+  source registry by registrable domain; already-vetted entities never
+  resurface, they are counted under `filtered_known`. Only
+  `new_candidates` need vetting.
+
+## The curated library
+
+Noiseless by construction: the library does not rank the internet, it records
+verdicts. Every entry was vetted by hand against the criteria in
+`references/library.md` and carries the reason and the vetting date. Two
+registries live beside each other and answer different questions:
+
+- `sources.json`: machine-parseable fetch sources, the data pipeline above.
+- `library.json`: the curated knowledge registry; which sites, creators, and
+  tools to trust or avoid, machine-readable or not.
+
+When the user asks where to learn, practice, or watch, answer from `library`
+first. Never recommend an entity the library marks avoid; if nothing adopted
+fits, say the library has no verdict and offer to vet candidates with
+`discover`.
 
 ## The degradation contract
 
@@ -81,4 +109,5 @@ against a fresh parse means the source shape drifted.
 | Need | Read | When |
 | --- | --- | --- |
 | Abuse/avoid/mover heuristics and their rationale | `references/derivation.md` | Questioning or tuning what snapshot derives |
-| Add or vet a source, manual fallback when firecrawl fails, fingerprint-drift repair | `references/sources.md` | doctor reports breakage or drift, or discover finds a candidate |
+| Vetting criteria, category definitions, how to vet or add a library entry | `references/library.md` | discover surfaces a new candidate, or adding or contesting a library verdict |
+| Add or vet a fetch source, manual fallback when firecrawl fails, fingerprint-drift repair | `references/sources.md` | doctor reports breakage or drift, or an adopted stats site becomes a data source |

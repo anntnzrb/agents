@@ -25,6 +25,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 class _ValCli(Protocol):
     def parse_stat(self, cell: str) -> tuple[float, float]: ...
     def agent_display_name(self, cell: str) -> str: ...
+    def registrable_domain(self, url: str) -> str: ...
 
 
 def _is_mapping(val: object) -> TypeIs[Mapping[str, object]]:
@@ -324,36 +325,95 @@ def test_doctor_reports_broken_source(fixture_dir: Path, tmp_path: Path) -> None
     assert isinstance(maps_entry["error"], str)
 
 
-def test_discover_filters_registry_domains(fixture_dir: Path, tmp_path: Path) -> None:
+def write_fake_parallel(tmp_path: Path, payload: Mapping[str, object]) -> Path:
+    """Write a fake parallel CLI emitting the given JSON payload."""
     fake = tmp_path / "fake_parallel.py"
-    payload = {
-        "results": [
-            {"url": "https://valking.gg/en/agents", "title": "already registered"},
-            {"url": "https://op.gg/valorant/statistics", "title": "candidate"},
-            {"url": "https://www.vstats.xyz/agent-stats", "title": "candidate"},
-        ]
-    }
     script = (
         "import json, sys\n"
         f"sys.stdout.write(json.dumps({json.dumps(payload)}) + '\\n')\n"
     )
     _ = fake.write_text(script, encoding="utf-8")
+    return fake
+
+
+def write_fixture_library(tmp_path: Path) -> dict[str, str]:
+    """Write a controlled library fixture and return its env override."""
+    entries = [
+        {
+            "name": "valking.gg",
+            "url": "https://valking.gg",
+            "category": "stats-site",
+            "status": "adopted",
+            "machine_readable": "firecrawl-ok",
+            "reason": "fixture",
+            "vetted_at": "2026-01-01",
+        },
+        {
+            "name": "metabot.gg",
+            "url": "https://metabot.gg",
+            "category": "stats-site",
+            "status": "avoid",
+            "machine_readable": "no",
+            "reason": "fixture",
+            "vetted_at": "2026-01-01",
+        },
+        {
+            "name": "CHARLATAN",
+            "url": "https://www.youtube.com/@charlatan",
+            "category": "creator",
+            "status": "adopted",
+            "machine_readable": "n/a",
+            "reason": "fixture",
+            "vetted_at": "2026-01-01",
+        },
+        {
+            "name": "Konpeki",
+            "url": "https://www.youtube.com/@coachkonpeki",
+            "category": "creator",
+            "status": "avoid",
+            "machine_readable": "n/a",
+            "reason": "fixture",
+            "vetted_at": "2026-01-01",
+        },
+    ]
+    path = tmp_path / "library-fixture.json"
+    _ = path.write_text(
+        json.dumps({"version": 1, "entries": entries}), encoding="utf-8"
+    )
+    return {"VALO_LIBRARY_FILE": str(path)}
+
+
+def test_discover_filters_vetted_domains(fixture_dir: Path, tmp_path: Path) -> None:
+    payload = {
+        "results": [
+            {"url": "https://valking.gg/en/agents", "title": "registry source"},
+            {"url": "https://api.valking.gg/images/x", "title": "same entity"},
+            {"url": "https://metabot.gg/stats/agents", "title": "library avoid"},
+            {"url": "https://www.youtube.com/@someone", "title": "platform"},
+            {"url": "https://op.gg/valorant/statistics", "title": "candidate"},
+            {"url": "https://www.vstats.xyz/agent-stats", "title": "candidate"},
+        ]
+    }
+    fake = write_fake_parallel(tmp_path, payload)
     env = fixture_env(fixture_dir, tmp_path)
-    env["VALORANT_META_PARALLEL_CLI"] = str(fake)
+    env["VALO_PARALLEL_CLI"] = str(fake)
+    env.update(write_fixture_library(tmp_path))
     proc = run_cli("discover", env=env)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     raw = emit_json(proc)
     assert raw["ok"] is True
-    candidates = raw["candidates"]
+    candidates = raw["new_candidates"]
     assert _is_object_list(candidates)
-    assert "op.gg" in candidates
-    assert "www.vstats.xyz" in candidates
-    assert "valking.gg" not in candidates
+    assert candidates == ["op.gg", "vstats.xyz"]
+    # valking.gg and api.valking.gg collapse to one vetted entity, metabot.gg
+    # is a library avoid entry, youtube.com is vetted through creator entries
+    assert raw["filtered_known"] == 3
+    assert "candidates" not in raw
 
 
 def test_discover_missing_parallel_is_clean_error(tmp_path: Path) -> None:
     env = {
-        "VALORANT_META_PARALLEL_CLI": str(tmp_path / "does-not-exist.py"),
+        "VALO_PARALLEL_CLI": str(tmp_path / "does-not-exist.py"),
         "XDG_STATE_HOME": str(tmp_path / "state"),
     }
     proc = run_cli("discover", env=env)
@@ -395,3 +455,137 @@ def test_agent_display_name_unit(val_cli: _ValCli) -> None:
         "\\<br>\\<br>KAY/O](https://valking.gg/en/agents/kayo)"
     )
     assert val_cli.agent_display_name(kayo) == "KAY/O"
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://valking.gg", "valking.gg"),
+        ("https://valking.gg/en/agents", "valking.gg"),
+        ("https://www.valking.gg/en/agents", "valking.gg"),
+        ("https://api.valking.gg/images/x.webp", "valking.gg"),
+        ("valking.gg", "valking.gg"),
+        ("www.vstats.xyz", "vstats.xyz"),
+        ("https://op.gg/valorant/statistics", "op.gg"),
+        ("https://www.youtube.com/@CHARLATAN", "youtube.com"),
+    ],
+)
+def test_registrable_domain(val_cli: _ValCli, url: str, expected: str) -> None:
+    assert val_cli.registrable_domain(url) == expected
+
+
+def test_library_schema_valid() -> None:
+    path = CLI.parent.parent / "library.json"
+    raw = _json_loads(path.read_text(encoding="utf-8"))
+    assert _is_mapping(raw)
+    assert raw["version"] == 1
+    entries = raw["entries"]
+    assert _is_object_list(entries)
+    assert len(entries) >= 3
+    required = {
+        "name",
+        "url",
+        "category",
+        "status",
+        "machine_readable",
+        "reason",
+        "vetted_at",
+    }
+    categories = {
+        "stats-site",
+        "creator",
+        "aim-tool",
+        "vod-tool",
+        "pro-meta",
+        "community",
+    }
+    statuses = {"adopted", "avoid", "unclear"}
+    machine_readable = {
+        "firecrawl-ok",
+        "server-rendered",
+        "api",
+        "no",
+        "unknown",
+        "n/a",
+    }
+    for entry in entries:
+        assert _is_mapping(entry)
+        assert required <= set(entry)
+        for key in required:
+            assert isinstance(entry[key], str)
+            assert entry[key]
+        assert entry["category"] in categories
+        assert entry["status"] in statuses
+        assert entry["machine_readable"] in machine_readable
+
+
+def test_library_command_all_entries(tmp_path: Path) -> None:
+    env = {"XDG_STATE_HOME": str(tmp_path / "state"), **write_fixture_library(tmp_path)}
+    proc = run_cli("library", env=env)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    raw = emit_json(proc)
+    assert raw["ok"] is True
+    entries = raw["entries"]
+    assert _is_object_list(entries)
+    assert len(entries) == 4
+    assert raw["total"] == 4
+    counts = raw["counts"]
+    assert _is_mapping(counts)
+    assert counts["adopted"] == 2
+    assert counts["avoid"] == 2
+    names = [entry["name"] for entry in entries if _is_mapping(entry)]
+    assert "valking.gg" in names
+    assert "metabot.gg" in names
+
+
+def test_library_filter_status(tmp_path: Path) -> None:
+    env = {"XDG_STATE_HOME": str(tmp_path), **write_fixture_library(tmp_path)}
+    proc = run_cli("library", "--status", "avoid", env=env)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    raw = emit_json(proc)
+    entries = raw["entries"]
+    assert _is_object_list(entries)
+    assert len(entries) == 2
+    for entry in entries:
+        assert _is_mapping(entry)
+        assert entry["status"] == "avoid"
+    counts = raw["counts"]
+    assert _is_mapping(counts)
+    assert counts["adopted"] == 0
+    assert counts["avoid"] == 2
+
+
+def test_library_filter_category(tmp_path: Path) -> None:
+    env = {"XDG_STATE_HOME": str(tmp_path), **write_fixture_library(tmp_path)}
+    proc = run_cli("library", "--category", "stats-site", env=env)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    raw = emit_json(proc)
+    entries = raw["entries"]
+    assert _is_object_list(entries)
+    assert len(entries) == 2
+    names = [entry["name"] for entry in entries if _is_mapping(entry)]
+    assert names == ["valking.gg", "metabot.gg"]
+
+
+def test_library_filter_combined(tmp_path: Path) -> None:
+    env = {"XDG_STATE_HOME": str(tmp_path), **write_fixture_library(tmp_path)}
+    proc = run_cli(
+        "library",
+        "--category",
+        "stats-site",
+        "--status",
+        "adopted",
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    raw = emit_json(proc)
+    entries = raw["entries"]
+    assert _is_object_list(entries)
+    assert len(entries) == 1
+    first = entries[0]
+    assert _is_mapping(first)
+    assert first["name"] == "valking.gg"
+    filters = raw["filters"]
+    assert _is_mapping(filters)
+    assert filters["category"] == "stats-site"
+    assert filters["status"] == "adopted"
