@@ -1,10 +1,80 @@
 # orjson: When to Use, How to Integrate
 
 
-
 ## Section index
 
+- [1. Decision tree; should you adopt orjson?](#1-decision-tree-should-you-adopt-orjson)
+- [2. Install](#2-install)
+- [3. Basic usage](#3-basic-usage)
+- [4. The option flags you actually use](#4-the-option-flags-you-actually-use)
+- [5. orjson + FastAPI](#5-orjson-fastapi)
+  - [5.1 The legacy pattern: `ORJSONResponse`](#51-the-legacy-pattern-orjsonresponse)
+  - [5.2 The 2026 reality: Pydantic v2 vs orjson](#52-the-2026-reality-pydantic-v2-vs-orjson)
+  - [5.3 Recommended setup](#53-recommended-setup)
+  - [5.4 Streaming responses](#54-streaming-responses)
+- [6. orjson + Pydantic v2 (no FastAPI)](#6-orjson-pydantic-v2-no-fastapi)
+  - [Custom `default=` callback: the universal extension point](#custom-default-callback-the-universal-extension-point)
+- [7. Caching, queues, logging; the prime orjson use cases](#7-caching-queues-logging-the-prime-orjson-use-cases)
+  - [Redis cache](#redis-cache)
+  - [Task queue payloads (Celery, RQ, dramatiq)](#task-queue-payloads-celery-rq-dramatiq)
+  - [Structured logging (structlog, custom slog)](#structured-logging-structlog-custom-slog)
+- [8. Gotchas](#8-gotchas)
+  - [`orjson.dumps` returns bytes, not str](#orjsondumps-returns-bytes-not-str)
+  - [No `cls=` argument for custom encoders](#no-cls-argument-for-custom-encoders)
+  - [Subclasses of `dict` / `list` are NOT serialized as their parent](#subclasses-of-dict-list-are-not-serialized-as-their-parent)
+  - [`int` overflow](#int-overflow)
+  - [Timezone-naive datetimes](#timezone-naive-datetimes)
+- [9. Benchmark; should I actually adopt this?](#9-benchmark-should-i-actually-adopt-this)
+- [10. When NOT to adopt orjson](#10-when-not-to-adopt-orjson)
+- [Sources](#sources)
 
+## Index
+
+Read the section whose heading matches the task; use heading search before loading unrelated detail.
+
+`orjson` is the fastest JSON library on PyPI; written in Rust, 6-11× faster than stdlib `json` on serialization, 1.5-4× faster on deserialization. It also supports types the stdlib refuses to serialize: `datetime`, `date`, `UUID`, `numpy` arrays, `dataclass`, Pydantic models (via a small bridge).
+
+This document covers the production patterns. **Not every project needs orjson.** The decision tree is in §1.
+
+---
+
+## 1. Decision tree; should you adopt orjson?
+
+```
+Are you serializing/deserializing JSON in a hot path?
+  ├─ NO  → stdlib `json` is fine. Stop here.
+  └─ YES ↓
+
+Is the project FastAPI?
+  ├─ YES ↓
+  │
+  │   Is your response body fully described by a Pydantic v2 model?
+  │     ├─ YES → Use FastAPI's default JSON response (uses Pydantic's
+  │     │       Rust-backed serializer; orjson saves nothing in this path).
+  │     │       Adopt orjson only for *non-Pydantic* responses below.
+  │     └─ NO  → Use `ORJSONResponse` for endpoints that return dicts,
+  │             lists, or arbitrary structures.
+  │
+  └─ NOT FastAPI ↓
+
+Are you serializing Pydantic v2 models repeatedly?
+  ├─ YES → Use `model.model_dump_json()` directly; backed by pydantic-core
+  │        (Rust), within ~10% of orjson on the same payload, and respects
+  │        every Pydantic feature (computed fields, aliases, validators).
+  └─ NO  ↓
+
+Are you serializing dicts / lists / dataclasses / datetime / UUID?
+  ├─ YES → orjson is the right answer.
+  └─ NO  → stdlib `json`.
+```
+
+**The crucial 2026 fact**: with Pydantic v2's `model_dump_json()`, **Pydantic-shaped responses no longer need orjson**. Adopt orjson where you are still going through `dict` / `list` / `dataclass`.
+
+---
+
+## 2. Install
+
+```toml
 # pyproject.toml
 dependencies = [
     "orjson>=3.10",

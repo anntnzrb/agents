@@ -1,10 +1,22 @@
 # Strict pyproject.toml (basedpyright + ruff + uv)
 
 
-
 ## Section index
 
+- [Bootstrap](#bootstrap)
+- [The full pyproject.toml](#the-full-pyprojecttoml)
+- [Why these settings](#why-these-settings)
+  - [basedpyright `typeCheckingMode = "all"`](#basedpyright-typecheckingmode-all)
+  - [ruff `select = ["ALL"]`](#ruff-select-all)
+- [CI gate](#ci-gate)
+- [Enforcement summary](#enforcement-summary)
+- [Sources](#sources)
 
+The canonical "super strict but sane" config for modern Python projects. Copy-paste, then add your own dependencies.
+
+## Bootstrap
+
+```bash
 # Application
 uv init --app myproject --python 3.14
 cd myproject

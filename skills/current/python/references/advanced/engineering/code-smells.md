@@ -1,10 +1,46 @@
 # Code Smells: Reference
 
 
-
 ## Section index
 
+- [Smell 1: Oversized module](#smell-1-oversized-module)
+  - [Why size matters](#why-size-matters)
+  - [Measuring pure LOC](#measuring-pure-loc)
+  - [Thresholds](#thresholds)
+  - [Required behavior](#required-behavior)
+  - [Exempt](#exempt)
+  - [Concrete split examples](#concrete-split-examples)
+- [Smell 2: Function with more than 3 parameters](#smell-2-function-with-more-than-3-parameters)
+  - [Disguises that count as the same smell](#disguises-that-count-as-the-same-smell)
+  - [Fix](#fix)
+- [Smell 3: Redundant verification after a destructive action](#smell-3-redundant-verification-after-a-destructive-action)
+- [Smell 4: Negative-form names and conditions](#smell-4-negative-form-names-and-conditions)
 
+## Index
+
+Read the section matching the task; search headings before loading unrelated detail.
+
+On detection, **stop and re-examine the design**. A smell is not a syntax error: fix it when the task and project contract support the change; otherwise document a specific reason to carry it. Do not trigger an unrelated rewrite merely because a smell exists.
+
+---
+
+## Smell 1: Oversized module
+
+### Why size matters
+
+Line count is a proxy. For agents, a large file costs:
+
+- Parallelism: a file is one edit boundary. Two agents cannot safely edit it at once, so one large file serializes work that separate modules would let run concurrently.
+- Context: an open question ("where does X happen?") reads more of a large mixed file than of a module named for its responsibility.
+- Stale reads: every edit changes the file's snapshot. A large shared file forces more re-reads and more edits against stale content.
+
+Over-splitting also costs: tracing one flow across many tiny files, wrappers, and re-exports takes more reads than one cohesive file. Size alone never justifies a split; mixed responsibilities do.
+
+### Measuring pure LOC
+
+Pure LOC counts non-blank, non-comment lines.
+
+```bash
 # Quick (line-comment + blank exclusion):
 awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
 
