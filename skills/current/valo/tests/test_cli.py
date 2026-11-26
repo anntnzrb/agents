@@ -26,6 +26,9 @@ class _ValCli(Protocol):
     def parse_stat(self, cell: str) -> tuple[float, float]: ...
     def agent_display_name(self, cell: str) -> str: ...
     def registrable_domain(self, url: str) -> str: ...
+    def load_env_fallback(self) -> None: ...
+
+    __file__: str
 
 
 def _is_mapping(val: object) -> TypeIs[Mapping[str, object]]:
@@ -589,3 +592,50 @@ def test_library_filter_combined(tmp_path: Path) -> None:
     assert _is_mapping(filters)
     assert filters["category"] == "stats-site"
     assert filters["status"] == "adopted"
+
+
+def test_env_file_override_loads_keys(
+    val_cli: _ValCli, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env_file = tmp_path / ".env"
+    _ = env_file.write_text(
+        "# comment\nVALO_PROBE_KEY=from-file\nBAD LINE\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("VALO_ENV_FILE", str(env_file))
+    monkeypatch.delenv("VALO_PROBE_KEY", raising=False)
+    val_cli.load_env_fallback()
+    assert os.environ.get("VALO_PROBE_KEY") == "from-file"
+
+
+def test_env_file_never_overrides_real_env(
+    val_cli: _ValCli, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env_file = tmp_path / ".env"
+    _ = env_file.write_text("VALO_PROBE_KEY=from-file\n", encoding="utf-8")
+    monkeypatch.setenv("VALO_ENV_FILE", str(env_file))
+    monkeypatch.setenv("VALO_PROBE_KEY", "from-env")
+    val_cli.load_env_fallback()
+    assert os.environ.get("VALO_PROBE_KEY") == "from-env"
+
+
+def test_env_fallback_missing_file_is_noop(
+    val_cli: _ValCli, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VALO_ENV_FILE", str(tmp_path / "absent.env"))
+    monkeypatch.delenv("VALO_PROBE_KEY", raising=False)
+    val_cli.load_env_fallback()
+    assert os.environ.get("VALO_PROBE_KEY") is None
+
+
+def test_env_fallback_walks_upward(
+    val_cli: _ValCli, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "proj"
+    nested = root / "skills" / "current" / "valo" / "scripts"
+    nested.mkdir(parents=True)
+    _ = (root / ".env").write_text("VALO_PROBE_KEY=upward\n", encoding="utf-8")
+    monkeypatch.delenv("VALO_ENV_FILE", raising=False)
+    monkeypatch.delenv("VALO_PROBE_KEY", raising=False)
+    monkeypatch.setattr(val_cli, "__file__", str(nested / "cli.py"))
+    val_cli.load_env_fallback()
+    assert os.environ.get("VALO_PROBE_KEY") == "upward"

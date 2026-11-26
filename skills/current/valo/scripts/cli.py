@@ -19,6 +19,11 @@ fingerprinted, and a state file tracks per-source health. When a source breaks
 or drifts, commands fail with explicit JSON errors or warnings instead of
 emitting garbage.
 
+Credentials: sibling CLIs need FIRECRAWL_API_KEY / PARALLEL_API_KEY in the
+environment. Harness launches inject the SSOT root .env; outside a launch,
+main() loads the first .env found walking up from this script (or
+VALO_ENV_FILE) with setdefault semantics, so real environment variables win.
+
 Test injection: when VALO_FIXTURE_DIR is set, the fetch layer reads
 <fixture_dir>/<source_key>.md instead of subprocessing firecrawl.
 """
@@ -253,6 +258,44 @@ class _Args(argparse.Namespace):
     max_results: int = 10
     category: str | None = None
     status: str | None = None
+
+
+def _load_simple_env(path: Path) -> None:
+    """Populate os.environ from a .env file; real environment variables win."""
+    if not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        if not key or any(char.isspace() for char in key):
+            continue
+        _ = os.environ.setdefault(key, value.strip().strip('"').strip("'"))
+
+
+def load_env_fallback() -> None:
+    """Load credential fallbacks so sibling CLIs inherit them via the environment.
+
+    Harness launches already inject the SSOT root .env into the process
+    environment; this fallback covers direct invocations outside a launch
+    (ssh, cron, tests). VALO_ENV_FILE pins an explicit file; otherwise the
+    first .env found walking up from this script is used.
+    """
+    override = os.environ.get("VALO_ENV_FILE")
+    if override:
+        _load_simple_env(Path(override).expanduser())
+        return
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            _load_simple_env(candidate)
+            return
 
 
 def emit(payload: object) -> None:
@@ -1401,6 +1444,7 @@ COMMANDS: dict[str, Callable[[_Args], None]] = {
 
 def main() -> None:
     """Dispatch the parsed command."""
+    load_env_fallback()
     args = arguments()
     handler = COMMANDS.get(args.command)
     if handler is None:
