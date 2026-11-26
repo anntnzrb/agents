@@ -666,7 +666,7 @@ def _discover_all_modules(addons_dir: Path) -> dict[str, dict[str, object]]:
 _SAFE_IDENTIFIER_RE = re.compile(r"\A[a-zA-Z0-9_-]+\Z")
 # Local replicas: the untouched baseline and the disposable copy agents write to.
 _SEED_DB_RE = re.compile(r"\A[a-z0-9_]+_seed_\d{8}\Z")
-_WORK_DB_RE = re.compile(r"\A[a-z0-9_]+_work_\d{8}\Z")
+_WORK_DB_RE = re.compile(r"\A[a-z0-9_]+_work_\d{8}(?:_[a-z0-9]+)?\Z")
 
 
 def _require_work_db(db: str, action: str) -> str:
@@ -680,7 +680,7 @@ def _require_work_db(db: str, action: str) -> str:
     )
     msg = (
         f"Refusing to {action} on {kind} {db!r}. Use a work replica named "
-        "<prodDB>_work_<YYYYMMDD>, cloned from its seed with db-clone."
+        "<prodDB>_work_<YYYYMMDD> (optional _<slug>), cloned from its seed with db-clone."
     )
     raise CliError(msg, code=2)
 
@@ -691,7 +691,7 @@ def _require_replica_name(db: str) -> str:
         return db
     msg = (
         f"Refusing database name {db!r}: local replicas are named "
-        "<prodDB>_seed_<YYYYMMDD> or <prodDB>_work_<YYYYMMDD>."
+        "<prodDB>_seed_<YYYYMMDD> or <prodDB>_work_<YYYYMMDD> (optional _<slug>)."
     )
     raise CliError(msg, code=2)
 

@@ -284,3 +284,7 @@ def test_copy_filestore_falls_back_to_podman_unshare(
         ["podman", "unshare", "mkdir", "-p", str(target)],
         ["podman", "unshare", "cp", "-a", f"{source}/.", str(target)],
     ]
+def test_agent_replica_works_for_clone_and_shell() -> None:
+    name = "example_work_20261124_crm1"
+    assert odooctl._require_replica_name(name) == name
+    assert odooctl._require_work_db(name, "execute shell") == name

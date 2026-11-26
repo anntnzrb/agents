@@ -56,7 +56,7 @@ After creating or editing module JavaScript under `static/src/`, you MUST run th
 When an orchestrator splits work across delegated agents:
 
 - Delegated agents MUST NOT use JSON-RPC or touch production in any way, reads included.
-- Delegated agents may freely use the local environment: local replicas, tests, local shell, and local queries.
+- Delegated agents may use their assigned local replicas, tests, local shell, and local queries. The orchestrator clones and drops their replicas.
 - The orchestrator owns every production interaction and every JSON-RPC call. It requests user approval and hands delegated agents the data they need.
 
 ## Public entrypoint

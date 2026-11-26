@@ -2,9 +2,9 @@
 
 Use these commands exclusively for local replica databases. Read [Runtime discovery](runtime-discovery.md) and [Safety model](safety-model.md) first.
 
-Naming convention: `<prodDB>_seed_<YYYYMMDD>` for the untouched baseline (restored once from a DBA dump) and `<prodDB>_work_<YYYYMMDD>` for the disposable working replica. Use lowercase letters and underscores only; never use hyphens, which require identifier quoting in PostgreSQL. Each runtime holds only these two databases; the profile selects the runtime, so both runtimes use the same names. The CLI enforces the convention: `dev`, `test`, `shell`, `auth-temp`, and `auth-restore` accept only a `_work_` replica, `db-restore` and `db-clone` create only `_seed_` or `_work_` targets, and every profile workflow points at a `_work_` replica. Never create scratch or probe databases; reset the work replica from its seed instead.
+Use `<prodDB>_seed_<YYYYMMDD>` for a baseline and `<prodDB>_work_<YYYYMMDD>` for a working copy. For delegated work, add `_<slug>` to the work name, using lowercase letters and digits in the slug. PostgreSQL identifiers here allow lowercase letters, digits, and underscores. `dev`, `test`, `shell`, `auth-temp`, and `auth-restore` accept only work replicas. `db-restore` and `db-clone` accept seed or work targets. Reset a work replica from its seed for a clean run.
 
-The CLI resolves the default database from the active profile (`effective_database`). Pass `--db <database_name>` to target a specific replica.
+Pass `--db <database_name>` to target a specific replica. See [database selection](runtime-discovery.md#database-selection) for command defaults.
 
 ## Database Inventory and Inspection
 
@@ -48,7 +48,7 @@ uv run --script <skill-dir>/scripts/cli.py shell --file <temp-dir>/script.py --d
 uv run --script <skill-dir>/scripts/cli.py shell --file <temp-dir>/script.py --db <prodDB>_work_<YYYYMMDD> --rollback
 ```
 
-The `shell` command runs against local replicas only; it strictly refuses execution against seed databases (`_seed_`) and production endpoints.
+The `shell` command runs against local replicas only; it accepts only work replicas.
 
 ## Container Health, Logs, and Lifecycle
 
@@ -77,7 +77,7 @@ uv run --script <skill-dir>/scripts/cli.py prune
 uv run --script <skill-dir>/scripts/cli.py db-restore <dump-path>.sql.gz <prodDB>_seed_<YYYYMMDD> --force
 ```
 
-Restores a plain or gzip-compressed SQL dump into a pristine seed database and removes the copied `database.uuid` so Odoo issues a fresh one upon startup. SQL dumps omit the filestore; missing binary attachments or spreadsheet dashboards are expected and do not constitute bugs. Use `--force` to drop any existing database with the target name. Never run migrations or writes on the seed.
+Restores a plain or gzip-compressed SQL dump into a pristine seed database and removes the copied `database.uuid` so Odoo issues a fresh one upon startup. SQL dumps omit the filestore; missing binary attachments or spreadsheet dashboards are expected and do not constitute bugs. Use `--force` only when explicitly replacing an existing target. Keep the seed unchanged between replacements.
 
 ## Clone a Working Copy
 
@@ -113,7 +113,7 @@ uv run --script <skill-dir>/scripts/cli.py db-drop <prodDB>_seed_<YYYYMMDD> --fo
 
 Rehearse a module upgrade on a fresh working copy before it ships. Never touch the seed.
 
-There is no update-only command. `dev` is the upgrade path: every start runs Odoo with `-u` for all modules of the profile workflow, as a deploy does, plus `-i` only for workflow modules the database has not installed. `test` also runs `-u`, but with `--test-enable`, so it is not a rehearsal. `dev` runs in the foreground until stopped; an unattended agent starts it as a background process. `dev` refuses `_seed_` databases; pass the working copy with `--db`, because without it `dev` uses the workflow database from the profile.
+There is no update-only command. `dev` is the upgrade path: every start runs Odoo with `-u` for all modules of the profile workflow, as a deploy does, plus `-i` only for workflow modules the database has not installed. `test` also runs `-u`, but with `--test-enable`, so it is not a rehearsal. `dev` runs in the foreground until stopped; an unattended agent starts it as a background process. `dev` accepts only work replicas; pass the working copy with `--db`, because without it `dev` uses the workflow database from the profile.
 
 ```text
 # 1. Fresh working copy from the seed
