@@ -1,6 +1,6 @@
 ---
 name: pstack-principles
-description: "Use before refactoring, debugging, design, or any software engineering related task"
+description: "Use before refactoring, root-cause debugging, architecture design, or sequencing a non-trivial code change."
 license: AGPL-3.0-or-later
 ---
 
