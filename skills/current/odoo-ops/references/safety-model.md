@@ -23,7 +23,7 @@ Every `rpc` invocation requires the mechanical `--allow-rpc` flag. The flag may 
 
 ### Data Privacy and Secret Handling
 - Operational accuracy: preserve exact values in private import files, mutation plans, and comparisons. Do not replace an actual identifier with a masked value in a write payload.
-- Evidence and handoffs: mask PII in chat. Use synthetic identities and consistent fictitious relation IDs in offline fixtures. Inspect free-text descriptions and notes as well as structured fields. Follow [Import and audit workflow](import-and-audit-workflow.md) before preparing a sanitized export.
+- Evidence and handoffs: mask PII in chat. Use synthetic identities and consistent fictitious relation IDs in offline fixtures. Inspect free-text descriptions and notes as well as structured fields. For sanitized exports, the procedure lives in [Import and audit workflow](import-and-audit-workflow.md).
 - Request discipline: query only the specific fields needed (`--fields`). `search_read` defaults to `--limit 10` and warns on truncation. Never dump full tables or broad `search_read` sets into the conversation context.
 - Secret protection: NEVER print connection tokens, passwords, or `.env` values into stdout or chat. NEVER read secrets or credentials from `ir_config_parameter` into user-visible output.
 - Data confinement: NEVER upload replica or production data, dumps, or query exports to public file hosts, external pastebins, or third-party web services.

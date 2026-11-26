@@ -1,6 +1,6 @@
 # Odoo Server Action safe_eval reference
 
-Read [Safety model](safety-model.md) before production interaction. Creating and executing Server Actions in production is performed by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. `safe_eval` restricts Python operations; it is not a read-only or authorization boundary.
+Creating and executing Server Actions in production is performed by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. `safe_eval` restricts Python operations; it is not a read-only or authorization boundary.
 
 Sources:
 - Odoo docs `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`

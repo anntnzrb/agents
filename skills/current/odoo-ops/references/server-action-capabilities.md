@@ -2,7 +2,7 @@
 
 Use when choosing Server Actions, contextual/automated actions, UI Python, automation, cron, webhooks, JSON-RPC, or a custom module.
 
-Read [Safety model](safety-model.md) first. Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Server Action templates provide the user's manual UI path; they are not an alternative way around denied RPC.
+Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Server Action templates provide the user's manual UI path; they are not an alternative way around denied RPC.
 
 Sources:
 - Odoo actions: `https://www.odoo.com/documentation/17.0/developer/reference/backend/actions.html`

@@ -1,6 +1,6 @@
 # Use Odoo Ops with OMP Eval
 
-Read only when using this skill through Oh My Pi (OMP). This companion does not change the skill's CLI, permissions, or behavior. Read [Safety model](safety-model.md) first.
+Read only when using this skill through Oh My Pi (OMP). This companion does not change the skill's CLI, permissions, or behavior.
 
 ## Local Analysis Workspace
 

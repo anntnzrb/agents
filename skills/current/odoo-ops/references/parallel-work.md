@@ -1,6 +1,6 @@
 # Parallel Work with Separate Replicas
 
-Read this before splitting work across agents that each need their own local database. Every agent still follows [Database recipes](db-recipes.md) and the delegation boundary in `SKILL.md`.
+Use this when splitting work across agents that each need their own local database. [Database recipes](db-recipes.md) carries the clone commands; `SKILL.md` carries the delegation boundary.
 
 ## One replica per delegated agent
 

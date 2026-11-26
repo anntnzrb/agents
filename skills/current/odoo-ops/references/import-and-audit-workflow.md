@@ -1,6 +1,6 @@
 # Prepare imports, audit CRM data, and hand off examples
 
-Read this guide before preparing Odoo import files, classifying CRM batches, recovering partial applications, or exporting offline fixtures. Use the [safety model](safety-model.md) for permissions and [database recipes](db-recipes.md) for local rehearsal.
+Use this guide when preparing Odoo import files, classifying CRM batches, recovering partial applications, or exporting offline fixtures. Permission boundaries live in the [safety model](safety-model.md); local rehearsal commands live in [database recipes](db-recipes.md).
 
 ## Start from an adaptable template
 

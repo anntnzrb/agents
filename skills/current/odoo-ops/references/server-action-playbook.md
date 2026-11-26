@@ -4,12 +4,12 @@
 
 Server Actions created from the Odoo UI under Settings > Technical > Actions > Server Actions, using `state=code` ("Execute Python Code"). Treat production as the default environment and the default risk model.
 
-Read [Safety model](safety-model.md) first. Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Render and audit snippets locally before handing them to the user for UI execution. Never substitute unapproved operations.
+Production reads via the CLI require no per-read approval. Creating, saving, and executing Server Actions in production is done directly by the user in the Odoo web UI because the CLI blocks production mutations on `ir.actions.server`. Render and audit snippets locally before handing them to the user for UI execution. Never substitute unapproved operations.
 
 ## Hard rules
 
-- Write every snippet to `<temp-dir>/<descriptive>.py` before copying it; copy with `pbcopy < <temp-dir>/<descriptive>.py` on macOS
-- Capture outputs with `pbpaste > <temp-dir>/<descriptive>_output.txt` on macOS, then parse JSON into `<temp-dir>/<descriptive>_output.json`
+- Write every snippet to `<temp-dir>/<descriptive>.py` before copying it with the platform clipboard tool or a manual copy fallback
+- Capture outputs into `<temp-dir>/<descriptive>_output.txt` with the platform clipboard tool or manual paste, then parse JSON into `<temp-dir>/<descriptive>_output.json`
 - Read-only audits may end with raise UserError(payload_json); write success must never raise UserError
 - A write action succeeds by assigning action = {'type': 'ir.actions.client', 'tag': 'display_notification', ...}
 - A write action fails by raising UserError(...), intentionally rolling back the transaction
@@ -28,7 +28,7 @@ Read [Safety model](safety-model.md) first. Production reads via the CLI require
 
 ## JSON helper
 
-Use the import-free JSON helpers in the [template catalog](server-action-templates.md). Preserve escaped control characters and quoted object keys. Parse sample output locally before deploying the action.
+The [template catalog](server-action-templates.md) documents the import-free JSON helpers. Preserve escaped control characters and quoted object keys. Parse sample output locally before deploying the action.
 
 ## Output policy
 
