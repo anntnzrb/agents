@@ -60,7 +60,7 @@ The rewrite MUST preserve every item below. These rules override every lever.
 5. Check equivalence in both directions against the proposition list:
    - Forward: every claim in the rewrite is supported by the source. Nothing added.
    - Backward: every source proposition appears in the rewrite. Nothing dropped.
-6. Fix any failure and repeat steps 4 and 5. After two failed repairs, deliver the closest valid rewrite and name the unresolved item.
+6. Fix any failure and repeat steps 4 and 5. After two failed repairs, stop. Never deliver a rewrite that fails an invariant; a noncompliant text the user pastes is worse than no text. Report the failing check and the unresolved proposition instead. Deliver a degraded rewrite only when the user, told exactly what fails, explicitly accepts it.
 
 ## Output
 
